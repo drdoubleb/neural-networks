@@ -1,0 +1,3415 @@
+{
+ "meta": {
+  "generated": "2026-09-22",
+  "seed": 20260922,
+  "size": 32,
+  "count": 100,
+  "train": 80,
+  "test": 20,
+  "classes": [
+   "regular",
+   "irregular"
+  ],
+  "note": "Synthetic nuclei. Size, elongation, rotation, darkness, texture, nucleolus and position are drawn from identical distributions in both classes; only the contour differs."
+ },
+ "nuclei": [
+  {
+   "id": 0,
+   "name": "T01",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_01_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.64,
+    "semiMinor": 7.05,
+    "rotationDeg": 121.5,
+    "centre": [
+     15.96,
+     15.33
+    ],
+    "contourRms": 0.01,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.014
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.072,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 1,
+   "name": "T02",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_02_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 9.27,
+    "semiMinor": 8.35,
+    "rotationDeg": 132.8,
+    "centre": [
+     16.4,
+     16.23
+    ],
+    "contourRms": 0.066,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.059
+     },
+     {
+      "k": 6,
+      "amp": 0.044
+     },
+     {
+      "k": 11,
+      "amp": 0.04
+     },
+     {
+      "k": 9,
+      "amp": 0.043
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.32,
+    "textureAmp": 0.059,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 2,
+   "name": "T03",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_03_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.52,
+    "semiMinor": 9.78,
+    "rotationDeg": 61.6,
+    "centre": [
+     16.23,
+     15.73
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.012
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.071,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 3,
+   "name": "T04",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_04_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.62,
+    "semiMinor": 9.22,
+    "rotationDeg": 75,
+    "centre": [
+     15.64,
+     16.38
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.012
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.084,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 4,
+   "name": "T05",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_05_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.23,
+    "semiMinor": 8.6,
+    "rotationDeg": 164.3,
+    "centre": [
+     16.09,
+     15.13
+    ],
+    "contourRms": 0.129,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.087
+     },
+     {
+      "k": 5,
+      "amp": 0.062
+     },
+     {
+      "k": 8,
+      "amp": 0.103
+     },
+     {
+      "k": 7,
+      "amp": 0.106
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.056,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 5,
+   "name": "T06",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_06_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.58,
+    "semiMinor": 6.98,
+    "rotationDeg": 35.6,
+    "centre": [
+     16.78,
+     15.19
+    ],
+    "contourRms": 0.011,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.016
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.077,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 6,
+   "name": "T07",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_07_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.86,
+    "semiMinor": 7.2,
+    "rotationDeg": 88.9,
+    "centre": [
+     15.56,
+     16.53
+    ],
+    "contourRms": 0.006,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.008
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.057,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 7,
+   "name": "T08",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_08_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.59,
+    "semiMinor": 8,
+    "rotationDeg": 154.7,
+    "centre": [
+     16.7,
+     15.96
+    ],
+    "contourRms": 0.086,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.051
+     },
+     {
+      "k": 9,
+      "amp": 0.047
+     },
+     {
+      "k": 7,
+      "amp": 0.056
+     },
+     {
+      "k": 10,
+      "amp": 0.056
+     },
+     {
+      "k": 6,
+      "amp": 0.06
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.088,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 8,
+   "name": "T09",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_09_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 8.88,
+    "semiMinor": 6.8,
+    "rotationDeg": 27.5,
+    "centre": [
+     15.36,
+     16.19
+    ],
+    "contourRms": 0.124,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.035
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.39,
+      "width": 0.34
+     }
+    ],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.078,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 9,
+   "name": "T10",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_10_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.26,
+    "semiMinor": 8.48,
+    "rotationDeg": 113,
+    "centre": [
+     16.43,
+     16.61
+    ],
+    "contourRms": 0.013,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.018
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.37,
+    "textureAmp": 0.056,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 10,
+   "name": "T11",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_11_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.53,
+    "semiMinor": 10.2,
+    "rotationDeg": 51,
+    "centre": [
+     15.79,
+     15.77
+    ],
+    "contourRms": 0.004,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.005
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.064,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 11,
+   "name": "T12",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_12_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.7,
+    "semiMinor": 9.84,
+    "rotationDeg": 138.8,
+    "centre": [
+     16.74,
+     16.12
+    ],
+    "contourRms": 0.008,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.011
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.078,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 12,
+   "name": "T13",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_13_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.58,
+    "semiMinor": 8.59,
+    "rotationDeg": 168.2,
+    "centre": [
+     15.7,
+     16.44
+    ],
+    "contourRms": 0.001,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.002
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.047,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 13,
+   "name": "T14",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_14_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.02,
+    "semiMinor": 7.38,
+    "rotationDeg": 83.2,
+    "centre": [
+     15.73,
+     16.57
+    ],
+    "contourRms": 0.1,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.029
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.32,
+      "width": 0.34
+     }
+    ],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.063,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 14,
+   "name": "T15",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_15_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 8.69,
+    "semiMinor": 6.81,
+    "rotationDeg": 3.6,
+    "centre": [
+     16.86,
+     15.66
+    ],
+    "contourRms": 0.113,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.026
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.36,
+      "width": 0.32
+     }
+    ],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.046,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 15,
+   "name": "T16",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_16_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.67,
+    "semiMinor": 8.66,
+    "rotationDeg": 152.6,
+    "centre": [
+     16.62,
+     16.72
+    ],
+    "contourRms": 0.11,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.023
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.42,
+      "width": 0.23
+     }
+    ],
+    "meanIntensity": 0.32,
+    "textureAmp": 0.086,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 16,
+   "name": "T17",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_17_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.57,
+    "semiMinor": 8.29,
+    "rotationDeg": 4.2,
+    "centre": [
+     15.32,
+     15.96
+    ],
+    "contourRms": 0.002,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.003
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.3,
+    "textureAmp": 0.089,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 17,
+   "name": "T18",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_18_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.84,
+    "semiMinor": 7.17,
+    "rotationDeg": 92.9,
+    "centre": [
+     15.86,
+     16.83
+    ],
+    "contourRms": 0.105,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.092
+     },
+     {
+      "k": 8,
+      "amp": 0.05
+     },
+     {
+      "k": 3,
+      "amp": 0.055
+     },
+     {
+      "k": 5,
+      "amp": 0.088
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.09,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 18,
+   "name": "T19",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_19_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.94,
+    "semiMinor": 8.8,
+    "rotationDeg": 8.4,
+    "centre": [
+     16.8,
+     16.96
+    ],
+    "contourRms": 0,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.001
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.45,
+    "textureAmp": 0.074,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 19,
+   "name": "T20",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_20_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.8,
+    "semiMinor": 6.47,
+    "rotationDeg": 29,
+    "centre": [
+     16.75,
+     16.07
+    ],
+    "contourRms": 0.003,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.005
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.45,
+    "textureAmp": 0.053,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 20,
+   "name": "T21",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_21_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.92,
+    "semiMinor": 8.92,
+    "rotationDeg": 138.6,
+    "centre": [
+     15.63,
+     15.94
+    ],
+    "contourRms": 0,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.001
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.072,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 21,
+   "name": "T22",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_22_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 10.72,
+    "semiMinor": 9.96,
+    "rotationDeg": 94.8,
+    "centre": [
+     15.57,
+     15.64
+    ],
+    "contourRms": 0.069,
+    "harmonics": [
+     {
+      "k": 11,
+      "amp": 0.042
+     },
+     {
+      "k": 6,
+      "amp": 0.056
+     },
+     {
+      "k": 8,
+      "amp": 0.054
+     },
+     {
+      "k": 9,
+      "amp": 0.042
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.041,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 22,
+   "name": "T23",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_23_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.64,
+    "semiMinor": 7.89,
+    "rotationDeg": 166.1,
+    "centre": [
+     16.12,
+     15.8
+    ],
+    "contourRms": 0.113,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.085
+     },
+     {
+      "k": 7,
+      "amp": 0.063
+     },
+     {
+      "k": 6,
+      "amp": 0.073
+     },
+     {
+      "k": 4,
+      "amp": 0.095
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.06,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 23,
+   "name": "T24",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_24_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.45,
+    "semiMinor": 9.05,
+    "rotationDeg": 166.4,
+    "centre": [
+     16.46,
+     15.41
+    ],
+    "contourRms": 0.008,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.012
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.054,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 24,
+   "name": "T25",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_25_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.44,
+    "semiMinor": 10.09,
+    "rotationDeg": 140.1,
+    "centre": [
+     16.01,
+     16.53
+    ],
+    "contourRms": 0,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.047,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 25,
+   "name": "T26",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_26_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 8.89,
+    "semiMinor": 8.4,
+    "rotationDeg": 127.7,
+    "centre": [
+     16.26,
+     15.29
+    ],
+    "contourRms": 0.095,
+    "harmonics": [
+     {
+      "k": 6,
+      "amp": 0.063
+     },
+     {
+      "k": 7,
+      "amp": 0.065
+     },
+     {
+      "k": 5,
+      "amp": 0.099
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.052,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 26,
+   "name": "T27",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_27_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.85,
+    "semiMinor": 7.24,
+    "rotationDeg": 87.7,
+    "centre": [
+     15.12,
+     16.5
+    ],
+    "contourRms": 0.001,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.002
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.071,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 27,
+   "name": "T28",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_28_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 9.28,
+    "semiMinor": 7.61,
+    "rotationDeg": 60.2,
+    "centre": [
+     16.4,
+     15.01
+    ],
+    "contourRms": 0.153,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.022
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.35,
+      "width": 0.33
+     },
+     {
+      "depth": -0.35,
+      "width": 0.34
+     }
+    ],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.043,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 28,
+   "name": "T29",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_29_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.02,
+    "semiMinor": 8.05,
+    "rotationDeg": 94.6,
+    "centre": [
+     16.15,
+     16.39
+    ],
+    "contourRms": 0.011,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.016
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.059,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 29,
+   "name": "T30",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_30_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.03,
+    "semiMinor": 7.58,
+    "rotationDeg": 16.5,
+    "centre": [
+     15.16,
+     16.24
+    ],
+    "contourRms": 0.012,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.017
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.43,
+    "textureAmp": 0.052,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 30,
+   "name": "T31",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_31_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.9,
+    "semiMinor": 7.18,
+    "rotationDeg": 78.4,
+    "centre": [
+     15.09,
+     15.2
+    ],
+    "contourRms": 0.073,
+    "harmonics": [
+     {
+      "k": 11,
+      "amp": 0.038
+     },
+     {
+      "k": 7,
+      "amp": 0.04
+     },
+     {
+      "k": 10,
+      "amp": 0.054
+     },
+     {
+      "k": 8,
+      "amp": 0.056
+     },
+     {
+      "k": 6,
+      "amp": 0.039
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.073,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 31,
+   "name": "T32",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_32_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.63,
+    "semiMinor": 7.67,
+    "rotationDeg": 166.2,
+    "centre": [
+     15.88,
+     16.33
+    ],
+    "contourRms": 0.07,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.045
+     },
+     {
+      "k": 10,
+      "amp": 0.052
+     },
+     {
+      "k": 6,
+      "amp": 0.058
+     },
+     {
+      "k": 11,
+      "amp": 0.043
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.46,
+    "textureAmp": 0.05,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 32,
+   "name": "T33",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_33_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.34,
+    "semiMinor": 8.85,
+    "rotationDeg": 114.6,
+    "centre": [
+     16.76,
+     15.95
+    ],
+    "contourRms": 0.136,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.037
+     }
+    ],
+    "bumps": [
+     {
+      "depth": 0.35,
+      "width": 0.29
+     },
+     {
+      "depth": -0.32,
+      "width": 0.32
+     }
+    ],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.07,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 33,
+   "name": "T34",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_34_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.46,
+    "semiMinor": 9.01,
+    "rotationDeg": 115.2,
+    "centre": [
+     16.46,
+     16.89
+    ],
+    "contourRms": 0.004,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.006
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.08,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 34,
+   "name": "T35",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_35_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.55,
+    "semiMinor": 7.55,
+    "rotationDeg": 163.6,
+    "centre": [
+     16.72,
+     15.37
+    ],
+    "contourRms": 0.096,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.032
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.3,
+      "width": 0.32
+     }
+    ],
+    "meanIntensity": 0.43,
+    "textureAmp": 0.047,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 35,
+   "name": "T36",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_36_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.57,
+    "semiMinor": 9.83,
+    "rotationDeg": 30.7,
+    "centre": [
+     16.08,
+     15.21
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.013
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.32,
+    "textureAmp": 0.062,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 36,
+   "name": "T37",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_37_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 8.75,
+    "semiMinor": 7.27,
+    "rotationDeg": 136.2,
+    "centre": [
+     16.11,
+     15.55
+    ],
+    "contourRms": 0.13,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.103
+     },
+     {
+      "k": 7,
+      "amp": 0.11
+     },
+     {
+      "k": 8,
+      "amp": 0.105
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.071,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 37,
+   "name": "T38",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_38_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.13,
+    "semiMinor": 8.95,
+    "rotationDeg": 99.5,
+    "centre": [
+     15.98,
+     16.34
+    ],
+    "contourRms": 0.109,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.107
+     },
+     {
+      "k": 4,
+      "amp": 0.07
+     },
+     {
+      "k": 6,
+      "amp": 0.055
+     },
+     {
+      "k": 5,
+      "amp": 0.068
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.39,
+    "textureAmp": 0.079,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 38,
+   "name": "T39",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_39_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.08,
+    "semiMinor": 6.8,
+    "rotationDeg": 103.4,
+    "centre": [
+     16,
+     15.17
+    ],
+    "contourRms": 0.004,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.006
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.45,
+    "textureAmp": 0.046,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 39,
+   "name": "T40",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_40_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.11,
+    "semiMinor": 8.82,
+    "rotationDeg": 8.8,
+    "centre": [
+     16.3,
+     16.82
+    ],
+    "contourRms": 0.011,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.015
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.07,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 40,
+   "name": "T41",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_41_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.79,
+    "semiMinor": 7.76,
+    "rotationDeg": 8.9,
+    "centre": [
+     15.4,
+     15.69
+    ],
+    "contourRms": 0.001,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.002
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.087,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 41,
+   "name": "T42",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_42_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.46,
+    "semiMinor": 9.5,
+    "rotationDeg": 127.9,
+    "centre": [
+     16.22,
+     15.89
+    ],
+    "contourRms": 0.084,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.067
+     },
+     {
+      "k": 4,
+      "amp": 0.051
+     },
+     {
+      "k": 7,
+      "amp": 0.084
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.045,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 42,
+   "name": "T43",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_43_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.58,
+    "semiMinor": 8.15,
+    "rotationDeg": 30.2,
+    "centre": [
+     16.16,
+     15.06
+    ],
+    "contourRms": 0.093,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.038
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.29,
+      "width": 0.3
+     }
+    ],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.069,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 43,
+   "name": "T44",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_44_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.61,
+    "semiMinor": 8.67,
+    "rotationDeg": 159.3,
+    "centre": [
+     15.77,
+     16.26
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.013
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.07,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 44,
+   "name": "T45",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_45_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 10.61,
+    "semiMinor": 9.97,
+    "rotationDeg": 0.6,
+    "centre": [
+     16.79,
+     15.94
+    ],
+    "contourRms": 0.075,
+    "harmonics": [
+     {
+      "k": 11,
+      "amp": 0.054
+     },
+     {
+      "k": 7,
+      "amp": 0.048
+     },
+     {
+      "k": 8,
+      "amp": 0.044
+     },
+     {
+      "k": 10,
+      "amp": 0.041
+     },
+     {
+      "k": 6,
+      "amp": 0.047
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.077,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 45,
+   "name": "T46",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_46_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.5,
+    "semiMinor": 9.08,
+    "rotationDeg": 88.3,
+    "centre": [
+     15.64,
+     16.2
+    ],
+    "contourRms": 0.007,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.01
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.45,
+    "textureAmp": 0.068,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 46,
+   "name": "T47",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_47_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.38,
+    "semiMinor": 7.55,
+    "rotationDeg": 156.3,
+    "centre": [
+     16.03,
+     16.03
+    ],
+    "contourRms": 0.098,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.064
+     },
+     {
+      "k": 3,
+      "amp": 0.105
+     },
+     {
+      "k": 8,
+      "amp": 0.063
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.086,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 47,
+   "name": "T48",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_48_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 10.54,
+    "semiMinor": 9.12,
+    "rotationDeg": 114.5,
+    "centre": [
+     15.86,
+     15.5
+    ],
+    "contourRms": 0.082,
+    "harmonics": [
+     {
+      "k": 11,
+      "amp": 0.054
+     },
+     {
+      "k": 8,
+      "amp": 0.056
+     },
+     {
+      "k": 7,
+      "amp": 0.049
+     },
+     {
+      "k": 6,
+      "amp": 0.058
+     },
+     {
+      "k": 9,
+      "amp": 0.039
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.065,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 48,
+   "name": "T49",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_49_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 10.91,
+    "semiMinor": 9.48,
+    "rotationDeg": 59,
+    "centre": [
+     16.19,
+     16.32
+    ],
+    "contourRms": 0.143,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.026
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.39,
+      "width": 0.25
+     },
+     {
+      "depth": 0.35,
+      "width": 0.29
+     }
+    ],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.055,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 49,
+   "name": "T50",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_50_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.25,
+    "semiMinor": 9.22,
+    "rotationDeg": 2.4,
+    "centre": [
+     16.45,
+     15.15
+    ],
+    "contourRms": 0.001,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.001
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.45,
+    "textureAmp": 0.071,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 50,
+   "name": "T51",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_51_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.58,
+    "semiMinor": 9.25,
+    "rotationDeg": 126.6,
+    "centre": [
+     16.49,
+     16.05
+    ],
+    "contourRms": 0.005,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.006
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.076,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 51,
+   "name": "T52",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_52_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 8.96,
+    "semiMinor": 6.81,
+    "rotationDeg": 51.2,
+    "centre": [
+     16.1,
+     16.65
+    ],
+    "contourRms": 0.113,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.06
+     },
+     {
+      "k": 5,
+      "amp": 0.09
+     },
+     {
+      "k": 3,
+      "amp": 0.072
+     },
+     {
+      "k": 7,
+      "amp": 0.092
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.041,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 52,
+   "name": "T53",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_53_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.03,
+    "semiMinor": 8.7,
+    "rotationDeg": 148,
+    "centre": [
+     15.38,
+     16.47
+    ],
+    "contourRms": 0.1,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.061
+     },
+     {
+      "k": 7,
+      "amp": 0.089
+     },
+     {
+      "k": 5,
+      "amp": 0.091
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.079,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 53,
+   "name": "T54",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_54_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.65,
+    "semiMinor": 8.48,
+    "rotationDeg": 117.8,
+    "centre": [
+     16.26,
+     16.68
+    ],
+    "contourRms": 0.114,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.087
+     },
+     {
+      "k": 3,
+      "amp": 0.108
+     },
+     {
+      "k": 5,
+      "amp": 0.082
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.39,
+    "textureAmp": 0.073,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 54,
+   "name": "T55",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_55_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.98,
+    "semiMinor": 8.63,
+    "rotationDeg": 11,
+    "centre": [
+     16.72,
+     15.87
+    ],
+    "contourRms": 0.075,
+    "harmonics": [
+     {
+      "k": 9,
+      "amp": 0.042
+     },
+     {
+      "k": 11,
+      "amp": 0.049
+     },
+     {
+      "k": 8,
+      "amp": 0.05
+     },
+     {
+      "k": 7,
+      "amp": 0.051
+     },
+     {
+      "k": 10,
+      "amp": 0.043
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.052,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 55,
+   "name": "T56",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_56_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 8.64,
+    "semiMinor": 7.56,
+    "rotationDeg": 47.4,
+    "centre": [
+     15.34,
+     16.11
+    ],
+    "contourRms": 0.118,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.025
+     }
+    ],
+    "bumps": [
+     {
+      "depth": 0.31,
+      "width": 0.25
+     },
+     {
+      "depth": 0.32,
+      "width": 0.29
+     }
+    ],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.084,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 56,
+   "name": "T57",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_57_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.69,
+    "semiMinor": 6.41,
+    "rotationDeg": 18.9,
+    "centre": [
+     15.62,
+     16.3
+    ],
+    "contourRms": 0.01,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.014
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.059,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 57,
+   "name": "T58",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_58_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.91,
+    "semiMinor": 8.24,
+    "rotationDeg": 30.3,
+    "centre": [
+     16.2,
+     15.71
+    ],
+    "contourRms": 0.077,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.038
+     },
+     {
+      "k": 10,
+      "amp": 0.058
+     },
+     {
+      "k": 6,
+      "amp": 0.038
+     },
+     {
+      "k": 11,
+      "amp": 0.054
+     },
+     {
+      "k": 9,
+      "amp": 0.052
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.086,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 58,
+   "name": "T59",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_59_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.06,
+    "semiMinor": 7.91,
+    "rotationDeg": 53.9,
+    "centre": [
+     15.73,
+     15.9
+    ],
+    "contourRms": 0.124,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.09
+     },
+     {
+      "k": 3,
+      "amp": 0.109
+     },
+     {
+      "k": 4,
+      "amp": 0.054
+     },
+     {
+      "k": 7,
+      "amp": 0.091
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.46,
+    "textureAmp": 0.083,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 59,
+   "name": "T60",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_60_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 8.78,
+    "semiMinor": 8.25,
+    "rotationDeg": 90.3,
+    "centre": [
+     15.11,
+     16.62
+    ],
+    "contourRms": 0.071,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.04
+     },
+     {
+      "k": 10,
+      "amp": 0.035
+     },
+     {
+      "k": 11,
+      "amp": 0.043
+     },
+     {
+      "k": 9,
+      "amp": 0.058
+     },
+     {
+      "k": 7,
+      "amp": 0.044
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.089,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 60,
+   "name": "T61",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_61_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 9.22,
+    "semiMinor": 6.96,
+    "rotationDeg": 72.7,
+    "centre": [
+     16.98,
+     15.97
+    ],
+    "contourRms": 0.143,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.035
+     }
+    ],
+    "bumps": [
+     {
+      "depth": 0.4,
+      "width": 0.24
+     },
+     {
+      "depth": 0.32,
+      "width": 0.33
+     }
+    ],
+    "meanIntensity": 0.37,
+    "textureAmp": 0.08,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 61,
+   "name": "T62",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_62_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.77,
+    "semiMinor": 7.87,
+    "rotationDeg": 109,
+    "centre": [
+     16.74,
+     15.52
+    ],
+    "contourRms": 0.094,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.103
+     },
+     {
+      "k": 4,
+      "amp": 0.063
+     },
+     {
+      "k": 6,
+      "amp": 0.055
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.086,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 62,
+   "name": "T63",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_63_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.48,
+    "semiMinor": 8.47,
+    "rotationDeg": 170.8,
+    "centre": [
+     16.03,
+     16.79
+    ],
+    "contourRms": 0.132,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.108
+     },
+     {
+      "k": 4,
+      "amp": 0.107
+     },
+     {
+      "k": 6,
+      "amp": 0.096
+     },
+     {
+      "k": 7,
+      "amp": 0.05
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.39,
+    "textureAmp": 0.046,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 63,
+   "name": "T64",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_64_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 8.91,
+    "semiMinor": 7.83,
+    "rotationDeg": 111.9,
+    "centre": [
+     16.16,
+     16.9
+    ],
+    "contourRms": 0.083,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.052
+     },
+     {
+      "k": 8,
+      "amp": 0.09
+     },
+     {
+      "k": 5,
+      "amp": 0.054
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.33,
+    "textureAmp": 0.08,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 64,
+   "name": "T65",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_65_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.78,
+    "semiMinor": 8.07,
+    "rotationDeg": 51.1,
+    "centre": [
+     16.05,
+     16.49
+    ],
+    "contourRms": 0.006,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.008
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.077,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 65,
+   "name": "T66",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_66_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.75,
+    "semiMinor": 9.2,
+    "rotationDeg": 67.7,
+    "centre": [
+     15.39,
+     15.48
+    ],
+    "contourRms": 0.003,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.004
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.054,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 66,
+   "name": "T67",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_67_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.76,
+    "semiMinor": 7.35,
+    "rotationDeg": 60.2,
+    "centre": [
+     15.26,
+     16.81
+    ],
+    "contourRms": 0.008,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.012
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.072,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 67,
+   "name": "T68",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_68_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.42,
+    "semiMinor": 7.5,
+    "rotationDeg": 121.1,
+    "centre": [
+     15.9,
+     16.07
+    ],
+    "contourRms": 0.014,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.019
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.05,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 68,
+   "name": "T69",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_69_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.56,
+    "semiMinor": 8.66,
+    "rotationDeg": 14.2,
+    "centre": [
+     15.58,
+     15.1
+    ],
+    "contourRms": 0.091,
+    "harmonics": [
+     {
+      "k": 6,
+      "amp": 0.095
+     },
+     {
+      "k": 7,
+      "amp": 0.057
+     },
+     {
+      "k": 3,
+      "amp": 0.066
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.065,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 69,
+   "name": "T70",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_70_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.87,
+    "semiMinor": 8.28,
+    "rotationDeg": 131.2,
+    "centre": [
+     16.33,
+     15.84
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.013
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.049,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 70,
+   "name": "T71",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_71_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.62,
+    "semiMinor": 8,
+    "rotationDeg": 63.3,
+    "centre": [
+     16.43,
+     16.42
+    ],
+    "contourRms": 0.002,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.003
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.086,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 71,
+   "name": "T72",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_72_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 8.8,
+    "semiMinor": 6.64,
+    "rotationDeg": 18.7,
+    "centre": [
+     15.34,
+     16.62
+    ],
+    "contourRms": 0.13,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.03
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.41,
+      "width": 0.35
+     }
+    ],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.067,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 72,
+   "name": "T73",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_73_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.29,
+    "semiMinor": 8.23,
+    "rotationDeg": 89.5,
+    "centre": [
+     16.59,
+     15.19
+    ],
+    "contourRms": 0.127,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.063
+     },
+     {
+      "k": 5,
+      "amp": 0.075
+     },
+     {
+      "k": 4,
+      "amp": 0.108
+     },
+     {
+      "k": 6,
+      "amp": 0.105
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.068,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 73,
+   "name": "T74",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_74_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.74,
+    "semiMinor": 9.62,
+    "rotationDeg": 6.6,
+    "centre": [
+     16.79,
+     16.24
+    ],
+    "contourRms": 0.004,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.006
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.37,
+    "textureAmp": 0.05,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 74,
+   "name": "T75",
+   "split": "train",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/train/train_75_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.75,
+    "semiMinor": 10.61,
+    "rotationDeg": 106.3,
+    "centre": [
+     15.43,
+     15.34
+    ],
+    "contourRms": 0.102,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.062
+     },
+     {
+      "k": 4,
+      "amp": 0.084
+     },
+     {
+      "k": 6,
+      "amp": 0.084
+     },
+     {
+      "k": 5,
+      "amp": 0.055
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.46,
+    "textureAmp": 0.046,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 75,
+   "name": "T76",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_76_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.88,
+    "semiMinor": 7.86,
+    "rotationDeg": 145.8,
+    "centre": [
+     15.98,
+     15.27
+    ],
+    "contourRms": 0.014,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.02
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.084,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 76,
+   "name": "T77",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_77_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.64,
+    "semiMinor": 10.16,
+    "rotationDeg": 147.4,
+    "centre": [
+     15.54,
+     15.12
+    ],
+    "contourRms": 0.004,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.005
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.043,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 77,
+   "name": "T78",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_78_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.5,
+    "semiMinor": 8.12,
+    "rotationDeg": 16.7,
+    "centre": [
+     16.26,
+     16.04
+    ],
+    "contourRms": 0.012,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.017
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.32,
+    "textureAmp": 0.044,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 78,
+   "name": "T79",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_79_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.84,
+    "semiMinor": 9.17,
+    "rotationDeg": 23.3,
+    "centre": [
+     16.08,
+     16.62
+    ],
+    "contourRms": 0.013,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.018
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.043,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 79,
+   "name": "T80",
+   "split": "train",
+   "label": 0,
+   "className": "regular",
+   "file": "images/train/train_80_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.87,
+    "semiMinor": 8,
+    "rotationDeg": 86.6,
+    "centre": [
+     16.95,
+     16.42
+    ],
+    "contourRms": 0.007,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.01
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.076,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 80,
+   "name": "X01",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_01_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 9.78,
+    "semiMinor": 8.73,
+    "rotationDeg": 25.3,
+    "centre": [
+     16.46,
+     15.01
+    ],
+    "contourRms": 0.101,
+    "harmonics": [
+     {
+      "k": 5,
+      "amp": 0.023
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.37,
+      "width": 0.25
+     }
+    ],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.045,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 81,
+   "name": "X02",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_02_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 10.09,
+    "semiMinor": 8.09,
+    "rotationDeg": 135.8,
+    "centre": [
+     16.13,
+     15.51
+    ],
+    "contourRms": 0.108,
+    "harmonics": [
+     {
+      "k": 6,
+      "amp": 0.091
+     },
+     {
+      "k": 7,
+      "amp": 0.102
+     },
+     {
+      "k": 3,
+      "amp": 0.069
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.46,
+    "textureAmp": 0.06,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 82,
+   "name": "X03",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_03_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.25,
+    "semiMinor": 7.8,
+    "rotationDeg": 92.7,
+    "centre": [
+     15.31,
+     16.04
+    ],
+    "contourRms": 0.012,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.017
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.058,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 83,
+   "name": "X04",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_04_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 10.4,
+    "semiMinor": 7.85,
+    "rotationDeg": 11.4,
+    "centre": [
+     15.8,
+     16.2
+    ],
+    "contourRms": 0.067,
+    "harmonics": [
+     {
+      "k": 6,
+      "amp": 0.037
+     },
+     {
+      "k": 8,
+      "amp": 0.052
+     },
+     {
+      "k": 9,
+      "amp": 0.048
+     },
+     {
+      "k": 10,
+      "amp": 0.05
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.083,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 84,
+   "name": "X05",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_05_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.84,
+    "semiMinor": 8.42,
+    "rotationDeg": 11.7,
+    "centre": [
+     16.02,
+     16.04
+    ],
+    "contourRms": 0.101,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.098
+     },
+     {
+      "k": 3,
+      "amp": 0.067
+     },
+     {
+      "k": 6,
+      "amp": 0.08
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.35,
+    "textureAmp": 0.045,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 85,
+   "name": "X06",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_06_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.53,
+    "semiMinor": 6.6,
+    "rotationDeg": 160.8,
+    "centre": [
+     16.57,
+     16.18
+    ],
+    "contourRms": 0.01,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.015
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.39,
+    "textureAmp": 0.068,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 86,
+   "name": "X07",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_07_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.61,
+    "semiMinor": 7.37,
+    "rotationDeg": 70.9,
+    "centre": [
+     16.25,
+     16.44
+    ],
+    "contourRms": 0.002,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.002
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.077,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 87,
+   "name": "X08",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_08_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.34,
+    "semiMinor": 7.55,
+    "rotationDeg": 89.7,
+    "centre": [
+     15.99,
+     16.73
+    ],
+    "contourRms": 0.007,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.01
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.38,
+    "textureAmp": 0.087,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 88,
+   "name": "X09",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_09_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 10.76,
+    "semiMinor": 9.76,
+    "rotationDeg": 11.8,
+    "centre": [
+     15.55,
+     16.86
+    ],
+    "contourRms": 0.005,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.007
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.34,
+    "textureAmp": 0.073,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 89,
+   "name": "X10",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_10_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.86,
+    "semiMinor": 7.79,
+    "rotationDeg": 44.5,
+    "centre": [
+     16.34,
+     16.22
+    ],
+    "contourRms": 0.107,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.092
+     },
+     {
+      "k": 6,
+      "amp": 0.105
+     },
+     {
+      "k": 4,
+      "amp": 0.06
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.4,
+    "textureAmp": 0.078,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 90,
+   "name": "X11",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_11_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.54,
+    "semiMinor": 7.8,
+    "rotationDeg": 9.6,
+    "centre": [
+     15.38,
+     16.86
+    ],
+    "contourRms": 0.01,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.014
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.37,
+    "textureAmp": 0.068,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 91,
+   "name": "X12",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_12_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.16,
+    "semiMinor": 7.09,
+    "rotationDeg": 91.5,
+    "centre": [
+     15.47,
+     16.33
+    ],
+    "contourRms": 0.008,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.011
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.41,
+    "textureAmp": 0.045,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 92,
+   "name": "X13",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_13_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 8.69,
+    "semiMinor": 6.77,
+    "rotationDeg": 161.9,
+    "centre": [
+     16.8,
+     15.95
+    ],
+    "contourRms": 0.008,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.011
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.42,
+    "textureAmp": 0.061,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 93,
+   "name": "X14",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_14_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 8.67,
+    "semiMinor": 6.56,
+    "rotationDeg": 158.3,
+    "centre": [
+     15.89,
+     15.45
+    ],
+    "contourRms": 0.116,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.093
+     },
+     {
+      "k": 6,
+      "amp": 0.107
+     },
+     {
+      "k": 5,
+      "amp": 0.081
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.087,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 94,
+   "name": "X15",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_15_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.56,
+    "semiMinor": 7.27,
+    "rotationDeg": 47.9,
+    "centre": [
+     15.35,
+     16.22
+    ],
+    "contourRms": 0.102,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.076
+     },
+     {
+      "k": 4,
+      "amp": 0.055
+     },
+     {
+      "k": 7,
+      "amp": 0.069
+     },
+     {
+      "k": 8,
+      "amp": 0.085
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.44,
+    "textureAmp": 0.082,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 95,
+   "name": "X16",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_16_irregular.png",
+   "generator": {
+    "style": "jagged",
+    "semiMajor": 9.35,
+    "semiMinor": 6.9,
+    "rotationDeg": 95.3,
+    "centre": [
+     16.23,
+     15.04
+    ],
+    "contourRms": 0.068,
+    "harmonics": [
+     {
+      "k": 7,
+      "amp": 0.054
+     },
+     {
+      "k": 8,
+      "amp": 0.052
+     },
+     {
+      "k": 9,
+      "amp": 0.043
+     },
+     {
+      "k": 10,
+      "amp": 0.042
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.43,
+    "textureAmp": 0.082,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 96,
+   "name": "X17",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_17_irregular.png",
+   "generator": {
+    "style": "lobulated",
+    "semiMajor": 9.08,
+    "semiMinor": 7.91,
+    "rotationDeg": 146.7,
+    "centre": [
+     16.69,
+     16.33
+    ],
+    "contourRms": 0.102,
+    "harmonics": [
+     {
+      "k": 8,
+      "amp": 0.088
+     },
+     {
+      "k": 6,
+      "amp": 0.053
+     },
+     {
+      "k": 5,
+      "amp": 0.051
+     },
+     {
+      "k": 7,
+      "amp": 0.089
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.3,
+    "textureAmp": 0.042,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 97,
+   "name": "X18",
+   "split": "test",
+   "label": 1,
+   "className": "irregular",
+   "file": "images/test/test_18_irregular.png",
+   "generator": {
+    "style": "notched",
+    "semiMajor": 8.61,
+    "semiMinor": 8.05,
+    "rotationDeg": 123.2,
+    "centre": [
+     15.78,
+     15.45
+    ],
+    "contourRms": 0.101,
+    "harmonics": [
+     {
+      "k": 4,
+      "amp": 0.03
+     }
+    ],
+    "bumps": [
+     {
+      "depth": -0.37,
+      "width": 0.22
+     }
+    ],
+    "meanIntensity": 0.36,
+    "textureAmp": 0.081,
+    "nucleolus": true
+   }
+  },
+  {
+   "id": 98,
+   "name": "X19",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_19_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.44,
+    "semiMinor": 6.83,
+    "rotationDeg": 125,
+    "centre": [
+     15,
+     15.04
+    ],
+    "contourRms": 0.009,
+    "harmonics": [
+     {
+      "k": 2,
+      "amp": 0.012
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.37,
+    "textureAmp": 0.06,
+    "nucleolus": false
+   }
+  },
+  {
+   "id": 99,
+   "name": "X20",
+   "split": "test",
+   "label": 0,
+   "className": "regular",
+   "file": "images/test/test_20_regular.png",
+   "generator": {
+    "style": "smooth",
+    "semiMajor": 9.37,
+    "semiMinor": 6.96,
+    "rotationDeg": 10.9,
+    "centre": [
+     15.52,
+     16.71
+    ],
+    "contourRms": 0.01,
+    "harmonics": [
+     {
+      "k": 3,
+      "amp": 0.015
+     }
+    ],
+    "bumps": [],
+    "meanIntensity": 0.31,
+    "textureAmp": 0.061,
+    "nucleolus": false
+   }
+  }
+ ]
+}

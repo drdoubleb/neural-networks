@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nucleus Net</title>
+<meta name="description" content="Train a tiny neural network to call nuclear irregularity and watch every weight while it learns.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="brand">
+    <h1>Nucleus Net</h1>
+    <p class="tagline">Teach a tiny neural network to call nuclear irregularity — and watch every node and weight while it learns.</p>
+  </div>
+  <nav class="stages" aria-label="Stages">
+    <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
+    <button type="button" class="stage" data-stage="train">2 · Train</button>
+    <button type="button" class="stage" data-stage="test">3 · Test</button>
+  </nav>
+  <div class="masthead-tools">
+    <label class="toggle"><input type="checkbox" id="tint" checked> H&amp;E tint</label>
+    <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
+  </div>
+</header>
+
+<main class="bench">
+  <div class="stage-panels">
+
+    <!-- ============================ 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-data">
+      <div class="card">
+        <div class="card-head">
+          <h2>One hundred nuclei, one question: is the contour regular?</h2>
+          <span class="small muted" id="meta-line"></span>
+        </div>
+        <div class="two-col">
+          <div class="prose">
+            <p>These are <strong>synthetic</strong> nuclei, drawn by a script so that we know the truth for every one. Half have a <strong>smooth, elliptical membrane</strong>; half are <strong>irregular</strong> — lobulated, notched or finely jagged. Everything else that could give the game away — size, elongation, rotation, hyperchromasia, chromatin texture, a nucleolus, position in the crop — is drawn from the <em>same</em> distribution in both groups. The only honest way to score well is to look at the outline.</p>
+            <p>Eighty nuclei form the <strong>training set</strong>, which the network learns from. Twenty are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the eighty.</p>
+            <p>Click any nucleus to put it under the inspector on the right. There you can see the six measurements a morphometry pipeline would make on it — the same six the network can be given as its input in stage 2.</p>
+          </div>
+          <div>
+            <h3>The six measurements</h3>
+            <ul class="prose small" id="feature-list"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Training set · 80</h2>
+          <div class="legend"><span class="chip regular">Regular</span><span class="chip irregular">Irregular</span><span>frame = ground truth</span></div>
+        </div>
+        <div class="tray named" id="data-train-tray"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Test set · 20 · held out</h2>
+          <label class="toggle"><input type="checkbox" id="reveal-test"> Reveal test labels (for the lecturer)</label>
+        </div>
+        <div class="tray named" id="data-test-tray"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>How separable are the measurements?</h2>
+          <span class="small muted">filled = training set · hollow = test set (when revealed) · click a point to inspect</span>
+        </div>
+        <div class="scatter-controls">
+          <label>x axis <select id="scatter-x"></select></label>
+          <label>y axis <select id="scatter-y"></select></label>
+          <span class="legend"><span class="chip regular">Regular</span><span class="chip irregular">Irregular</span></span>
+        </div>
+        <div class="chart scatter"><svg id="scatter" role="img" aria-label="Scatter plot of two measurements, coloured by class"></svg></div>
+        <p class="small muted" style="margin-top:8px">Try the decoys — area against darkness — and then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.</p>
+      </div>
+    </section>
+
+    <!-- ============================ 2 · TRAIN ============================ -->
+    <section class="stage-panel" id="panel-train" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Build the network, then let it learn</h2>
+          <span class="small muted">changing the input, hidden layer, activation, seed or augmentation re-rolls the weights</span>
+        </div>
+        <div class="controls">
+          <div class="ctl wide">
+            <span class="lbl">Input the network sees</span>
+            <div class="seg" id="mode-seg">
+              <button type="button" data-mode="features" class="is-active">6 measurements</button>
+              <button type="button" data-mode="pixels">1,024 raw pixels</button>
+            </div>
+          </div>
+          <div class="ctl"><label for="hidden">Hidden units <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
+          <div class="ctl"><label for="activation">Activation</label>
+            <select id="activation"><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option><option value="relu">ReLU</option></select></div>
+          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.1</span></label><input type="range" id="lr" min="0" max="100" step="1" value="57"></div>
+          <div class="ctl"><label for="batch">Batch size</label>
+            <select id="batch"><option value="1">1 (one nucleus per step)</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option><option value="80">80 (whole set)</option></select></div>
+          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">60</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="60"></div>
+          <div class="ctl"><label for="speed">Speed <span class="val" id="speed-val">4 epochs/s</span></label><input type="range" id="speed" min="0" max="100" step="1" value="52"></div>
+          <div class="ctl"><label for="seed">Random seed</label>
+            <div style="display:flex;gap:6px"><input type="number" id="seed" min="1" max="9999" value="1"><button type="button" class="btn" id="seed-random" title="new random seed">🎲</button></div></div>
+          <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
+          <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Augment pixels with flips &amp; rotations (×8)</label></div>
+          <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
+          <button type="button" class="btn" id="btn-step-batch">Step one batch</button>
+          <button type="button" class="btn" id="btn-step-epoch">Step one epoch</button>
+          <button type="button" class="btn" id="btn-reset">↺ Reset weights</button>
+          <span class="small muted"><kbd>space</kbd> train / pause</span>
+        </div>
+        <div class="recipes">
+          <span>Lecture recipes:</span>
+          <button type="button" class="recipe" data-recipe="1">① Measurements, single layer</button>
+          <button type="button" class="recipe" data-recipe="2">② Measurements, 4 tanh units</button>
+          <button type="button" class="recipe" data-recipe="3">③ Pixels, single layer — watch it memorise</button>
+          <button type="button" class="recipe" data-recipe="4">④ Pixels, 8 ReLU units + augmentation + decay</button>
+        </div>
+        <div class="status" id="status"></div>
+        <div class="note" id="note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The network, live</h2>
+          <span class="small muted">showing the forward pass for the nucleus in the inspector · hover any node or connection</span>
+        </div>
+        <div class="net-wrap">
+          <canvas id="net-canvas" width="760" height="440" aria-label="Network diagram"></canvas>
+          <div class="tip" id="net-tip" hidden></div>
+        </div>
+        <div class="legend net-legend">
+          <span><span class="swatch" style="background:var(--irregular)"></span>positive weight</span>
+          <span><span class="swatch" style="background:var(--regular)"></span>negative weight</span>
+          <span>thickness = size of the weight</span>
+          <span>at the output, positive pushes toward <b>Irregular</b></span>
+          <span>node fill = value flowing through it for this nucleus</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Training set · what the network currently calls</h2>
+          <div class="legend">
+            <span><span class="swatch ring"></span>called Regular</span>
+            <span><span class="swatch ring irregular"></span>called Irregular</span>
+            <span><span class="swatch badge">✗</span>disagrees with truth</span>
+            <span><span class="swatch batch"></span>in the last batch</span>
+          </div>
+        </div>
+        <div class="tray" id="train-tray"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Learning curves</h2>
+          <div class="legend">
+            <span><span class="line"></span>training set</span>
+            <span id="curves-legend-test" hidden><span class="line test"></span>test set (peeking)</span>
+            <span><span class="line chance"></span>chance</span>
+          </div>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Loss (cross-entropy) per epoch</span><span class="now" id="loss-now"></span></div><svg id="chart-loss" role="img" aria-label="Loss per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Accuracy per epoch</span><span class="now" id="acc-now"></span></div><svg id="chart-acc" role="img" aria-label="Accuracy per epoch"></svg></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-test" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Twenty nuclei the network has never seen</h2>
+          <span class="small muted">the weights are frozen; nothing here changes the model</span>
+        </div>
+        <p class="lede">Each held-out nucleus is fed through the trained network one at a time. Watch the values flow, see the call, then the truth. <kbd>N</kbd> classifies the next one.</p>
+        <p class="note" id="test-warning" hidden>The network has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
+        <div class="actions">
+          <button type="button" class="btn primary big" id="btn-classify-next">Classify next</button>
+          <button type="button" class="btn" id="btn-classify-all">Classify all 20</button>
+          <button type="button" class="btn" id="btn-test-reset">Clear results</button>
+          <div class="ctl" style="min-width:200px;margin-left:auto"><label for="threshold">Call Irregular when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+        </div>
+        <div class="note" id="test-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="scoreboard">
+          <div class="stat"><span class="lbl">Classified</span><span class="v" id="stat-n">0 / 20</span><span class="sub">held-out nuclei</span></div>
+          <div class="stat"><span class="lbl">Accuracy</span><span class="v" id="stat-acc">–</span><span class="sub" id="stat-acc-sub"></span></div>
+          <div class="stat"><span class="lbl">Sensitivity</span><span class="v" id="stat-sens">–</span><span class="sub" id="stat-sens-sub"></span></div>
+          <div class="stat"><span class="lbl">Specificity</span><span class="v" id="stat-spec">–</span><span class="sub" id="stat-spec-sub"></span></div>
+          <div class="confusion" id="confusion"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The network, frozen</h2>
+          <span class="small muted">forward pass for the nucleus in the inspector</span>
+        </div>
+        <div class="net-wrap">
+          <canvas id="net-canvas-test" width="760" height="440" aria-label="Network diagram during testing"></canvas>
+          <div class="tip" id="net-tip-test" hidden></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Test set</h2>
+          <div class="legend">
+            <span><span class="swatch ring"></span>called Regular</span>
+            <span><span class="swatch ring irregular"></span>called Irregular</span>
+            <span><span class="swatch badge" style="background:var(--good)">✓</span>correct</span>
+            <span><span class="swatch badge">✗</span>wrong</span>
+          </div>
+        </div>
+        <div class="tray named" id="test-tray"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================ INSPECTOR ============================ -->
+  <aside class="inspector" aria-label="Specimen inspector">
+    <div class="card">
+      <div class="spec-head">
+        <h2 id="spec-name">Specimen</h2>
+        <div class="chips" id="spec-chips"></div>
+      </div>
+      <div class="views">
+        <button type="button" data-view="image" class="is-active">Image</button>
+        <button type="button" data-view="measure">Measurements</button>
+        <button type="button" data-view="evidence">Evidence</button>
+      </div>
+      <canvas class="spec-view" id="spec-view" width="288" height="288" aria-label="Selected nucleus, enlarged"></canvas>
+      <div class="spec-caption" id="spec-caption"></div>
+      <div class="verdict" id="verdict">
+        <div class="p"><small class="lbl">network call</small><b class="soft">–</b></div>
+        <div class="pbar"><div class="thr" id="pbar-thr" style="left:50%"></div><div class="marker" id="pbar-marker" style="left:50%"></div></div>
+        <div class="pbar-labels"><span>Regular</span><span>0.5</span><span>Irregular</span></div>
+        <div class="row" id="verdict-call"></div>
+        <div class="evidence-sum" id="evidence-sum"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Measurements</h3>
+      <table class="feat">
+        <thead><tr><th>measurement</th><th style="text-align:right">value</th><th style="text-align:right" title="standardized: how many training-set standard deviations from the training-set mean">z</th><th id="feat-push-head">push</th></tr></thead>
+        <tbody id="feat-table"></tbody>
+      </table>
+      <p class="small muted" id="feat-note" style="margin-top:8px"></p>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <p>Nucleus Net is a teaching toy: a fully connected network with hand-written backpropagation, trained in your browser on 100 synthetic nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the specimens with <code>node tools/generate_nuclei.js</code>.</p>
+</footer>
+
+<script src="data/nuclei_data.js"></script>
+<script src="js/features.js"></script>
+<script src="js/nn.js"></script>
+<script src="js/dataset.js"></script>
+<script src="js/viz.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
