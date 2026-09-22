@@ -6,11 +6,29 @@
   "count": 100,
   "train": 80,
   "test": 20,
+  "task": {
+   "id": "irregularity",
+   "order": 2,
+   "title": "Irregular contour?",
+   "short": "Irregularity",
+   "classes": [
+    {
+     "key": "regular",
+     "name": "Regular"
+    },
+    {
+     "key": "irregular",
+     "name": "Irregular"
+    }
+   ],
+   "blurb": "Half the nuclei have a smooth, elliptical membrane; half are irregular: lobulated, notched or finely jagged. Size, elongation, rotation, hyperchromasia, chromatin texture, a nucleolus and position in the crop are drawn from the same distribution in both groups. The only honest way to score well is to look at the outline.",
+   "decoys": "size, elongation, rotation, darkness, chromatin texture, nucleolus and position",
+   "signal": "the contour"
+  },
   "classes": [
    "regular",
    "irregular"
-  ],
-  "note": "Synthetic nuclei. Size, elongation, rotation, darkness, texture, nucleolus and position are drawn from identical distributions in both classes; only the contour differs."
+  ]
  },
  "nuclei": [
   {
@@ -22,6 +40,7 @@
    "file": "images/train/train_01_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.64,
     "semiMinor": 7.05,
     "rotationDeg": 121.5,
@@ -51,6 +70,7 @@
    "file": "images/train/train_02_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 9.27,
     "semiMinor": 8.35,
     "rotationDeg": 132.8,
@@ -92,6 +112,7 @@
    "file": "images/train/train_03_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.52,
     "semiMinor": 9.78,
     "rotationDeg": 61.6,
@@ -121,6 +142,7 @@
    "file": "images/train/train_04_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.62,
     "semiMinor": 9.22,
     "rotationDeg": 75,
@@ -150,6 +172,7 @@
    "file": "images/train/train_05_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.23,
     "semiMinor": 8.6,
     "rotationDeg": 164.3,
@@ -191,6 +214,7 @@
    "file": "images/train/train_06_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.58,
     "semiMinor": 6.98,
     "rotationDeg": 35.6,
@@ -220,6 +244,7 @@
    "file": "images/train/train_07_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.86,
     "semiMinor": 7.2,
     "rotationDeg": 88.9,
@@ -249,6 +274,7 @@
    "file": "images/train/train_08_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.59,
     "semiMinor": 8,
     "rotationDeg": 154.7,
@@ -294,6 +320,7 @@
    "file": "images/train/train_09_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 8.88,
     "semiMinor": 6.8,
     "rotationDeg": 27.5,
@@ -328,6 +355,7 @@
    "file": "images/train/train_10_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.26,
     "semiMinor": 8.48,
     "rotationDeg": 113,
@@ -357,6 +385,7 @@
    "file": "images/train/train_11_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.53,
     "semiMinor": 10.2,
     "rotationDeg": 51,
@@ -386,6 +415,7 @@
    "file": "images/train/train_12_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.7,
     "semiMinor": 9.84,
     "rotationDeg": 138.8,
@@ -415,6 +445,7 @@
    "file": "images/train/train_13_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.58,
     "semiMinor": 8.59,
     "rotationDeg": 168.2,
@@ -444,6 +475,7 @@
    "file": "images/train/train_14_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.02,
     "semiMinor": 7.38,
     "rotationDeg": 83.2,
@@ -478,6 +510,7 @@
    "file": "images/train/train_15_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 8.69,
     "semiMinor": 6.81,
     "rotationDeg": 3.6,
@@ -512,6 +545,7 @@
    "file": "images/train/train_16_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.67,
     "semiMinor": 8.66,
     "rotationDeg": 152.6,
@@ -546,6 +580,7 @@
    "file": "images/train/train_17_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.57,
     "semiMinor": 8.29,
     "rotationDeg": 4.2,
@@ -575,6 +610,7 @@
    "file": "images/train/train_18_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.84,
     "semiMinor": 7.17,
     "rotationDeg": 92.9,
@@ -616,6 +652,7 @@
    "file": "images/train/train_19_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.94,
     "semiMinor": 8.8,
     "rotationDeg": 8.4,
@@ -645,6 +682,7 @@
    "file": "images/train/train_20_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.8,
     "semiMinor": 6.47,
     "rotationDeg": 29,
@@ -674,6 +712,7 @@
    "file": "images/train/train_21_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.92,
     "semiMinor": 8.92,
     "rotationDeg": 138.6,
@@ -703,6 +742,7 @@
    "file": "images/train/train_22_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 10.72,
     "semiMinor": 9.96,
     "rotationDeg": 94.8,
@@ -744,6 +784,7 @@
    "file": "images/train/train_23_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.64,
     "semiMinor": 7.89,
     "rotationDeg": 166.1,
@@ -785,6 +826,7 @@
    "file": "images/train/train_24_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.45,
     "semiMinor": 9.05,
     "rotationDeg": 166.4,
@@ -814,6 +856,7 @@
    "file": "images/train/train_25_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.44,
     "semiMinor": 10.09,
     "rotationDeg": 140.1,
@@ -843,6 +886,7 @@
    "file": "images/train/train_26_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 8.89,
     "semiMinor": 8.4,
     "rotationDeg": 127.7,
@@ -880,6 +924,7 @@
    "file": "images/train/train_27_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.85,
     "semiMinor": 7.24,
     "rotationDeg": 87.7,
@@ -909,6 +954,7 @@
    "file": "images/train/train_28_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 9.28,
     "semiMinor": 7.61,
     "rotationDeg": 60.2,
@@ -947,6 +993,7 @@
    "file": "images/train/train_29_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.02,
     "semiMinor": 8.05,
     "rotationDeg": 94.6,
@@ -976,6 +1023,7 @@
    "file": "images/train/train_30_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.03,
     "semiMinor": 7.58,
     "rotationDeg": 16.5,
@@ -1005,6 +1053,7 @@
    "file": "images/train/train_31_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.9,
     "semiMinor": 7.18,
     "rotationDeg": 78.4,
@@ -1050,6 +1099,7 @@
    "file": "images/train/train_32_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.63,
     "semiMinor": 7.67,
     "rotationDeg": 166.2,
@@ -1091,6 +1141,7 @@
    "file": "images/train/train_33_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.34,
     "semiMinor": 8.85,
     "rotationDeg": 114.6,
@@ -1129,6 +1180,7 @@
    "file": "images/train/train_34_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.46,
     "semiMinor": 9.01,
     "rotationDeg": 115.2,
@@ -1158,6 +1210,7 @@
    "file": "images/train/train_35_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.55,
     "semiMinor": 7.55,
     "rotationDeg": 163.6,
@@ -1192,6 +1245,7 @@
    "file": "images/train/train_36_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.57,
     "semiMinor": 9.83,
     "rotationDeg": 30.7,
@@ -1221,6 +1275,7 @@
    "file": "images/train/train_37_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 8.75,
     "semiMinor": 7.27,
     "rotationDeg": 136.2,
@@ -1258,6 +1313,7 @@
    "file": "images/train/train_38_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.13,
     "semiMinor": 8.95,
     "rotationDeg": 99.5,
@@ -1299,6 +1355,7 @@
    "file": "images/train/train_39_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.08,
     "semiMinor": 6.8,
     "rotationDeg": 103.4,
@@ -1328,6 +1385,7 @@
    "file": "images/train/train_40_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.11,
     "semiMinor": 8.82,
     "rotationDeg": 8.8,
@@ -1357,6 +1415,7 @@
    "file": "images/train/train_41_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.79,
     "semiMinor": 7.76,
     "rotationDeg": 8.9,
@@ -1386,6 +1445,7 @@
    "file": "images/train/train_42_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.46,
     "semiMinor": 9.5,
     "rotationDeg": 127.9,
@@ -1423,6 +1483,7 @@
    "file": "images/train/train_43_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.58,
     "semiMinor": 8.15,
     "rotationDeg": 30.2,
@@ -1457,6 +1518,7 @@
    "file": "images/train/train_44_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.61,
     "semiMinor": 8.67,
     "rotationDeg": 159.3,
@@ -1486,6 +1548,7 @@
    "file": "images/train/train_45_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 10.61,
     "semiMinor": 9.97,
     "rotationDeg": 0.6,
@@ -1531,6 +1594,7 @@
    "file": "images/train/train_46_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.5,
     "semiMinor": 9.08,
     "rotationDeg": 88.3,
@@ -1560,6 +1624,7 @@
    "file": "images/train/train_47_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.38,
     "semiMinor": 7.55,
     "rotationDeg": 156.3,
@@ -1597,6 +1662,7 @@
    "file": "images/train/train_48_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 10.54,
     "semiMinor": 9.12,
     "rotationDeg": 114.5,
@@ -1642,6 +1708,7 @@
    "file": "images/train/train_49_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 10.91,
     "semiMinor": 9.48,
     "rotationDeg": 59,
@@ -1680,6 +1747,7 @@
    "file": "images/train/train_50_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.25,
     "semiMinor": 9.22,
     "rotationDeg": 2.4,
@@ -1709,6 +1777,7 @@
    "file": "images/train/train_51_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.58,
     "semiMinor": 9.25,
     "rotationDeg": 126.6,
@@ -1738,6 +1807,7 @@
    "file": "images/train/train_52_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 8.96,
     "semiMinor": 6.81,
     "rotationDeg": 51.2,
@@ -1779,6 +1849,7 @@
    "file": "images/train/train_53_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.03,
     "semiMinor": 8.7,
     "rotationDeg": 148,
@@ -1816,6 +1887,7 @@
    "file": "images/train/train_54_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.65,
     "semiMinor": 8.48,
     "rotationDeg": 117.8,
@@ -1853,6 +1925,7 @@
    "file": "images/train/train_55_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.98,
     "semiMinor": 8.63,
     "rotationDeg": 11,
@@ -1898,6 +1971,7 @@
    "file": "images/train/train_56_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 8.64,
     "semiMinor": 7.56,
     "rotationDeg": 47.4,
@@ -1936,6 +2010,7 @@
    "file": "images/train/train_57_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.69,
     "semiMinor": 6.41,
     "rotationDeg": 18.9,
@@ -1965,6 +2040,7 @@
    "file": "images/train/train_58_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.91,
     "semiMinor": 8.24,
     "rotationDeg": 30.3,
@@ -2010,6 +2086,7 @@
    "file": "images/train/train_59_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.06,
     "semiMinor": 7.91,
     "rotationDeg": 53.9,
@@ -2051,6 +2128,7 @@
    "file": "images/train/train_60_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 8.78,
     "semiMinor": 8.25,
     "rotationDeg": 90.3,
@@ -2096,6 +2174,7 @@
    "file": "images/train/train_61_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 9.22,
     "semiMinor": 6.96,
     "rotationDeg": 72.7,
@@ -2134,6 +2213,7 @@
    "file": "images/train/train_62_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.77,
     "semiMinor": 7.87,
     "rotationDeg": 109,
@@ -2171,6 +2251,7 @@
    "file": "images/train/train_63_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.48,
     "semiMinor": 8.47,
     "rotationDeg": 170.8,
@@ -2212,6 +2293,7 @@
    "file": "images/train/train_64_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 8.91,
     "semiMinor": 7.83,
     "rotationDeg": 111.9,
@@ -2249,6 +2331,7 @@
    "file": "images/train/train_65_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.78,
     "semiMinor": 8.07,
     "rotationDeg": 51.1,
@@ -2278,6 +2361,7 @@
    "file": "images/train/train_66_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.75,
     "semiMinor": 9.2,
     "rotationDeg": 67.7,
@@ -2307,6 +2391,7 @@
    "file": "images/train/train_67_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.76,
     "semiMinor": 7.35,
     "rotationDeg": 60.2,
@@ -2336,6 +2421,7 @@
    "file": "images/train/train_68_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.42,
     "semiMinor": 7.5,
     "rotationDeg": 121.1,
@@ -2365,6 +2451,7 @@
    "file": "images/train/train_69_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.56,
     "semiMinor": 8.66,
     "rotationDeg": 14.2,
@@ -2402,6 +2489,7 @@
    "file": "images/train/train_70_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.87,
     "semiMinor": 8.28,
     "rotationDeg": 131.2,
@@ -2431,6 +2519,7 @@
    "file": "images/train/train_71_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.62,
     "semiMinor": 8,
     "rotationDeg": 63.3,
@@ -2460,6 +2549,7 @@
    "file": "images/train/train_72_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 8.8,
     "semiMinor": 6.64,
     "rotationDeg": 18.7,
@@ -2494,6 +2584,7 @@
    "file": "images/train/train_73_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.29,
     "semiMinor": 8.23,
     "rotationDeg": 89.5,
@@ -2535,6 +2626,7 @@
    "file": "images/train/train_74_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.74,
     "semiMinor": 9.62,
     "rotationDeg": 6.6,
@@ -2564,6 +2656,7 @@
    "file": "images/train/train_75_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.75,
     "semiMinor": 10.61,
     "rotationDeg": 106.3,
@@ -2605,6 +2698,7 @@
    "file": "images/train/train_76_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.88,
     "semiMinor": 7.86,
     "rotationDeg": 145.8,
@@ -2634,6 +2728,7 @@
    "file": "images/train/train_77_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.64,
     "semiMinor": 10.16,
     "rotationDeg": 147.4,
@@ -2663,6 +2758,7 @@
    "file": "images/train/train_78_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.5,
     "semiMinor": 8.12,
     "rotationDeg": 16.7,
@@ -2692,6 +2788,7 @@
    "file": "images/train/train_79_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.84,
     "semiMinor": 9.17,
     "rotationDeg": 23.3,
@@ -2721,6 +2818,7 @@
    "file": "images/train/train_80_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.87,
     "semiMinor": 8,
     "rotationDeg": 86.6,
@@ -2750,6 +2848,7 @@
    "file": "images/test/test_01_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 9.78,
     "semiMinor": 8.73,
     "rotationDeg": 25.3,
@@ -2784,6 +2883,7 @@
    "file": "images/test/test_02_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 10.09,
     "semiMinor": 8.09,
     "rotationDeg": 135.8,
@@ -2821,6 +2921,7 @@
    "file": "images/test/test_03_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.25,
     "semiMinor": 7.8,
     "rotationDeg": 92.7,
@@ -2850,6 +2951,7 @@
    "file": "images/test/test_04_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 10.4,
     "semiMinor": 7.85,
     "rotationDeg": 11.4,
@@ -2891,6 +2993,7 @@
    "file": "images/test/test_05_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.84,
     "semiMinor": 8.42,
     "rotationDeg": 11.7,
@@ -2928,6 +3031,7 @@
    "file": "images/test/test_06_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.53,
     "semiMinor": 6.6,
     "rotationDeg": 160.8,
@@ -2957,6 +3061,7 @@
    "file": "images/test/test_07_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.61,
     "semiMinor": 7.37,
     "rotationDeg": 70.9,
@@ -2986,6 +3091,7 @@
    "file": "images/test/test_08_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.34,
     "semiMinor": 7.55,
     "rotationDeg": 89.7,
@@ -3015,6 +3121,7 @@
    "file": "images/test/test_09_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 10.76,
     "semiMinor": 9.76,
     "rotationDeg": 11.8,
@@ -3044,6 +3151,7 @@
    "file": "images/test/test_10_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.86,
     "semiMinor": 7.79,
     "rotationDeg": 44.5,
@@ -3081,6 +3189,7 @@
    "file": "images/test/test_11_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.54,
     "semiMinor": 7.8,
     "rotationDeg": 9.6,
@@ -3110,6 +3219,7 @@
    "file": "images/test/test_12_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.16,
     "semiMinor": 7.09,
     "rotationDeg": 91.5,
@@ -3139,6 +3249,7 @@
    "file": "images/test/test_13_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 8.69,
     "semiMinor": 6.77,
     "rotationDeg": 161.9,
@@ -3168,6 +3279,7 @@
    "file": "images/test/test_14_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 8.67,
     "semiMinor": 6.56,
     "rotationDeg": 158.3,
@@ -3205,6 +3317,7 @@
    "file": "images/test/test_15_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.56,
     "semiMinor": 7.27,
     "rotationDeg": 47.9,
@@ -3246,6 +3359,7 @@
    "file": "images/test/test_16_irregular.png",
    "generator": {
     "style": "jagged",
+    "contourIrregular": true,
     "semiMajor": 9.35,
     "semiMinor": 6.9,
     "rotationDeg": 95.3,
@@ -3287,6 +3401,7 @@
    "file": "images/test/test_17_irregular.png",
    "generator": {
     "style": "lobulated",
+    "contourIrregular": true,
     "semiMajor": 9.08,
     "semiMinor": 7.91,
     "rotationDeg": 146.7,
@@ -3328,6 +3443,7 @@
    "file": "images/test/test_18_irregular.png",
    "generator": {
     "style": "notched",
+    "contourIrregular": true,
     "semiMajor": 8.61,
     "semiMinor": 8.05,
     "rotationDeg": 123.2,
@@ -3362,6 +3478,7 @@
    "file": "images/test/test_19_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.44,
     "semiMinor": 6.83,
     "rotationDeg": 125,
@@ -3391,6 +3508,7 @@
    "file": "images/test/test_20_regular.png",
    "generator": {
     "style": "smooth",
+    "contourIrregular": false,
     "semiMajor": 9.37,
     "semiMinor": 6.96,
     "rotationDeg": 10.9,

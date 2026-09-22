@@ -142,10 +142,10 @@ ul.prose li + li { margin-top: 4px; }
 /* class chips / legend */
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; background: var(--surface-2); color: var(--ink-2); white-space: nowrap; }
 .chip::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--ink-3); }
-.chip.regular::before { background: var(--regular); }
-.chip.irregular::before { background: var(--irregular); }
-.chip.regular { color: var(--regular); background: color-mix(in srgb, var(--regular) 12%, transparent); }
-.chip.irregular { color: var(--irregular); background: color-mix(in srgb, var(--irregular) 14%, transparent); }
+.chip.neg::before { background: var(--regular); }
+.chip.pos::before { background: var(--irregular); }
+.chip.neg { color: var(--regular); background: color-mix(in srgb, var(--regular) 12%, transparent); }
+.chip.pos { color: var(--irregular); background: color-mix(in srgb, var(--irregular) 14%, transparent); }
 .chip.plain::before { display: none; }
 .chip.good { color: var(--good-text); background: color-mix(in srgb, var(--good) 14%, transparent); }
 .chip.good::before { display: none; }
@@ -154,7 +154,7 @@ ul.prose li + li { margin-top: 4px; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; color: var(--ink-2); }
 .legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .legend .swatch.ring { border: 3px solid var(--regular); background: transparent; }
-.legend .swatch.ring.irregular { border-color: var(--irregular); }
+.legend .swatch.ring.pos { border-color: var(--irregular); }
 .legend .swatch.batch { border: 2px solid var(--accent); background: transparent; border-radius: 50%; }
 .legend .swatch.badge { background: var(--bad); border-radius: 50%; color: #fff; font-size: 10px; line-height: 14px; text-align: center; font-weight: 700; }
 .legend .line { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--accent); vertical-align: middle; margin-right: 5px; }
@@ -244,11 +244,11 @@ ul.prose li + li { margin-top: 4px; }
 .chart .tiptext { fill: var(--ground); font-size: 11px; }
 .chart .endlabel { fill: var(--ink); font-weight: 500; }
 .scatter .pt { stroke: var(--surface); stroke-width: 2; cursor: pointer; }
-.scatter .pt.regular { fill: var(--regular); }
-.scatter .pt.irregular { fill: var(--irregular); }
+.scatter .pt.neg { fill: var(--regular); }
+.scatter .pt.pos { fill: var(--irregular); }
 .scatter .pt.test { fill: var(--surface); stroke-width: 2.5; }
-.scatter .pt.test.regular { stroke: var(--regular); }
-.scatter .pt.test.irregular { stroke: var(--irregular); }
+.scatter .pt.test.neg { stroke: var(--regular); }
+.scatter .pt.test.pos { stroke: var(--irregular); }
 .scatter .pt.unknown { fill: var(--surface); stroke: var(--ink-3); stroke-width: 2; }
 .scatter .pt.selected { stroke: var(--ink); stroke-width: 3; }
 .scatter .axlabel { fill: var(--ink-2); font-family: var(--font-body); font-size: 12px; }

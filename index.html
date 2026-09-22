@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nucleus Net</title>
-<meta name="description" content="Train a tiny neural network to call nuclear irregularity and watch every weight while it learns.">
+<meta name="description" content="Train a tiny neural network to read nuclei and watch every weight while it learns: from a single layer to a convolutional network.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -15,7 +15,7 @@
 <header class="masthead">
   <div class="brand">
     <h1>Nucleus Net</h1>
-    <p class="tagline">Teach a tiny neural network to call nuclear irregularity — and watch every node and weight while it learns.</p>
+    <p class="tagline">Teach a tiny neural network to read nuclei — and watch every node and weight while it learns, from a single layer to a convolution.</p>
   </div>
   <nav class="stages" aria-label="Stages">
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
@@ -35,13 +35,17 @@
     <section class="stage-panel" id="panel-data">
       <div class="card">
         <div class="card-head">
-          <h2>One hundred nuclei, one question: is the contour regular?</h2>
+          <h2>One hundred nuclei, one question</h2>
           <span class="small muted" id="meta-line"></span>
+        </div>
+        <div class="ctl wide" style="margin-bottom:12px">
+          <span class="lbl">Question for the network</span>
+          <div class="seg" id="task-seg"></div>
         </div>
         <div class="two-col">
           <div class="prose">
-            <p>These are <strong>synthetic</strong> nuclei, drawn by a script so that we know the truth for every one. Half have a <strong>smooth, elliptical membrane</strong>; half are <strong>irregular</strong> — lobulated, notched or finely jagged. Everything else that could give the game away — size, elongation, rotation, hyperchromasia, chromatin texture, a nucleolus, position in the crop — is drawn from the <em>same</em> distribution in both groups. The only honest way to score well is to look at the outline.</p>
-            <p>Eighty nuclei form the <strong>training set</strong>, which the network learns from. Twenty are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the eighty.</p>
+            <p><strong id="task-title"></strong> <span id="task-blurb"></span></p>
+            <p>These are <strong>synthetic</strong> nuclei, drawn by a script so that we know the truth for every one. Eighty form the <strong>training set</strong>, which the network learns from. Twenty are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the eighty.</p>
             <p>Click any nucleus to put it under the inspector on the right. There you can see the six measurements a morphometry pipeline would make on it — the same six the network can be given as its input in stage 2.</p>
           </div>
           <div>
@@ -54,7 +58,7 @@
       <div class="card">
         <div class="card-head">
           <h2>Training set · 80</h2>
-          <div class="legend"><span class="chip regular">Regular</span><span class="chip irregular">Irregular</span><span>frame = ground truth</span></div>
+          <div class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span><span>frame = ground truth</span></div>
         </div>
         <div class="tray named" id="data-train-tray"></div>
       </div>
@@ -75,10 +79,10 @@
         <div class="scatter-controls">
           <label>x axis <select id="scatter-x"></select></label>
           <label>y axis <select id="scatter-y"></select></label>
-          <span class="legend"><span class="chip regular">Regular</span><span class="chip irregular">Irregular</span></span>
+          <span class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span></span>
         </div>
         <div class="chart scatter"><svg id="scatter" role="img" aria-label="Scatter plot of two measurements, coloured by class"></svg></div>
-        <p class="small muted" style="margin-top:8px">Try the decoys — area against darkness — and then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.</p>
+        <p class="small muted" style="margin-top:8px" id="scatter-hint"></p>
       </div>
     </section>
 
@@ -87,29 +91,32 @@
       <div class="card">
         <div class="card-head">
           <h2>Build the network, then let it learn</h2>
-          <span class="small muted">changing the input, hidden layer, activation, seed or augmentation re-rolls the weights</span>
+          <span class="small muted">question: <b id="train-task"></b> · changing the architecture, seed or augmentation re-rolls the weights</span>
         </div>
         <div class="controls">
           <div class="ctl wide">
             <span class="lbl">Input the network sees</span>
             <div class="seg" id="mode-seg">
-              <button type="button" data-mode="features" class="is-active">6 measurements</button>
-              <button type="button" data-mode="pixels">1,024 raw pixels</button>
+              <button type="button" data-mode="features">6 measurements</button>
+              <button type="button" data-mode="pixels" class="is-active">1,024 raw pixels</button>
             </div>
           </div>
-          <div class="ctl"><label for="hidden">Hidden units <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
+          <div class="ctl"><label for="conv">Convolution (pixels only)</label>
+            <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
+          <div class="ctl"><label for="hidden">Hidden layer 1 <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
+          <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
           <div class="ctl"><label for="activation">Activation</label>
-            <select id="activation"><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option><option value="relu">ReLU</option></select></div>
-          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.1</span></label><input type="range" id="lr" min="0" max="100" step="1" value="57"></div>
+            <select id="activation"><option value="relu">ReLU</option><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></div>
+          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.01</span></label><input type="range" id="lr" min="0" max="100" step="1" value="29"></div>
           <div class="ctl"><label for="batch">Batch size</label>
             <select id="batch"><option value="1">1 (one nucleus per step)</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option><option value="80">80 (whole set)</option></select></div>
-          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">60</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="60"></div>
+          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">30</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="30"></div>
           <div class="ctl"><label for="speed">Speed <span class="val" id="speed-val">4 epochs/s</span></label><input type="range" id="speed" min="0" max="100" step="1" value="52"></div>
           <div class="ctl"><label for="seed">Random seed</label>
             <div style="display:flex;gap:6px"><input type="number" id="seed" min="1" max="9999" value="1"><button type="button" class="btn" id="seed-random" title="new random seed">🎲</button></div></div>
           <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
           <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Augment pixels with flips &amp; rotations (×8)</label></div>
-          <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
+          <div class="ctl check"><input type="checkbox" id="peek" checked><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
         </div>
         <div class="actions">
           <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
@@ -119,11 +126,13 @@
           <span class="small muted"><kbd>space</kbd> train / pause</span>
         </div>
         <div class="recipes">
-          <span>Lecture recipes:</span>
-          <button type="button" class="recipe" data-recipe="1">① Measurements, single layer</button>
-          <button type="button" class="recipe" data-recipe="2">② Measurements, 4 tanh units</button>
-          <button type="button" class="recipe" data-recipe="3">③ Pixels, single layer — watch it memorise</button>
-          <button type="button" class="recipe" data-recipe="4">④ Pixels, 8 ReLU units + augmentation + decay</button>
+          <span>Lecture recipes, in order:</span>
+          <button type="button" class="recipe" data-recipe="1">① Enlargement · pixels · single layer</button>
+          <button type="button" class="recipe" data-recipe="2">② Irregularity · pixels · single layer</button>
+          <button type="button" class="recipe" data-recipe="3">③ Irregularity · measurements · single layer</button>
+          <button type="button" class="recipe" data-recipe="4">④ Irregularity · pixels · 8 ReLU + augmentation</button>
+          <button type="button" class="recipe" data-recipe="5">⑤ Irregularity · pixels · 8 + 8 ReLU + augmentation</button>
+          <button type="button" class="recipe" data-recipe="6">⑥ Irregularity · pixels · convolution + 8 ReLU + augmentation</button>
         </div>
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
@@ -132,18 +141,19 @@
       <div class="card">
         <div class="card-head">
           <h2>The network, live</h2>
-          <span class="small muted">showing the forward pass for the nucleus in the inspector · hover any node or connection</span>
+          <span class="small muted">showing the forward pass for the nucleus in the inspector · hover any node, map or connection</span>
         </div>
         <div class="net-wrap">
-          <canvas id="net-canvas" width="760" height="440" aria-label="Network diagram"></canvas>
+          <canvas id="net-canvas" width="800" height="440" aria-label="Network diagram"></canvas>
           <div class="tip" id="net-tip" hidden></div>
         </div>
         <div class="legend net-legend">
           <span><span class="swatch" style="background:var(--irregular)"></span>positive weight</span>
           <span><span class="swatch" style="background:var(--regular)"></span>negative weight</span>
           <span>thickness = size of the weight</span>
-          <span>at the output, positive pushes toward <b>Irregular</b></span>
+          <span>at the output, positive pushes toward <b data-cls="1"></b></span>
           <span>node fill = value flowing through it for this nucleus</span>
+          <span>feature maps: brighter violet = the filter fires there</span>
         </div>
       </div>
 
@@ -151,8 +161,8 @@
         <div class="card-head">
           <h2>Training set · what the network currently calls</h2>
           <div class="legend">
-            <span><span class="swatch ring"></span>called Regular</span>
-            <span><span class="swatch ring irregular"></span>called Irregular</span>
+            <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
+            <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
             <span><span class="swatch badge">✗</span>disagrees with truth</span>
             <span><span class="swatch batch"></span>in the last batch</span>
           </div>
@@ -181,7 +191,7 @@
       <div class="card">
         <div class="card-head">
           <h2>Twenty nuclei the network has never seen</h2>
-          <span class="small muted">the weights are frozen; nothing here changes the model</span>
+          <span class="small muted">question: <b id="test-task"></b> · the weights are frozen; nothing here changes the model</span>
         </div>
         <p class="lede">Each held-out nucleus is fed through the trained network one at a time. Watch the values flow, see the call, then the truth. <kbd>N</kbd> classifies the next one.</p>
         <p class="note" id="test-warning" hidden>The network has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
@@ -189,7 +199,7 @@
           <button type="button" class="btn primary big" id="btn-classify-next">Classify next</button>
           <button type="button" class="btn" id="btn-classify-all">Classify all 20</button>
           <button type="button" class="btn" id="btn-test-reset">Clear results</button>
-          <div class="ctl" style="min-width:200px;margin-left:auto"><label for="threshold">Call Irregular when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+          <div class="ctl" style="min-width:220px;margin-left:auto"><label for="threshold">Call <span data-cls="1"></span> when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
         </div>
         <div class="note" id="test-note"></div>
       </div>
@@ -210,7 +220,7 @@
           <span class="small muted">forward pass for the nucleus in the inspector</span>
         </div>
         <div class="net-wrap">
-          <canvas id="net-canvas-test" width="760" height="440" aria-label="Network diagram during testing"></canvas>
+          <canvas id="net-canvas-test" width="800" height="440" aria-label="Network diagram during testing"></canvas>
           <div class="tip" id="net-tip-test" hidden></div>
         </div>
       </div>
@@ -219,8 +229,8 @@
         <div class="card-head">
           <h2>Test set</h2>
           <div class="legend">
-            <span><span class="swatch ring"></span>called Regular</span>
-            <span><span class="swatch ring irregular"></span>called Irregular</span>
+            <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
+            <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
             <span><span class="swatch badge" style="background:var(--good)">✓</span>correct</span>
             <span><span class="swatch badge">✗</span>wrong</span>
           </div>
@@ -247,7 +257,7 @@
       <div class="verdict" id="verdict">
         <div class="p"><small class="lbl">network call</small><b class="soft">–</b></div>
         <div class="pbar"><div class="thr" id="pbar-thr" style="left:50%"></div><div class="marker" id="pbar-marker" style="left:50%"></div></div>
-        <div class="pbar-labels"><span>Regular</span><span>0.5</span><span>Irregular</span></div>
+        <div class="pbar-labels"><span data-cls="0"></span><span>0.5</span><span data-cls="1"></span></div>
         <div class="row" id="verdict-call"></div>
         <div class="evidence-sum" id="evidence-sum"></div>
       </div>
@@ -264,10 +274,11 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a fully connected network with hand-written backpropagation, trained in your browser on 100 synthetic nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the specimens with <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the specimens with <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
-<script src="data/nuclei_data.js"></script>
+<script src="data/enlargement/nuclei_data.js"></script>
+<script src="data/irregularity/nuclei_data.js"></script>
 <script src="js/features.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>

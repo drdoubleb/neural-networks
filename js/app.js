@@ -1,5 +1,5 @@
 /*
- * app.js — wires the dataset, the network and the drawings into the three-stage bench.
+ * app.js — wires the datasets, the network and the drawings into the three-stage bench.
  */
 (function () {
   'use strict';
@@ -9,8 +9,8 @@
 
   // ------------------------------------------------------------------ state
   const S = {
-    ds: null, size: 32,
-    mode: 'features', hidden: 0, activation: 'sigmoid', lr: 0.1, batch: 8, epochs: 60, speed: 4, seed: 1, augment: false, l2: 0, peek: false,
+    tasks: null, taskId: 'enlargement', task: null, ds: null, size: 32,
+    mode: 'pixels', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 30, speed: 4, seed: 1, augment: false, l2: 0, peek: true,
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
     trainEval: null, testEval: null,
@@ -21,10 +21,12 @@
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
   const RECIPES = {
-    1: { mode: 'features', hidden: 0, activation: 'sigmoid', lr: 0.1, batch: 8, epochs: 60, augment: false, l2: 0, peek: false, speed: 4 },
-    2: { mode: 'features', hidden: 4, activation: 'tanh', lr: 0.1, batch: 8, epochs: 60, augment: false, l2: 0, peek: false, speed: 4 },
-    3: { mode: 'pixels', hidden: 0, activation: 'sigmoid', lr: 0.01, batch: 8, epochs: 60, augment: false, l2: 0, peek: true, speed: 4 },
-    4: { mode: 'pixels', hidden: 8, activation: 'relu', lr: 0.02, batch: 8, epochs: 60, augment: true, l2: 0.02, peek: true, speed: 6 },
+    1: { task: 'enlargement',  mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 30, augment: false, l2: 0,    peek: true,  speed: 4 },
+    2: { task: 'irregularity', mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 60, augment: false, l2: 0,    peek: true,  speed: 4 },
+    3: { task: 'irregularity', mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60, augment: false, l2: 0,    peek: false, speed: 4 },
+    4: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60, augment: true,  l2: 0.02, peek: true,  speed: 6 },
+    5: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 8, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60, augment: true,  l2: 0.02, peek: true,  speed: 6 },
+    6: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 8, activation: 'relu', lr: 0.02, batch: 8, epochs: 30, augment: true,  l2: 0,    peek: true,  speed: 4 },
   };
 
   // ------------------------------------------------------------------ helpers
@@ -34,12 +36,38 @@
   function sliderFromLr(lr) { return Math.round((Math.log10(lr) + 3) / 3.5 * 100); }
   function speedFromSlider(v) { return +(Math.pow(10, -0.6 + 2.3 * v / 100)).toPrecision(2); } // 0.25 .. 50 epochs/s
   function sliderFromSpeed(s) { return Math.round((Math.log10(s) + 0.6) / 2.3 * 100); }
-  function classOf(label) { return label ? 'irregular' : 'regular'; }
-  function className(label) { return label ? 'Irregular' : 'Regular'; }
+  const classOf = label => (label ? 'pos' : 'neg');                 // css hook
+  const className = label => S.task.classes[label].name;            // display name
+  const posName = () => S.task.classes[1].name, negName = () => S.task.classes[0].name;
   function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id); }
   function isClassified(s) { return s.split === 'train' || S.test.results.has(s.id); }
 
-  // ------------------------------------------------------------------ model lifecycle
+  // ------------------------------------------------------------------ task + model lifecycle
+  function loadTask(id) {
+    S.taskId = id;
+    const raw = S.tasks[id];
+    S.task = raw.meta.task;
+    S.ds = DS.prepare(raw);
+    S.size = S.ds.size;
+    S.inputCache.clear();
+    S.selected = S.ds.train[0];
+    buildTrays();
+    // task-specific copy
+    $('task-title').textContent = S.task.title;
+    $('task-blurb').textContent = S.task.blurb;
+    $('meta-line').textContent = `${S.ds.specimens.length} synthetic nuclei · ${S.ds.train.length} training / ${S.ds.test.length} test · ${S.size} × ${S.size} px · seed ${raw.meta.seed}`;
+    document.querySelectorAll('#task-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.task === id));
+    document.querySelectorAll('[data-cls="0"]').forEach(el => { el.textContent = negName(); });
+    document.querySelectorAll('[data-cls="1"]').forEach(el => { el.textContent = posName(); });
+    document.querySelectorAll('[data-cls-called="0"]').forEach(el => { el.textContent = `called ${negName()}`; });
+    document.querySelectorAll('[data-cls-called="1"]').forEach(el => { el.textContent = `called ${posName()}`; });
+    $('scatter-x').value = id === 'enlargement' ? 0 : 5; $('scatter-y').value = id === 'enlargement' ? 2 : 4;
+    $('scatter-hint').textContent = id === 'enlargement'
+      ? 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.'
+      : 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.';
+    $('train-task').textContent = S.task.title;
+    $('test-task').textContent = S.task.title;
+  }
   function inputsFor(mode, augment) {
     const key = mode + (mode === 'pixels' && augment ? '+aug' : '');
     if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment }));
@@ -48,7 +76,9 @@
   function resetModel(reason) {
     stopTraining();
     S.inputs = inputsFor(S.mode, S.augment);
-    S.net = new NN.TinyNet({ inputSize: S.inputs.inputSize, hidden: S.hidden, activation: S.activation, seed: S.seed });
+    const conv = S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
+    const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
+    S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set();
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -87,12 +117,11 @@
     if (S.epoch >= S.epochs) { note(`Already at ${S.epochs} epochs. Raise the epoch count or reset to train again.`); return; }
     S.running = true; S.lastTime = performance.now(); S.debt = 0;
     $('btn-train').textContent = '⏸ Pause';
-    $('btn-train').classList.add('is-running');
     requestAnimationFrame(tick);
   }
   function stopTraining(msg) {
     S.running = false;
-    const b = $('btn-train'); if (b) { b.textContent = '▶ Train'; b.classList.remove('is-running'); }
+    const b = $('btn-train'); if (b) b.textContent = '▶ Train';
     if (msg) note(msg);
   }
   function tick(now) {
@@ -103,7 +132,7 @@
     const t0 = performance.now(); let did = false;
     while (S.debt >= 1 && performance.now() - t0 < 16) {
       trainStep(); S.debt -= 1; did = true;
-      if (S.ptr === 0 && S.epoch >= S.epochs) { stopTraining(`Finished ${S.epochs} epochs. Train accuracy ${pct(S.trainEval.accuracy)}. Head to 3 · Test.`); break; }
+      if (S.ptr === 0 && S.epoch >= S.epochs) { stopTraining(`Finished ${S.epochs} epochs. Train accuracy ${pct(S.trainEval.accuracy)}${S.peek ? `, test accuracy ${pct(S.testEval.accuracy)}` : ''}. Head to 3 · Test.`); break; }
     }
     if (S.debt > bpe) S.debt = bpe;
     if (did) renderTraining();
@@ -172,6 +201,8 @@
   }
   function buildTrays() {
     const dt = $('data-train-tray'), dx = $('data-test-tray'), tt = $('train-tray'), xt = $('test-tray');
+    for (const el of [dt, dx, tt, xt]) el.innerHTML = '';
+    for (const m of Object.values(thumbs)) m.clear();
     for (const s of S.ds.train) { dt.appendChild(makeThumb(s, thumbs.data, true)); tt.appendChild(makeThumb(s, thumbs.train, false)); }
     for (const s of S.ds.test) { dx.appendChild(makeThumb(s, thumbs.data, true)); xt.appendChild(makeThumb(s, thumbs.test, true)); }
   }
@@ -224,16 +255,15 @@
   function renderStatus() {
     const bpe = batchesPerEpoch();
     const bi = S.ptr === 0 ? bpe : Math.ceil(S.ptr / S.batch);
-    const h = S.history[S.history.length - 1];
     $('status').innerHTML =
+      `<span>architecture <b>${S.mode === 'features' ? '6 measurements' : '1,024 pixels'} → ${S.net.describe()} → output</b></span>` +
+      `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
+      `<span>training images <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
       `<span>loss <b>${S.trainEval.loss.toFixed(3)}</b></span>` +
       `<span>train accuracy <b>${pct(S.trainEval.accuracy)}</b></span>` +
-      (S.peek ? `<span>test accuracy <b>${pct(S.testEval.accuracy)}</b> (peeking)</span>` : '') +
-      `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
-      `<span>training images <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}</span>`;
-    void h;
+      (S.peek ? `<span>test accuracy <b>${pct(S.testEval.accuracy)}</b> (peeking)</span>` : '');
   }
   function graphModel(spec, stage, hover) {
     const s = spec || null;
@@ -244,11 +274,12 @@
       fw = S.net.forward(x);
       if (!allowed) { fw = null; stage = 0; }
     }
-    return { net: S.net, mode: S.mode, x, fw, featureNames: NF.FEATURES.map(f => f.name), specimen: s, size: S.size, tint: S.tint, stage, hover, activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label };
+    return { net: S.net, mode: S.mode, x, fw, featureNames: NF.FEATURES.map(f => f.name), specimen: s, size: S.size, tint: S.tint, stage, hover,
+      activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
     const cv = $('net-canvas');
-    const m = graphModel(S.selected && S.selected.split === 'train' ? S.selected : (S.selected || null), 2, S.hover.train);
+    const m = graphModel(S.selected || null, 2, S.hover.train);
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -270,9 +301,8 @@
     $('acc-now').textContent = pct(S.trainEval.accuracy);
     $('curves-legend-test').hidden = !S.peek;
   }
-  function renderTraining(full) {
-    if (!S.trainEval || full) evaluateAll();
-    else evaluateAll();
+  function renderTraining() {
+    evaluateAll();
     renderStatus();
     if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); renderCharts(); }
     if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
@@ -288,19 +318,18 @@
     $('stat-sens').textContent = st.sens == null ? '–' : pct(st.sens);
     $('stat-spec').textContent = st.spec == null ? '–' : pct(st.spec);
     $('stat-acc-sub').textContent = st.n ? `${st.tp + st.tn} of ${st.n} correct` : 'no calls yet';
-    $('stat-sens-sub').textContent = st.tp + st.fn ? `${st.tp} of ${st.tp + st.fn} irregular caught` : 'no irregular seen yet';
-    $('stat-spec-sub').textContent = st.tn + st.fp ? `${st.tn} of ${st.tn + st.fp} regular cleared` : 'no regular seen yet';
+    $('stat-sens-sub').textContent = st.tp + st.fn ? `${st.tp} of ${st.tp + st.fn} ${posName().toLowerCase()} caught` : `no ${posName().toLowerCase()} seen yet`;
+    $('stat-spec-sub').textContent = st.tn + st.fp ? `${st.tn} of ${st.tn + st.fp} ${negName().toLowerCase()} cleared` : `no ${negName().toLowerCase()} seen yet`;
     const cell = (v, kind) => `<div class="cell ${v ? kind : 'empty'}">${v}</div>`;
     $('confusion').innerHTML =
-      `<div></div><div class="hd">called regular</div><div class="hd">called irregular</div>` +
-      `<div class="rh">truth regular</div>${cell(st.tn, 'hit')}${cell(st.fp, 'miss')}` +
-      `<div class="rh">truth irregular</div>${cell(st.fn, 'miss')}${cell(st.tp, 'hit')}`;
+      `<div></div><div class="hd">called ${negName()}</div><div class="hd">called ${posName()}</div>` +
+      `<div class="rh">truth ${negName()}</div>${cell(st.tn, 'hit')}${cell(st.fp, 'miss')}` +
+      `<div class="rh">truth ${posName()}</div>${cell(st.fn, 'miss')}${cell(st.tp, 'hit')}`;
     $('btn-classify-next').disabled = S.test.next >= S.ds.test.length;
     $('btn-classify-all').disabled = S.test.next >= S.ds.test.length;
     $('btn-classify-next').textContent = S.test.next >= S.ds.test.length ? 'All 20 classified' : `Classify next (${S.test.next + 1} of ${S.ds.test.length})`;
     $('threshold-val').textContent = S.test.threshold.toFixed(2);
-    const untrained = S.epoch === 0 && S.net.steps === 0;
-    $('test-warning').hidden = !untrained;
+    $('test-warning').hidden = !(S.epoch === 0 && S.net.steps === 0);
   }
 
   // ------------------------------------------------------------------ rendering: inspector
@@ -337,7 +366,7 @@
         const sal = new Float64Array(g.length);
         for (let i = 0; i < g.length; i++) sal[i] = g[i] * x[i];
         Viz.renderEvidence(cv, s.px, s.size, sal, S.tint);
-        caption = 'Orange pixels push the score toward Irregular, blue toward Regular (weight × input at each pixel).';
+        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (weight × input at each pixel).`;
       } else { Viz.renderMeasurement(cv, s.px, s.size, m, S.tint); caption = 'In measurement mode the evidence is per measurement — see the “push” column below.'; }
     }
     $('spec-caption').textContent = caption;
@@ -352,7 +381,7 @@
     } else {
       const thr = s.split === 'test' ? S.test.threshold : 0.5;
       const call = fw.p >= thr ? 1 : 0;
-      v.querySelector('.p').innerHTML = `<small class="lbl">P(irregular)</small><b>${fw.p.toFixed(3)}</b><small>score z = ${Viz.fmtSigned(fw.z, 2)}</small>`;
+      v.querySelector('.p').innerHTML = `<small class="lbl">P(${posName()})</small><b>${fw.p.toFixed(3)}</b><small>score z = ${Viz.fmtSigned(fw.z, 2)}</small>`;
       let chips = `<span class="chip ${classOf(call)}">call: ${className(call)}</span>`;
       if (known) chips += call === s.label ? `<span class="chip good">✓ agrees with truth</span>` : `<span class="chip bad">✗ truth is ${className(s.label)}</span>`;
       $('verdict-call').innerHTML = chips;
@@ -360,8 +389,8 @@
       $('pbar-thr').style.left = (thr * 100).toFixed(1) + '%';
       const g = S.net.inputGradient(x, fw);
       let sum = 0; for (let i = 0; i < g.length; i++) sum += g[i] * x[i];
-      const exact = S.net.H === 0;
-      $('evidence-sum').innerHTML = `evidence Σ(weight × input) ${exact ? '=' : '≈'} ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.b2, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}${exact ? '' : '<br><span class="muted">(with a hidden layer the per-input evidence is a linear approximation)</span>'}`;
+      const exact = !S.net.conv && S.net.hidden.length === 0;
+      $('evidence-sum').innerHTML = `evidence Σ(weight × input) ${exact ? '=' : '≈'} ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}${exact ? '' : '<br><span class="muted">(with hidden layers or a convolution the per-input evidence is a linear approximation)</span>'}`;
     }
 
     // measurement table
@@ -381,7 +410,7 @@
       return `<tr><td class="name" title="${f.desc.replace(/"/g, '&quot;')}">${f.name}</td><td class="n">${f.fmt(val)}${f.unit ? ' ' + f.unit : ''}</td><td class="n">${Viz.fmtSigned(z, 1)}</td>${featMode ? `<td>${bar}</td>` : ''}</tr>`;
     }).join('');
     $('feat-push-head').hidden = !featMode;
-    $('feat-note').textContent = featMode ? 'push = weight × standardized value: how far this measurement moves the score (orange → Irregular, blue → Regular).' : 'In pixel mode the network never sees these measurements — they are here for you, the human.';
+    $('feat-note').textContent = featMode ? `push = weight × standardized value: how far this measurement moves the score (orange → ${posName()}, blue → ${negName()}).` : 'In pixel mode the network never sees these measurements — they are here for you, the human.';
   }
 
   // ------------------------------------------------------------------ data panel
@@ -389,7 +418,7 @@
     const xi = +$('scatter-x').value, yi = +$('scatter-y').value;
     const pts = S.ds.specimens.filter(s => s.split === 'train' || S.revealTest).map(s => ({
       id: s.id, name: s.name, x: s.features[xi], y: s.features[yi], split: s.split,
-      cls: truthKnown(s) ? classOf(s.label) : 'unknown', selected: S.selected && S.selected.id === s.id,
+      cls: truthKnown(s) ? classOf(s.label) : 'unknown', clsName: truthKnown(s) ? className(s.label) : '', selected: S.selected && S.selected.id === s.id,
     }));
     Viz.drawScatter($('scatter'), { points: pts, xLabel: NF.FEATURES[xi].name, yLabel: NF.FEATURES[yi].name, onSelect: id => selectSpecimen(S.ds.specimens[id]) });
   }
@@ -397,8 +426,10 @@
   // ------------------------------------------------------------------ controls
   function syncControls() {
     document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === S.mode));
-    $('hidden').value = S.hidden; $('hidden-val').textContent = S.hidden === 0 ? 'none' : S.hidden;
-    $('activation').value = S.activation; $('activation').disabled = S.hidden === 0;
+    $('hidden').value = S.h1; $('hidden-val').textContent = S.h1 === 0 ? 'none' : S.h1;
+    $('hidden2').value = S.h2; $('hidden2-val').textContent = S.h1 === 0 ? '–' : (S.h2 === 0 ? 'none' : S.h2); $('hidden2').disabled = S.h1 === 0;
+    $('conv').value = S.mode === 'pixels' ? S.convK : 0; $('conv').disabled = S.mode !== 'pixels';
+    $('activation').value = S.activation; $('activation').disabled = S.h1 === 0;
     $('lr').value = sliderFromLr(S.lr); $('lr-val').textContent = S.lr;
     $('batch').value = S.batch;
     $('epochs').value = S.epochs; $('epochs-val').textContent = S.epochs;
@@ -411,6 +442,12 @@
     $('threshold').value = S.test.threshold;
   }
   function bindControls() {
+    document.querySelectorAll('#task-seg button').forEach(b => b.addEventListener('click', () => {
+      if (S.taskId === b.dataset.task) return;
+      loadTask(b.dataset.task);
+      resetModel(`Question changed to “${S.task.title}” — new specimens, fresh random weights.`);
+      renderDataTrays(); renderScatter(); renderInspector();
+    }));
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode) return;
       S.mode = b.dataset.mode;
@@ -418,7 +455,9 @@
       if (S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
       syncControls(); resetModel(`Input changed to ${S.mode === 'pixels' ? 'raw pixels' : 'measurements'} — fresh random weights.`);
     }));
-    $('hidden').addEventListener('input', () => { S.hidden = +$('hidden').value; syncControls(); resetModel(`Hidden layer set to ${S.hidden || 'none'} — fresh random weights.`); });
+    $('hidden').addEventListener('input', () => { S.h1 = +$('hidden').value; syncControls(); resetModel(`Hidden layer 1 set to ${S.h1 || 'none'} — fresh random weights.`); });
+    $('hidden2').addEventListener('input', () => { S.h2 = +$('hidden2').value; syncControls(); resetModel(`Hidden layer 2 set to ${S.h2 || 'none'} — fresh random weights.`); });
+    $('conv').addEventListener('change', () => { S.convK = +$('conv').value; resetModel(S.convK ? `Convolutional layer with ${S.convK} filters — fresh random weights.` : 'Convolution removed — fresh random weights.'); });
     $('activation').addEventListener('change', () => { S.activation = $('activation').value; resetModel('Activation changed — fresh random weights.'); });
     $('lr').addEventListener('input', () => { S.lr = lrFromSlider(+$('lr').value); $('lr-val').textContent = S.lr; });
     $('batch').addEventListener('change', () => { S.batch = +$('batch').value; S.ptr = 0; renderStatus(); });
@@ -434,8 +473,13 @@
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
     document.querySelectorAll('.recipe').forEach(b => b.addEventListener('click', () => {
-      Object.assign(S, RECIPES[b.dataset.recipe]);
-      syncControls(); resetModel(`Recipe loaded: ${b.textContent.trim()}. Press Train.`);
+      const { task: taskId, ...settings } = RECIPES[b.dataset.recipe];
+      const switchTask = taskId !== S.taskId;
+      Object.assign(S, settings);
+      if (switchTask) loadTask(taskId);
+      syncControls();
+      resetModel(`Recipe loaded: ${b.textContent.trim()}${switchTask ? ` (question switched to “${S.task.title}”)` : ''}. Press Train.`);
+      if (switchTask) { renderDataTrays(); renderScatter(); renderInspector(); }
     }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
@@ -454,7 +498,6 @@
       onThemeChange();
     });
     document.querySelectorAll('.stage').forEach(b => b.addEventListener('click', () => showStage(b.dataset.stage)));
-    // hover tooltips on the network diagrams
     for (const [key, cvId, tipId] of [['train', 'net-canvas', 'net-tip'], ['test', 'net-canvas-test', 'net-tip-test']]) {
       const cv = $(cvId), tip = $(tipId);
       cv.addEventListener('mousemove', ev => {
@@ -465,7 +508,7 @@
         S.hover[key] = hit;
         if (hit) { tip.hidden = false; tip.textContent = hit.text; tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
         else tip.hidden = true;
-        if ((prev && prev.ref) !== (hit && hit.ref)) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
+        if ((prev && prev.ref) !== (hit && hit.ref) || (hit && hit.ref && (hit.ref.kind === 'map' || hit.ref.kind === 'fmap'))) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
     }
@@ -488,7 +531,7 @@
     S.stage = name;
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test';
-    if (name === 'data') { renderDataTrays(); renderScatter(); }
+    if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
     if (name === 'train') { if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0]; renderTraining(); }
     if (name === 'test') { stopTraining(); renderTestPanel(); if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; } renderTestGraph(); renderInspector(); renderDataTrays(); }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
@@ -498,17 +541,14 @@
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
-    S.ds = DS.prepare(window.NUCLEI_DATA);
-    S.size = S.ds.size;
-    $('meta-line').textContent = `${S.ds.specimens.length} synthetic nuclei · ${S.ds.train.length} training / ${S.ds.test.length} test · ${S.size} × ${S.size} px · generated with seed ${window.NUCLEI_DATA.meta.seed}`;
+    S.tasks = window.NUCLEI_TASKS;
     const opts = NF.FEATURES.map((f, i) => `<option value="${i}">${f.name}</option>`).join('');
     $('scatter-x').innerHTML = opts; $('scatter-y').innerHTML = opts;
-    $('scatter-x').value = 5; $('scatter-y').value = 4;
     $('feature-list').innerHTML = NF.FEATURES.map(f => `<li><strong>${f.name}</strong> — ${f.desc}</li>`).join('');
-    buildTrays();
+    $('task-seg').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => `<button type="button" data-task="${t.meta.task.id}">${t.meta.task.order} · ${t.meta.task.title}</button>`).join('');
     bindControls();
+    loadTask(S.taskId);
     syncControls();
-    S.selected = S.ds.train[0];
     resetModel();
     renderDataTrays(); renderScatter(); renderInspector();
     onThemeChange();

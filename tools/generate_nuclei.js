@@ -1,23 +1,24 @@
 #!/usr/bin/env node
 /*
- * generate_nuclei.js — builds the synthetic nucleus dataset used by the demo.
+ * generate_nuclei.js — builds the synthetic nucleus datasets used by the demo, one per lecture question.
  *
  * Zero dependencies (Node >= 16). Run:  node tools/generate_nuclei.js
  *
- * Writes:
- *   data/nuclei_data.js        all 100 images (base64 grayscale) + labels + split, loaded by index.html
- *   data/nuclei.json           manifest: labels, split, and the generator parameters of every nucleus
- *   data/images/train/*.png    80 training nuclei  (40 regular, 40 irregular)
- *   data/images/test/*.png     20 test nuclei      (10 regular, 10 irregular)
- *   data/contact_sheet.png     all 100 at 4x, class-coloured frames, for slides
+ * For each task (data/enlargement, data/irregularity) it writes:
+ *   nuclei_data.js        all 100 images (base64 grayscale) + labels + split, loaded by index.html
+ *   nuclei.json           manifest: labels, split, and the generator parameters of every nucleus
+ *   images/train/*.png    80 training nuclei  (40 + 40)
+ *   images/test/*.png     20 test nuclei      (10 + 10)
+ *   contact_sheet.png     all 100 at 4x, class-coloured frames, for slides
  *
  * Design of the data (this matters for the lecture):
  *   - Every nucleus is a dark shape on a pale background, 32x32 pixels, 8-bit grayscale.
- *   - Size, elongation, rotation, darkness, chromatin texture, nucleolus presence and position jitter
- *     are drawn from the SAME distributions for both classes. The only systematic difference between
- *     "regular" and "irregular" is the contour: regular nuclei are smooth ellipses, irregular nuclei
- *     have lobulated, notched/blebbed or finely jagged outlines. So the only honest way to score well
- *     is to look at the contour.
+ *   - Task "irregularity": size, elongation, rotation, darkness, chromatin texture, nucleolus presence and
+ *     position jitter are drawn from the SAME distributions for both classes. The only systematic difference
+ *     between "regular" and "irregular" is the contour: smooth ellipses versus lobulated, notched/blebbed or
+ *     finely jagged outlines.
+ *   - Task "enlargement": the classes differ in size and darkness (bland = small and pale, enlarged = large
+ *     and hyperchromatic), and now the contour is the decoy: half of each class is irregular.
  */
 'use strict';
 const fs = require('fs');
@@ -25,12 +26,32 @@ const path = require('path');
 const zlib = require('zlib');
 
 // ----------------------------------------------------------------------------- config
-const SEED = 20260922;          // change to get a different but reproducible dataset
 const SIZE = 32;                // image side in pixels
 const SS = 4;                   // supersampling factor for anti-aliased contours
 const N_PER_CLASS = 50;         // 50 regular + 50 irregular = 100 nuclei
 const N_TEST_PER_CLASS = 10;    // 10 + 10 = 20 test, the remaining 80 train
-const OUT = path.join(__dirname, '..', 'data');
+const DATA_ROOT = path.join(__dirname, '..', 'data');
+
+const TASKS = [
+  {
+    id: 'enlargement', order: 1, seed: 20260923,
+    title: 'Enlarged and hyperchromatic?',
+    short: 'Enlargement',
+    classes: [{ key: 'bland', name: 'Bland' }, { key: 'enlarged', name: 'Enlarged' }],
+    blurb: 'Half the nuclei are bland: small and pale. Half are enlarged and hyperchromatic: bigger and darker, the first thing residents learn to look for. Everything else is a decoy, and this time that includes the contour: half of each class has an irregular outline.',
+    decoys: 'contour shape, elongation, rotation, chromatin texture, nucleolus and position',
+    signal: 'size and darkness',
+  },
+  {
+    id: 'irregularity', order: 2, seed: 20260922,
+    title: 'Irregular contour?',
+    short: 'Irregularity',
+    classes: [{ key: 'regular', name: 'Regular' }, { key: 'irregular', name: 'Irregular' }],
+    blurb: 'Half the nuclei have a smooth, elliptical membrane; half are irregular: lobulated, notched or finely jagged. Size, elongation, rotation, hyperchromasia, chromatin texture, a nucleolus and position in the crop are drawn from the same distribution in both groups. The only honest way to score well is to look at the outline.',
+    decoys: 'size, elongation, rotation, darkness, chromatin texture, nucleolus and position',
+    signal: 'the contour',
+  },
+];
 
 // ----------------------------------------------------------------------------- PRNG
 function mulberry32(seed) {
@@ -43,7 +64,7 @@ function mulberry32(seed) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-const rand = mulberry32(SEED);
+let rand = mulberry32(1); // re-seeded per task below
 const uniform = (lo, hi) => lo + (hi - lo) * rand();
 const randint = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1)); // inclusive
 function gaussian() {
@@ -79,9 +100,9 @@ function makeValueNoise(cells) {
 // ----------------------------------------------------------------------------- contour models
 // The contour is an ellipse (semi-axes a, b, rotation phi) whose radius is multiplied by (1 + m(theta)).
 // m(theta) is a sum of low-order harmonics plus optional localised notches (negative) or blebs (positive).
-function sampleShapeParams(label) {
+function sampleShapeParams(label, task) {
   const p = {
-    a: uniform(8.5, 11.0),                      // semi-major axis, px
+    a: task.id === 'enlargement' ? (label ? uniform(10.0, 12.0) : uniform(7.5, 9.5)) : uniform(8.5, 11.0), // semi-major axis, px
     aspect: uniform(1.0, 1.4),                  // major/minor
     phi: uniform(0, Math.PI),                   // rotation
     cx: SIZE / 2 + uniform(-1.0, 1.0),          // centre jitter
@@ -91,7 +112,10 @@ function sampleShapeParams(label) {
     style: 'smooth',
   };
   p.b = p.a / p.aspect;
-  if (label === 0) {
+  // which contour family? in the irregularity task it IS the label; in the enlargement task it is a coin flip
+  const contourClass = task.id === 'irregularity' ? label : (rand() < 0.5 ? 0 : 1);
+  p.contourClass = contourClass;
+  if (contourClass === 0) {
     // regular: essentially a perfect ellipse, at most a faint egg-shape
     p.style = 'smooth';
     const k = randint(2, 3);
@@ -135,11 +159,11 @@ function contourRms(p) {
 }
 
 // ----------------------------------------------------------------------------- appearance (shared by both classes)
-function sampleAppearance() {
+function sampleAppearance(label, task) {
   return {
     bg: uniform(0.88, 0.94),                 // background intensity (pale eosin)
     bgNoise: 0.02,
-    nucleus: uniform(0.30, 0.46),            // mean nuclear intensity (hematoxylin)
+    nucleus: task.id === 'enlargement' ? (label ? uniform(0.22, 0.36) : uniform(0.40, 0.52)) : uniform(0.30, 0.46), // mean nuclear intensity
     textureAmp: uniform(0.04, 0.09),         // chromatin clumping amplitude
     grain: 0.018,                            // per-pixel grain
     rim: uniform(0.03, 0.08),                // slightly darker nuclear membrane / margination
@@ -244,25 +268,30 @@ function encodePNG(width, height, channels, pixels) {
 }
 
 // ----------------------------------------------------------------------------- build the set
-function makeOne(label) {
-  // resample until the contour is unambiguously in its class
+function makeOne(label, task) {
+  // resample until the contour is unambiguously smooth or unambiguously irregular
   for (let tries = 0; tries < 50; tries++) {
-    const shape = sampleShapeParams(label);
+    const shape = sampleShapeParams(label, task);
     const rms = contourRms(shape);
-    if (label === 0 && rms > 0.02) continue;
-    if (label === 1 && rms < 0.065) continue;
-    const look = sampleAppearance();
+    if (shape.contourClass === 0 && rms > 0.02) continue;
+    if (shape.contourClass === 1 && rms < 0.065) continue;
+    const look = sampleAppearance(label, task);
     return { shape, look, rms };
   }
   throw new Error('could not sample a nucleus');
 }
 
-const regular = [], irregular = [];
-for (let i = 0; i < N_PER_CLASS; i++) regular.push({ label: 0, ...makeOne(0) });
-for (let i = 0; i < N_PER_CLASS; i++) irregular.push({ label: 1, ...makeOne(1) });
-shuffle(regular); shuffle(irregular);
-const test = shuffle([...regular.slice(0, N_TEST_PER_CLASS), ...irregular.slice(0, N_TEST_PER_CLASS)]);
-const train = shuffle([...regular.slice(N_TEST_PER_CLASS), ...irregular.slice(N_TEST_PER_CLASS)]);
+for (const task of TASKS) buildTask(task);
+
+function buildTask(task) {
+const OUT = path.join(DATA_ROOT, task.id);
+rand = mulberry32(task.seed);
+const negatives = [], positives = [];
+for (let i = 0; i < N_PER_CLASS; i++) negatives.push({ label: 0, ...makeOne(0, task) });
+for (let i = 0; i < N_PER_CLASS; i++) positives.push({ label: 1, ...makeOne(1, task) });
+shuffle(negatives); shuffle(positives);
+const test = shuffle([...negatives.slice(0, N_TEST_PER_CLASS), ...positives.slice(0, N_TEST_PER_CLASS)]);
+const train = shuffle([...negatives.slice(N_TEST_PER_CLASS), ...positives.slice(N_TEST_PER_CLASS)]);
 const all = [...train.map(n => ({ ...n, split: 'train' })), ...test.map(n => ({ ...n, split: 'test' }))];
 
 fs.mkdirSync(path.join(OUT, 'images', 'train'), { recursive: true });
@@ -276,18 +305,18 @@ for (let i = 0; i < all.length; i++) {
   const n = all[i];
   const img = renderNucleus(n.shape, n.look);
   const k = n.split === 'train' ? ++trainIdx : ++testIdx;
-  const file = `${n.split}_${String(k).padStart(2, '0')}_${n.label ? 'irregular' : 'regular'}.png`;
+  const file = `${n.split}_${String(k).padStart(2, '0')}_${task.classes[n.label].key}.png`;
   fs.writeFileSync(path.join(OUT, 'images', n.split, file), encodePNG(SIZE, SIZE, 1, img));
   records.push({
     id: i,
     name: `${n.split === 'train' ? 'T' : 'X'}${String(k).padStart(2, '0')}`,
     split: n.split,
     label: n.label,
-    className: n.label ? 'irregular' : 'regular',
+    className: task.classes[n.label].key,
     file: `images/${n.split}/${file}`,
     px: Buffer.from(img).toString('base64'),
     generator: {
-      style: n.shape.style,
+      style: n.shape.style, contourIrregular: n.shape.contourClass === 1,
       semiMajor: +n.shape.a.toFixed(2), semiMinor: +n.shape.b.toFixed(2),
       rotationDeg: +(n.shape.phi * 180 / Math.PI).toFixed(1),
       centre: [+n.shape.cx.toFixed(2), +n.shape.cy.toFixed(2)],
@@ -327,19 +356,21 @@ for (let i = 0; i < all.length; i++) {
 
 const meta = {
   generated: new Date().toISOString().slice(0, 10),
-  seed: SEED, size: SIZE, count: records.length,
+  seed: task.seed, size: SIZE, count: records.length,
   train: records.filter(r => r.split === 'train').length,
   test: records.filter(r => r.split === 'test').length,
-  classes: ['regular', 'irregular'],
-  note: 'Synthetic nuclei. Size, elongation, rotation, darkness, texture, nucleolus and position are drawn from identical distributions in both classes; only the contour differs.',
+  task: { id: task.id, order: task.order, title: task.title, short: task.short, classes: task.classes, blurb: task.blurb, decoys: task.decoys, signal: task.signal },
+  classes: task.classes.map(c => c.key),
 };
 fs.writeFileSync(path.join(OUT, 'nuclei.json'), JSON.stringify({ meta, nuclei: records.map(({ px, ...rest }) => rest) }, null, 1));
 const js = `// Generated by tools/generate_nuclei.js — do not edit by hand.\n` +
-  `// ${meta.count} synthetic nuclei, ${SIZE}x${SIZE} 8-bit grayscale, base64 of the raw pixel rows (0 = black, 255 = white).\n` +
-  `window.NUCLEI_DATA = ${JSON.stringify({ meta, nuclei: records.map(({ generator, ...rest }) => rest) })};\n`;
+  `// Task "${task.id}": ${meta.count} synthetic nuclei, ${SIZE}x${SIZE} 8-bit grayscale, base64 of the raw pixel rows (0 = black, 255 = white).\n` +
+  `window.NUCLEI_TASKS = window.NUCLEI_TASKS || {};\n` +
+  `window.NUCLEI_TASKS[${JSON.stringify(task.id)}] = ${JSON.stringify({ meta, nuclei: records.map(({ generator, ...rest }) => rest) })};\n`;
 fs.writeFileSync(path.join(OUT, 'nuclei_data.js'), js);
 
 const styles = {};
 for (const r of records) styles[r.generator.style] = (styles[r.generator.style] || 0) + 1;
-console.log(`wrote ${records.length} nuclei (${meta.train} train / ${meta.test} test) to ${OUT}`);
-console.log('contour styles:', styles);
+console.log(`[${task.id}] wrote ${records.length} nuclei (${meta.train} train / ${meta.test} test) to ${OUT}`);
+console.log('  contour styles:', styles);
+}

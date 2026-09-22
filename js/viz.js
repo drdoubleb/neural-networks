@@ -134,68 +134,123 @@ window.Viz = (function () {
     ctx.beginPath(); ctx.ellipse(0, 0, m.ellipse.a, m.ellipse.b, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // weight map: size*size weights drawn with the diverging scale, normalised to max |w|
-  const mapCache = new Map();
-  function weightMapCanvas(key, w, size, offset) {
-    let cv = mapCache.get(key);
-    if (!cv) { cv = document.createElement('canvas'); cv.width = size; cv.height = size; mapCache.set(key, cv); }
+
+  // ------------------------------------------------------------------ network diagram
+  const NET_W = 800, NET_H = 440;
+  function fmtSigned(v, d) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d); }
+  function fmtNum(v, d) { return v < 0 ? '−' + Math.abs(v).toFixed(d) : v.toFixed(d); }
+  const fmtInt = n => n.toLocaleString();
+
+  // small cached canvases for weight maps, filters and feature maps
+  const tileCache = new Map();
+  function tileCanvas(key, arr, offset, w, h, opt) {
+    let cv = tileCache.get(key);
+    if (!cv || cv.width !== w || cv.height !== h) { cv = document.createElement('canvas'); cv.width = w; cv.height = h; tileCache.set(key, cv); }
     const ctx = cv.getContext('2d');
-    const im = ctx.createImageData(size, size);
-    let max = 1e-9;
-    for (let i = 0; i < size * size; i++) max = Math.max(max, Math.abs(w[offset + i]));
-    for (let i = 0; i < size * size; i++) {
-      const c = divergingRgb(w[offset + i] / max);
+    const im = ctx.createImageData(w, h);
+    let max = opt && opt.max != null ? opt.max : 1e-9;
+    if (!(opt && opt.max != null)) for (let i = 0; i < w * h; i++) max = Math.max(max, Math.abs(arr[offset + i]));
+    max = Math.max(max, 1e-9);
+    for (let i = 0; i < w * h; i++) {
+      const v = arr[offset + i] / max;
+      const c = opt && opt.mode === 'sequential' ? sequentialRgb(Math.max(0, v)) : divergingRgb(v);
       im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = 255;
     }
     ctx.putImageData(im, 0, 0);
     return { canvas: cv, max };
   }
 
-  // ------------------------------------------------------------------ network diagram
-  const NET_W = 760, NET_H = 440;
-  function fmtSigned(v, d) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d); }
-  function fmtNum(v, d) { return v < 0 ? '−' + Math.abs(v).toFixed(d) : v.toFixed(d); }
+  function spread(n, yc, step) { return Array.from({ length: n }, (_, i) => yc + (i - (n - 1) / 2) * step); }
 
+  /*
+   * Layout: columns from left to right depending on the architecture.
+   *   measurements: inputs -> [units] -> [units] -> output
+   *   pixels:       image -> squares (first-layer weight maps) | map (no hidden) -> [units] -> output
+   *   pixels+conv:  image -> filters -> feature maps -> pooled -> [units] -> [units] -> output
+   */
   function layoutNetwork(m) {
-    const net = m.net, D = net.D, Hn = net.H;
-    const L = { W: NET_W, H: NET_H, inputs: [], hidden: [], edges: [], bands: [], singleMap: null, inputBlock: null, mode: m.mode };
-    const xOut = 668, xHid = 430;
-    L.output = { x: xOut, y: NET_H / 2, r: 26 };
+    const net = m.net, hidden = net.hidden, conv = net.conv;
+    const L = { W: NET_W, H: NET_H, nodes: [], edges: [], bands: [], captions: [], mode: m.mode };
+    const yc = NET_H / 2 + 8;
+    const add = n => { L.nodes.push(n); return n; };
+    const output = add({ kind: 'output', x: 722, y: yc, r: 26 });
+    const unitColumns = []; // arrays of unit nodes per dense hidden layer
+    const link = (from, to, w, layer, meta) => L.edges.push(Object.assign({ x1: from.x + (from.r || from.size / 2), y1: from.y, x2: to.x - (to.r || to.size / 2), y2: to.y, w, layer }, meta));
+
     if (m.mode === 'features') {
-      const xIn = 150;
-      const sp = Math.min(60, (NET_H - 80) / Math.max(1, D - 1));
-      for (let i = 0; i < D; i++) L.inputs.push({ kind: 'input', x: xIn, y: NET_H / 2 + (i - (D - 1) / 2) * sp, r: 16, i });
-      if (Hn > 0) {
-        const hs = Math.min(64, (NET_H - 80) / Math.max(1, Hn - 1));
-        for (let j = 0; j < Hn; j++) L.hidden.push({ kind: 'hidden', x: xHid, y: NET_H / 2 + (j - (Hn - 1) / 2) * hs, r: 18, j });
-        for (let j = 0; j < Hn; j++) for (let i = 0; i < D; i++) {
-          const a = L.inputs[i], b = L.hidden[j];
-          L.edges.push({ x1: a.x + a.r, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W1[j * D + i], layer: 1, i, j });
-        }
-        for (let j = 0; j < Hn; j++) { const b = L.hidden[j]; L.edges.push({ x1: b.x + b.r, y1: b.y, x2: L.output.x - L.output.r, y2: L.output.y, w: net.W2[j], layer: 2, j }); }
+      const D = net.D;
+      const xs = hidden.length === 0 ? [150] : hidden.length === 1 ? [150, 440] : [140, 400, 585];
+      const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: 16 }));
+      L.captions.push({ x: xs[0], text: `INPUT · ${D} MEASUREMENTS` });
+      let prev = inputs;
+      hidden.forEach((h, l) => {
+        const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));
+        unitColumns.push(col);
+        L.captions.push({ x: xs[l + 1], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
+        prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: m.featureNames[i], fromIdx: i, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
+        prev = col;
+      });
+      if (!hidden.length) L.captions.push({ x: 440, text: 'NO HIDDEN LAYER' });
+      prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], toName: 'output' }));
+    } else if (!conv) {
+      const img = add({ kind: 'image', x: 108, y: yc, w: 124, h: 124 });
+      L.captions.push({ x: 108, text: 'INPUT · 1,024 PIXELS' });
+      if (!hidden.length) {
+        const map = add({ kind: 'map', x: 440, y: yc, size: 132 });
+        L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 4], [map.x - map.size / 2, map.y - map.size / 2], [map.x - map.size / 2, map.y + map.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 4]], label: '1,024 weights' });
+        L.captions.push({ x: 440, text: 'WEIGHTS · ONE PER PIXEL' });
+        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ weight × pixel' });
       } else {
-        for (let i = 0; i < D; i++) { const a = L.inputs[i]; L.edges.push({ x1: a.x + a.r, y1: a.y, x2: L.output.x - L.output.r, y2: L.output.y, w: net.W2[i], layer: 2, i }); }
+        const xs = hidden.length === 1 ? [420] : [400, 585];
+        const h1 = hidden[0];
+        const size = Math.min(66, (NET_H - 100) / h1 - 8);
+        const squares = spread(h1, yc, size + 8).map((y, j) => add({ kind: 'square', j, x: xs[0], y, size }));
+        unitColumns.push(squares);
+        L.captions.push({ x: xs[0], text: `HIDDEN ${hidden.length > 1 ? '1' : ''} · ${h1} ${m.activationLabel.toUpperCase()}` });
+        for (const s of squares) L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 6], [s.x - s.size / 2, s.y - s.size / 2], [s.x - s.size / 2, s.y + s.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 6]], j: s.j });
+        L.bandLabel = { x: (img.x + img.w / 2 + xs[0] - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max |w|' };
+        let prev = squares;
+        if (hidden.length > 1) {
+          const col = spread(hidden[1], yc, Math.min(46, (NET_H - 110) / Math.max(1, hidden[1] - 1))).map((y, j) => add({ kind: 'unit', l: 1, j, x: xs[1], y, r: 17 }));
+          unitColumns.push(col);
+          L.captions.push({ x: xs[1], text: `HIDDEN 2 · ${hidden[1]} ${m.activationLabel.toUpperCase()}` });
+          prev.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: a.x + a.size / 2 + 14, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
+          prev = col;
+        }
+        prev.forEach((a, i) => L.edges.push({ x1: a.x + (a.r || a.size / 2 + 14), y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
       }
     } else {
-      L.inputBlock = { x: 46, y: NET_H / 2 - 62, w: 124, h: 124 };
-      if (Hn > 0) {
-        const s = Math.min(66, (NET_H - 50) / Hn - 8);
-        const step = s + 8;
-        for (let j = 0; j < Hn; j++) {
-          const y = NET_H / 2 + (j - (Hn - 1) / 2) * step;
-          L.hidden.push({ kind: 'hidden', x: xHid, y, size: s, r: s / 2, j });
-          const b = L.inputBlock;
-          L.bands.push({ pts: [[b.x + b.w, b.y + 6], [xHid - s / 2, y - s / 2], [xHid - s / 2, y + s / 2], [b.x + b.w, b.y + b.h - 6]], j });
-          L.edges.push({ x1: xHid + s / 2 + 12, y1: y, x2: L.output.x - L.output.r, y2: L.output.y, w: net.W2[j], layer: 2, j });
-        }
-      } else {
-        const s = 132;
-        L.singleMap = { kind: 'map', x: xHid, y: NET_H / 2, size: s, r: s / 2 };
-        const b = L.inputBlock;
-        L.bands.push({ pts: [[b.x + b.w, b.y + 4], [xHid - s / 2, NET_H / 2 - s / 2], [xHid - s / 2, NET_H / 2 + s / 2], [b.x + b.w, b.y + b.h - 4]], j: -1 });
-        L.edges.push({ x1: xHid + s / 2, y1: NET_H / 2, x2: L.output.x - L.output.r, y2: L.output.y, w: 1, layer: 0 });
-      }
+      const K = conv.K;
+      const img = add({ kind: 'image', x: 80, y: yc, w: 100, h: 100 });
+      L.captions.push({ x: 30, text: 'INPUT · 1,024 PX', align: 'left' });
+      const rowStep = (NET_H - 100) / K;
+      const fs = Math.min(38, rowStep - 6), ms = Math.min(50, rowStep - 4), ps = Math.min(32, rowStep - 8);
+      const xF = 212, xM = 282, xP = 350;
+      const ys = spread(K, yc, rowStep);
+      const filters = ys.map((y, k) => add({ kind: 'filter', k, x: xF, y, size: fs }));
+      const fmaps = ys.map((y, k) => add({ kind: 'fmap', k, x: xM, y, size: ms }));
+      const pooled = ys.map((y, k) => add({ kind: 'pooled', k, x: xP, y, size: ps }));
+      L.captions.push({ x: (xF + xP) / 2 + 14, text: `CONV · ${K} FILTERS ${conv.f}×${conv.f} · RELU · MAX-POOL ${conv.pool}×${conv.pool}` });
+      L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2], [xF - fs / 2 - 4, ys[0] - fs / 2], [xF - fs / 2 - 4, ys[K - 1] + fs / 2], [img.x + img.w / 2, img.y + img.h / 2]], label: '' });
+      L.bandLabel = { x: (img.x + img.w / 2 + xF - fs / 2) / 2, y: 44, text: 'each filter slides over the image' };
+      L.footnotes = [{ x: xF, text: 'filters' }, { x: xM, text: 'feature maps' }, { x: xP, text: 'pooled' }];
+      const F = net.featureCount;
+      const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [520] : [485, 610];
+      const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
+      let prev = null;
+      hidden.forEach((h, l) => {
+        const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l], y, r: 17 }));
+        unitColumns.push(col);
+        L.captions.push({ x: xs[l], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
+        if (l === 0) { for (const u of col) L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [u.x - u.r, u.y - u.r], [u.x - u.r, u.y + u.r], [poolBox.x1, poolBox.yBot]], unit: u }); L.bandLabel2 = { x: (poolBox.x1 + xs[0]) / 2, y: 44, text: `${fmtInt(F)} weights per unit` }; }
+        else prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
+        prev = col;
+      });
+      if (!hidden.length) { L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [output.x - output.r, output.y - output.r], [output.x - output.r, output.y + output.r], [poolBox.x1, poolBox.yBot]] }); L.bandLabel2 = { x: (poolBox.x1 + output.x) / 2, y: 44, text: `${fmtInt(F)} weights` }; }
+      else prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
     }
+    L.captions.push({ x: output.x, text: 'OUTPUT' });
+    L.output = output; L.unitColumns = unitColumns;
     return L;
   }
 
@@ -211,22 +266,28 @@ window.Viz = (function () {
     return ctx;
   }
 
-  function nodeFillText(ctx, x, y, r, fill, text, font) {
+  function circleNode(ctx, x, y, r, fill, text, font, ring) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fillStyle = fill; ctx.fill();
-    ctx.lineWidth = 1.5; ctx.strokeStyle = colors().lineStrong; ctx.stroke();
+    ctx.lineWidth = ring ? 2 : 1.5; ctx.strokeStyle = ring ? colors().ink : colors().lineStrong; ctx.stroke();
     if (text != null) {
-      const rgb = typeof fill === 'string' && fill.startsWith('rgb') ? hexToRgb(fill) : colors().rgb.surface;
+      const rgb = typeof fill === 'string' && fill.startsWith('rgb') ? hexToRgb(fill) : hexToRgb(fill);
       ctx.fillStyle = luminance(rgb) < 0.5 ? '#ffffff' : colors().ink;
       ctx.font = font || `500 11px "IBM Plex Mono", ui-monospace, monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(text, x, y + 0.5);
     }
   }
+  function unitFill(a, layerActs, signed) {
+    if (a == null) return colors().surface2;
+    if (signed) return diverging(Math.max(-1, Math.min(1, a)));
+    let max = 1; for (let i = 0; i < layerActs.length; i++) max = Math.max(max, Math.abs(layerActs[i]));
+    return rgbStr(sequentialRgb(Math.abs(a) / max));
+  }
 
   /*
    * m = { net, mode, x (standardized input or null), fw (forward result or null), featureNames, specimen, size, tint,
-   *       stage (0 input only, 1 + hidden, 2 + output; default 2), hover {x,y} in logical coords or null, activationLabel }
+   *       stage (0 input only, 1 + hidden, 2 + output; default 2), hover, activation, activationLabel, positiveName }
    */
   function drawNetwork(canvas, m) {
     const ctx = fitCanvas(canvas, NET_W, NET_H);
@@ -235,33 +296,30 @@ window.Viz = (function () {
     canvas._layout = L;
     const stage = m.stage == null ? 2 : m.stage;
     const net = m.net, fw = m.fw;
+    const signed = ACT_SIGNED(m.activation);
     ctx.clearRect(0, 0, NET_W, NET_H);
     ctx.fillStyle = c.surface; ctx.fillRect(0, 0, NET_W, NET_H);
     const labelFont = `500 12px "IBM Plex Sans", system-ui, sans-serif`;
     const monoFont = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
-    const capFont = `600 12px "IBM Plex Sans", system-ui, sans-serif`;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`;
+    const hovered = m.hover ? m.hover.ref : null;
 
-    // layer captions
+    // captions
     ctx.font = capFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    const inX = m.mode === 'features' ? 150 : L.inputBlock.x + L.inputBlock.w / 2;
-    ctx.fillText(m.mode === 'features' ? 'INPUT · 6 MEASUREMENTS' : 'INPUT · 1,024 PIXELS', inX, 10);
-    if (net.H > 0) ctx.fillText(`HIDDEN · ${net.H} UNIT${net.H > 1 ? 'S' : ''} · ${(m.activationLabel || '').toUpperCase()}`, 430, 10);
-    else if (m.mode === 'pixels') ctx.fillText('WEIGHTS · ONE PER PIXEL', 430, 10);
-    else ctx.fillText('NO HIDDEN LAYER', 430, 10);
-    ctx.fillText('OUTPUT', L.output.x, 10);
+    for (const cap of L.captions) { ctx.textAlign = cap.align || 'center'; ctx.fillText(cap.text, cap.x, 10); }
+    ctx.textAlign = 'center';
+    if (L.footnotes) { ctx.font = monoFont; for (const f of L.footnotes) ctx.fillText(f.text, f.x, 25); }
 
-    // bands (pixel mode)
+    // bands
     for (const b of L.bands) {
       ctx.beginPath(); b.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
       ctx.fillStyle = rgbStr(c.rgb.accent, 0.07); ctx.fill();
       ctx.strokeStyle = rgbStr(c.rgb.accent, 0.35); ctx.lineWidth = 1; ctx.stroke();
     }
-    if (L.bands.length) {
-      ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const b0 = L.bands[Math.floor(L.bands.length / 2)];
-      const mx = (b0.pts[0][0] + b0.pts[1][0]) / 2;
-      ctx.fillText(net.H > 0 ? '1,024 weights per unit · each map scaled to its own max |w|' : '1,024 weights', mx, NET_H - 22);
-    }
+    ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (L.bandLabel) ctx.fillText(L.bandLabel.text, L.bandLabel.x, L.bandLabel.y || NET_H - 16);
+    if (L.bandLabel2) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16);
+    if (L.bands.length && L.bands[0].label) ctx.fillText(L.bands[0].label, L.bandLabel ? L.bandLabel.x : 300, NET_H - 16);
 
     // edges, weak first so strong ones sit on top
     const maxAbs = {};
@@ -269,141 +327,136 @@ window.Viz = (function () {
     const edges = L.edges.slice().sort((a, b) => Math.abs(a.w) / maxAbs[a.layer] - Math.abs(b.w) / maxAbs[b.layer]);
     for (const e of edges) {
       const rel = Math.abs(e.w) / maxAbs[e.layer];
-      const hovered = m.hover && m.hover.kind === 'edge' && m.hover.ref === e;
-      if (e.layer === 0) { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 2; }
+      const hov = hovered === e;
+      if (e.layer === 'sum') { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 2; }
       else {
         const rgb = e.w < 0 ? c.rgb.regular : c.rgb.irregular;
-        ctx.strokeStyle = rgbStr(rgb, hovered ? 1 : 0.18 + 0.82 * rel);
-        ctx.lineWidth = (0.6 + 5 * Math.pow(rel, 0.9)) * (hovered ? 1.4 : 1);
+        ctx.strokeStyle = rgbStr(rgb, hov ? 1 : 0.18 + 0.82 * rel);
+        ctx.lineWidth = (0.6 + 5 * Math.pow(rel, 0.9)) * (hov ? 1.4 : 1);
       }
       ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
-    }
-    if (L.singleMap) { // the sum symbol on the map -> output edge
-      const e = L.edges[0]; ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-      ctx.fillText('Σ weight × pixel', (e.x1 + e.x2) / 2, e.y1 - 6);
+      if (e.label) { ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(e.label, (e.x1 + e.x2) / 2, e.y1 - 6); }
     }
 
-    // input layer
+    // nodes
     const pending = c.surface2;
-    if (m.mode === 'features') {
-      for (const n of L.inputs) {
+    let fmapMax = 1e-9;
+    if (fw && fw.conv) for (let i = 0; i < fw.conv.act.length; i++) fmapMax = Math.max(fmapMax, fw.conv.act[i]);
+    for (const n of L.nodes) {
+      const isHov = hovered === n;
+      if (n.kind === 'input') {
         const z = m.x ? m.x[n.i] : null;
-        const fill = z == null ? pending : diverging(clamp(z / 2.5, -1, 1));
-        nodeFillText(ctx, n.x, n.y, n.r, fill, z == null ? '·' : fmtSigned(z, 1));
+        circleNode(ctx, n.x, n.y, n.r, z == null ? pending : diverging(Math.max(-1, Math.min(1, z / 2.5))), z == null ? '·' : fmtSigned(z, 1), null, isHov);
         ctx.font = labelFont; ctx.fillStyle = c.ink2; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
         ctx.fillText(m.featureNames[n.i], n.x - n.r - 10, n.y);
-      }
-    } else {
-      const b = L.inputBlock;
-      ctx.fillStyle = c.surface2; ctx.fillRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
-      if (m.specimen) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(imageToCanvas(m.specimen.px, m.size, m.tint), b.x, b.y, b.w, b.h);
-      } else {
-        ctx.font = labelFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('select a nucleus', b.x + b.w / 2, b.y + b.h / 2);
-      }
-      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8);
-      ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(m.specimen ? `${m.size}×${m.size} ink values, mean removed` : '', b.x + b.w / 2, b.y + b.h + 12);
-    }
-
-    // hidden layer
-    const hoveredNode = m.hover && m.hover.kind === 'node' ? m.hover.ref : null;
-    if (m.mode === 'features') {
-      for (const n of L.hidden) {
-        const a = fw && stage >= 1 ? fw.h[n.j] : null;
-        let fill = pending, txt = '·';
-        if (a != null) {
-          const signed = m.activation === 'tanh';
-          const hmax = Math.max(1, ...Array.from(fw.h).map(Math.abs));
-          fill = signed ? diverging(a) : rgbStr(sequentialRgb(Math.abs(a) / hmax));
-          txt = fmtNum(a, 2);
-        }
-        nodeFillText(ctx, n.x, n.y, n.r, fill, txt);
-        if (hoveredNode === n) { ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 3, 0, Math.PI * 2); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.stroke(); }
+      } else if (n.kind === 'image') {
+        const x0 = n.x - n.w / 2, y0 = n.y - n.h / 2;
+        ctx.fillStyle = c.surface2; ctx.fillRect(x0 - 4, y0 - 4, n.w + 8, n.h + 8);
+        if (m.specimen) { ctx.imageSmoothingEnabled = false; ctx.drawImage(imageToCanvas(m.specimen.px, m.size, m.tint), x0, y0, n.w, n.h); }
+        else { ctx.font = labelFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('select a nucleus', n.x, n.y); }
+        ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x0 - 4, y0 - 4, n.w + 8, n.h + 8);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        ctx.fillText(`b ${fmtSigned(net.b1[n.j], 2)}`, n.x, n.y + n.r + 4);
-      }
-    } else {
-      const squares = L.singleMap ? [L.singleMap] : L.hidden;
-      for (const n of squares) {
-        const isMap = n.kind === 'map';
-        const { canvas: mc, max } = weightMapCanvas(isMap ? 'out' : 'h' + n.j, isMap ? net.W2 : net.W1, m.size, isMap ? 0 : n.j * net.D);
+        ctx.fillText(m.specimen ? `${m.size}×${m.size} ink, mean removed` : '', n.x, y0 + n.h + 12);
+      } else if (n.kind === 'map' || n.kind === 'square' || n.kind === 'filter') {
+        let tile;
+        if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size);
+        else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size);
+        else tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f);
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(mc, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
-        ctx.strokeStyle = hoveredNode === n ? c.ink : c.lineStrong; ctx.lineWidth = hoveredNode === n ? 2 : 1;
+        ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
-        if (isMap || n.size >= 56) { ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`±${max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3); }
-        if (!isMap) {
-          const a = fw && stage >= 1 ? fw.h[n.j] : null;
-          const hmax = a != null ? Math.max(1, ...Array.from(fw.h).map(Math.abs)) : 1;
-          const fill = a == null ? pending : (m.activation === 'tanh' ? diverging(a) : rgbStr(sequentialRgb(Math.abs(a) / hmax)));
-          nodeFillText(ctx, n.x + n.size / 2 + 2, n.y, 11, fill, null);
-          if (a != null && n.size >= 40) {
-            ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
-            ctx.fillStyle = luminance(hexToRgb(fill)) < 0.5 ? '#fff' : c.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1), n.x + n.size / 2 + 2, n.y + 0.5);
-          }
+        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) { ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3); }
+        if (n.kind === 'square') {
+          const a = fw && stage >= 1 ? fw.a[1][n.j] : null;
+          circleNode(ctx, n.x + n.size / 2 + 2, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null || n.size < 40 ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);
+        }
+      } else if (n.kind === 'fmap' || n.kind === 'pooled') {
+        const side = n.kind === 'fmap' ? net.co : net.po;
+        const show = fw && fw.conv && stage >= 1;
+        if (show) {
+          const arr = n.kind === 'fmap' ? fw.conv.act : fw.conv.v;
+          const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax });
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        } else { ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size); }
+        ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
+        ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        // small arrows between filter -> map -> pooled
+        const prevX = n.kind === 'fmap' ? n.x - n.size / 2 - 8 : n.x - n.size / 2 - 6;
+        ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(prevX - 8, n.y); ctx.lineTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y - 3); ctx.moveTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y + 3); ctx.stroke();
+      } else if (n.kind === 'unit') {
+        const acts = fw && stage >= 1 ? fw.a[n.l + 1] : null;
+        const a = acts ? acts[n.j] : null;
+        circleNode(ctx, n.x, n.y, n.r, unitFill(a, acts || [], signed), a == null ? '·' : fmtNum(a, 2), null, isHov);
+        ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        if (L.unitColumns[n.l].length <= 8) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
+      } else if (n.kind === 'output') {
+        const p = fw && stage >= 2 ? fw.p : null;
+        circleNode(ctx, n.x, n.y, n.r, p == null ? pending : diverging((p - 0.5) * 2), p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
+        ctx.font = labelFont; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(`P(${m.positiveName})`, n.x, n.y + n.r + 6);
+        ctx.font = monoFont; ctx.fillStyle = c.ink3;
+        ctx.fillText(`b ${fmtSigned(net.bo, 2)}`, n.x, n.y + n.r + 24);
+        if (p != null) {
+          ctx.font = `700 13px "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif`;
+          ctx.fillStyle = p >= 0.5 ? c.irregular : c.regular; ctx.textBaseline = 'bottom';
+          ctx.fillText((p >= 0.5 ? m.positiveName : m.negativeName).toUpperCase(), n.x, n.y - n.r - 8);
         }
       }
-    }
-
-    // output
-    const o = L.output;
-    const p = fw && stage >= 2 ? fw.p : null;
-    const ofill = p == null ? pending : diverging((p - 0.5) * 2);
-    nodeFillText(ctx, o.x, o.y, o.r, ofill, p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`);
-    if (hoveredNode === o) { ctx.beginPath(); ctx.arc(o.x, o.y, o.r + 3, 0, Math.PI * 2); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.stroke(); }
-    ctx.font = labelFont; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText('P(irregular)', o.x, o.y + o.r + 6);
-    ctx.font = monoFont; ctx.fillStyle = c.ink3;
-    ctx.fillText(`b ${fmtSigned(net.b2, 2)}`, o.x, o.y + o.r + 24);
-    if (p != null) {
-      const call = p >= 0.5 ? 'IRREGULAR' : 'REGULAR';
-      ctx.font = `700 13px "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif`;
-      ctx.fillStyle = p >= 0.5 ? c.irregular : c.regular; ctx.textBaseline = 'bottom';
-      ctx.fillText(call, o.x, o.y - o.r - 8);
     }
     return L;
   }
+  function ACT_SIGNED(name) { return name === 'tanh'; }
 
-  // hit-test in logical coordinates; returns {kind:'node'|'edge', ref, text} or null
+  // hit-test in logical coordinates; returns { kind, ref, text } or null
   function hitNetwork(canvas, px, py, m) {
     const L = canvas._layout; if (!L) return null;
     const x = px * NET_W / canvas.clientWidth, y = py * NET_W / canvas.clientWidth;
     const net = m.net, fw = m.fw;
-    const near = (n, r) => Math.hypot(x - n.x, y - n.y) <= r;
-    if (near(L.output, L.output.r + 4)) return { kind: 'node', ref: L.output, text: fw ? `score z = ${fmtSigned(fw.z, 2)} → P(irregular) = ${fw.p.toFixed(3)} · bias ${fmtSigned(net.b2, 3)}` : `output · bias ${fmtSigned(net.b2, 3)}` };
-    for (const n of L.hidden) {
-      const r = n.size ? n.size / 2 + 14 : n.r + 4;
-      if (n.size ? (Math.abs(x - n.x - 6) <= n.size / 2 + 8 && Math.abs(y - n.y) <= n.size / 2 + 2) : near(n, r)) {
-        const a = fw ? ` · activation ${fmtNum(fw.h[n.j], 3)}` : '';
-        const mx = n.size ? (() => { let mm = 0; for (let i = 0; i < net.D; i++) mm = Math.max(mm, Math.abs(net.W1[n.j * net.D + i])); return ` · max |w| ${mm.toFixed(3)}`; })() : '';
-      return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1}${a}${mx} · bias ${fmtSigned(net.b1[n.j], 3)} · to output ${fmtSigned(net.W2[n.j], 3)}` };
+    const inBox = (n, pad) => Math.abs(x - n.x) <= n.size / 2 + pad && Math.abs(y - n.y) <= n.size / 2 + pad;
+    for (const n of L.nodes) {
+      if (n.kind === 'output' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: fw ? `score z = ${fmtSigned(fw.z, 2)} → P(${m.positiveName}) = ${fw.p.toFixed(3)} · bias ${fmtSigned(net.bo, 3)}` : `output · bias ${fmtSigned(net.bo, 3)}` };
+      if (n.kind === 'unit' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) {
+        const a = fw ? ` · activation ${fmtNum(fw.a[n.l + 1][n.j], 3)}` : '';
+        const out = n.l === net.hidden.length - 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
+        return { kind: 'node', ref: n, text: `hidden unit ${net.hidden.length > 1 ? (n.l + 1) + '.' : ''}${n.j + 1}${a} · bias ${fmtSigned(net.b[n.l][n.j], 3)}${out}` };
       }
-    }
-    if (L.singleMap && Math.abs(x - L.singleMap.x) <= L.singleMap.size / 2 && Math.abs(y - L.singleMap.y) <= L.singleMap.size / 2) {
-      const i = Math.floor((x - (L.singleMap.x - L.singleMap.size / 2)) / L.singleMap.size * m.size), j = Math.floor((y - (L.singleMap.y - L.singleMap.size / 2)) / L.singleMap.size * m.size);
-      const w = net.W2[j * m.size + i];
-      return { kind: 'node', ref: L.singleMap, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
-    }
-    for (const n of L.inputs) if (near(n, n.r + 4)) {
-      return { kind: 'node', ref: n, text: `${m.featureNames[n.i]}${m.x ? ` · standardized value ${fmtSigned(m.x[n.i], 2)}` : ''}` };
+      if (n.kind === 'input' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: `${m.featureNames[n.i]}${m.x ? ` · standardized value ${fmtSigned(m.x[n.i], 2)}` : ''}` };
+      if (n.kind === 'square' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 2, y - n.y) <= 13)) {
+        let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
+        const a = fw ? ` · activation ${fmtNum(fw.a[1][n.j], 3)}` : '';
+        const out = net.hidden.length === 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
+        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1}: 1,024 weights, max |w| ${mm.toFixed(3)}${a} · bias ${fmtSigned(net.b[0][n.j], 3)}${out}` };
+      }
+      if (n.kind === 'map' && inBox(n, 0)) {
+        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const w = net.Wo[j * m.size + i];
+        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
+      }
+      if (n.kind === 'filter' && inBox(n, 2)) {
+        let mm = 0; const f = net.conv.f; for (let i = 0; i < f * f; i++) mm = Math.max(mm, Math.abs(net.Wc[n.k * f * f + i]));
+        return { kind: 'node', ref: n, text: `filter ${n.k + 1}: ${f}×${f} weights, max |w| ${mm.toFixed(3)} · bias ${fmtSigned(net.bc[n.k], 3)}` };
+      }
+      if (n.kind === 'fmap' && inBox(n, 2)) {
+        if (!fw || !fw.conv) return { kind: 'node', ref: n, text: `feature map ${n.k + 1}: where filter ${n.k + 1} fires (${net.co}×${net.co})` };
+        const i = Math.max(0, Math.min(net.co - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * net.co))), j = Math.max(0, Math.min(net.co - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * net.co)));
+        return { kind: 'node', ref: n, text: `feature map ${n.k + 1} at (${i}, ${j}): ${fmtNum(fw.conv.act[(n.k * net.co + j) * net.co + i], 2)} · ${net.co}×${net.co} values` };
+      }
+      if (n.kind === 'pooled' && inBox(n, 2)) {
+        const F = net.po * net.po;
+        return { kind: 'node', ref: n, text: `pooled map ${n.k + 1}: the largest response in each ${net.conv.pool}×${net.conv.pool} block (${net.po}×${net.po} = ${F} values to the next layer)` };
+      }
     }
     let best = null, bestD = 6;
     for (const e of L.edges) {
-      if (e.layer === 0) continue;
+      if (e.layer === 'sum') continue;
       const dx = e.x2 - e.x1, dy = e.y2 - e.y1, len2 = dx * dx + dy * dy;
-      const t = clamp(((x - e.x1) * dx + (y - e.y1) * dy) / len2, 0, 1);
+      const t = Math.max(0, Math.min(1, ((x - e.x1) * dx + (y - e.y1) * dy) / len2));
       const d = Math.hypot(x - (e.x1 + t * dx), y - (e.y1 + t * dy));
       if (d < bestD) { bestD = d; best = e; }
     }
-    if (best) {
-      const from = best.layer === 1 ? m.featureNames[best.i] : (best.j != null ? `unit ${best.j + 1}` : m.featureNames[best.i]);
-      const to = best.layer === 1 ? `unit ${best.j + 1}` : 'output';
-      return { kind: 'edge', ref: best, text: `weight ${from} → ${to}: ${fmtSigned(best.w, 3)}` };
-    }
+    if (best) return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}` };
     return null;
   }
 
@@ -506,7 +559,7 @@ window.Viz = (function () {
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
       const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}`;
-      g += `<circle class="${cls}" data-id="${p.id}" r="${p.selected ? 6 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.cls !== 'unknown' ? ' · ' + p.cls : ''}</title></circle>`;
+      g += `<circle class="${cls}" data-id="${p.id}" r="${p.selected ? 6 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.clsName ? ' · ' + p.clsName : ''}</title></circle>`;
     }
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.innerHTML = g;

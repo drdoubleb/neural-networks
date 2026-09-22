@@ -1,8 +1,10 @@
 /*
- * nn.js — a tiny fully-connected network with hand-written backpropagation.
- *   inputs (D) -> optional hidden layer (H units, sigmoid/tanh/ReLU) -> 1 output (sigmoid) = P(irregular)
- * Trained with plain mini-batch gradient descent on binary cross-entropy.
- * Works in the browser (window.TinyNet) and in Node (module.exports).
+ * nn.js — a small neural network with hand-written backpropagation.
+ *
+ *   input  ->  [optional convolution: K filters f×f, ReLU, max-pool p×p]  ->  [0, 1 or 2 dense hidden layers]  ->  sigmoid output
+ *
+ * The output is P(positive class). Trained with mini-batch gradient descent on binary cross-entropy,
+ * with optional weight decay. Works in the browser (window.TinyNet) and in Node (module.exports).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -22,123 +24,164 @@
   }
 
   const ACTIVATIONS = {
-    sigmoid: { label: 'Sigmoid', f: z => 1 / (1 + Math.exp(-z)), df: (z, a) => a * (1 - a), range: [0, 1] },
-    tanh:    { label: 'Tanh',    f: z => Math.tanh(z),           df: (z, a) => 1 - a * a,   range: [-1, 1] },
-    relu:    { label: 'ReLU',    f: z => (z > 0 ? z : 0),        df: (z, a) => (z > 0 ? 1 : 0), range: [0, Infinity] },
+    sigmoid: { label: 'Sigmoid', f: z => 1 / (1 + Math.exp(-z)), df: (z, a) => a * (1 - a), signed: false },
+    tanh:    { label: 'Tanh',    f: z => Math.tanh(z),           df: (z, a) => 1 - a * a,   signed: true },
+    relu:    { label: 'ReLU',    f: z => (z > 0 ? z : 0),        df: (z, a) => (z > 0 ? 1 : 0), signed: false },
   };
   const sigmoid = z => 1 / (1 + Math.exp(-z));
   const EPS = 1e-7;
   const bce = (p, y) => -(y * Math.log(p + EPS) + (1 - y) * Math.log(1 - p + EPS));
 
-  class TinyNet {
-    constructor({ inputSize, hidden = 0, activation = 'sigmoid', seed = 1 }) {
-      this.D = inputSize;
-      this.H = hidden;
-      this.activation = activation;
-      this.seed = seed;
+  class Net {
+    /*
+     * inputSize   number of inputs (6 measurements, or 1024 pixels)
+     * imageSize   side of the image when the input is pixels (needed for convolution)
+     * conv        null, or { K: filters, f: filter side, pool: pooling side }
+     * hidden      [] | [h1] | [h1, h2] dense hidden layer sizes
+     * activation  'sigmoid' | 'tanh' | 'relu' for the dense hidden layers (the convolution always uses ReLU)
+     */
+    constructor({ inputSize, imageSize = 0, conv = null, hidden = [], activation = 'relu', seed = 1 }) {
+      this.D = inputSize; this.size = imageSize;
+      this.conv = conv && conv.K > 0 ? { K: conv.K, f: conv.f || 5, pool: conv.pool || 4 } : null;
+      this.hidden = (hidden || []).filter(h => h > 0);
+      this.activation = activation; this.seed = seed;
       this.init();
     }
     init() {
       const rnd = mulberry32(this.seed * 7919 + 17);
       const u = s => (rnd() * 2 - 1) * s;
-      const D = this.D, H = this.H;
-      if (H > 0) {
-        const s1 = Math.sqrt(6 / (D + H));
-        this.W1 = new Float64Array(H * D); for (let i = 0; i < H * D; i++) this.W1[i] = u(s1);
-        this.b1 = new Float64Array(H);
-        const s2 = Math.sqrt(6 / (H + 1));
-        this.W2 = new Float64Array(H); for (let j = 0; j < H; j++) this.W2[j] = u(s2);
-      } else {
-        this.W1 = null; this.b1 = null;
-        const s = Math.sqrt(6 / (D + 1));
-        this.W2 = new Float64Array(D); for (let i = 0; i < D; i++) this.W2[i] = u(s);
+      let d0 = this.D;
+      if (this.conv) {
+        const { K, f, pool } = this.conv;
+        this.co = this.size - f + 1; this.po = Math.floor(this.co / pool);
+        this.Wc = new Float64Array(K * f * f); const sc = Math.sqrt(6 / (f * f + K));
+        for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = u(sc);
+        this.bc = new Float64Array(K);
+        d0 = K * this.po * this.po;
       }
-      this.b2 = 0;
+      this.sizes = [d0, ...this.hidden];
+      this.W = []; this.b = [];
+      for (let l = 0; l < this.hidden.length; l++) {
+        // layers fed by pixels (or pooled maps) start small, so the learned structure shows through in the weight maps
+        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], s = fanIn >= 256 ? 0.02 : Math.sqrt(6 / (fanIn + fanOut));
+        const W = new Float64Array(fanOut * fanIn); for (let i = 0; i < W.length; i++) W[i] = u(s);
+        this.W.push(W); this.b.push(new Float64Array(fanOut));
+      }
+      const last = this.sizes[this.sizes.length - 1], so = last >= 256 ? 0.01 : Math.sqrt(6 / (last + 1));
+      this.Wo = new Float64Array(last); for (let i = 0; i < last; i++) this.Wo[i] = u(so);
+      this.bo = 0;
       this.steps = 0;
     }
-    forward(x) {
-      const D = this.D, H = this.H;
-      let z = this.b2;
-      let pre = null, h = null;
-      if (H > 0) {
-        const act = ACTIVATIONS[this.activation];
-        pre = new Float64Array(H); h = new Float64Array(H);
-        for (let j = 0; j < H; j++) {
-          let s = this.b1[j]; const off = j * D;
-          for (let i = 0; i < D; i++) s += this.W1[off + i] * x[i];
-          pre[j] = s; h[j] = act.f(s);
-          z += this.W2[j] * h[j];
-        }
-      } else {
-        for (let i = 0; i < D; i++) z += this.W2[i] * x[i];
+    get H() { return this.hidden.length ? this.hidden[0] : 0; }           // first hidden layer width (0 = none)
+    get featureCount() { return this.sizes[0]; }                          // inputs to the first dense layer
+
+    convForward(x) {
+      const { K, f, pool } = this.conv, size = this.size, co = this.co, po = this.po, Wc = this.Wc;
+      const pre = new Float64Array(K * co * co), act = new Float64Array(K * co * co);
+      for (let k = 0; k < K; k++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+        let s = this.bc[k];
+        if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (k * 5 + dy) * 5; s += Wc[wrow] * x[row] + Wc[wrow + 1] * x[row + 1] + Wc[wrow + 2] * x[row + 2] + Wc[wrow + 3] * x[row + 3] + Wc[wrow + 4] * x[row + 4]; }
+        else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (k * f + dy) * f; for (let dx = 0; dx < f; dx++) s += Wc[wrow + dx] * x[row + dx]; }
+        const i = (k * co + oy) * co + ox; pre[i] = s; act[i] = s > 0 ? s : 0;
       }
-      const p = sigmoid(z);
-      return { pre, h, z, p };
+      const F = K * po * po, v = new Float64Array(F), arg = new Int32Array(F);
+      for (let k = 0; k < K; k++) for (let py = 0; py < po; py++) for (let px = 0; px < po; px++) {
+        let best = -Infinity, bi = -1;
+        for (let dy = 0; dy < pool; dy++) for (let dx = 0; dx < pool; dx++) { const i = (k * co + py * pool + dy) * co + px * pool + dx; if (act[i] > best) { best = act[i]; bi = i; } }
+        const j = (k * po + py) * po + px; v[j] = best; arg[j] = bi;
+      }
+      return { pre, act, v, arg };
+    }
+    forward(x) {
+      const act = ACTIVATIONS[this.activation];
+      const conv = this.conv ? this.convForward(x) : null;
+      const a = [conv ? conv.v : x], pre = [];
+      for (let l = 0; l < this.hidden.length; l++) {
+        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], W = this.W[l], inp = a[l];
+        const p = new Float64Array(fanOut), o = new Float64Array(fanOut);
+        for (let j = 0; j < fanOut; j++) { let s = this.b[l][j]; const off = j * fanIn; for (let i = 0; i < fanIn; i++) s += W[off + i] * inp[i]; p[j] = s; o[j] = act.f(s); }
+        pre.push(p); a.push(o);
+      }
+      const top = a[a.length - 1];
+      let z = this.bo; for (let i = 0; i < top.length; i++) z += this.Wo[i] * top[i];
+      // h / pre kept for the first hidden layer for backwards compatibility with the diagrams
+      return { conv, a, pre, h: a.length > 1 ? a[1] : null, z, p: sigmoid(z) };
     }
     predict(x) { return this.forward(x).p; }
 
-    // one gradient-descent step on a mini-batch (l2 = weight decay strength); returns the mean loss before the update
+    // backpropagate d(loss)/dz = dz through the dense layers; returns d(loss)/d(a0) (a0 = pooled conv features or the raw input)
+    backDense(fw, dz, g) {
+      const act = ACTIVATIONS[this.activation];
+      const top = fw.a[fw.a.length - 1];
+      let d = new Float64Array(top.length);
+      if (g) g.gbo += dz;
+      for (let i = 0; i < top.length; i++) { if (g) g.gWo[i] += dz * top[i]; d[i] = dz * this.Wo[i]; }
+      for (let l = this.hidden.length - 1; l >= 0; l--) {
+        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
+        const dn = new Float64Array(fanIn);
+        for (let j = 0; j < fanOut; j++) {
+          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]); if (dj === 0) continue;
+          if (g) g.gb[l][j] += dj;
+          const off = j * fanIn;
+          if (g) for (let i = 0; i < fanIn; i++) { g.gW[l][off + i] += dj * inp[i]; dn[i] += dj * W[off + i]; }
+          else for (let i = 0; i < fanIn; i++) dn[i] += dj * W[off + i];
+        }
+        d = dn;
+      }
+      return d;
+    }
+    // route d(loss)/d(pooled) back through pooling + ReLU to the conv pre-activations
+    backPool(fw, d0) {
+      const { K } = this.conv, co = this.co;
+      const dconv = new Float64Array(K * co * co);
+      for (let j = 0; j < d0.length; j++) { const i = fw.conv.arg[j]; if (i >= 0 && fw.conv.pre[i] > 0) dconv[i] += d0[j]; }
+      return dconv;
+    }
+
+    // one gradient-descent step on a mini-batch (l2 = weight decay); returns the mean loss before the update
     trainBatch(xs, ys, lr, l2 = 0) {
-      const D = this.D, H = this.H, n = xs.length;
+      const n = xs.length;
+      const g = { gW: this.W.map(W => new Float64Array(W.length)), gb: this.b.map(b => new Float64Array(b.length)), gWo: new Float64Array(this.Wo.length), gbo: 0 };
+      if (this.conv) { g.gWc = new Float64Array(this.Wc.length); g.gbc = new Float64Array(this.bc.length); }
       let loss = 0;
-      if (H > 0) {
-        const act = ACTIVATIONS[this.activation];
-        const gW1 = new Float64Array(H * D), gb1 = new Float64Array(H), gW2 = new Float64Array(H);
-        let gb2 = 0;
-        for (let k = 0; k < n; k++) {
-          const x = xs[k], y = ys[k];
-          const fw = this.forward(x);
-          loss += bce(fw.p, y);
-          const dz = fw.p - y;                    // dLoss/dz for sigmoid + cross-entropy
-          gb2 += dz;
-          for (let j = 0; j < H; j++) {
-            gW2[j] += dz * fw.h[j];
-            const dpre = dz * this.W2[j] * act.df(fw.pre[j], fw.h[j]);
-            gb1[j] += dpre;
-            const off = j * D;
-            for (let i = 0; i < D; i++) gW1[off + i] += dpre * x[i];
+      for (let k = 0; k < n; k++) {
+        const x = xs[k], fw = this.forward(x);
+        loss += bce(fw.p, ys[k]);
+        const d0 = this.backDense(fw, fw.p - ys[k], g);
+        if (this.conv) {
+          const { K, f } = this.conv, size = this.size, co = this.co;
+          const dconv = this.backPool(fw, d0);
+          for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+            const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
+            g.gbc[kk] += gg;
+            const gWc = g.gWc;
+            if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
+            else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
           }
         }
-        const s = lr / n, decay = 1 - lr * l2;
-        for (let i = 0; i < H * D; i++) this.W1[i] = this.W1[i] * decay - s * gW1[i];
-        for (let j = 0; j < H; j++) { this.b1[j] -= s * gb1[j]; this.W2[j] = this.W2[j] * decay - s * gW2[j]; }
-        this.b2 -= s * gb2;
-      } else {
-        const gW = new Float64Array(D);
-        let gb = 0;
-        for (let k = 0; k < n; k++) {
-          const x = xs[k], y = ys[k];
-          const fw = this.forward(x);
-          loss += bce(fw.p, y);
-          const dz = fw.p - y;
-          gb += dz;
-          for (let i = 0; i < D; i++) gW[i] += dz * x[i];
-        }
-        const s = lr / n, decay = 1 - lr * l2;
-        for (let i = 0; i < D; i++) this.W2[i] = this.W2[i] * decay - s * gW[i];
-        this.b2 -= s * gb;
       }
+      const s = lr / n, decay = 1 - lr * l2;
+      if (this.conv) { for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = this.Wc[i] * decay - s * g.gWc[i]; for (let k = 0; k < this.bc.length; k++) this.bc[k] -= s * g.gbc[k]; }
+      for (let l = 0; l < this.W.length; l++) { const W = this.W[l]; for (let i = 0; i < W.length; i++) W[i] = W[i] * decay - s * g.gW[l][i]; for (let j = 0; j < this.b[l].length; j++) this.b[l][j] -= s * g.gb[l][j]; }
+      for (let i = 0; i < this.Wo.length; i++) this.Wo[i] = this.Wo[i] * decay - s * g.gWo[i];
+      this.bo -= s * g.gbo;
       this.steps++;
       return loss / n;
     }
 
-    // d(score z)/d(input) — how much each input nudges the score toward "irregular"
+    // d(score z)/d(input): how much each input nudges the score toward the positive class
     inputGradient(x, fw) {
-      const D = this.D, H = this.H;
-      const g = new Float64Array(D);
-      if (H > 0) {
-        fw = fw || this.forward(x);
-        const act = ACTIVATIONS[this.activation];
-        for (let j = 0; j < H; j++) {
-          const c = this.W2[j] * act.df(fw.pre[j], fw.h[j]);
-          if (c === 0) continue;
-          const off = j * D;
-          for (let i = 0; i < D; i++) g[i] += c * this.W1[off + i];
-        }
-      } else {
-        g.set(this.W2);
+      fw = fw || this.forward(x);
+      const d0 = this.backDense(fw, 1, null);
+      if (!this.conv) return d0;
+      const { K, f } = this.conv, size = this.size, co = this.co;
+      const dconv = this.backPool(fw, d0);
+      const gx = new Float64Array(this.D);
+      for (let k = 0; k < K; k++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+        const gg = dconv[(k * co + oy) * co + ox]; if (gg === 0) continue;
+        for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (k * f + dy) * f; for (let dx = 0; dx < f; dx++) gx[row + dx] += gg * this.Wc[wrow + dx]; }
       }
-      return g;
+      return gx;
     }
 
     evaluate(xs, ys, threshold = 0.5) {
@@ -146,13 +189,23 @@
       const probs = new Float64Array(xs.length);
       for (let k = 0; k < xs.length; k++) {
         const p = this.predict(xs[k]);
-        probs[k] = p;
-        loss += bce(p, ys[k]);
+        probs[k] = p; loss += bce(p, ys[k]);
         if ((p >= threshold ? 1 : 0) === ys[k]) correct++;
       }
       return { loss: loss / xs.length, accuracy: correct / xs.length, probs };
     }
-    parameterCount() { return this.H > 0 ? this.H * this.D + this.H + this.H + 1 : this.D + 1; }
+    parameterCount() {
+      let n = this.Wo.length + 1;
+      for (let l = 0; l < this.W.length; l++) n += this.W[l].length + this.b[l].length;
+      if (this.conv) n += this.Wc.length + this.bc.length;
+      return n;
+    }
+    describe() {
+      const parts = [];
+      if (this.conv) parts.push(`${this.conv.K} filters ${this.conv.f}×${this.conv.f} + pool ${this.conv.pool}×${this.conv.pool}`);
+      if (this.hidden.length) parts.push(`${this.hidden.join(' + ')} ${ACTIVATIONS[this.activation].label} units`);
+      return parts.length ? parts.join(' → ') : 'single layer';
+    }
   }
 
   // z-scoring helpers. Fit on the training set only, apply to everything.
@@ -174,5 +227,27 @@
     };
   }
 
-  return { TinyNet, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid };
+  // finite-difference check of the analytic gradients on a tiny random instance; returns the worst relative error
+  function gradientCheck(opts) {
+    const net = new Net(Object.assign({ inputSize: 64, imageSize: 8, conv: { K: 2, f: 3, pool: 2 }, hidden: [3, 2], activation: 'sigmoid', seed: 3 }, opts || {}));
+    const rnd = mulberry32(11);
+    const x = new Float64Array(net.D); for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1;
+    const y = 1, eps = 1e-6;
+    const lossAt = () => bce(net.forward(x).p, y);
+    // analytic gradient via one lr=1 step on a batch of one (new = old - grad), then restore
+    const params = [...(net.conv ? [net.Wc, net.bc] : []), ...net.W, ...net.b, net.Wo];
+    const before = params.map(p => Float64Array.from(p)); const bo = net.bo;
+    net.trainBatch([x], [y], 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j]));
+    params.forEach((p, i) => p.set(before[i])); net.bo = bo; net.steps = 0;
+    let worst = 0, checked = 0;
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
+      const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
+      const num = (lp - lm) / (2 * eps);
+      if (Math.abs(num) > 1e-8) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+    } });
+    return { worst, checked };
+  }
+
+  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck };
 });
