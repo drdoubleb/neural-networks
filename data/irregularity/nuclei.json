@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-09-22",
+  "generated": "2026-09-23",
   "seed": 20260922,
   "size": 32,
   "count": 100,
@@ -9,6 +9,7 @@
   "task": {
    "id": "irregularity",
    "order": 2,
+   "kind": "image",
    "title": "Irregular contour?",
    "short": "Irregularity",
    "classes": [
@@ -23,7 +24,30 @@
    ],
    "blurb": "Half the nuclei have a smooth, elliptical membrane; half are irregular: lobulated, notched or finely jagged. Size, elongation, rotation, hyperchromasia, chromatin texture, a nucleolus and position in the crop are drawn from the same distribution in both groups. The only honest way to score well is to look at the outline.",
    "decoys": "size, elongation, rotation, darkness, chromatin texture, nucleolus and position",
-   "signal": "the contour"
+   "signal": "the contour",
+   "subtypes": [
+    {
+     "key": "smooth",
+     "name": "Smooth ellipse",
+     "positive": 0
+    },
+    {
+     "key": "lobulated",
+     "name": "Lobulated",
+     "positive": 1
+    },
+    {
+     "key": "notched",
+     "name": "Notched / blebbed",
+     "positive": 1
+    },
+    {
+     "key": "jagged",
+     "name": "Finely jagged",
+     "positive": 1
+    }
+   ],
+   "specimenNoun": "nucleus"
   },
   "classes": [
    "regular",
@@ -37,6 +61,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_01_regular.png",
    "generator": {
     "style": "smooth",
@@ -67,6 +92,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_02_irregular.png",
    "generator": {
     "style": "jagged",
@@ -109,6 +135,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_03_regular.png",
    "generator": {
     "style": "smooth",
@@ -139,6 +166,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_04_regular.png",
    "generator": {
     "style": "smooth",
@@ -169,6 +197,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_05_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -211,6 +240,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_06_regular.png",
    "generator": {
     "style": "smooth",
@@ -241,6 +271,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_07_regular.png",
    "generator": {
     "style": "smooth",
@@ -271,6 +302,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_08_irregular.png",
    "generator": {
     "style": "jagged",
@@ -317,6 +349,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_09_irregular.png",
    "generator": {
     "style": "notched",
@@ -352,6 +385,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_10_regular.png",
    "generator": {
     "style": "smooth",
@@ -382,6 +416,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_11_regular.png",
    "generator": {
     "style": "smooth",
@@ -412,6 +447,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_12_regular.png",
    "generator": {
     "style": "smooth",
@@ -442,6 +478,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_13_regular.png",
    "generator": {
     "style": "smooth",
@@ -472,6 +509,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_14_irregular.png",
    "generator": {
     "style": "notched",
@@ -507,6 +545,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_15_irregular.png",
    "generator": {
     "style": "notched",
@@ -542,6 +581,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_16_irregular.png",
    "generator": {
     "style": "notched",
@@ -577,6 +617,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_17_regular.png",
    "generator": {
     "style": "smooth",
@@ -607,6 +648,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_18_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -649,6 +691,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_19_regular.png",
    "generator": {
     "style": "smooth",
@@ -679,6 +722,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_20_regular.png",
    "generator": {
     "style": "smooth",
@@ -709,6 +753,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_21_regular.png",
    "generator": {
     "style": "smooth",
@@ -739,6 +784,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_22_irregular.png",
    "generator": {
     "style": "jagged",
@@ -781,6 +827,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_23_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -823,6 +870,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_24_regular.png",
    "generator": {
     "style": "smooth",
@@ -853,6 +901,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_25_regular.png",
    "generator": {
     "style": "smooth",
@@ -883,6 +932,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_26_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -921,6 +971,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_27_regular.png",
    "generator": {
     "style": "smooth",
@@ -951,6 +1002,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_28_irregular.png",
    "generator": {
     "style": "notched",
@@ -990,6 +1042,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_29_regular.png",
    "generator": {
     "style": "smooth",
@@ -1020,6 +1073,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_30_regular.png",
    "generator": {
     "style": "smooth",
@@ -1050,6 +1104,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_31_irregular.png",
    "generator": {
     "style": "jagged",
@@ -1096,6 +1151,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_32_irregular.png",
    "generator": {
     "style": "jagged",
@@ -1138,6 +1194,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_33_irregular.png",
    "generator": {
     "style": "notched",
@@ -1177,6 +1234,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_34_regular.png",
    "generator": {
     "style": "smooth",
@@ -1207,6 +1265,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_35_irregular.png",
    "generator": {
     "style": "notched",
@@ -1242,6 +1301,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_36_regular.png",
    "generator": {
     "style": "smooth",
@@ -1272,6 +1332,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_37_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1310,6 +1371,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_38_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1352,6 +1414,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_39_regular.png",
    "generator": {
     "style": "smooth",
@@ -1382,6 +1445,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_40_regular.png",
    "generator": {
     "style": "smooth",
@@ -1412,6 +1476,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_41_regular.png",
    "generator": {
     "style": "smooth",
@@ -1442,6 +1507,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_42_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1480,6 +1546,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_43_irregular.png",
    "generator": {
     "style": "notched",
@@ -1515,6 +1582,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_44_regular.png",
    "generator": {
     "style": "smooth",
@@ -1545,6 +1613,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_45_irregular.png",
    "generator": {
     "style": "jagged",
@@ -1591,6 +1660,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_46_regular.png",
    "generator": {
     "style": "smooth",
@@ -1621,6 +1691,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_47_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1659,6 +1730,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_48_irregular.png",
    "generator": {
     "style": "jagged",
@@ -1705,6 +1777,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_49_irregular.png",
    "generator": {
     "style": "notched",
@@ -1744,6 +1817,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_50_regular.png",
    "generator": {
     "style": "smooth",
@@ -1774,6 +1848,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_51_regular.png",
    "generator": {
     "style": "smooth",
@@ -1804,6 +1879,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_52_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1846,6 +1922,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_53_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1884,6 +1961,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_54_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -1922,6 +2000,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_55_irregular.png",
    "generator": {
     "style": "jagged",
@@ -1968,6 +2047,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_56_irregular.png",
    "generator": {
     "style": "notched",
@@ -2007,6 +2087,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_57_regular.png",
    "generator": {
     "style": "smooth",
@@ -2037,6 +2118,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_58_irregular.png",
    "generator": {
     "style": "jagged",
@@ -2083,6 +2165,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_59_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2125,6 +2208,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/train/train_60_irregular.png",
    "generator": {
     "style": "jagged",
@@ -2171,6 +2255,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_61_irregular.png",
    "generator": {
     "style": "notched",
@@ -2210,6 +2295,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_62_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2248,6 +2334,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_63_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2290,6 +2377,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_64_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2328,6 +2416,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_65_regular.png",
    "generator": {
     "style": "smooth",
@@ -2358,6 +2447,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_66_regular.png",
    "generator": {
     "style": "smooth",
@@ -2388,6 +2478,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_67_regular.png",
    "generator": {
     "style": "smooth",
@@ -2418,6 +2509,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_68_regular.png",
    "generator": {
     "style": "smooth",
@@ -2448,6 +2540,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_69_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2486,6 +2579,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_70_regular.png",
    "generator": {
     "style": "smooth",
@@ -2516,6 +2610,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_71_regular.png",
    "generator": {
     "style": "smooth",
@@ -2546,6 +2641,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/train/train_72_irregular.png",
    "generator": {
     "style": "notched",
@@ -2581,6 +2677,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_73_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2623,6 +2720,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_74_regular.png",
    "generator": {
     "style": "smooth",
@@ -2653,6 +2751,7 @@
    "split": "train",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/train/train_75_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2695,6 +2794,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_76_regular.png",
    "generator": {
     "style": "smooth",
@@ -2725,6 +2825,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_77_regular.png",
    "generator": {
     "style": "smooth",
@@ -2755,6 +2856,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_78_regular.png",
    "generator": {
     "style": "smooth",
@@ -2785,6 +2887,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_79_regular.png",
    "generator": {
     "style": "smooth",
@@ -2815,6 +2918,7 @@
    "split": "train",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/train/train_80_regular.png",
    "generator": {
     "style": "smooth",
@@ -2845,6 +2949,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/test/test_01_irregular.png",
    "generator": {
     "style": "notched",
@@ -2880,6 +2985,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_02_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -2918,6 +3024,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_03_regular.png",
    "generator": {
     "style": "smooth",
@@ -2948,6 +3055,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/test/test_04_irregular.png",
    "generator": {
     "style": "jagged",
@@ -2990,6 +3098,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_05_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -3028,6 +3137,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_06_regular.png",
    "generator": {
     "style": "smooth",
@@ -3058,6 +3168,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_07_regular.png",
    "generator": {
     "style": "smooth",
@@ -3088,6 +3199,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_08_regular.png",
    "generator": {
     "style": "smooth",
@@ -3118,6 +3230,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_09_regular.png",
    "generator": {
     "style": "smooth",
@@ -3148,6 +3261,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_10_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -3186,6 +3300,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_11_regular.png",
    "generator": {
     "style": "smooth",
@@ -3216,6 +3331,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_12_regular.png",
    "generator": {
     "style": "smooth",
@@ -3246,6 +3362,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_13_regular.png",
    "generator": {
     "style": "smooth",
@@ -3276,6 +3393,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_14_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -3314,6 +3432,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_15_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -3356,6 +3475,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "jagged",
    "file": "images/test/test_16_irregular.png",
    "generator": {
     "style": "jagged",
@@ -3398,6 +3518,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "lobulated",
    "file": "images/test/test_17_irregular.png",
    "generator": {
     "style": "lobulated",
@@ -3440,6 +3561,7 @@
    "split": "test",
    "label": 1,
    "className": "irregular",
+   "subtype": "notched",
    "file": "images/test/test_18_irregular.png",
    "generator": {
     "style": "notched",
@@ -3475,6 +3597,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_19_regular.png",
    "generator": {
     "style": "smooth",
@@ -3505,6 +3628,7 @@
    "split": "test",
    "label": 0,
    "className": "regular",
+   "subtype": "smooth",
    "file": "images/test/test_20_regular.png",
    "generator": {
     "style": "smooth",

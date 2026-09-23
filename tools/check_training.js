@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * check_training.js — trains the demo's six lecture recipes in Node and prints their accuracies,
+ * check_training.js — trains the demo's eight lecture recipes in Node and prints their accuracies,
  * so you can verify the datasets are learnable without a browser.  node tools/check_training.js [--seeds 5]
  */
 'use strict';
@@ -12,32 +12,34 @@ const DS = require('../js/dataset.js');
 
 const nSeeds = process.argv.includes('--seeds') ? +process.argv[process.argv.indexOf('--seeds') + 1] : 3;
 const window = {};
-for (const t of ['enlargement', 'irregularity']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', t, 'nuclei_data.js'), 'utf8'))(window);
+for (const f of ['leukaemia/patients_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const tasks = {};
-for (const [id, raw] of Object.entries(window.NUCLEI_TASKS)) tasks[id] = { raw, ds: DS.prepare(raw) };
+for (const [id, raw] of Object.entries(window.LECTURE_TASKS)) tasks[id] = { raw, ds: DS.prepare(raw) };
 
 const gc = gradientCheck();
 console.log(`gradient check (conv + two dense layers): ${gc.checked} gradients compared, worst relative error ${gc.worst.toExponential(1)} ${gc.worst < 1e-5 ? 'OK' : 'BAD'}`);
 
 for (const [id, t] of Object.entries(tasks)) {
   console.log(`\nTask "${t.raw.meta.task.title}" — class means on the training set (effect size d):`);
-  NF.FEATURES.forEach((f, i) => {
+  t.ds.featureDefs.forEach((f, i) => {
     const grp = lab => t.ds.train.filter(s => s.label === lab).map(s => s.features[i]);
     const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
     const sd = a => { const mu = mean(a); return Math.sqrt(a.reduce((x, y) => x + (y - mu) ** 2, 0) / a.length); };
     const r = grp(0), q = grp(1);
     const d = Math.abs(mean(q) - mean(r)) / Math.sqrt((sd(r) ** 2 + sd(q) ** 2) / 2);
-    console.log(`  ${f.name.padEnd(18)} ${t.raw.meta.task.classes[0].name.toLowerCase().padEnd(9)} ${mean(r).toFixed(3).padStart(8)}   ${t.raw.meta.task.classes[1].name.toLowerCase().padEnd(9)} ${mean(q).toFixed(3).padStart(8)}   d = ${d.toFixed(2)}`);
+    console.log(`  ${f.name.padEnd(22)} ${t.raw.meta.task.classes[0].name.toLowerCase().padEnd(13)} ${mean(r).toFixed(3).padStart(8)}   ${t.raw.meta.task.classes[1].name.toLowerCase().padEnd(13)} ${mean(q).toFixed(3).padStart(8)}   d = ${d.toFixed(2)}`);
   });
 }
 
 const RECIPES = [
-  { n: '①', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
-  { n: '②', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
-  { n: '③', label: 'Irregularity · measurements · single layer',                 task: 'irregularity', mode: 'features', hidden: [],     conv: null,               lr: 0.1,  epochs: 60, augment: false, l2: 0 },
-  { n: '④', label: 'Irregularity · pixels · 8 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
-  { n: '⑤', label: 'Irregularity · pixels · 8 + 8 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [8, 8], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
-  { n: '⑥', label: 'Irregularity · pixels · conv 8@5×5 + 8 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: { K: 8, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
+  { n: '①', label: 'Leukaemia · blood count · single layer',                       task: 'leukaemia',    mode: 'features', hidden: [],     conv: null,               lr: 0.05, epochs: 60,  augment: false, l2: 0 },
+  { n: '②', label: 'Leukaemia · blood count · 3 ReLU units',                       task: 'leukaemia',    mode: 'features', hidden: [3],    conv: null,               lr: 0.05, epochs: 150, augment: false, l2: 0 },
+  { n: '③', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
+  { n: '④', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
+  { n: '⑤', label: 'Irregularity · measurements · single layer',                 task: 'irregularity', mode: 'features', hidden: [],     conv: null,               lr: 0.1,  epochs: 60, augment: false, l2: 0 },
+  { n: '⑥', label: 'Irregularity · pixels · 8 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
+  { n: '⑦', label: 'Irregularity · pixels · 8 + 8 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [8, 8], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
+  { n: '⑧', label: 'Irregularity · pixels · conv 8@5×5 + 8 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: { K: 8, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
 ];
 function run(r, seed) {
   const ds = tasks[r.task].ds;

@@ -314,3 +314,41 @@ kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--li
   .thumb, .btn, .stage { transition: box-shadow 120ms ease, border-color 160ms ease, background-color 120ms ease; }
   .pbar .marker { transition: left 240ms ease; }
 }
+
+/* ---------- inputs picker, score card, unit profile, prevalence ---------- */
+.picker { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.picker label { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; color: var(--ink); }
+.picker input { accent-color: var(--accent); margin: 0; }
+.picker label.off { color: var(--ink-3); text-decoration: line-through; }
+.seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+.seg.small button { padding: 4px 8px; font-size: 12px; }
+table.score { width: 100%; max-width: 520px; border-collapse: collapse; font-size: 13px; }
+table.score td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+table.score td.n { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+table.score .bar { position: relative; height: 10px; background: var(--surface-2); border-radius: 3px; min-width: 120px; }
+table.score .bar i { position: absolute; top: 0; bottom: 0; }
+table.score .bar i.pos { background: var(--irregular); left: 50%; }
+table.score .bar i.neg { background: var(--regular); right: 50%; }
+table.score .bar::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line-strong); }
+.formula { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); margin-top: 8px; }
+table.profile { border-collapse: separate; border-spacing: 3px; font-size: 12px; }
+table.profile th { font-weight: 600; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 6px; text-align: center; white-space: nowrap; }
+table.profile th.row { text-align: left; }
+table.profile td { padding: 5px 8px; text-align: center; border-radius: 5px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+table.profile td.row { text-align: left; font-family: var(--font-body); white-space: nowrap; background: transparent; }
+table.profile td.row .n { color: var(--ink-3); font-size: 11px; margin-left: 4px; }
+table.profile td.row .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+table.profile td.top { font-family: var(--font-body); font-size: 11px; color: var(--ink-2); background: transparent; line-height: 1.35; }
+table.profile td.out { background: transparent; font-weight: 600; }
+.udot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+.profile-wrap { overflow-x: auto; }
+.prev-grid { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: flex-end; }
+.prev-grid .ctl { min-width: 240px; flex: 1 1 240px; }
+.prev-text { font-size: 13px; color: var(--ink-2); margin-top: 8px; max-width: 70ch; }
+table.feat td.flag { font-family: var(--font-mono); font-weight: 600; text-align: center; }
+table.feat td.flag.H { color: var(--irregular); }
+table.feat td.flag.L { color: var(--regular); }
+table.feat td.ref { font-family: var(--font-mono); color: var(--ink-3); white-space: nowrap; font-size: 12px; }
+table.feat tr.off td { color: var(--ink-3); }
+table.feat tr.off td.name { text-decoration: line-through; }
+body[data-kind="tabular"] .toggle.tint { display: none; }

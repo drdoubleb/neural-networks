@@ -184,15 +184,19 @@
       return gx;
     }
 
-    evaluate(xs, ys, threshold = 0.5) {
+    // withActs: also return each sample's first-hidden-layer activations (null when there is no hidden layer)
+    evaluate(xs, ys, threshold = 0.5, withActs = false) {
       let loss = 0, correct = 0;
       const probs = new Float64Array(xs.length);
+      const acts = withActs && this.hidden.length ? new Array(xs.length) : null;
       for (let k = 0; k < xs.length; k++) {
-        const p = this.predict(xs[k]);
+        const fw = this.forward(xs[k]);
+        const p = fw.p;
         probs[k] = p; loss += bce(p, ys[k]);
+        if (acts) acts[k] = fw.a[1];
         if ((p >= threshold ? 1 : 0) === ys[k]) correct++;
       }
-      return { loss: loss / xs.length, accuracy: correct / xs.length, probs };
+      return { loss: loss / xs.length, accuracy: correct / xs.length, probs, acts };
     }
     parameterCount() {
       let n = this.Wo.length + 1;

@@ -9,24 +9,27 @@
 
   // ------------------------------------------------------------------ state
   const S = {
-    tasks: null, taskId: 'enlargement', task: null, ds: null, size: 32,
-    mode: 'pixels', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 30, speed: 4, seed: 1, augment: false, l2: 0, peek: true,
+    tasks: null, taskId: 'leukaemia', task: null, ds: null, kind: 'tabular', size: 0, featureDefs: [],
+    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
+    excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
-    trainEval: null, testEval: null,
-    selected: null, view: 'image', tint: true, revealTest: false, stage: 'data',
-    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set() },
+    trainEval: null, testEval: null, profileAt: 0,
+    selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
+    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
     hover: { train: null, test: null },
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
   const RECIPES = {
-    1: { task: 'enlargement',  mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 30, augment: false, l2: 0,    peek: true,  speed: 4 },
-    2: { task: 'irregularity', mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 60, augment: false, l2: 0,    peek: true,  speed: 4 },
-    3: { task: 'irregularity', mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60, augment: false, l2: 0,    peek: false, speed: 4 },
-    4: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60, augment: true,  l2: 0.02, peek: true,  speed: 6 },
-    5: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 8, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60, augment: true,  l2: 0.02, peek: true,  speed: 6 },
-    6: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 8, activation: 'relu', lr: 0.02, batch: 8, epochs: 30, augment: true,  l2: 0,    peek: true,  speed: 4 },
+    1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
+    2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
+    3: { task: 'enlargement',  mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: false, l2: 0,    peek: true,  speed: 4 },
+    4: { task: 'irregularity', mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: true,  speed: 4 },
+    5: { task: 'irregularity', mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 4 },
+    6: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.02, peek: true,  speed: 6 },
+    7: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 8, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.02, peek: true,  speed: 6 },
+    8: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 8, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
   };
 
   // ------------------------------------------------------------------ helpers
@@ -36,11 +39,16 @@
   function sliderFromLr(lr) { return Math.round((Math.log10(lr) + 3) / 3.5 * 100); }
   function speedFromSlider(v) { return +(Math.pow(10, -0.6 + 2.3 * v / 100)).toPrecision(2); } // 0.25 .. 50 epochs/s
   function sliderFromSpeed(s) { return Math.round((Math.log10(s) + 0.6) / 2.3 * 100); }
-  const classOf = label => (label ? 'pos' : 'neg');                 // css hook
-  const className = label => S.task.classes[label].name;            // display name
+  function prevFromSlider(v) { return Math.pow(10, -4 + 3.7 * v / 100); }                       // 1 in 10,000 .. 1 in 2
+  function sliderFromPrev(p) { return Math.round((Math.log10(p) + 4) / 3.7 * 100); }
+  const classOf = label => (label ? 'pos' : 'neg');
+  const className = label => S.task.classes[label].name;
   const posName = () => S.task.classes[1].name, negName = () => S.task.classes[0].name;
+  const noun = (n) => { const w = S.task.specimenNoun || 'specimen'; return n === 1 ? w : (w === 'nucleus' ? 'nuclei' : w + 's'); };
   function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id); }
   function isClassified(s) { return s.split === 'train' || S.test.results.has(s.id); }
+  function subtypeName(key) { const st = (S.task.subtypes || []).find(t => t.key === key); return st ? st.name : key; }
+  const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
   // ------------------------------------------------------------------ task + model lifecycle
   function loadTask(id) {
@@ -48,35 +56,51 @@
     const raw = S.tasks[id];
     S.task = raw.meta.task;
     S.ds = DS.prepare(raw);
-    S.size = S.ds.size;
+    S.kind = S.ds.kind; S.size = S.ds.size; S.featureDefs = S.ds.featureDefs;
     S.inputCache.clear();
+    S.excluded = new Set();
     S.selected = S.ds.train[0];
+    if (S.kind === 'tabular') { S.mode = 'features'; S.convK = 0; S.augment = false; }
+    document.body.dataset.kind = S.kind;
     buildTrays();
-    // task-specific copy
     $('task-title').textContent = S.task.title;
     $('task-blurb').textContent = S.task.blurb;
-    $('meta-line').textContent = `${S.ds.specimens.length} synthetic nuclei · ${S.ds.train.length} training / ${S.ds.test.length} test · ${S.size} × ${S.size} px · seed ${raw.meta.seed}`;
+    $('meta-line').textContent = `${S.ds.specimens.length} synthetic ${noun(2)} · ${S.ds.train.length} training / ${S.ds.test.length} test${S.size ? ` · ${S.size} × ${S.size} px` : ''} · seed ${raw.meta.seed}`;
     document.querySelectorAll('#task-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.task === id));
     document.querySelectorAll('[data-cls="0"]').forEach(el => { el.textContent = negName(); });
     document.querySelectorAll('[data-cls="1"]').forEach(el => { el.textContent = posName(); });
     document.querySelectorAll('[data-cls-called="0"]').forEach(el => { el.textContent = `called ${negName()}`; });
     document.querySelectorAll('[data-cls-called="1"]').forEach(el => { el.textContent = `called ${posName()}`; });
-    $('scatter-x').value = id === 'enlargement' ? 0 : 5; $('scatter-y').value = id === 'enlargement' ? 2 : 4;
-    $('scatter-hint').textContent = id === 'enlargement'
-      ? 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.'
-      : 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.';
+    document.querySelectorAll('[data-noun]').forEach(el => { el.textContent = noun(2); });
+    $('train-count').textContent = `${S.ds.train.length}`; $('test-count').textContent = `${S.ds.test.length}`;
+    $('stat-n-sub').textContent = `held-out ${noun(2)}`;
+    $('train-count-2').textContent = `${S.ds.train.length} ${noun(2)}`; $('test-count-2').textContent = `${S.ds.test.length} ${noun(2)}`;
+    $('feature-heading').textContent = S.kind === 'tabular' ? `The ${S.featureDefs.length} parameters the network can see` : 'The six measurements';
+    $('feature-list').innerHTML = S.featureDefs.map(f => `<li><strong>${esc(f.name)}</strong>${f.unit ? ` (${esc(f.unit)})` : ''}${f.low != null ? ` · reference ${f.low}–${f.high}` : ''} — ${esc(f.desc)}</li>`).join('');
+    const opts = S.featureDefs.map((f, i) => `<option value="${i}">${esc(f.name)}</option>`).join('');
+    $('scatter-x').innerHTML = opts; $('scatter-y').innerHTML = opts;
+    const ax = { leukaemia: [0, 5], enlargement: [0, 2], irregularity: [5, 4] }[id] || [0, 1];
+    $('scatter-x').value = ax[0]; $('scatter-y').value = ax[1];
+    $('scatter-hint').textContent = {
+      leukaemia: 'WBC against lymphocytes shows why no single parameter works: CLL and viral lymphocytosis overlap, and acute leukaemia sits at both ends of the WBC axis. Try platelets against haemoglobin, or basophils against immature granulocytes.',
+      enlargement: 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.',
+      irregularity: 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.',
+    }[id] || '';
     $('train-task').textContent = S.task.title;
     $('test-task').textContent = S.task.title;
+    $('mode-pixels').disabled = S.kind === 'tabular';
+    $('mode-pixels').title = S.kind === 'tabular' ? 'Blood counts have no pixels' : '';
+    renderInputPicker();
   }
-  function inputsFor(mode, augment) {
-    const key = mode + (mode === 'pixels' && augment ? '+aug' : '');
-    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment }));
+  function inputsFor(mode, augment, excluded) {
+    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '');
+    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment, exclude: excluded }));
     return S.inputCache.get(key);
   }
   function resetModel(reason) {
     stopTraining();
-    S.inputs = inputsFor(S.mode, S.augment);
-    const conv = S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
+    S.inputs = inputsFor(S.mode, S.augment, S.excluded);
+    const conv = S.kind === 'image' && S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set();
@@ -93,7 +117,7 @@
   }
   function evaluateAll() {
     const tr = S.ds.train, te = S.ds.test;
-    S.trainEval = S.net.evaluate(tr.map(s => S.inputs.xOf(s)), tr.map(s => s.label));
+    S.trainEval = S.net.evaluate(tr.map(s => S.inputs.xOf(s)), tr.map(s => s.label), 0.5, true);
     S.testEval = S.net.evaluate(te.map(s => S.inputs.xOf(s)), te.map(s => s.label));
   }
   function recordEpoch() {
@@ -108,8 +132,10 @@
     S.net.trainBatch(idx.map(i => X[i]), idx.map(i => Y[i]), S.lr, S.l2);
     S.lastBatch = new Set(idx.map(i => S.inputs.trainOwner[i]));
     S.ptr = end >= n ? 0 : end;
-    if (S.ptr === 0) { S.epoch++; recordEpoch(); }
+    let ended = false;
+    if (S.ptr === 0) { S.epoch++; recordEpoch(); ended = true; }
     if (S.test.results.size) clearTestResults(true);
+    return ended;
   }
   function batchesPerEpoch() { return Math.ceil(S.inputs.trainX.length / S.batch); }
 
@@ -129,17 +155,17 @@
     const dt = Math.min(0.1, (now - S.lastTime) / 1000); S.lastTime = now;
     const bpe = batchesPerEpoch();
     S.debt += dt * S.speed * bpe;
-    const t0 = performance.now(); let did = false;
+    const t0 = performance.now(); let did = false, ended = false;
     while (S.debt >= 1 && performance.now() - t0 < 16) {
-      trainStep(); S.debt -= 1; did = true;
+      ended = trainStep() || ended; S.debt -= 1; did = true;
       if (S.ptr === 0 && S.epoch >= S.epochs) { stopTraining(`Finished ${S.epochs} epochs. Train accuracy ${pct(S.trainEval.accuracy)}${S.peek ? `, test accuracy ${pct(S.testEval.accuracy)}` : ''}. Head to 3 · Test.`); break; }
     }
     if (S.debt > bpe) S.debt = bpe;
-    if (did) renderTraining();
+    if (did) renderTraining(ended || S.kind === 'tabular');
     if (S.running) requestAnimationFrame(tick);
   }
-  function stepBatch() { stopTraining(); trainStep(); renderTraining(); if (S.ptr === 0) note(`Epoch ${S.epoch} complete.`); }
-  function stepEpoch() { stopTraining(); do { trainStep(); } while (S.ptr !== 0); renderTraining(); note(`Epoch ${S.epoch} complete.`); }
+  function stepBatch() { stopTraining(); trainStep(); renderTraining(true); if (S.ptr === 0) note(`Epoch ${S.epoch} complete.`); }
+  function stepEpoch() { stopTraining(); do { trainStep(); } while (S.ptr !== 0); renderTraining(true); note(`Epoch ${S.epoch} complete.`); }
 
   // ------------------------------------------------------------------ test phase
   function clearTestResults(notify) {
@@ -170,7 +196,7 @@
   }
   function classifyAll() {
     if (S.test.animating) return;
-    const go = () => { if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 90); } };
+    const go = () => { if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
     go();
   }
   function testStats() {
@@ -186,16 +212,17 @@
   }
 
   // ------------------------------------------------------------------ rendering: trays
+  function paintThumb(cv, s) { if (s.px) Viz.renderThumb(cv, s.px, s.size, S.tint); else Viz.renderFingerprint(cv, s.deviation, false); }
   function makeThumb(s, map, named) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'thumb'; b.dataset.id = s.id;
-    b.setAttribute('aria-label', `Specimen ${s.name}`);
-    const cv = document.createElement('canvas'); cv.width = s.size; cv.height = s.size;
+    b.setAttribute('aria-label', `${S.task.specimenNoun || 'Specimen'} ${s.name}`);
+    const cv = document.createElement('canvas'); cv.width = s.size || 48; cv.height = s.size || 48;
     b.appendChild(cv);
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
     if (named) { const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = s.name; b.appendChild(nm); }
     b.addEventListener('click', () => selectSpecimen(s));
-    Viz.renderThumb(cv, s.px, s.size, S.tint);
+    paintThumb(cv, s);
     map.set(s.id, b);
     return b;
   }
@@ -207,13 +234,11 @@
     for (const s of S.ds.test) { dx.appendChild(makeThumb(s, thumbs.data, true)); xt.appendChild(makeThumb(s, thumbs.test, true)); }
   }
   function repaintThumbs() {
-    for (const map of Object.values(thumbs)) for (const [id, el] of map) {
-      const s = S.ds.specimens[id];
-      Viz.renderThumb(el.querySelector('canvas'), s.px, s.size, S.tint);
-    }
+    for (const map of Object.values(thumbs)) for (const [id, el] of map) paintThumb(el.querySelector('canvas'), S.ds.specimens[id]);
   }
-  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title }) {
+  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit }) {
     el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '');
+    el.style.borderColor = unit != null ? Viz.unitColor(unit) : '';
     const badge = el.querySelector('.badge');
     badge.className = 'badge' + (q ? ' q' : '');
     badge.textContent = q ? '?' : (right ? '✓' : '✗');
@@ -224,17 +249,23 @@
       const el = thumbs.data.get(s.id); if (!el) continue;
       const known = truthKnown(s);
       setThumbState(el, { truth: known ? s.label : null, unknown: !known, selected: S.selected && S.selected.id === s.id,
-        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ' · ' + className(s.label) : ''}` });
+        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ' · ' + className(s.label) : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}` });
     }
   }
+  function topUnit(acts) { let j = 0; for (let i = 1; i < acts.length; i++) if (acts[i] > acts[j]) j = i; return acts[j] > 0 ? j : null; }
   function renderTrainTray() {
-    const probs = S.trainEval.probs;
+    const probs = S.trainEval.probs, acts = S.trainEval.acts;
+    const byUnit = S.trayColor === 'unit' && acts;
     S.ds.train.forEach((s, k) => {
       const el = thumbs.train.get(s.id);
       const p = probs[k], call = p >= 0.5 ? 1 : 0;
-      setThumbState(el, { call, wrong: call !== s.label, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id,
-        title: `${s.name} · truth ${className(s.label)} · call ${className(call)} (P ${fmtP(p)})` });
+      const u = byUnit ? topUnit(acts[k]) : null;
+      setThumbState(el, { call, wrong: call !== s.label, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u,
+        title: `${s.name} · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}` });
     });
+    $('tray-legend-call').hidden = !!byUnit;
+    $('tray-legend-unit').hidden = !byUnit;
+    if (byUnit) $('tray-legend-unit').innerHTML = S.net.hidden[0] ? Array.from({ length: S.net.hidden[0] }, (_, j) => `<span><span class="udot" style="background:${Viz.unitColor(j)}"></span>unit ${j + 1}</span>`).join('') + '<span class="muted">grey = no unit active</span>' : '';
   }
   function renderTestTray() {
     const thr = S.test.threshold;
@@ -245,7 +276,7 @@
       else {
         const call = r.p >= thr ? 1 : 0;
         setThumbState(el, { call, wrong: call !== s.label, right: call === s.label, selected: S.selected && S.selected.id === s.id,
-          title: `${s.name} · call ${className(call)} (P ${fmtP(r.p)}) · truth ${className(s.label)}` });
+          title: `${s.name} · call ${className(call)} (P ${fmtP(r.p)}) · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''}` });
       }
     }
   }
@@ -255,10 +286,11 @@
   function renderStatus() {
     const bpe = batchesPerEpoch();
     const bi = S.ptr === 0 ? bpe : Math.ceil(S.ptr / S.batch);
+    const inputDesc = S.mode === 'features' ? `${S.inputs.inputSize} ${S.kind === 'tabular' ? 'parameters' : 'measurements'}` : '1,024 pixels';
     $('status').innerHTML =
-      `<span>architecture <b>${S.mode === 'features' ? '6 measurements' : '1,024 pixels'} → ${S.net.describe()} → output</b></span>` +
+      `<span>architecture <b>${inputDesc} → ${S.net.describe()} → output</b></span>` +
       `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
-      `<span>training images <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}</span>` +
+      `<span>training cases <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
       `<span>loss <b>${S.trainEval.loss.toFixed(3)}</b></span>` +
@@ -274,7 +306,7 @@
       fw = S.net.forward(x);
       if (!allowed) { fw = null; stage = 0; }
     }
-    return { net: S.net, mode: S.mode, x, fw, featureNames: NF.FEATURES.map(f => f.name), specimen: s, size: S.size, tint: S.tint, stage, hover,
+    return { net: S.net, mode: S.mode, x, fw, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
@@ -301,10 +333,54 @@
     $('acc-now').textContent = pct(S.trainEval.accuracy);
     $('curves-legend-test').hidden = !S.peek;
   }
-  function renderTraining() {
-    evaluateAll();
+  // the single-layer network as a weighted checklist
+  function renderScorecard() {
+    const card = $('scorecard');
+    const show = S.net.hidden.length === 0 && !S.net.conv && S.mode === 'features';
+    card.hidden = !show; if (!show) return;
+    const names = S.inputs.featureNames;
+    const rows = names.map((n, i) => ({ n, w: S.net.Wo[i] })).sort((a, b) => Math.abs(b.w) - Math.abs(a.w));
+    const max = Math.max(1e-9, ...rows.map(r => Math.abs(r.w)));
+    $('scorecard-body').innerHTML = rows.map(r => `<tr><td>${esc(r.n)}</td><td class="n" style="color:${r.w >= 0 ? 'var(--irregular)' : 'var(--regular)'}">${Viz.fmtSigned(r.w, 2)}</td><td><div class="bar"><i class="${r.w >= 0 ? 'pos' : 'neg'}" style="width:${(Math.abs(r.w) / max * 50).toFixed(1)}%"></i></div></td></tr>`).join('');
+    $('scorecard-formula').innerHTML = `score = Σ weight × standardized value + bias (${Viz.fmtSigned(S.net.bo, 2)}) &nbsp;→&nbsp; P(${esc(posName())}) = 1 / (1 + e<sup>−score</sup>)`;
+  }
+  // which kinds of case make each first-layer unit fire
+  function renderProfile(force) {
+    const card = $('unit-profile');
+    const H = S.net.hidden.length ? S.net.hidden[0] : 0;
+    const show = H > 0 && S.trainEval && S.trainEval.acts;
+    card.hidden = !show; if (!show) return;
+    const now = performance.now();
+    if (!force && now - S.profileAt < 400) return;
+    S.profileAt = now;
+    const subtypes = (S.task.subtypes || []).slice();
+    const acts = S.trainEval.acts;
+    const rows = subtypes.map(st => { const sums = new Float64Array(H); let n = 0; S.ds.train.forEach((s, k) => { if (s.subtype === st.key) { n++; for (let j = 0; j < H; j++) sums[j] += acts[k][j]; } }); return { st, n, mean: Array.from(sums, v => (n ? v / n : 0)) }; }).filter(r => r.n > 0);
+    const colMax = Array.from({ length: H }, (_, j) => Math.max(1e-9, ...rows.map(r => Math.abs(r.mean[j]))));
+    const signed = S.activation === 'tanh';
+    let html = `<table class="profile"><thead><tr><th class="row">kind of ${esc(S.task.specimenNoun || 'case')}</th>` + Array.from({ length: H }, (_, j) => `<th><span class="udot" style="background:${Viz.unitColor(j)}"></span>unit ${j + 1}</th>`).join('') + '</tr></thead><tbody>';
+    for (const r of rows) {
+      html += `<tr><td class="row"><span class="dot" style="background:${r.st.positive ? 'var(--irregular)' : 'var(--regular)'}"></span>${esc(r.st.name)}<span class="n">n=${r.n}</span></td>` +
+        r.mean.map((v, j) => { const t = Math.abs(v) / colMax[j]; const bg = signed ? Viz.diverging(v / colMax[j], 0.25 + 0.75 * t) : Viz.sequential(t, 0.15 + 0.85 * t); return `<td style="background:${bg};color:${t > 0.6 ? '#fff' : 'var(--ink)'}">${v.toFixed(2)}</td>`; }).join('') + '</tr>';
+    }
+    if (S.net.hidden.length === 1) html += `<tr><td class="row">weight to output</td>` + Array.from({ length: H }, (_, j) => `<td class="out" style="color:${S.net.Wo[j] >= 0 ? 'var(--irregular)' : 'var(--regular)'}">${Viz.fmtSigned(S.net.Wo[j], 2)}</td>`).join('') + '</tr>';
+    if (S.mode === 'features') {
+      const names = S.inputs.featureNames, D = S.net.sizes[0];
+      html += `<tr><td class="row">responds most to</td>` + Array.from({ length: H }, (_, j) => {
+        const ws = names.map((n, i) => ({ n, w: S.net.W[0][j * D + i] })).sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 3);
+        return `<td class="top">${ws.map(w => `${w.w >= 0 ? '↑' : '↓'} ${esc(w.n)}`).join('<br>')}</td>`;
+      }).join('') + '</tr>';
+    }
+    html += '</tbody></table>';
+    $('unit-profile-body').innerHTML = html;
+    $('unit-profile-note').textContent = signed
+      ? 'Mean activation of each first-layer unit for each kind of training case (tanh: orange positive, blue negative). Nothing told the network these kinds exist; it only saw the label.'
+      : 'Mean activation of each first-layer unit for each kind of training case, each column scaled to its own maximum. Nothing told the network these kinds exist; it only saw the label. Rows with a blue dot are negatives, orange are positives.';
+  }
+  function renderTraining(fresh) {
+    if (fresh || !S.trainEval) evaluateAll();
     renderStatus();
-    if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); renderCharts(); }
+    if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); renderCharts(); renderScorecard(); renderProfile(fresh === true && !S.running); }
     if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
     renderInspector();
   }
@@ -322,14 +398,26 @@
     $('stat-spec-sub').textContent = st.tn + st.fp ? `${st.tn} of ${st.tn + st.fp} ${negName().toLowerCase()} cleared` : `no ${negName().toLowerCase()} seen yet`;
     const cell = (v, kind) => `<div class="cell ${v ? kind : 'empty'}">${v}</div>`;
     $('confusion').innerHTML =
-      `<div></div><div class="hd">called ${negName()}</div><div class="hd">called ${posName()}</div>` +
-      `<div class="rh">truth ${negName()}</div>${cell(st.tn, 'hit')}${cell(st.fp, 'miss')}` +
-      `<div class="rh">truth ${posName()}</div>${cell(st.fn, 'miss')}${cell(st.tp, 'hit')}`;
+      `<div></div><div class="hd">called ${esc(negName())}</div><div class="hd">called ${esc(posName())}</div>` +
+      `<div class="rh">truth ${esc(negName())}</div>${cell(st.tn, 'hit')}${cell(st.fp, 'miss')}` +
+      `<div class="rh">truth ${esc(posName())}</div>${cell(st.fn, 'miss')}${cell(st.tp, 'hit')}`;
     $('btn-classify-next').disabled = S.test.next >= S.ds.test.length;
     $('btn-classify-all').disabled = S.test.next >= S.ds.test.length;
-    $('btn-classify-next').textContent = S.test.next >= S.ds.test.length ? 'All 20 classified' : `Classify next (${S.test.next + 1} of ${S.ds.test.length})`;
+    $('btn-classify-next').textContent = S.test.next >= S.ds.test.length ? `All ${S.ds.test.length} classified` : `Classify next (${S.test.next + 1} of ${S.ds.test.length})`;
+    $('btn-classify-all').textContent = `Classify all ${S.ds.test.length}`;
     $('threshold-val').textContent = S.test.threshold.toFixed(2);
     $('test-warning').hidden = !(S.epoch === 0 && S.net.steps === 0);
+    // prevalence -> predictive values
+    const p = S.test.prevalence;
+    $('prev-val').textContent = `1 in ${Math.round(1 / p).toLocaleString()}`;
+    if (st.sens == null || st.spec == null) { $('ppv').textContent = '–'; $('npv').textContent = '–'; $('prev-text').textContent = `Classify some ${noun(2)} of both kinds first; the predictive values use the sensitivity and specificity measured above.`; }
+    else {
+      const ppv = st.sens * p / (st.sens * p + (1 - st.spec) * (1 - p)), npv = st.spec * (1 - p) / (st.spec * (1 - p) + (1 - st.sens) * p);
+      $('ppv').textContent = pct(ppv); $('npv').textContent = pct(npv);
+      const per = 100000;
+      const tp = st.sens * p * per, fp = (1 - st.spec) * (1 - p) * per;
+      $('prev-text').textContent = `In ${per.toLocaleString()} ${noun(2)} with this prevalence the network would call ${Math.round(tp + fp).toLocaleString()} “${posName()}”, of which ${Math.round(tp).toLocaleString()} truly are. The test set was half positive, so its accuracy says nothing about this.`;
+    }
   }
 
   // ------------------------------------------------------------------ rendering: inspector
@@ -345,11 +433,14 @@
     const s = S.selected;
     const cv = $('spec-view');
     if (!s) return;
-    $('spec-name').textContent = `Specimen ${s.name}`;
+    const tabular = S.kind === 'tabular';
+    $('spec-name').textContent = `${tabular ? 'Patient' : 'Specimen'} ${s.name}`;
     const known = truthKnown(s);
     $('spec-chips').innerHTML =
       `<span class="chip plain">${s.split === 'train' ? 'Training set' : 'Test set · held out'}</span>` +
-      (known ? `<span class="chip ${classOf(s.label)}">truth: ${className(s.label)}</span>` : `<span class="chip plain">truth hidden</span>`);
+      (known ? `<span class="chip ${classOf(s.label)}">truth: ${esc(className(s.label))}</span>` : `<span class="chip plain">truth hidden</span>`) +
+      (known && s.subtype && tabular ? `<span class="chip plain">${esc(subtypeName(s.subtype))}</span>` : '');
+    document.querySelector('.views').hidden = tabular;
     document.querySelectorAll('.views button').forEach(b => b.classList.toggle('is-active', b.dataset.view === S.view));
     const m = s.measurement;
     const x = S.inputs.xOf(s);
@@ -357,7 +448,8 @@
     const untrainedHere = S.stage === 'data' && S.net.steps === 0;
     const fw = classified && !untrainedHere ? S.net.forward(x) : null;
     let caption = '';
-    if (S.view === 'image') { Viz.renderBigImage(cv, s.px, s.size, S.tint); caption = `${s.size} × ${s.size} pixels, 8-bit grayscale${S.tint ? ', shown with an H&E tint' : ''}.`; }
+    if (tabular) { Viz.renderFingerprint(cv, s.deviation, true); caption = 'Blood-count fingerprint: one bar per parameter in report order, up = above the reference range, down = below, dotted lines = the limits of the range.'; }
+    else if (S.view === 'image') { Viz.renderBigImage(cv, s.px, s.size, S.tint); caption = `${s.size} × ${s.size} pixels, 8-bit grayscale${S.tint ? ', shown with an H&E tint' : ''}.`; }
     else if (S.view === 'measure') { Viz.renderMeasurement(cv, s.px, s.size, m, S.tint); caption = 'Violet: membrane found by thresholding · white dashes: convex hull · orange dots: smooth ellipse with the same area · shaded: where darkness and texture are read.'; }
     else {
       if (!fw) { Viz.renderBigImage(cv, s.px, s.size, S.tint); caption = untrainedHere ? 'Evidence appears once the network has trained (stage 2).' : 'Evidence appears once the network has classified this nucleus.'; }
@@ -381,9 +473,9 @@
     } else {
       const thr = s.split === 'test' ? S.test.threshold : 0.5;
       const call = fw.p >= thr ? 1 : 0;
-      v.querySelector('.p').innerHTML = `<small class="lbl">P(${posName()})</small><b>${fw.p.toFixed(3)}</b><small>score z = ${Viz.fmtSigned(fw.z, 2)}</small>`;
-      let chips = `<span class="chip ${classOf(call)}">call: ${className(call)}</span>`;
-      if (known) chips += call === s.label ? `<span class="chip good">✓ agrees with truth</span>` : `<span class="chip bad">✗ truth is ${className(s.label)}</span>`;
+      v.querySelector('.p').innerHTML = `<small class="lbl">P(${esc(posName())})</small><b>${fw.p.toFixed(3)}</b><small>score z = ${Viz.fmtSigned(fw.z, 2)}</small>`;
+      let chips = `<span class="chip ${classOf(call)}">call: ${esc(className(call))}</span>`;
+      if (known) chips += call === s.label ? `<span class="chip good">✓ agrees with truth</span>` : `<span class="chip bad">✗ truth is ${esc(className(s.label))}</span>`;
       $('verdict-call').innerHTML = chips;
       $('pbar-marker').style.left = (fw.p * 100).toFixed(1) + '%';
       $('pbar-thr').style.left = (thr * 100).toFixed(1) + '%';
@@ -393,37 +485,65 @@
       $('evidence-sum').innerHTML = `evidence Σ(weight × input) ${exact ? '=' : '≈'} ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}${exact ? '' : '<br><span class="muted">(with hidden layers or a convolution the per-input evidence is a linear approximation)</span>'}`;
     }
 
-    // measurement table
-    const tb = $('feat-table');
+    // measurement / blood-count table
     const featMode = S.mode === 'features';
     const g = fw && featMode ? S.net.inputGradient(x, fw) : null;
-    let maxPush = 1e-9;
-    const pushes = NF.FEATURES.map((f, i) => (g ? g[i] * x[i] : 0));
-    for (const p of pushes) maxPush = Math.max(maxPush, Math.abs(p));
-    const zf = featMode ? x : inputsFor('features', false).xOf(s);
-    tb.innerHTML = NF.FEATURES.map((f, i) => {
-      const val = m.vector[i];
-      const z = zf[i];
-      const push = pushes[i];
-      const w = Math.min(50, Math.abs(push) / maxPush * 50);
-      const bar = featMode ? `<div class="bar" title="push ${Viz.fmtSigned(push, 2)}">${g ? `<i class="${push >= 0 ? 'pos' : 'neg'}" style="width:${w.toFixed(1)}%"></i>` : ''}</div>` : '';
-      return `<tr><td class="name" title="${f.desc.replace(/"/g, '&quot;')}">${f.name}</td><td class="n">${f.fmt(val)}${f.unit ? ' ' + f.unit : ''}</td><td class="n">${Viz.fmtSigned(z, 1)}</td>${featMode ? `<td>${bar}</td>` : ''}</tr>`;
+    const pushByFeature = new Array(S.featureDefs.length).fill(null);
+    if (g) S.inputs.columns.forEach((fi, ci) => { pushByFeature[fi] = g[ci] * x[ci]; });
+    let maxPush = 1e-9; for (const p of pushByFeature) if (p != null) maxPush = Math.max(maxPush, Math.abs(p));
+    const zInputs = featMode ? S.inputs : inputsFor('features', false, new Set());
+    const zx = zInputs.xOf(s);
+    const zByFeature = new Array(S.featureDefs.length).fill(null);
+    zInputs.columns.forEach((fi, ci) => { zByFeature[fi] = zx[ci]; });
+    $('feat-card-title').textContent = tabular ? 'Blood count' : 'Measurements';
+    $('feat-head').innerHTML = tabular
+      ? `<th>parameter</th><th style="text-align:right">value</th><th class="ref">reference</th><th>flag</th><th style="text-align:right" title="standardized: training-set standard deviations from the training-set mean (log scale for counts)">z</th>${featMode ? '<th>push</th>' : ''}`
+      : `<th>measurement</th><th style="text-align:right">value</th><th style="text-align:right" title="standardized: how many training-set standard deviations from the training-set mean">z</th>${featMode ? '<th>push</th>' : ''}`;
+    $('feat-table').innerHTML = S.featureDefs.map((f, i) => {
+      const val = s.features[i];
+      const off = featMode && S.excluded.has(f.key);
+      const push = pushByFeature[i];
+      const w = push == null ? 0 : Math.min(50, Math.abs(push) / maxPush * 50);
+      const bar = featMode ? `<td>${off ? '<span class="muted small">withheld</span>' : `<div class="bar" title="push ${push == null ? '' : Viz.fmtSigned(push, 2)}">${push != null ? `<i class="${push >= 0 ? 'pos' : 'neg'}" style="width:${w.toFixed(1)}%"></i>` : ''}</div>`}</td>` : '';
+      const z = zByFeature[i];
+      const zTxt = z == null ? '' : Viz.fmtSigned(z, 1);
+      if (tabular) {
+        const flag = f.high === f.low ? (val > f.high ? 'H' : '') : (val > f.high ? 'H' : val < f.low ? 'L' : '');
+        return `<tr class="${off ? 'off' : ''}"><td class="name" title="${esc(f.desc)}">${esc(f.name)}</td><td class="n">${f.fmt(val)} <span class="muted">${esc(f.unit)}</span></td><td class="ref">${f.low === f.high ? f.low : `${f.low}–${f.high}`}</td><td class="flag ${flag}">${flag}</td><td class="n">${zTxt}</td>${bar}</tr>`;
+      }
+      return `<tr class="${off ? 'off' : ''}"><td class="name" title="${esc(f.desc)}">${esc(f.name)}</td><td class="n">${f.fmt(val)}${f.unit ? ' ' + f.unit : ''}</td><td class="n">${zTxt}</td>${bar}</tr>`;
     }).join('');
-    $('feat-push-head').hidden = !featMode;
-    $('feat-note').textContent = featMode ? `push = weight × standardized value: how far this measurement moves the score (orange → ${posName()}, blue → ${negName()}).` : 'In pixel mode the network never sees these measurements — they are here for you, the human.';
+    $('feat-note').textContent = featMode
+      ? `push = weight × standardized value: how far this ${tabular ? 'parameter' : 'measurement'} moves the score (orange → ${posName()}, blue → ${negName()}).${S.excluded.size ? ' Withheld inputs are not given to the network.' : ''}`
+      : 'In pixel mode the network never sees these measurements — they are here for you, the human.';
   }
 
   // ------------------------------------------------------------------ data panel
   function renderScatter() {
     const xi = +$('scatter-x').value, yi = +$('scatter-y').value;
+    const fx = S.featureDefs[xi], fy = S.featureDefs[yi];
+    const tx = v => (fx.log ? Math.log10(Math.max(v, 1e-3)) : v), ty = v => (fy.log ? Math.log10(Math.max(v, 1e-3)) : v);
     const pts = S.ds.specimens.filter(s => s.split === 'train' || S.revealTest).map(s => ({
-      id: s.id, name: s.name, x: s.features[xi], y: s.features[yi], split: s.split,
-      cls: truthKnown(s) ? classOf(s.label) : 'unknown', clsName: truthKnown(s) ? className(s.label) : '', selected: S.selected && S.selected.id === s.id,
+      id: s.id, name: s.name, x: tx(s.features[xi]), y: ty(s.features[yi]), split: s.split,
+      cls: truthKnown(s) ? classOf(s.label) : 'unknown', clsName: truthKnown(s) ? className(s.label) + (s.subtype ? ' · ' + subtypeName(s.subtype) : '') : '', selected: S.selected && S.selected.id === s.id,
     }));
-    Viz.drawScatter($('scatter'), { points: pts, xLabel: NF.FEATURES[xi].name, yLabel: NF.FEATURES[yi].name, onSelect: id => selectSpecimen(S.ds.specimens[id]) });
+    Viz.drawScatter($('scatter'), { points: pts, xLabel: (fx.log ? 'log₁₀ ' : '') + fx.name, yLabel: (fy.log ? 'log₁₀ ' : '') + fy.name, onSelect: id => selectSpecimen(S.ds.specimens[id]) });
   }
 
   // ------------------------------------------------------------------ controls
+  function renderInputPicker() {
+    const wrap = $('picker-wrap');
+    wrap.hidden = S.mode !== 'features';
+    $('input-picker').innerHTML = S.featureDefs.map(f => `<label class="${S.excluded.has(f.key) ? 'off' : ''}"><input type="checkbox" data-key="${esc(f.key)}" ${S.excluded.has(f.key) ? '' : 'checked'}> ${esc(f.name)}</label>`).join('');
+    $('input-picker').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+      const key = cb.dataset.key;
+      if (!cb.checked && S.featureDefs.length - S.excluded.size <= 2) { cb.checked = true; note('Keep at least two inputs.'); return; }
+      if (cb.checked) S.excluded.delete(key); else S.excluded.add(key);
+      const name = S.featureDefs.find(f => f.key === key).name;
+      renderInputPicker();
+      resetModel(cb.checked ? `${name} restored — fresh random weights.` : `${name} withheld from the network — fresh random weights.`);
+    }));
+  }
   function syncControls() {
     document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === S.mode));
     $('hidden').value = S.h1; $('hidden-val').textContent = S.h1 === 0 ? 'none' : S.h1;
@@ -440,20 +560,25 @@
     $('l2').value = S.l2; $('l2-val').textContent = S.l2 === 0 ? 'off' : S.l2.toFixed(2);
     $('peek').checked = S.peek;
     $('threshold').value = S.test.threshold;
+    $('prev').value = sliderFromPrev(S.test.prevalence);
+    document.querySelectorAll('#tray-color-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.color === S.trayColor));
+    renderInputPicker();
   }
   function bindControls() {
     document.querySelectorAll('#task-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.taskId === b.dataset.task) return;
       loadTask(b.dataset.task);
-      resetModel(`Question changed to “${S.task.title}” — new specimens, fresh random weights.`);
+      if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
+      syncControls();
+      resetModel(`Question changed to “${S.task.title}” — new ${noun(2)}, fresh random weights.`);
       renderDataTrays(); renderScatter(); renderInspector();
     }));
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
-      if (S.mode === b.dataset.mode) return;
+      if (S.mode === b.dataset.mode || b.disabled) return;
       S.mode = b.dataset.mode;
       if (S.mode === 'pixels' && S.lr > 0.05) S.lr = 0.01;
       if (S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
-      syncControls(); resetModel(`Input changed to ${S.mode === 'pixels' ? 'raw pixels' : 'measurements'} — fresh random weights.`);
+      syncControls(); resetModel(`Input changed to ${S.mode === 'pixels' ? 'raw pixels' : (S.kind === 'tabular' ? 'the blood count' : 'measurements')} — fresh random weights.`);
     }));
     $('hidden').addEventListener('input', () => { S.h1 = +$('hidden').value; syncControls(); resetModel(`Hidden layer 1 set to ${S.h1 || 'none'} — fresh random weights.`); });
     $('hidden2').addEventListener('input', () => { S.h2 = +$('hidden2').value; syncControls(); resetModel(`Hidden layer 2 set to ${S.h2 || 'none'} — fresh random weights.`); });
@@ -475,12 +600,14 @@
     document.querySelectorAll('.recipe').forEach(b => b.addEventListener('click', () => {
       const { task: taskId, ...settings } = RECIPES[b.dataset.recipe];
       const switchTask = taskId !== S.taskId;
-      Object.assign(S, settings);
       if (switchTask) loadTask(taskId);
+      Object.assign(S, settings);
+      S.excluded = new Set();
       syncControls();
       resetModel(`Recipe loaded: ${b.textContent.trim()}${switchTask ? ` (question switched to “${S.task.title}”)` : ''}. Press Train.`);
       if (switchTask) { renderDataTrays(); renderScatter(); renderInspector(); }
     }));
+    document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
     $('scatter-x').addEventListener('change', renderScatter);
@@ -489,6 +616,7 @@
     $('btn-classify-all').addEventListener('click', classifyAll);
     $('btn-test-reset').addEventListener('click', () => { clearTestResults(false); $('test-note').textContent = 'Test results cleared.'; renderInspector(); renderTestGraph(); });
     $('threshold').addEventListener('input', () => { S.test.threshold = +$('threshold').value; renderTestPanel(); renderInspector(); });
+    $('prev').addEventListener('input', () => { S.test.prevalence = prevFromSlider(+$('prev').value); renderTestPanel(); });
     $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); renderInspector(); if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
     $('theme-toggle').addEventListener('click', () => {
       const root = document.documentElement;
@@ -524,7 +652,8 @@
     Viz.refreshTheme();
     const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
-    if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph();
+    repaintThumbs();
+    if (S.stage === 'train') { renderTrainGraph(); renderProfile(true); } if (S.stage === 'test') renderTestGraph();
     renderInspector();
   }
   function showStage(name) {
@@ -532,7 +661,7 @@
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test';
     if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
-    if (name === 'train') { if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0]; renderTraining(); }
+    if (name === 'train') { if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0]; renderTraining(true); }
     if (name === 'test') { stopTraining(); renderTestPanel(); if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; } renderTestGraph(); renderInspector(); renderDataTrays(); }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
@@ -541,11 +670,8 @@
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
-    S.tasks = window.NUCLEI_TASKS;
-    const opts = NF.FEATURES.map((f, i) => `<option value="${i}">${f.name}</option>`).join('');
-    $('scatter-x').innerHTML = opts; $('scatter-y').innerHTML = opts;
-    $('feature-list').innerHTML = NF.FEATURES.map(f => `<li><strong>${f.name}</strong> — ${f.desc}</li>`).join('');
-    $('task-seg').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => `<button type="button" data-task="${t.meta.task.id}">${t.meta.task.order} · ${t.meta.task.title}</button>`).join('');
+    S.tasks = window.LECTURE_TASKS;
+    $('task-seg').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<button type="button" data-task="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</button>`).join('');
     bindControls();
     loadTask(S.taskId);
     syncControls();

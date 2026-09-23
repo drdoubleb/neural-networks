@@ -79,6 +79,30 @@ window.Viz = (function () {
     const ctx = canvas.getContext('2d');
     ctx.drawImage(imageToCanvas(px, size, tint), 0, 0);
   }
+  // a patient card: one bar per parameter, up = above the reference range, down = below, in the class-free diverging scale
+  function renderFingerprint(canvas, dev, big) {
+    const n = dev.length, W = big ? 288 : 48, H = big ? 288 : 48;
+    const dpr = big ? (window.devicePixelRatio || 1) : 1;
+    if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const c = colors();
+    ctx.fillStyle = c.surface2; ctx.fillRect(0, 0, W, H);
+    const pad = big ? 18 : 3, bw = (W - 2 * pad) / n, mid = H / 2, amp = (H / 2 - pad) / 3;
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pad, mid); ctx.lineTo(W - pad, mid); ctx.stroke();
+    if (big) { ctx.setLineDash([3, 4]); ctx.strokeStyle = c.line; ctx.beginPath(); ctx.moveTo(pad, mid - amp); ctx.lineTo(W - pad, mid - amp); ctx.moveTo(pad, mid + amp); ctx.lineTo(W - pad, mid + amp); ctx.stroke(); ctx.setLineDash([]); }
+    for (let i = 0; i < n; i++) {
+      const d = Math.max(-3, Math.min(3, dev[i]));
+      const h = d * amp;
+      ctx.fillStyle = diverging(d / 3);
+      const x = pad + i * bw + bw * 0.15, w = bw * 0.7;
+      if (Math.abs(h) < 1) ctx.fillRect(x, mid - 0.5, w, 1); else ctx.fillRect(x, h > 0 ? mid - h : mid, w, Math.abs(h));
+    }
+  }
+  const UNIT_COLORS = ['#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948', '#2a78d6', '#eb6834'];
+  const unitColor = j => UNIT_COLORS[j % UNIT_COLORS.length];
+  function sequential(t, a) { return rgbStr(sequentialRgb(t), a); }
+
   function setupBig(canvas, size) {
     const dpr = window.devicePixelRatio || 1;
     const css = 288;
@@ -179,8 +203,9 @@ window.Viz = (function () {
 
     if (m.mode === 'features') {
       const D = net.D;
-      const xs = hidden.length === 0 ? [150] : hidden.length === 1 ? [150, 440] : [140, 400, 585];
-      const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: 16 }));
+      const wide = D > 8 ? 40 : 0; // room for long parameter names
+      const xs = hidden.length === 0 ? [150 + wide] : hidden.length === 1 ? [150 + wide, 440 + wide / 2] : [140 + wide, 400 + wide / 2, 585];
+      const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: D > 8 ? 13 : 16 }));
       L.captions.push({ x: xs[0], text: `INPUT · ${D} MEASUREMENTS` });
       let prev = inputs;
       hidden.forEach((h, l) => {
@@ -572,5 +597,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, renderThumb, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();

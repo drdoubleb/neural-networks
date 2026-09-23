@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nucleus Net</title>
-<meta name="description" content="Train a tiny neural network to read nuclei and watch every weight while it learns: from a single layer to a convolutional network.">
+<meta name="description" content="Train a tiny neural network on blood counts and nuclei, watching every node and weight as it learns: from a single layer to a convolutional network.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -15,7 +15,7 @@
 <header class="masthead">
   <div class="brand">
     <h1>Nucleus Net</h1>
-    <p class="tagline">Teach a tiny neural network to read nuclei — and watch every node and weight while it learns, from a single layer to a convolution.</p>
+    <p class="tagline">Teach a tiny neural network to read a blood count, then a nucleus — and watch every node and weight while it learns, from a single layer to a convolution.</p>
   </div>
   <nav class="stages" aria-label="Stages">
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
@@ -23,7 +23,7 @@
     <button type="button" class="stage" data-stage="test">3 · Test</button>
   </nav>
   <div class="masthead-tools">
-    <label class="toggle"><input type="checkbox" id="tint" checked> H&amp;E tint</label>
+    <label class="toggle tint"><input type="checkbox" id="tint" checked> H&amp;E tint</label>
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
   </div>
 </header>
@@ -35,7 +35,7 @@
     <section class="stage-panel" id="panel-data">
       <div class="card">
         <div class="card-head">
-          <h2>One hundred nuclei, one question</h2>
+          <h2>One set of cases, one question</h2>
           <span class="small muted" id="meta-line"></span>
         </div>
         <div class="ctl wide" style="margin-bottom:12px">
@@ -45,11 +45,11 @@
         <div class="two-col">
           <div class="prose">
             <p><strong id="task-title"></strong> <span id="task-blurb"></span></p>
-            <p>These are <strong>synthetic</strong> nuclei, drawn by a script so that we know the truth for every one. Eighty form the <strong>training set</strong>, which the network learns from. Twenty are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the eighty.</p>
-            <p>Click any nucleus to put it under the inspector on the right. There you can see the six measurements a morphometry pipeline would make on it — the same six the network can be given as its input in stage 2.</p>
+            <p>All the cases are <strong>synthetic</strong>, drawn by a script so that we know the truth for every one. <span id="train-count">80</span> form the <strong>training set</strong>, which the network learns from. <span id="test-count">20</span> are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the training cases.</p>
+            <p>Click any case to put it under the inspector on the right, where you can see the numbers the network is given in stage 2 — and, for nuclei, exactly where each measurement comes from.</p>
           </div>
           <div>
-            <h3>The six measurements</h3>
+            <h3 id="feature-heading">The six measurements</h3>
             <ul class="prose small" id="feature-list"></ul>
           </div>
         </div>
@@ -57,7 +57,7 @@
 
       <div class="card">
         <div class="card-head">
-          <h2>Training set · 80</h2>
+          <h2>Training set · <span id="train-count-2" data-count="train"></span></h2>
           <div class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span><span>frame = ground truth</span></div>
         </div>
         <div class="tray named" id="data-train-tray"></div>
@@ -65,7 +65,7 @@
 
       <div class="card">
         <div class="card-head">
-          <h2>Test set · 20 · held out</h2>
+          <h2>Test set · held out</h2>
           <label class="toggle"><input type="checkbox" id="reveal-test"> Reveal test labels (for the lecturer)</label>
         </div>
         <div class="tray named" id="data-test-tray"></div>
@@ -97,26 +97,27 @@
           <div class="ctl wide">
             <span class="lbl">Input the network sees</span>
             <div class="seg" id="mode-seg">
-              <button type="button" data-mode="features">6 measurements</button>
-              <button type="button" data-mode="pixels" class="is-active">1,024 raw pixels</button>
+              <button type="button" data-mode="features" class="is-active">measurements / blood count</button>
+              <button type="button" data-mode="pixels" id="mode-pixels">1,024 raw pixels</button>
             </div>
           </div>
+          <div class="ctl wide" id="picker-wrap"><span class="lbl">Inputs the network may use</span><div class="picker" id="input-picker"></div></div>
           <div class="ctl"><label for="conv">Convolution (pixels only)</label>
             <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
           <div class="ctl"><label for="hidden">Hidden layer 1 <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
           <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
           <div class="ctl"><label for="activation">Activation</label>
             <select id="activation"><option value="relu">ReLU</option><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></div>
-          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.01</span></label><input type="range" id="lr" min="0" max="100" step="1" value="29"></div>
+          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.05</span></label><input type="range" id="lr" min="0" max="100" step="1" value="49"></div>
           <div class="ctl"><label for="batch">Batch size</label>
             <select id="batch"><option value="1">1 (one nucleus per step)</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option><option value="80">80 (whole set)</option></select></div>
-          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">30</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="30"></div>
+          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">60</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="60"></div>
           <div class="ctl"><label for="speed">Speed <span class="val" id="speed-val">4 epochs/s</span></label><input type="range" id="speed" min="0" max="100" step="1" value="52"></div>
           <div class="ctl"><label for="seed">Random seed</label>
             <div style="display:flex;gap:6px"><input type="number" id="seed" min="1" max="9999" value="1"><button type="button" class="btn" id="seed-random" title="new random seed">🎲</button></div></div>
           <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
           <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Augment pixels with flips &amp; rotations (×8)</label></div>
-          <div class="ctl check"><input type="checkbox" id="peek" checked><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
+          <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
         </div>
         <div class="actions">
           <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
@@ -127,12 +128,14 @@
         </div>
         <div class="recipes">
           <span>Lecture recipes, in order:</span>
-          <button type="button" class="recipe" data-recipe="1">① Enlargement · pixels · single layer</button>
-          <button type="button" class="recipe" data-recipe="2">② Irregularity · pixels · single layer</button>
-          <button type="button" class="recipe" data-recipe="3">③ Irregularity · measurements · single layer</button>
-          <button type="button" class="recipe" data-recipe="4">④ Irregularity · pixels · 8 ReLU + augmentation</button>
-          <button type="button" class="recipe" data-recipe="5">⑤ Irregularity · pixels · 8 + 8 ReLU + augmentation</button>
-          <button type="button" class="recipe" data-recipe="6">⑥ Irregularity · pixels · convolution + 8 ReLU + augmentation</button>
+          <button type="button" class="recipe" data-recipe="1">① Leukaemia · blood count · single layer</button>
+          <button type="button" class="recipe" data-recipe="2">② Leukaemia · blood count · 3 ReLU units</button>
+          <button type="button" class="recipe" data-recipe="3">③ Enlargement · pixels · single layer</button>
+          <button type="button" class="recipe" data-recipe="4">④ Irregularity · pixels · single layer</button>
+          <button type="button" class="recipe" data-recipe="5">⑤ Irregularity · measurements · single layer</button>
+          <button type="button" class="recipe" data-recipe="6">⑥ Irregularity · pixels · 8 ReLU + augmentation</button>
+          <button type="button" class="recipe" data-recipe="7">⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation</button>
+          <button type="button" class="recipe" data-recipe="8">⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation</button>
         </div>
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
@@ -157,16 +160,36 @@
         </div>
       </div>
 
+      <div class="card" id="scorecard" hidden>
+        <div class="card-head">
+          <h2>The single-layer network as a weighted checklist</h2>
+          <span class="small muted">every weight, largest first · orange pushes toward <b data-cls="1"></b>, blue away</span>
+        </div>
+        <table class="score"><tbody id="scorecard-body"></tbody></table>
+        <p class="formula" id="scorecard-formula"></p>
+      </div>
+
+      <div class="card" id="unit-profile" hidden>
+        <div class="card-head">
+          <h2>What each hidden unit responds to</h2>
+          <span class="small muted">first hidden layer · updated at the end of each epoch</span>
+        </div>
+        <div class="profile-wrap" id="unit-profile-body"></div>
+        <p class="small muted" id="unit-profile-note" style="margin-top:8px"></p>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Training set · what the network currently calls</h2>
-          <div class="legend">
-            <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
-            <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
-            <span><span class="swatch badge">✗</span>disagrees with truth</span>
-            <span><span class="swatch batch"></span>in the last batch</span>
-          </div>
+          <div class="seg small" id="tray-color-seg"><button type="button" data-color="call" class="is-active">frame = call</button><button type="button" data-color="unit">frame = most active unit</button></div>
         </div>
+        <div class="legend" id="tray-legend-call" style="margin-bottom:10px">
+          <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
+          <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
+          <span><span class="swatch badge">✗</span>disagrees with truth</span>
+          <span><span class="swatch batch"></span>in the last batch</span>
+        </div>
+        <div class="legend" id="tray-legend-unit" style="margin-bottom:10px" hidden></div>
         <div class="tray" id="train-tray"></div>
       </div>
 
@@ -190,14 +213,14 @@
     <section class="stage-panel" id="panel-test" hidden>
       <div class="card">
         <div class="card-head">
-          <h2>Twenty nuclei the network has never seen</h2>
+          <h2>Cases the network has never seen</h2>
           <span class="small muted">question: <b id="test-task"></b> · the weights are frozen; nothing here changes the model</span>
         </div>
-        <p class="lede">Each held-out nucleus is fed through the trained network one at a time. Watch the values flow, see the call, then the truth. <kbd>N</kbd> classifies the next one.</p>
+        <p class="lede">Each held-out case is fed through the trained network one at a time. Watch the values flow, see the call, then the truth. <kbd>N</kbd> classifies the next one.</p>
         <p class="note" id="test-warning" hidden>The network has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
         <div class="actions">
           <button type="button" class="btn primary big" id="btn-classify-next">Classify next</button>
-          <button type="button" class="btn" id="btn-classify-all">Classify all 20</button>
+          <button type="button" class="btn" id="btn-classify-all">Classify all</button>
           <button type="button" class="btn" id="btn-test-reset">Clear results</button>
           <div class="ctl" style="min-width:220px;margin-left:auto"><label for="threshold">Call <span data-cls="1"></span> when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
         </div>
@@ -206,12 +229,25 @@
 
       <div class="card">
         <div class="scoreboard">
-          <div class="stat"><span class="lbl">Classified</span><span class="v" id="stat-n">0 / 20</span><span class="sub">held-out nuclei</span></div>
+          <div class="stat"><span class="lbl">Classified</span><span class="v" id="stat-n">0 / 20</span><span class="sub" id="stat-n-sub">held-out nuclei</span></div>
           <div class="stat"><span class="lbl">Accuracy</span><span class="v" id="stat-acc">–</span><span class="sub" id="stat-acc-sub"></span></div>
           <div class="stat"><span class="lbl">Sensitivity</span><span class="v" id="stat-sens">–</span><span class="sub" id="stat-sens-sub"></span></div>
           <div class="stat"><span class="lbl">Specificity</span><span class="v" id="stat-spec">–</span><span class="sub" id="stat-spec-sub"></span></div>
           <div class="confusion" id="confusion"></div>
         </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>What the calls would mean in a real population</h2>
+          <span class="small muted">sensitivity and specificity from above · prevalence from the slider</span>
+        </div>
+        <div class="prev-grid">
+          <div class="ctl"><label for="prev">Prevalence: <span data-cls="1"></span> in <span class="val" id="prev-val">1 in 100</span></label><input type="range" id="prev" min="0" max="100" step="1" value="54"></div>
+          <div class="stat"><span class="lbl">Positive predictive value</span><span class="v" id="ppv">–</span><span class="sub">of those called positive, truly positive</span></div>
+          <div class="stat"><span class="lbl">Negative predictive value</span><span class="v" id="npv">–</span><span class="sub">of those called negative, truly negative</span></div>
+        </div>
+        <p class="prev-text" id="prev-text"></p>
       </div>
 
       <div class="card">
@@ -227,7 +263,7 @@
 
       <div class="card">
         <div class="card-head">
-          <h2>Test set</h2>
+          <h2>Test set · <span id="test-count-2"></span></h2>
           <div class="legend">
             <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
             <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
@@ -263,9 +299,9 @@
       </div>
     </div>
     <div class="card">
-      <h3>Measurements</h3>
+      <h3 id="feat-card-title">Measurements</h3>
       <table class="feat">
-        <thead><tr><th>measurement</th><th style="text-align:right">value</th><th style="text-align:right" title="standardized: how many training-set standard deviations from the training-set mean">z</th><th id="feat-push-head">push</th></tr></thead>
+        <thead><tr id="feat-head"></tr></thead>
         <tbody id="feat-table"></tbody>
       </table>
       <p class="small muted" id="feat-note" style="margin-top:8px"></p>
@@ -274,9 +310,10 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the specimens with <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
+<script src="data/leukaemia/patients_data.js"></script>
 <script src="data/enlargement/nuclei_data.js"></script>
 <script src="data/irregularity/nuclei_data.js"></script>
 <script src="js/features.js"></script>
