@@ -12,7 +12,7 @@ const DS = require('../js/dataset.js');
 
 const nSeeds = process.argv.includes('--seeds') ? +process.argv[process.argv.indexOf('--seeds') + 1] : 3;
 const window = {};
-for (const f of ['leukaemia/patients_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
+for (const f of ['leukaemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const tasks = {};
 for (const [id, raw] of Object.entries(window.LECTURE_TASKS)) tasks[id] = { raw, ds: DS.prepare(raw) };
 
@@ -34,12 +34,12 @@ for (const [id, t] of Object.entries(tasks)) {
 const RECIPES = [
   { n: '①', label: 'Leukaemia · blood count · single layer',                       task: 'leukaemia',    mode: 'features', hidden: [],     conv: null,               lr: 0.05, epochs: 60,  augment: false, l2: 0 },
   { n: '②', label: 'Leukaemia · blood count · 3 ReLU units',                       task: 'leukaemia',    mode: 'features', hidden: [3],    conv: null,               lr: 0.05, epochs: 150, augment: false, l2: 0 },
-  { n: '③', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
-  { n: '④', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
-  { n: '⑤', label: 'Irregularity · measurements · single layer',                 task: 'irregularity', mode: 'features', hidden: [],     conv: null,               lr: 0.1,  epochs: 60, augment: false, l2: 0 },
-  { n: '⑥', label: 'Irregularity · pixels · 8 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
-  { n: '⑦', label: 'Irregularity · pixels · 8 + 8 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [8, 8], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.02 },
-  { n: '⑧', label: 'Irregularity · pixels · conv 8@5×5 + 8 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [8],    conv: { K: 8, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
+  { n: '③', label: 'Atypia · measurements · single layer',                       task: 'atypia',       mode: 'features', hidden: [],     conv: null,               lr: 0.1,  epochs: 60, augment: false, l2: 0 },
+  { n: '④', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
+  { n: '⑤', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
+  { n: '⑥', label: 'Irregularity · pixels · 4 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
+  { n: '⑦', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
+  { n: '⑧', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
 ];
 function run(r, seed) {
   const ds = tasks[r.task].ds;

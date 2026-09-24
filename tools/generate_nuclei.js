@@ -4,7 +4,7 @@
  *
  * Zero dependencies (Node >= 16). Run:  node tools/generate_nuclei.js
  *
- * For each task (data/enlargement, data/irregularity) it writes:
+ * For each task (data/atypia, data/enlargement, data/irregularity) it writes:
  *   nuclei_data.js        all 100 images (base64 grayscale) + labels + split, loaded by index.html
  *   nuclei.json           manifest: labels, split, and the generator parameters of every nucleus
  *   images/train/*.png    80 training nuclei  (40 + 40)
@@ -19,6 +19,9 @@
  *     finely jagged outlines.
  *   - Task "enlargement": the classes differ in size and darkness (bland = small and pale, enlarged = large
  *     and hyperchromatic), and now the contour is the decoy: half of each class is irregular.
+ *   - Task "atypia": bland nuclei are normal-sized, pale, smooth and finely textured. Atypical nuclei carry at
+ *     least one of four traits, alone or combined: enlarged, hyperchromatic, irregular contour, coarse chromatin.
+ *     Every other property is a decoy. Made for the measurement approach: each trait is caught by a different measurement.
  */
 'use strict';
 const fs = require('fs');
@@ -34,7 +37,17 @@ const DATA_ROOT = path.join(__dirname, '..', 'data');
 
 const TASKS = [
   {
-    id: 'enlargement', order: 1, kind: 'image', seed: 20260923,
+    id: 'atypia', order: 1, kind: 'image', seed: 20260924,
+    subtypes: [{ key: 'bland', name: 'Bland', positive: 0 }, { key: 'enlarged', name: 'Enlarged only', positive: 1 }, { key: 'hyperchromatic', name: 'Hyperchromatic only', positive: 1 }, { key: 'irregular', name: 'Irregular contour only', positive: 1 }, { key: 'coarse', name: 'Coarse chromatin only', positive: 1 }, { key: 'combined', name: 'Two or more traits', positive: 1 }],
+    title: 'Atypical nucleus?',
+    short: 'Atypia',
+    classes: [{ key: 'bland', name: 'Bland' }, { key: 'atypical', name: 'Atypical' }],
+    blurb: 'Half the nuclei are bland: normal size, pale, smooth outline, fine chromatin. Half are atypical in at least one way: enlarged, hyperchromatic, irregular in outline or coarse in chromatin, alone or in combination. Elongation, rotation and position in the crop are decoys (no nucleoli in this set). Measured the way a morphometry program would, each trait shows up in a different number.',
+    decoys: 'elongation, rotation and position',
+    signal: 'size, darkness, contour and chromatin texture, in any combination',
+  },
+  {
+    id: 'enlargement', order: 2, kind: 'image', seed: 20260923,
     subtypes: [{ key: 'bland-smooth', name: 'Bland · smooth contour', positive: 0 }, { key: 'bland-irregular', name: 'Bland · irregular contour', positive: 0 }, { key: 'enlarged-smooth', name: 'Enlarged · smooth contour', positive: 1 }, { key: 'enlarged-irregular', name: 'Enlarged · irregular contour', positive: 1 }],
     title: 'Enlarged and hyperchromatic?',
     short: 'Enlargement',
@@ -44,7 +57,7 @@ const TASKS = [
     signal: 'size and darkness',
   },
   {
-    id: 'irregularity', order: 2, kind: 'image', seed: 20260922,
+    id: 'irregularity', order: 3, kind: 'image', seed: 20260922,
     subtypes: [{ key: 'smooth', name: 'Smooth ellipse', positive: 0 }, { key: 'lobulated', name: 'Lobulated', positive: 1 }, { key: 'notched', name: 'Notched / blebbed', positive: 1 }, { key: 'jagged', name: 'Finely jagged', positive: 1 }],
     title: 'Irregular contour?',
     short: 'Irregularity',
@@ -102,9 +115,9 @@ function makeValueNoise(cells) {
 // ----------------------------------------------------------------------------- contour models
 // The contour is an ellipse (semi-axes a, b, rotation phi) whose radius is multiplied by (1 + m(theta)).
 // m(theta) is a sum of low-order harmonics plus optional localised notches (negative) or blebs (positive).
-function sampleShapeParams(label, task) {
+function sampleShapeParams(label, task, traits) {
   const p = {
-    a: task.id === 'enlargement' ? (label ? uniform(10.0, 12.0) : uniform(7.5, 9.5)) : uniform(8.5, 11.0), // semi-major axis, px
+    a: task.id === 'enlargement' ? (label ? uniform(10.0, 12.0) : uniform(7.5, 9.5)) : task.id === 'atypia' ? (traits.enlarged ? uniform(300, 380) : uniform(150, 215)) : uniform(8.5, 11.0), // semi-major axis, px (atypia: ellipse area, px², converted below)
     aspect: uniform(1.0, 1.4),                  // major/minor
     phi: uniform(0, Math.PI),                   // rotation
     cx: SIZE / 2 + uniform(-1.0, 1.0),          // centre jitter
@@ -114,8 +127,9 @@ function sampleShapeParams(label, task) {
     style: 'smooth',
   };
   p.b = p.a / p.aspect;
-  // which contour family? in the irregularity task it IS the label; in the enlargement task it is a coin flip
-  const contourClass = task.id === 'irregularity' ? label : (rand() < 0.5 ? 0 : 1);
+  if (task.id === 'atypia') { const area = p.a; p.a = Math.sqrt(area * p.aspect / Math.PI); p.b = p.a / p.aspect; }
+  // which contour family? in the irregularity task it IS the label; in the enlargement task it is a coin flip; in the atypia task it is one of the traits
+  const contourClass = task.id === 'irregularity' ? label : task.id === 'atypia' ? (traits.irregular ? 1 : 0) : (rand() < 0.5 ? 0 : 1);
   p.contourClass = contourClass;
   if (contourClass === 0) {
     // regular: essentially a perfect ellipse, at most a faint egg-shape
@@ -161,15 +175,16 @@ function contourRms(p) {
 }
 
 // ----------------------------------------------------------------------------- appearance (shared by both classes)
-function sampleAppearance(label, task) {
+function sampleAppearance(label, task, traits) {
   return {
     bg: uniform(0.88, 0.94),                 // background intensity (pale eosin)
     bgNoise: 0.02,
-    nucleus: task.id === 'enlargement' ? (label ? uniform(0.22, 0.36) : uniform(0.40, 0.52)) : uniform(0.30, 0.46), // mean nuclear intensity
-    textureAmp: uniform(0.04, 0.09),         // chromatin clumping amplitude
+    nucleus: task.id === 'enlargement' ? (label ? uniform(0.22, 0.36) : uniform(0.40, 0.52)) : task.id === 'atypia' ? (traits.dark ? uniform(0.22, 0.32) : uniform(0.44, 0.50)) : uniform(0.30, 0.46), // mean nuclear intensity
+    textureAmp: task.id === 'atypia' ? (traits.coarse ? uniform(0.18, 0.24) : uniform(0.04, 0.065)) : uniform(0.04, 0.09), // chromatin clumping amplitude
+    textureCells: task.id === 'atypia' && traits.coarse ? 10 : 7, // lattice of the chromatin noise: finer cells give several clumps per nucleus
     grain: 0.018,                            // per-pixel grain
     rim: uniform(0.03, 0.08),                // slightly darker nuclear membrane / margination
-    nucleolus: rand() < 0.35 ? { r: uniform(1.0, 1.6), rho: uniform(0.0, 0.5), ang: uniform(0, 2 * Math.PI), dark: uniform(0.10, 0.18) } : null,
+    nucleolus: task.id !== 'atypia' && rand() < 0.35 ? { r: uniform(1.0, 1.6), rho: uniform(0.0, 0.5), ang: uniform(0, 2 * Math.PI), dark: uniform(0.10, 0.18) } : null,
     edgeSoftness: uniform(0.35, 0.6),        // px of extra blur at the membrane
   };
 }
@@ -199,7 +214,7 @@ function renderNucleus(shape, look) {
       rhoAcc[idx] += Math.min(r, 1.2) / (SS * SS);
     }
   }
-  const tex = makeValueNoise(7);
+  const tex = makeValueNoise(look.textureCells || 7);
   const img = new Uint8Array(SIZE * SIZE);
   const nucCos = Math.cos(shape.phi), nucSin = Math.sin(shape.phi);
   let nx = 0, ny = 0;
@@ -270,15 +285,33 @@ function encodePNG(width, height, channels, pixels) {
 }
 
 // ----------------------------------------------------------------------------- build the set
-function makeOne(label, task) {
-  // resample until the contour is unambiguously smooth or unambiguously irregular
+const TRAITS = ['enlarged', 'dark', 'irregular', 'coarse'];
+const TRAIT_SUBTYPE = { enlarged: 'enlarged', dark: 'hyperchromatic', irregular: 'irregular', coarse: 'coarse' };
+function sampleTraits(label, task, i) {
+  if (task.id !== 'atypia') return null;
+  const t = { enlarged: false, dark: false, irregular: false, coarse: false, subtype: 'bland' };
+  if (!label) return t;
+  // the first 24 atypical nuclei carry exactly one trait (six of each), the rest two to four, so every trait has to be
+  // caught on its own by its own measurement
+  let on;
+  if (i < 24) on = [TRAITS[i % 4]];
+  else { const k = rand() < 0.6 ? 2 : rand() < 0.7 ? 3 : 4; on = shuffle(TRAITS.slice()).slice(0, k); }
+  for (const k of on) t[k] = true;
+  t.subtype = on.length === 1 ? TRAIT_SUBTYPE[on[0]] : 'combined';
+  return t;
+}
+function makeOne(label, task, i) {
+  const traits = sampleTraits(label, task, i);
+  // resample until the contour is unambiguously smooth or unambiguously irregular (clearly so in the atypia set, where
+  // an irregular outline may be the only trait)
+  const minRms = task.id === 'atypia' ? 0.11 : 0.065;
   for (let tries = 0; tries < 50; tries++) {
-    const shape = sampleShapeParams(label, task);
+    const shape = sampleShapeParams(label, task, traits);
     const rms = contourRms(shape);
     if (shape.contourClass === 0 && rms > 0.02) continue;
-    if (shape.contourClass === 1 && rms < 0.065) continue;
-    const look = sampleAppearance(label, task);
-    return { shape, look, rms };
+    if (shape.contourClass === 1 && rms < minRms) continue;
+    const look = sampleAppearance(label, task, traits);
+    return { shape, look, rms, traits };
   }
   throw new Error('could not sample a nucleus');
 }
@@ -289,11 +322,18 @@ function buildTask(task) {
 const OUT = path.join(DATA_ROOT, task.id);
 rand = mulberry32(task.seed);
 const negatives = [], positives = [];
-for (let i = 0; i < N_PER_CLASS; i++) negatives.push({ label: 0, ...makeOne(0, task) });
-for (let i = 0; i < N_PER_CLASS; i++) positives.push({ label: 1, ...makeOne(1, task) });
+for (let i = 0; i < N_PER_CLASS; i++) negatives.push({ label: 0, ...makeOne(0, task, i) });
+for (let i = 0; i < N_PER_CLASS; i++) positives.push({ label: 1, ...makeOne(1, task, i) });
 shuffle(negatives); shuffle(positives);
-const test = shuffle([...negatives.slice(0, N_TEST_PER_CLASS), ...positives.slice(0, N_TEST_PER_CLASS)]);
-const train = shuffle([...negatives.slice(N_TEST_PER_CLASS), ...positives.slice(N_TEST_PER_CLASS)]);
+// the atypia test set gets one nucleus of each single trait and six combined ones, so every trait is tested on its own
+let testPos = positives.slice(0, N_TEST_PER_CLASS), trainPos = positives.slice(N_TEST_PER_CLASS);
+if (task.id === 'atypia') {
+  const quota = { enlarged: 1, hyperchromatic: 1, irregular: 1, coarse: 1, combined: N_TEST_PER_CLASS - 4 };
+  testPos = []; trainPos = [];
+  for (const n of positives) { if (quota[n.traits.subtype] > 0) { quota[n.traits.subtype]--; testPos.push(n); } else trainPos.push(n); }
+}
+const test = shuffle([...negatives.slice(0, N_TEST_PER_CLASS), ...testPos]);
+const train = shuffle([...negatives.slice(N_TEST_PER_CLASS), ...trainPos]);
 const all = [...train.map(n => ({ ...n, split: 'train' })), ...test.map(n => ({ ...n, split: 'test' }))];
 
 fs.mkdirSync(path.join(OUT, 'images', 'train'), { recursive: true });
@@ -315,7 +355,7 @@ for (let i = 0; i < all.length; i++) {
     split: n.split,
     label: n.label,
     className: task.classes[n.label].key,
-    subtype: task.id === 'irregularity' ? n.shape.style : `${n.label ? 'enlarged' : 'bland'}-${n.shape.contourClass ? 'irregular' : 'smooth'}`,
+    subtype: task.id === 'irregularity' ? n.shape.style : task.id === 'atypia' ? n.traits.subtype : `${n.label ? 'enlarged' : 'bland'}-${n.shape.contourClass ? 'irregular' : 'smooth'}`,
     file: `images/${n.split}/${file}`,
     px: Buffer.from(img).toString('base64'),
     generator: {
@@ -329,6 +369,7 @@ for (let i = 0; i < all.length; i++) {
       meanIntensity: +n.look.nucleus.toFixed(2),
       textureAmp: +n.look.textureAmp.toFixed(3),
       nucleolus: !!n.look.nucleolus,
+      ...(n.traits ? { traits: TRAITS.filter(k => n.traits[k]) } : {}),
     },
   });
 }
@@ -372,8 +413,9 @@ const js = `// Generated by tools/generate_nuclei.js — do not edit by hand.\n`
   `window.LECTURE_TASKS[${JSON.stringify(task.id)}] = ${JSON.stringify({ meta, nuclei: records.map(({ generator, ...rest }) => rest) })};\n`;
 fs.writeFileSync(path.join(OUT, 'nuclei_data.js'), js);
 
-const styles = {};
-for (const r of records) styles[r.generator.style] = (styles[r.generator.style] || 0) + 1;
+const styles = {}, subtypes = {};
+for (const r of records) { styles[r.generator.style] = (styles[r.generator.style] || 0) + 1; subtypes[r.subtype] = (subtypes[r.subtype] || 0) + 1; }
 console.log(`[${task.id}] wrote ${records.length} nuclei (${meta.train} train / ${meta.test} test) to ${OUT}`);
 console.log('  contour styles:', styles);
+console.log('  subtypes:', subtypes);
 }

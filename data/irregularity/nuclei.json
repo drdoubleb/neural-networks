@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-09-23",
+  "generated": "2026-09-24",
   "seed": 20260922,
   "size": 32,
   "count": 100,
@@ -8,7 +8,7 @@
   "test": 20,
   "task": {
    "id": "irregularity",
-   "order": 2,
+   "order": 3,
    "kind": "image",
    "title": "Irregular contour?",
    "short": "Irregularity",

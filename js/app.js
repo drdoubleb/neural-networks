@@ -21,16 +21,16 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Enlargement · pixels · single layer', '④ Irregularity · pixels · single layer', '⑤ Irregularity · measurements · single layer', '⑥ Irregularity · pixels · 8 ReLU + augmentation', '⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation'];
+  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Enlargement · pixels · single layer', '⑤ Irregularity · pixels · single layer', '⑥ Irregularity · pixels · 4 ReLU + augmentation', '⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation'];
   const RECIPES = {
     1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
-    3: { task: 'enlargement',  mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: false, l2: 0,    peek: true,  speed: 4 },
-    4: { task: 'irregularity', mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: true,  speed: 4 },
-    5: { task: 'irregularity', mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 4 },
-    6: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.02, peek: true,  speed: 6 },
-    7: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 8, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.02, peek: true,  speed: 6 },
-    8: { task: 'irregularity', mode: 'pixels',   h1: 8, h2: 0, convK: 8, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
+    3: { task: 'atypia',       mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 4 },
+    4: { task: 'enlargement',  mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: false, l2: 0,    peek: true,  speed: 4 },
+    5: { task: 'irregularity', mode: 'pixels',   h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.01, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: true,  speed: 4 },
+    6: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
+    7: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 4, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
+    8: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
   };
 
   // ------------------------------------------------------------------ helpers
@@ -80,10 +80,11 @@
     $('feature-list').innerHTML = S.featureDefs.map(f => `<li><strong>${esc(f.name)}</strong>${f.unit ? ` (${esc(f.unit)})` : ''}${f.low != null ? ` · reference ${f.low}–${f.high}` : ''} — ${esc(f.desc)}</li>`).join('');
     const opts = S.featureDefs.map((f, i) => `<option value="${i}">${esc(f.name)}</option>`).join('');
     $('scatter-x').innerHTML = opts; $('scatter-y').innerHTML = opts;
-    const ax = { leukaemia: [0, 5], enlargement: [0, 2], irregularity: [5, 4] }[id] || [0, 1];
+    const ax = { leukaemia: [0, 5], atypia: [0, 2], enlargement: [0, 2], irregularity: [5, 4] }[id] || [0, 1];
     $('scatter-x').value = ax[0]; $('scatter-y').value = ax[1];
     $('scatter-hint').textContent = {
       leukaemia: 'WBC against lymphocytes shows why no single parameter works: CLL and viral lymphocytosis overlap, and acute leukaemia sits at both ends of the WBC axis. Try platelets against haemoglobin, or basophils against immature granulocytes.',
+      atypia: 'Area against darkness catches the enlarged and the hyperchromatic nuclei, solidity against contour roughness the irregular ones, texture the coarse chromatin. No single pair catches every atypical nucleus, which is why the network gets all six measurements.',
       enlargement: 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.',
       irregularity: 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.',
     }[id] || '';

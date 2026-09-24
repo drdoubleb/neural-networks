@@ -3,8 +3,8 @@
 An interactive, single-page teaching tool for an *AI for pathologists* lecture. Residents build a small neural network,
 watch it train with every node and weight on screen, then run it on cases it has never seen. The page starts with a
 clinical-pathology question (a blood count: leukaemia or not?) where the whole network fits on one screen, moves to
-nuclei, and takes the network from a single layer on raw pixels to a convolutional network, with the reasons for each
-step visible along the way. No installation, no server: open `index.html` in a browser.
+nuclei (first as six hand-made measurements, then as raw pixels), and takes the network from a single layer on raw
+pixels to a convolutional network, with the reasons for each step visible along the way. No installation, no server: open `index.html` in a browser.
 
 ![Contour irregularity task: all 100 nuclei, blue frames regular, orange irregular](data/irregularity/contact_sheet.png)
 
@@ -22,18 +22,19 @@ each step of the arc, which also switches the question if needed). The Train sta
 (input, convolution, hidden units, Train / Step / Reset); everything else lives under *Advanced settings*. Controls that
 do not apply to the current question are hidden.
 
-## Three questions, one page
+## Four questions, one page
 
-The **question** dropdown switches between three datasets, each with its own synthetic cases (80/20 split):
+The **question** dropdown switches between four datasets, each with its own synthetic cases (80/20 split):
 
 | Question | Cases | Positive class | What separates the classes | Decoys |
 |---|---|---|---|---|
 | **Leukaemia?** | 200 blood counts (160 / 40) | Leukaemia (acute, CML, CLL) vs No leukaemia (normal, bacterial infection, viral lymphocytosis, iron deficiency) | the pattern across ten CBC parameters | a raised white count on its own, cytopenias on their own |
+| **Atypical nucleus?** | 100 nuclei (80 / 20) | Atypical (enlarged, hyperchromatic, irregular contour or coarse chromatin, alone or combined; six nuclei carry each trait on its own) vs Bland | size, darkness, contour and texture, in any combination | elongation, rotation, nucleolus, position |
 | **Enlarged and hyperchromatic?** | 100 nuclei (80 / 20) | Enlarged (large, dark) vs Bland (small, pale) | size and darkness | contour shape (half of each class is irregular), elongation, rotation, texture, nucleolus, position |
 | **Irregular contour?** | 100 nuclei (80 / 20) | Irregular (lobulated, notched, jagged) vs Regular (smooth ellipse) | the contour only | size, elongation, rotation, darkness, texture, nucleolus, position |
 
-Every case also carries a hidden **subtype** (the kind of blood count, or the contour style of the nucleus). The
-network never sees it; the page uses it to show which hidden units respond to which kind of case.
+Every case also carries a hidden **subtype** (the kind of blood count, the traits of an atypical nucleus, or the contour
+style). The network never sees it; the page uses it to show which hidden units respond to which kind of case.
 
 ## The three stages
 
@@ -82,12 +83,16 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 |---|---|---|---|
 | ① Leukaemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and haemoglobin, positive on basophils, immature granulocytes, WBC and blasts. |
 | ② Leukaemia · blood count · 3 ReLU units | 37 | ~95% | Hidden units organise themselves: one becomes an acute-leukaemia detector, one a CML detector, one a "looks healthy" detector with a negative weight; CLL is folded into a neighbour. Nobody told the network these types exist. |
-| ③ Enlargement · pixels · single layer | 1,025 | 100% | A basic network works on pixels when the answer is a whole-image template: the weight map becomes a nucleus-shaped stencil. |
-| ④ Irregularity · pixels · single layer | 1,025 | ~60% | Same network, new question: training accuracy hits 100% while the test curve stays at chance. Memorisation. No single template can capture "a bump somewhere on the outline". |
-| ⑤ Irregularity · measurements · single layer | 7 | ~95% | Hand-made features rescue it: the weights land on solidity and contour roughness, the decoys stay near zero. |
-| ⑥ Irregularity · pixels · 8 ReLU + augmentation | 8,209 | ~90% | Hidden units as learned feature detectors; flips and rotations turn 80 images into 640 views (roughly worth 8× more real data). |
-| ⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation | 8,281 | ~88% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
-| ⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation | 3,361 | ~93% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
+| ③ Atypia · measurements · single layer | 7 | ~95% | One approach to images: measure what a pathologist would name (area, darkness, chromatin texture, solidity, contour roughness) and let a single layer weigh the numbers. The checklist reads like a grading scheme: every trait measurement earns a weight, because each trait appears on its own in some nuclei, and elongation, the decoy, stays near zero. |
+| ④ Enlargement · pixels · single layer | 1,025 | 100% | The other approach: raw pixels. A basic network works on pixels when the answer is a whole-image template: the weight map becomes a nucleus-shaped stencil. |
+| ⑤ Irregularity · pixels · single layer | 1,025 | ~60% | Same network, new question: training accuracy hits 100% while the test curve stays at chance. Memorisation. No single template can capture "a bump somewhere on the outline". Switching the input to measurements rescues it (~95%, the weights land on solidity and contour roughness), but someone had to invent those measurements. |
+| ⑥ Irregularity · pixels · 4 ReLU + augmentation | 4,105 | ~77% | Hidden units as learned feature detectors; flips and rotations turn 80 images into 640 views (roughly worth 8× more real data). |
+| ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
+| ⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
+
+The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
+a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑥ (four: 79%), 87% on ⑦
+(four: 81%) and 94% on ⑧ (four: 93%).
 
 ## The data
 
@@ -98,8 +103,8 @@ count and few blasts), CML (very high count, basophilia, marked left shift), CLL
 infection (neutrophilia, left shift, a quarter septic with low platelets), viral lymphocytosis and iron-deficiency
 anaemia (microcytosis, reactive thrombocytosis). Counts are log-transformed before standardization.
 
-`tools/generate_nuclei.js` (no dependencies) draws both nucleus datasets from fixed seeds and writes, per task, into
-`data/enlargement/` and `data/irregularity/`:
+`tools/generate_nuclei.js` (no dependencies) draws the three nucleus datasets from fixed seeds and writes, per task, into
+`data/atypia/`, `data/enlargement/` and `data/irregularity/`:
 
 - `images/train/*.png`, `images/test/*.png` — 32 × 32 8-bit grayscale PNGs (80 + 20, class in the file name)
 - `nuclei_data.js` — the same pixels, base64-encoded, loaded by the page
@@ -108,7 +113,8 @@ anaemia (microcytosis, reactive thrombocytosis). Counts are log-transformed befo
 
 Each nucleus is a dark ellipse on a pale, noisy background whose radius is modulated by low-order harmonics (lobulation),
 localised clefts or blebs, or higher harmonics (jagged outlines). Chromatin texture, an optional nucleolus, a slightly
-darker membrane and position jitter are added to every nucleus.
+darker membrane and position jitter are added to every nucleus. In the atypia set, 24 of the 50 atypical nuclei carry
+exactly one trait (six enlarged, six hyperchromatic, six irregular, six coarse) and 26 carry two to four.
 
 The six measurements are computed from the pixels in the browser (`js/features.js`): Otsu threshold → largest component
 → sub-pixel contour by marching squares. *Area*, *elongation* (second moments), *darkness* and *texture* (mean and spread
