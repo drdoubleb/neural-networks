@@ -271,19 +271,21 @@ window.Viz = (function () {
       const img = add({ kind: 'image', x: 80, y: yc, w: 100, h: 100 });
       L.captions.push({ x: 30, text: 'INPUT · 1,024 PX', align: 'left' });
       const rowStep = (NET_H - 100) / K;
-      const fs = Math.min(38, rowStep - 6), ms = Math.min(50, rowStep - 4), ps = Math.min(32, rowStep - 8);
-      const xF = 228, xM = 298, xP = 366;
+      // tiles grow when there are few filters (four rows leave room for 48/64/40 px tiles); the columns follow the tile widths
+      const fs = Math.min(48, rowStep - 6), ms = Math.min(64, rowStep - 4), ps = Math.min(40, rowStep - 10.5);
+      const xF = 228, xM = ms > 50 ? xF + fs / 2 + 26 + ms / 2 : 298, xP = ms > 50 ? xM + ms / 2 + 26 + ps / 2 : 366;
       const ys = spread(K, yc, rowStep);
       const filters = ys.map((y, k) => add({ kind: 'filter', k, x: xF, y, size: fs }));
       const fmaps = ys.map((y, k) => add({ kind: 'fmap', k, x: xM, y, size: ms }));
       const pooled = ys.map((y, k) => add({ kind: 'pooled', k, x: xP, y, size: ps }));
-      L.captions.push({ x: (xF + xP) / 2 + 14, text: `CONV · ${K} FILTERS ${conv.f}×${conv.f} · RELU · MAX-POOL ${conv.pool}×${conv.pool}` });
+      // with two dense layers the caption row is crowded, so the conv caption drops to its short form
+      L.captions.push({ x: (xF + xP) / 2 + 8, text: hidden.length > 1 ? `CONV · ${K} FILTERS ${conv.f}×${conv.f} · POOL ${conv.pool}×${conv.pool}` : `CONV · ${K} FILTERS ${conv.f}×${conv.f} · RELU · MAX-POOL ${conv.pool}×${conv.pool}` });
       L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2], [xF - fs / 2 - 4, ys[0] - fs / 2], [xF - fs / 2 - 4, ys[K - 1] + fs / 2], [img.x + img.w / 2, img.y + img.h / 2]], label: '' });
       L.bandLabel = { x: (img.x + img.w / 2 + xF - fs / 2) / 2, y: 44, text: 'each filter slides over the image' };
       L.footnotes = [{ x: xF, text: 'filters' }, { x: xM, text: 'feature maps' }, { x: xP, text: 'pooled' }];
       L.poolCaption = { x: xP, text: `each cell = largest of a ${conv.pool}×${conv.pool} block` };
       const F = net.featureCount;
-      const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [530] : [495, 615];
+      const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [530] : [510, 630];
       const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
       let prevCol = null;
       hidden.forEach((h, l) => {
