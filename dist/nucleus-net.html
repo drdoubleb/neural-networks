@@ -225,6 +225,10 @@ ul.prose li + li { margin-top: 4px; }
 .status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); margin-top: 12px; }
 .status b { color: var(--ink); font-weight: 500; }
 .note { font-size: 13px; color: var(--accent); min-height: 1.4em; margin-top: 6px; }
+.lesson { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); border-left: 3px solid var(--accent); font-size: 13.5px; line-height: 1.45; }
+.lesson .step { font-weight: 700; color: var(--accent); font-family: "IBM Plex Mono", ui-monospace, monospace; white-space: nowrap; }
+.lesson .lesson-actions { display: flex; gap: 6px; margin-left: auto; }
+.lesson .btn { padding: 4px 10px; font-size: 12px; }
 
 /* ---------- network diagram ---------- */
 .net-wrap { position: relative; width: 100%; }
@@ -493,6 +497,7 @@ details.fold > ul { margin-top: 8px; }
             <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
             <button type="button" class="btn" id="btn-step-epoch">Step epoch</button>
             <button type="button" class="btn" id="btn-step-batch">Step batch</button>
+            <button type="button" class="btn" id="btn-teach" title="">Teach this case</button>
             <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
           </div>
         </div>
@@ -525,6 +530,10 @@ details.fold > ul { margin-top: 8px; }
           <h2>The network, live</h2>
           <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
+        <div class="lesson" id="lesson" hidden>
+          <span id="lesson-text"></span>
+          <span class="lesson-actions"><button type="button" class="btn" id="btn-teach-again" hidden>Teach it 10× more</button><button type="button" class="btn" id="btn-teach-next" hidden>Worst case next ▸</button></span>
+        </div>
         <div class="net-wrap">
           <canvas id="net-canvas" width="800" height="440" aria-label="Network diagram"></canvas>
           <div class="tip" id="net-tip" hidden></div>
@@ -536,6 +545,7 @@ details.fold > ul { margin-top: 8px; }
           <span>at the output, positive pushes toward <b data-cls="1"></b></span>
           <span>node fill = value flowing through it for this case</span>
           <span id="legend-conv" hidden>filters are 5×5 stencils slid over the image; a feature map lights up (violet) where the image matches the stencil</span>
+          <span id="legend-lesson" hidden>during a lesson: violet dots carry the error back, pills show each unit’s blame, glows show each weight’s nudge (orange up, blue down)</span>
         </div>
       </div>
 
@@ -1075,7 +1085,9 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
         const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
         const dn = new Float64Array(fanIn);
         for (let j = 0; j < fanOut; j++) {
-          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]); if (dj === 0) continue;
+          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]);
+          if (g && g.delta) g.delta[l][j] = dj;
+          if (dj === 0) continue;
           if (g) g.gb[l][j] += dj;
           const off = j * fanIn;
           if (g) for (let i = 0; i < fanIn; i++) { g.gW[l][off + i] += dj * inp[i]; dn[i] += dj * W[off + i]; }
@@ -1093,35 +1105,54 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
       return dconv;
     }
 
-    // one gradient-descent step on a mini-batch (l2 = weight decay); returns the mean loss before the update
-    trainBatch(xs, ys, lr, l2 = 0) {
-      const n = xs.length;
+    // an empty gradient accumulator, one slot per parameter
+    newGradient() {
       const g = { gW: this.W.map(W => new Float64Array(W.length)), gb: this.b.map(b => new Float64Array(b.length)), gWo: new Float64Array(this.Wo.length), gbo: 0 };
       if (this.conv) { g.gWc = new Float64Array(this.Wc.length); g.gbc = new Float64Array(this.bc.length); }
-      let loss = 0;
-      for (let k = 0; k < n; k++) {
-        const x = xs[k], fw = this.forward(x);
-        loss += bce(fw.p, ys[k]);
-        const d0 = this.backDense(fw, fw.p - ys[k], g);
-        if (this.conv) {
-          const { K, f } = this.conv, size = this.size, co = this.co;
-          const dconv = this.backPool(fw, d0);
-          for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
-            const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
-            g.gbc[kk] += gg;
-            const gWc = g.gWc;
-            if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
-            else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
-          }
+      return g;
+    }
+    // forward + backward for one case, adding its gradient into g; returns the case's loss
+    accumulate(x, y, g, fw) {
+      fw = fw || this.forward(x);
+      const loss = bce(fw.p, y);
+      const d0 = this.backDense(fw, fw.p - y, g);
+      if (this.conv) {
+        const { K, f } = this.conv, size = this.size, co = this.co;
+        const dconv = this.backPool(fw, d0);
+        for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+          const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
+          g.gbc[kk] += gg;
+          const gWc = g.gWc;
+          if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
+          else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
         }
       }
+      return loss;
+    }
+    // gradient-descent update from an accumulated gradient over n cases (l2 = weight decay)
+    applyGradient(g, n, lr, l2 = 0) {
       const s = lr / n, decay = 1 - lr * l2;
       if (this.conv) { for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = this.Wc[i] * decay - s * g.gWc[i]; for (let k = 0; k < this.bc.length; k++) this.bc[k] -= s * g.gbc[k]; }
       for (let l = 0; l < this.W.length; l++) { const W = this.W[l]; for (let i = 0; i < W.length; i++) W[i] = W[i] * decay - s * g.gW[l][i]; for (let j = 0; j < this.b[l].length; j++) this.b[l][j] -= s * g.gb[l][j]; }
       for (let i = 0; i < this.Wo.length; i++) this.Wo[i] = this.Wo[i] * decay - s * g.gWo[i];
       this.bo -= s * g.gbo;
       this.steps++;
+    }
+    // one gradient-descent step on a mini-batch; returns the mean loss before the update
+    trainBatch(xs, ys, lr, l2 = 0) {
+      const n = xs.length, g = this.newGradient();
+      let loss = 0;
+      for (let k = 0; k < n; k++) loss += this.accumulate(xs[k], ys[k], g);
+      this.applyGradient(g, n, lr, l2);
       return loss / n;
+    }
+    // one case's lesson, not yet applied: its forward pass, error (call − truth), the blame each hidden unit receives
+    // (g.delta[l][j] = d loss / d pre-activation) and the gradient of every weight. Apply with applyGradient(g, 1, lr, l2).
+    lesson(x, y) {
+      const g = this.newGradient(); g.delta = this.hidden.map(h => new Float64Array(h));
+      const fw = this.forward(x);
+      const loss = this.accumulate(x, y, g, fw);
+      return { fw, error: fw.p - y, loss, g };
     }
 
     // d(score z)/d(input): how much each input nudges the score toward the positive class
@@ -1522,11 +1553,11 @@ window.Viz = (function () {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l + 1], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
-        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
+        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { wi: j * net.sizes[l] + i, fi: i, ti: j, prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
         prevCol = col;
       });
       if (!hidden.length) L.captions.push({ x: 440, text: 'NO HIDDEN LAYER' });
-      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
+      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { wi: i, fi: i, prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
     } else if (!conv) {
       const img = add({ kind: 'image', x: 108, y: yc, w: 124, h: 124 });
       L.captions.push({ x: 108, text: 'INPUT · 1,024 PIXELS' });
@@ -1560,15 +1591,16 @@ window.Viz = (function () {
         }
         L.bandLabel = { x: (img.x + img.w / 2 + xW - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max' };
         const badgeX = xP + size / 2 + 16; // the activation badge sits after the product map: Σ weight × pixel + bias, through the activation
+        L.badgeX = badgeX;
         let prevCol = prods;
         if (hidden.length > 1) {
           const col = spread(hidden[1], yc, Math.min(46, (NET_H - 110) / Math.max(1, hidden[1] - 1))).map((y, j) => add({ kind: 'unit', l: 1, j, x: xs[1], y, r: 17 }));
           unitColumns.push(col);
           L.captions.push({ x: xs[1], text: `HIDDEN 2 · ${hidden[1]} ${m.activationLabel.toUpperCase()}` });
-          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: badgeX + 12, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
+          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: badgeX + 12, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], wi: j * net.sizes[1] + i, fi: i, ti: j, prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
           prevCol = col;
         }
-        prevCol.forEach((a, i) => L.edges.push({ x1: a.r ? a.x + a.r : badgeX + 12, y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
+        prevCol.forEach((a, i) => L.edges.push({ x1: a.r ? a.x + a.r : badgeX + 12, y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], wi: i, fi: i, prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
       }
     } else {
       const K = conv.K;
@@ -1597,11 +1629,11 @@ window.Viz = (function () {
         unitColumns.push(col);
         L.captions.push({ x: xs[l], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
         if (l === 0) { for (const u of col) L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [u.x - u.r, u.y - u.r], [u.x - u.r, u.y + u.r], [poolBox.x1, poolBox.yBot]], unit: u }); L.bandLabel2 = { x: (poolBox.x1 + xs[0]) / 2, y: 44, text: `${fmtInt(F)} weights per unit` }; }
-        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
+        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { wi: j * net.sizes[l] + i, fi: i, ti: j, prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
         prevCol = col;
       });
       if (!hidden.length) { L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [output.x - output.r, output.y - output.r], [output.x - output.r, output.y + output.r], [poolBox.x1, poolBox.yBot]] }); L.bandLabel2 = { x: (poolBox.x1 + output.x) / 2, y: 44, text: `${fmtInt(F)} weights` }; }
-      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
+      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { wi: i, fi: i, prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
     }
     L.captions.push({ x: output.x, text: 'OUTPUT' });
     L.output = output; L.unitColumns = unitColumns;
@@ -1798,7 +1830,7 @@ window.Viz = (function () {
         const a = acts ? acts[n.j] : null;
         circleNode(ctx, n.x, n.y, n.r, unitFill(a, acts || [], signed), a == null ? '·' : fmtNum(a, 2), null, isHov);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        if (L.unitColumns[n.l].length <= 8) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
+        if (L.unitColumns[n.l].length <= 8 && !(m.lesson && m.lesson.phase !== 'forward' && m.lesson.phase !== 'error')) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
       } else if (n.kind === 'output') {
         const p = fw && stage >= 2 ? fw.p : null;
         circleNode(ctx, n.x, n.y, n.r, p == null ? pending : diverging((p - 0.5) * 2), p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
@@ -1813,6 +1845,7 @@ window.Viz = (function () {
         }
       }
     }
+    if (m.lesson) drawLesson(ctx, L, m);
     // convolution walk-through: the sliding window on the image and the arithmetic of the current position
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
@@ -1832,6 +1865,102 @@ window.Viz = (function () {
     return L;
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
+
+  // The lesson walk-through: one case's error, the blame each hidden unit receives, and the nudge every weight gets.
+  // m.lesson = { phase: forward | error | blame | nudge | after, frac (0..1 within the phase), error (call − truth),
+  //   y, truthName, pBefore, pAfter, delta[l][j] (d loss / d pre-activation of each hidden unit), gW, gWo, lr, fwBefore }
+  function drawLesson(ctx, L, m) {
+    const les = m.lesson, c = colors(), net = m.net, out = L.output;
+    const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
+    const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
+    const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
+    const truthCol = les.y ? c.irregular : c.regular;
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
+    if (les.phase === 'forward') return;
+    // call against truth on a 0..1 scale beside the output; the gap between them is the error
+    const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
+    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
+    const ty = yOf(les.y);
+    const pv = les.phase === 'after' && les.pAfter != null ? les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, les.frac)) : les.pBefore;
+    ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
+    ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
+    ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
+    if (les.phase === 'after' && les.pAfter != null) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 74); }
+    if (les.phase === 'error') return;
+
+    // blame flows back one layer at a time: violet dots run from each target back to its source, then every unit
+    // shows its share of the error (d loss / d pre-activation); a unit that was switched off gets none
+    const nL = net.hidden.length;
+    if (nL) {
+      const prog = les.phase === 'blame' ? les.frac * nL : nL;
+      for (let k = 0; k < nL; k++) {
+        const l = nL - 1 - k, t = Math.min(1, prog - k);
+        if (t <= 0) continue;
+        const key = l === nL - 1 ? 'out' : l + 1;  // the connections that leave layer l
+        if (t < 1) {
+          ctx.fillStyle = c.accent;
+          for (const e of L.edges) { if (e.layer !== key) continue; const x = e.x2 + (e.x1 - e.x2) * t, y = e.y2 + (e.y1 - e.y2) * t; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
+        } else {
+          L.unitColumns[l].forEach((u, j) => {
+            const d = les.delta[l][j];
+            const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 7;
+            pill(ctx, px, py, d === 0 ? 'no blame' : `blame ${fmtSigned(d, 2)}`, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
+          });
+        }
+      }
+    }
+    if (les.phase !== 'nudge') return;
+
+    // the nudge: every weight moves by −lr × blame × its input. Connections glow in the colour of their change
+    // (orange up, blue down), and on pixels a scaled copy of the image slides along the band into each weight map.
+    const fr = Math.min(1, les.frac);
+    const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
+    const maxDw = {};
+    for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
+    ctx.lineCap = 'round';
+    for (const e of L.edges) {
+      const dw = dwOf(e); if (!dw) continue;
+      const rel = Math.abs(dw) / maxDw[e.layer];
+      ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.25 + 0.65 * Math.min(1, fr * 2));
+      ctx.lineWidth = 2 + 8 * rel;
+      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    if (m.mode === 'pixels' && m.x && !net.conv) {
+      const img = L.nodes.find(n => n.kind === 'image');
+      const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
+      const D = m.x.length;
+      let common = 1e-9, xmax = 1e-9;
+      for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
+      for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
+      targets.forEach((t, j) => {
+        const n = t.node; if (!n || !img) return;
+        const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
+        const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
+        if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
+        const cx = x0 + (x1 - x0) * ease(fr);
+        const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
+        const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
+        if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+      });
+    }
+  }
+  function pill(ctx, x, y, text, col, c) {
+    ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
+    const w = ctx.measureText(text).width + 10, h = 14, r = 4, x0 = x - w / 2, y0 = y - h / 2;
+    ctx.beginPath(); ctx.moveTo(x0 + r, y0); ctx.lineTo(x0 + w - r, y0); ctx.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r); ctx.lineTo(x0 + w, y0 + h - r); ctx.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h); ctx.lineTo(x0 + r, y0 + h); ctx.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r); ctx.lineTo(x0, y0 + r); ctx.quadraticCurveTo(x0, y0, x0 + r, y0); ctx.closePath();
+    ctx.fillStyle = c.surface; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 0.5);
+  }
 
   // one position of one filter, spelled out: image patch × filter = products, summed, through ReLU
   function drawConvPanel(ctx, m, k, oy, ox, at) {
@@ -1913,7 +2042,8 @@ window.Viz = (function () {
         let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
         const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
         const w = net.W[0][n.j * net.sizes[0] + Math.max(0, Math.min(net.D - 1, j * m.size + i))];
-        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}` };
+        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
+        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
         const D = net.D, off = n.j * D;
@@ -1924,12 +2054,13 @@ window.Viz = (function () {
         return { kind: 'node', ref: n, text: `unit ${n.j + 1}: Σ weight × pixel ${m.x ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}` };
       }
       if (n.kind === 'map' && inBox(n, 0)) {
-        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const w = net.Wo[j * m.size + i];
-        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
+        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
+        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
       }
       if (n.kind === 'product' && inBox(n, 0) && m.x) {
-        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const k = j * m.size + i;
         return { kind: 'node', ref: n, text: `pixel (${i}, ${j}): weight ${fmtSigned(net.Wo[k], 3)} × input ${fmtSigned(m.x[k], 2)} = ${fmtSigned(net.Wo[k] * m.x[k], 3)}` };
       }
@@ -1959,7 +2090,15 @@ window.Viz = (function () {
     if (best) {
       const contrib = best.fromIdx != null && m.x ? ` × input ${fmtSigned(m.x[best.fromIdx], 2)} = ${fmtSigned(best.w * m.x[best.fromIdx], 3)}` : '';
       const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
-      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}` };
+      let lessonTxt = '';
+      const les = m.lesson;
+      if (les && best.wi != null && (les.phase === 'nudge' || les.phase === 'after')) {
+        const arr = best.layer === 'out' ? les.gWo : les.gW[best.layer], fwB = les.fwBefore;
+        const inp = best.layer === 'out' ? fwB.a[fwB.a.length - 1][best.fi] : best.layer === 0 ? m.x[best.fi] : fwB.a[best.layer][best.fi];
+        const blame = best.layer === 'out' ? les.error : les.delta[best.layer][best.ti];
+        lessonTxt = ` · this lesson: Δw = −${les.lr} × ${best.layer === 'out' ? 'error' : 'blame'} ${fmtSigned(blame, 3)} × input ${fmtSigned(inp, 2)} = ${fmtSigned(-les.lr * arr[best.wi], 4)}`;
+      }
+      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}${lessonTxt}` };
     }
     return null;
   }
@@ -2101,6 +2240,7 @@ window.Viz = (function () {
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
     test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
     hover: { train: null, test: null },
+    lesson: null, lastLesson: null,
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
@@ -2187,6 +2327,7 @@ window.Viz = (function () {
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
+    S.lesson = null; S.lastLesson = null; renderLessonLine();
     if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -2209,6 +2350,7 @@ window.Viz = (function () {
     S.history.push({ epoch: S.epoch, loss: S.trainEval.loss, acc: S.trainEval.accuracy, testLoss: S.testEval.loss, testAcc: S.testEval.accuracy });
   }
   function trainStep() {
+    if (S.lesson || S.lastLesson) endLesson();
     const X = S.inputs.trainX, Y = S.inputs.trainY, n = X.length;
     if (S.ptr === 0) shuffleOrder();
     const end = Math.min(n, S.ptr + S.batch);
@@ -2225,6 +2367,7 @@ window.Viz = (function () {
   function batchesPerEpoch() { return Math.ceil(S.inputs.trainX.length / S.batch); }
 
   function startTraining() {
+    if (S.lesson) endLesson();
     if (S.epoch >= S.epochs) { note(`Already at ${S.epochs} epochs. Raise the epoch count or reset to train again.`); return; }
     S.running = true; S.lastTime = performance.now(); S.debt = 0;
     $('btn-train').textContent = '⏸ Pause';
@@ -2249,6 +2392,127 @@ window.Viz = (function () {
     if (did) renderTraining(ended || S.kind === 'tabular');
     if (S.running) requestAnimationFrame(tick);
   }
+  // ------------------------------------------------------------------ the lesson: one case teaches the network
+  // A walk-through of one gradient step on the selected training case, phase by phase: the forward pass, the error
+  // (call − truth), the blame flowing back to each hidden unit, the nudge every weight receives, and the same case
+  // again with its new call. The step is real training: a batch of one at the current learning rate.
+  const LESSON_MS = { forward: 1500, error: 2200, blame: 2600, blame2: 3400, nudge: 3200, after: 2200 };
+  function lessonPhases() {
+    const L = S.net.hidden.length;
+    const ph = [['forward', LESSON_MS.forward], ['error', LESSON_MS.error]];
+    if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
+    ph.push(['nudge', LESSON_MS.nudge], ['after', LESSON_MS.after]);
+    return ph;
+  }
+  function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv && S.selected && S.selected.split === 'train'); }
+  function updateTeachButton() {
+    const b = $('btn-teach'); if (!b || !S.net) return;
+    b.disabled = !canTeach() && !S.lesson;
+    b.textContent = S.lesson ? 'Skip ▸' : 'Teach this case';
+    b.title = S.net.conv ? 'The walk-through covers dense networks: switch the convolution off'
+      : S.selected && S.selected.split !== 'train' ? `Pick a training ${noun(1)}: test ${noun(2)} are never taught`
+      : `Watch ${S.selected ? S.selected.name : 'this case'} teach the network one step (T)`;
+    $('btn-teach-next').title = 'the training case the network currently gets most wrong (N)';
+  }
+  function startLesson(s) {
+    if (!s || s.split !== 'train' || !S.net || S.net.conv) return;
+    stopTraining();
+    if (S.selected !== s) selectSpecimen(s);
+    const x = S.inputs.xOf(s), y = s.label;
+    const res = S.net.lesson(x, y);
+    S.lastLesson = null;
+    S.lesson = { s, x, y, res, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, applied: false };
+    updateTeachButton(); renderLessonLine();
+    requestAnimationFrame(lessonFrame);
+  }
+  function applyLesson() {
+    const les = S.lesson;
+    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
+    S.net.applyGradient(les.res.g, 1, S.lr, S.l2);
+    les.pAfter = S.net.forward(les.x).p; les.applied = true;
+    if (S.test.results.size) clearTestResults(true);
+    evaluateAll(); renderStatus();
+  }
+  function lessonFrame(now) {
+    const les = S.lesson; if (!les) return;
+    const t = les.skip ? Infinity : now - les.t0;
+    let acc = 0, phase = null, frac = 1;
+    for (const [name, ms] of les.phases) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
+    if (!phase) {
+      if (!les.applied) applyLesson();
+      S.lastLesson = { s: les.s, calls: [les.pBefore, les.pAfter] };
+      S.lesson = null;
+      renderTraining(true); renderLessonLine(); updateTeachButton();
+      return;
+    }
+    if (phase === 'after' && !les.applied) applyLesson();
+    les.phase = phase; les.frac = frac;
+    renderTrainGraph(); renderLessonLine();
+    requestAnimationFrame(lessonFrame);
+  }
+  function endLesson() { // finish a running lesson at once (its step still counts) and clear the strip
+    const les = S.lesson;
+    if (les && !les.applied) applyLesson();
+    S.lesson = null; S.lastLesson = null;
+    renderLessonLine(); updateTeachButton();
+  }
+  function lessonView() {
+    const les = S.lesson; if (!les) return null;
+    const g = les.res.g;
+    return { phase: les.phase, frac: les.frac, error: les.res.error, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
+  }
+  function renderLessonLine() {
+    const box = $('lesson'); if (!box) return;
+    const les = S.lesson, last = S.lastLesson;
+    if (!les && !last) { box.hidden = true; $('legend-lesson').hidden = true; return; }
+    box.hidden = false; $('legend-lesson').hidden = !les;
+    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !!les;
+    let html;
+    if (les) {
+      const n = les.phases.findIndex(p => p[0] === les.phase) + 1, total = les.phases.length;
+      const hidden = S.net.hidden.length, blame = hidden ? 'blame' : 'error';
+      const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
+      const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
+      const pair = les.pAfter == null ? `${p} → …` : fmtCalls([les.pBefore, les.pAfter]);
+      const texts = {
+        forward: `Forward pass: the network calls <b>${p}</b> (${esc(call)}). The truth is <b>${esc(className(les.y))}</b>.`,
+        error: `Error = call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
+        blame: hidden > 1
+          ? 'Back-propagation: the error flows back one layer at a time, shared out along the connections in proportion to their weights. A unit that was switched off gets no blame.'
+          : 'Back-propagation: the error is shared out to the hidden units in proportion to their weights to the output. A unit that was switched off gets no blame.',
+        nudge: allSilent
+          ? 'Every hidden unit was switched off for this case, so none of them learns from it: only the output bias moves. A ReLU unit that is off passes no blame back.'
+          : S.mode === 'pixels'
+          ? `Every weight moves by −learning rate × ${blame} × its input. On pixels that is a faint copy of the ${noun(1)} itself, added to ${hidden ? 'each weight map, scaled by that unit’s blame' : 'the weight map'} (orange = weight up, blue = weight down).`
+          : `Every weight moves by −learning rate × ${blame} × its input (orange = weight up, blue = weight down): large inputs get large nudges. Hover a connection for the arithmetic.`,
+        after: sure ? `The call was already right and sure, so the nudge is tiny: <b>${pair}</b>. Pick a case it gets wrong for a bigger lesson.` : `The same case again: <b>${pair}</b>. It learned a little.`,
+      };
+      html = `<span class="step">${n} / ${total}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
+    } else {
+      const calls = last.calls;
+      html = `<span class="step">✓</span> <span><b>${esc(last.s.name)}</b> (truth ${esc(className(last.s.label))}) taught ${calls.length - 1}×: ${fmtCalls(calls)}.${calls.length > 2 ? ' One case repeated is memorised; the next case will pull the weights its own way.' : ''}</span>`;
+    }
+    $('lesson-text').innerHTML = html;
+  }
+  function fmtCalls(calls) { const d = new Set(calls.map(v => v.toFixed(2))).size < calls.length ? 3 : 2; return calls.map(v => v.toFixed(d)).join(' → '); }
+  function teachAgain(n) {
+    const last = S.lastLesson; if (!last || S.lesson || S.running) return;
+    const x = S.inputs.xOf(last.s), y = last.s.label;
+    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
+    for (let i = 0; i < n; i++) { S.net.trainBatch([x], [y], S.lr, S.l2); last.calls.push(S.net.forward(x).p); }
+    if (S.test.results.size) clearTestResults(true);
+    renderTraining(true); renderLessonLine();
+  }
+  function worstTrainingCase(exclude) {
+    let worst = null, worstErr = -1;
+    for (const s of S.ds.train) { if (s === exclude) continue; const e = Math.abs(S.net.forward(S.inputs.xOf(s)).p - s.label); if (e > worstErr) { worstErr = e; worst = s; } }
+    return worst;
+  }
+  function teachNext() {
+    if (S.lesson || S.running || !S.net || S.net.conv) return;
+    startLesson(worstTrainingCase(S.lastLesson ? S.lastLesson.s : null));
+  }
+
   function stepBatch() { stopTraining(); trainStep(); renderTraining(true); if (S.ptr === 0) note(`Epoch ${S.epoch} complete.`); }
   function stepEpoch() { stopTraining(); do { trainStep(); } while (S.ptr !== 0); renderTraining(true); note(`Epoch ${S.epoch} complete.`); }
 
@@ -2399,6 +2663,7 @@ window.Viz = (function () {
   function renderTrainGraph() {
     const cv = $('net-canvas');
     const m = graphModel(S.selected || null, 2, S.hover.train);
+    if (S.lesson) m.lesson = lessonView();
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -2499,6 +2764,7 @@ window.Viz = (function () {
     if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); renderCharts(); renderScorecard(); renderProfile(fresh === true && !S.running); }
     if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
     renderInspector();
+    updateTeachButton();
   }
 
   // ------------------------------------------------------------------ rendering: test panel
@@ -2544,6 +2810,7 @@ window.Viz = (function () {
     if (S.stage === 'test') { renderTestTray(); if (!(opts && opts.silent)) renderTestGraph(); }
     if (S.stage === 'data') renderScatter();
     renderInspector();
+    updateTeachButton();
   }
   function renderInspector() {
     const s = S.selected;
@@ -2723,6 +2990,9 @@ window.Viz = (function () {
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
+    $('btn-teach').addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; else startLesson(S.selected); });
+    $('btn-teach-again').addEventListener('click', () => teachAgain(10));
+    $('btn-teach-next').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
       const { task: taskId, ...settings } = RECIPES[k];
@@ -2772,12 +3042,15 @@ window.Viz = (function () {
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
       if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
+      if (key === 'train') cv.addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; });
     }
     document.addEventListener('keydown', ev => {
       if (ev.target.matches('input, select, textarea')) return;
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (S.lastLesson) teachNext(); }
+      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (canTeach()) startLesson(S.selected); }
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
     window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });

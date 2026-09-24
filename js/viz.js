@@ -218,11 +218,11 @@ window.Viz = (function () {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l + 1], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
-        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
+        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { wi: j * net.sizes[l] + i, fi: i, ti: j, prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
         prevCol = col;
       });
       if (!hidden.length) L.captions.push({ x: 440, text: 'NO HIDDEN LAYER' });
-      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
+      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { wi: i, fi: i, prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
     } else if (!conv) {
       const img = add({ kind: 'image', x: 108, y: yc, w: 124, h: 124 });
       L.captions.push({ x: 108, text: 'INPUT · 1,024 PIXELS' });
@@ -256,15 +256,16 @@ window.Viz = (function () {
         }
         L.bandLabel = { x: (img.x + img.w / 2 + xW - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max' };
         const badgeX = xP + size / 2 + 16; // the activation badge sits after the product map: Σ weight × pixel + bias, through the activation
+        L.badgeX = badgeX;
         let prevCol = prods;
         if (hidden.length > 1) {
           const col = spread(hidden[1], yc, Math.min(46, (NET_H - 110) / Math.max(1, hidden[1] - 1))).map((y, j) => add({ kind: 'unit', l: 1, j, x: xs[1], y, r: 17 }));
           unitColumns.push(col);
           L.captions.push({ x: xs[1], text: `HIDDEN 2 · ${hidden[1]} ${m.activationLabel.toUpperCase()}` });
-          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: badgeX + 12, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
+          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: badgeX + 12, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], wi: j * net.sizes[1] + i, fi: i, ti: j, prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
           prevCol = col;
         }
-        prevCol.forEach((a, i) => L.edges.push({ x1: a.r ? a.x + a.r : badgeX + 12, y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
+        prevCol.forEach((a, i) => L.edges.push({ x1: a.r ? a.x + a.r : badgeX + 12, y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], wi: i, fi: i, prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
       }
     } else {
       const K = conv.K;
@@ -293,11 +294,11 @@ window.Viz = (function () {
         unitColumns.push(col);
         L.captions.push({ x: xs[l], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
         if (l === 0) { for (const u of col) L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [u.x - u.r, u.y - u.r], [u.x - u.r, u.y + u.r], [poolBox.x1, poolBox.yBot]], unit: u }); L.bandLabel2 = { x: (poolBox.x1 + xs[0]) / 2, y: 44, text: `${fmtInt(F)} weights per unit` }; }
-        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
+        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { wi: j * net.sizes[l] + i, fi: i, ti: j, prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
         prevCol = col;
       });
       if (!hidden.length) { L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [output.x - output.r, output.y - output.r], [output.x - output.r, output.y + output.r], [poolBox.x1, poolBox.yBot]] }); L.bandLabel2 = { x: (poolBox.x1 + output.x) / 2, y: 44, text: `${fmtInt(F)} weights` }; }
-      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
+      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { wi: i, fi: i, prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
     }
     L.captions.push({ x: output.x, text: 'OUTPUT' });
     L.output = output; L.unitColumns = unitColumns;
@@ -494,7 +495,7 @@ window.Viz = (function () {
         const a = acts ? acts[n.j] : null;
         circleNode(ctx, n.x, n.y, n.r, unitFill(a, acts || [], signed), a == null ? '·' : fmtNum(a, 2), null, isHov);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        if (L.unitColumns[n.l].length <= 8) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
+        if (L.unitColumns[n.l].length <= 8 && !(m.lesson && m.lesson.phase !== 'forward' && m.lesson.phase !== 'error')) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
       } else if (n.kind === 'output') {
         const p = fw && stage >= 2 ? fw.p : null;
         circleNode(ctx, n.x, n.y, n.r, p == null ? pending : diverging((p - 0.5) * 2), p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
@@ -509,6 +510,7 @@ window.Viz = (function () {
         }
       }
     }
+    if (m.lesson) drawLesson(ctx, L, m);
     // convolution walk-through: the sliding window on the image and the arithmetic of the current position
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
@@ -528,6 +530,102 @@ window.Viz = (function () {
     return L;
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
+
+  // The lesson walk-through: one case's error, the blame each hidden unit receives, and the nudge every weight gets.
+  // m.lesson = { phase: forward | error | blame | nudge | after, frac (0..1 within the phase), error (call − truth),
+  //   y, truthName, pBefore, pAfter, delta[l][j] (d loss / d pre-activation of each hidden unit), gW, gWo, lr, fwBefore }
+  function drawLesson(ctx, L, m) {
+    const les = m.lesson, c = colors(), net = m.net, out = L.output;
+    const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
+    const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
+    const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
+    const truthCol = les.y ? c.irregular : c.regular;
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
+    if (les.phase === 'forward') return;
+    // call against truth on a 0..1 scale beside the output; the gap between them is the error
+    const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
+    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
+    const ty = yOf(les.y);
+    const pv = les.phase === 'after' && les.pAfter != null ? les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, les.frac)) : les.pBefore;
+    ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
+    ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
+    ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
+    if (les.phase === 'after' && les.pAfter != null) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 74); }
+    if (les.phase === 'error') return;
+
+    // blame flows back one layer at a time: violet dots run from each target back to its source, then every unit
+    // shows its share of the error (d loss / d pre-activation); a unit that was switched off gets none
+    const nL = net.hidden.length;
+    if (nL) {
+      const prog = les.phase === 'blame' ? les.frac * nL : nL;
+      for (let k = 0; k < nL; k++) {
+        const l = nL - 1 - k, t = Math.min(1, prog - k);
+        if (t <= 0) continue;
+        const key = l === nL - 1 ? 'out' : l + 1;  // the connections that leave layer l
+        if (t < 1) {
+          ctx.fillStyle = c.accent;
+          for (const e of L.edges) { if (e.layer !== key) continue; const x = e.x2 + (e.x1 - e.x2) * t, y = e.y2 + (e.y1 - e.y2) * t; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
+        } else {
+          L.unitColumns[l].forEach((u, j) => {
+            const d = les.delta[l][j];
+            const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 7;
+            pill(ctx, px, py, d === 0 ? 'no blame' : `blame ${fmtSigned(d, 2)}`, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
+          });
+        }
+      }
+    }
+    if (les.phase !== 'nudge') return;
+
+    // the nudge: every weight moves by −lr × blame × its input. Connections glow in the colour of their change
+    // (orange up, blue down), and on pixels a scaled copy of the image slides along the band into each weight map.
+    const fr = Math.min(1, les.frac);
+    const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
+    const maxDw = {};
+    for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
+    ctx.lineCap = 'round';
+    for (const e of L.edges) {
+      const dw = dwOf(e); if (!dw) continue;
+      const rel = Math.abs(dw) / maxDw[e.layer];
+      ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.25 + 0.65 * Math.min(1, fr * 2));
+      ctx.lineWidth = 2 + 8 * rel;
+      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    if (m.mode === 'pixels' && m.x && !net.conv) {
+      const img = L.nodes.find(n => n.kind === 'image');
+      const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
+      const D = m.x.length;
+      let common = 1e-9, xmax = 1e-9;
+      for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
+      for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
+      targets.forEach((t, j) => {
+        const n = t.node; if (!n || !img) return;
+        const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
+        const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
+        if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
+        const cx = x0 + (x1 - x0) * ease(fr);
+        const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
+        const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
+        if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+      });
+    }
+  }
+  function pill(ctx, x, y, text, col, c) {
+    ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
+    const w = ctx.measureText(text).width + 10, h = 14, r = 4, x0 = x - w / 2, y0 = y - h / 2;
+    ctx.beginPath(); ctx.moveTo(x0 + r, y0); ctx.lineTo(x0 + w - r, y0); ctx.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r); ctx.lineTo(x0 + w, y0 + h - r); ctx.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h); ctx.lineTo(x0 + r, y0 + h); ctx.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r); ctx.lineTo(x0, y0 + r); ctx.quadraticCurveTo(x0, y0, x0 + r, y0); ctx.closePath();
+    ctx.fillStyle = c.surface; ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 0.5);
+  }
 
   // one position of one filter, spelled out: image patch × filter = products, summed, through ReLU
   function drawConvPanel(ctx, m, k, oy, ox, at) {
@@ -609,7 +707,8 @@ window.Viz = (function () {
         let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
         const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
         const w = net.W[0][n.j * net.sizes[0] + Math.max(0, Math.min(net.D - 1, j * m.size + i))];
-        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}` };
+        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
+        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
         const D = net.D, off = n.j * D;
@@ -620,12 +719,13 @@ window.Viz = (function () {
         return { kind: 'node', ref: n, text: `unit ${n.j + 1}: Σ weight × pixel ${m.x ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}` };
       }
       if (n.kind === 'map' && inBox(n, 0)) {
-        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const w = net.Wo[j * m.size + i];
-        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
+        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
+        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
       }
       if (n.kind === 'product' && inBox(n, 0) && m.x) {
-        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const k = j * m.size + i;
         return { kind: 'node', ref: n, text: `pixel (${i}, ${j}): weight ${fmtSigned(net.Wo[k], 3)} × input ${fmtSigned(m.x[k], 2)} = ${fmtSigned(net.Wo[k] * m.x[k], 3)}` };
       }
@@ -655,7 +755,15 @@ window.Viz = (function () {
     if (best) {
       const contrib = best.fromIdx != null && m.x ? ` × input ${fmtSigned(m.x[best.fromIdx], 2)} = ${fmtSigned(best.w * m.x[best.fromIdx], 3)}` : '';
       const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
-      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}` };
+      let lessonTxt = '';
+      const les = m.lesson;
+      if (les && best.wi != null && (les.phase === 'nudge' || les.phase === 'after')) {
+        const arr = best.layer === 'out' ? les.gWo : les.gW[best.layer], fwB = les.fwBefore;
+        const inp = best.layer === 'out' ? fwB.a[fwB.a.length - 1][best.fi] : best.layer === 0 ? m.x[best.fi] : fwB.a[best.layer][best.fi];
+        const blame = best.layer === 'out' ? les.error : les.delta[best.layer][best.ti];
+        lessonTxt = ` · this lesson: Δw = −${les.lr} × ${best.layer === 'out' ? 'error' : 'blame'} ${fmtSigned(blame, 3)} × input ${fmtSigned(inp, 2)} = ${fmtSigned(-les.lr * arr[best.wi], 4)}`;
+      }
+      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}${lessonTxt}` };
     }
     return null;
   }

@@ -214,6 +214,10 @@ ul.prose li + li { margin-top: 4px; }
 .status { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-mono); font-size: 13px; color: var(--ink-2); margin-top: 12px; }
 .status b { color: var(--ink); font-weight: 500; }
 .note { font-size: 13px; color: var(--accent); min-height: 1.4em; margin-top: 6px; }
+.lesson { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); border-left: 3px solid var(--accent); font-size: 13.5px; line-height: 1.45; }
+.lesson .step { font-weight: 700; color: var(--accent); font-family: "IBM Plex Mono", ui-monospace, monospace; white-space: nowrap; }
+.lesson .lesson-actions { display: flex; gap: 6px; margin-left: auto; }
+.lesson .btn { padding: 4px 10px; font-size: 12px; }
 
 /* ---------- network diagram ---------- */
 .net-wrap { position: relative; width: 100%; }

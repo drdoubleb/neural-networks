@@ -123,7 +123,9 @@
         const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
         const dn = new Float64Array(fanIn);
         for (let j = 0; j < fanOut; j++) {
-          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]); if (dj === 0) continue;
+          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]);
+          if (g && g.delta) g.delta[l][j] = dj;
+          if (dj === 0) continue;
           if (g) g.gb[l][j] += dj;
           const off = j * fanIn;
           if (g) for (let i = 0; i < fanIn; i++) { g.gW[l][off + i] += dj * inp[i]; dn[i] += dj * W[off + i]; }
@@ -141,35 +143,54 @@
       return dconv;
     }
 
-    // one gradient-descent step on a mini-batch (l2 = weight decay); returns the mean loss before the update
-    trainBatch(xs, ys, lr, l2 = 0) {
-      const n = xs.length;
+    // an empty gradient accumulator, one slot per parameter
+    newGradient() {
       const g = { gW: this.W.map(W => new Float64Array(W.length)), gb: this.b.map(b => new Float64Array(b.length)), gWo: new Float64Array(this.Wo.length), gbo: 0 };
       if (this.conv) { g.gWc = new Float64Array(this.Wc.length); g.gbc = new Float64Array(this.bc.length); }
-      let loss = 0;
-      for (let k = 0; k < n; k++) {
-        const x = xs[k], fw = this.forward(x);
-        loss += bce(fw.p, ys[k]);
-        const d0 = this.backDense(fw, fw.p - ys[k], g);
-        if (this.conv) {
-          const { K, f } = this.conv, size = this.size, co = this.co;
-          const dconv = this.backPool(fw, d0);
-          for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
-            const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
-            g.gbc[kk] += gg;
-            const gWc = g.gWc;
-            if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
-            else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
-          }
+      return g;
+    }
+    // forward + backward for one case, adding its gradient into g; returns the case's loss
+    accumulate(x, y, g, fw) {
+      fw = fw || this.forward(x);
+      const loss = bce(fw.p, y);
+      const d0 = this.backDense(fw, fw.p - y, g);
+      if (this.conv) {
+        const { K, f } = this.conv, size = this.size, co = this.co;
+        const dconv = this.backPool(fw, d0);
+        for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+          const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
+          g.gbc[kk] += gg;
+          const gWc = g.gWc;
+          if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
+          else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
         }
       }
+      return loss;
+    }
+    // gradient-descent update from an accumulated gradient over n cases (l2 = weight decay)
+    applyGradient(g, n, lr, l2 = 0) {
       const s = lr / n, decay = 1 - lr * l2;
       if (this.conv) { for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = this.Wc[i] * decay - s * g.gWc[i]; for (let k = 0; k < this.bc.length; k++) this.bc[k] -= s * g.gbc[k]; }
       for (let l = 0; l < this.W.length; l++) { const W = this.W[l]; for (let i = 0; i < W.length; i++) W[i] = W[i] * decay - s * g.gW[l][i]; for (let j = 0; j < this.b[l].length; j++) this.b[l][j] -= s * g.gb[l][j]; }
       for (let i = 0; i < this.Wo.length; i++) this.Wo[i] = this.Wo[i] * decay - s * g.gWo[i];
       this.bo -= s * g.gbo;
       this.steps++;
+    }
+    // one gradient-descent step on a mini-batch; returns the mean loss before the update
+    trainBatch(xs, ys, lr, l2 = 0) {
+      const n = xs.length, g = this.newGradient();
+      let loss = 0;
+      for (let k = 0; k < n; k++) loss += this.accumulate(xs[k], ys[k], g);
+      this.applyGradient(g, n, lr, l2);
       return loss / n;
+    }
+    // one case's lesson, not yet applied: its forward pass, error (call − truth), the blame each hidden unit receives
+    // (g.delta[l][j] = d loss / d pre-activation) and the gradient of every weight. Apply with applyGradient(g, 1, lr, l2).
+    lesson(x, y) {
+      const g = this.newGradient(); g.delta = this.hidden.map(h => new Float64Array(h));
+      const fw = this.forward(x);
+      const loss = this.accumulate(x, y, g, fw);
+      return { fw, error: fw.p - y, loss, g };
     }
 
     // d(score z)/d(input): how much each input nudges the score toward the positive class
