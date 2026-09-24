@@ -15,11 +15,16 @@ step visible along the way. No installation, no server: open `index.html` in a b
   inlined. Rebuild it with `node tools/build_single_file.js`.
 - **GitHub Pages:** repository settings → Pages → *Deploy from a branch* → the default branch, root folder.
 
-Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `N` classifies the next test nucleus.
+Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `N` classifies the next test case.
+
+The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
+each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
+(input, convolution, hidden units, Train / Step / Reset); everything else lives under *Advanced settings*. Controls that
+do not apply to the current question are hidden.
 
 ## Three questions, one page
 
-The Specimens stage has a switch between three questions, each with its own synthetic cases (80/20 split):
+The **question** dropdown switches between three datasets, each with its own synthetic cases (80/20 split):
 
 | Question | Cases | Positive class | What separates the classes | Decoys |
 |---|---|---|---|---|
@@ -43,7 +48,10 @@ network never sees it; the page uses it to show which hidden units respond to wh
    rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Press *Train*, or step one batch or one
    epoch at a time. The diagram redraws every frame: connection thickness and colour show each weight, node fill shows
    the value flowing through for the selected case, first-layer weights on pixels are drawn as 32 × 32 maps, and with a
-   convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps. A
+   convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps.
+   Connections are drawn against a fixed scale so they visibly grow as the network learns, and a bright core marks the
+   ones the last training step moved most. A single-layer network on pixels also shows the **weight × pixel** product
+   map whose sum is the score. A
    single-layer network is also shown as a **weighted checklist** (every weight, largest first). With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.

@@ -161,6 +161,8 @@ window.Viz = (function () {
 
   // ------------------------------------------------------------------ network diagram
   const NET_W = 800, NET_H = 440;
+  const EDGE_FLOOR = 1.5;                 // |w| at which a connection is drawn at full thickness (weights start near ±0.3)
+  const TILE_FLOOR = { map: 0.05, square: 0.08, filter: 0.3 }; // colour scale floors for weight maps, so they emerge from grey
   function fmtSigned(v, d) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d); }
   function fmtNum(v, d) { return v < 0 ? '−' + Math.abs(v).toFixed(d) : v.toFixed(d); }
   const fmtInt = n => n.toLocaleString();
@@ -174,6 +176,7 @@ window.Viz = (function () {
     const im = ctx.createImageData(w, h);
     let max = opt && opt.max != null ? opt.max : 1e-9;
     if (!(opt && opt.max != null)) for (let i = 0; i < w * h; i++) max = Math.max(max, Math.abs(arr[offset + i]));
+    if (opt && opt.floor) max = Math.max(max, opt.floor);
     max = Math.max(max, 1e-9);
     for (let i = 0; i < w * h; i++) {
       const v = arr[offset + i] / max;
@@ -199,6 +202,8 @@ window.Viz = (function () {
     const add = n => { L.nodes.push(n); return n; };
     const output = add({ kind: 'output', x: 722, y: yc, r: 26 });
     const unitColumns = []; // arrays of unit nodes per dense hidden layer
+    const prev = m.prev || null;
+    const prevW = (l, i) => (prev && prev.W[l] ? prev.W[l][i] : null), prevWo = i => (prev ? prev.Wo[i] : null);
     const link = (from, to, w, layer, meta) => L.edges.push(Object.assign({ x1: from.x + (from.r || from.size / 2), y1: from.y, x2: to.x - (to.r || to.size / 2), y2: to.y, w, layer }, meta));
 
     if (m.mode === 'features') {
@@ -207,24 +212,29 @@ window.Viz = (function () {
       const xs = hidden.length === 0 ? [150 + wide] : hidden.length === 1 ? [150 + wide, 440 + wide / 2] : [140 + wide, 400 + wide / 2, 585];
       const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: D > 8 ? 13 : 16 }));
       L.captions.push({ x: xs[0], text: `INPUT · ${D} MEASUREMENTS` });
-      let prev = inputs;
+      let prevCol = inputs;
       hidden.forEach((h, l) => {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l + 1], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
-        prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: m.featureNames[i], fromIdx: i, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
-        prev = col;
+        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
+        prevCol = col;
       });
       if (!hidden.length) L.captions.push({ x: 440, text: 'NO HIDDEN LAYER' });
-      prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], toName: 'output' }));
+      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
     } else if (!conv) {
       const img = add({ kind: 'image', x: 108, y: yc, w: 124, h: 124 });
       L.captions.push({ x: 108, text: 'INPUT · 1,024 PIXELS' });
       if (!hidden.length) {
-        const map = add({ kind: 'map', x: 440, y: yc, size: 132 });
+        img.x = 96; img.w = 112; img.h = 112;
+        const map = add({ kind: 'map', x: 340, y: yc, size: 120 });
+        const prod = add({ kind: 'product', x: 545, y: yc, size: 120 });
+        L.captions[L.captions.length - 1].x = 96;
         L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 4], [map.x - map.size / 2, map.y - map.size / 2], [map.x - map.size / 2, map.y + map.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 4]], label: '1,024 weights' });
-        L.captions.push({ x: 440, text: 'WEIGHTS · ONE PER PIXEL' });
-        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ weight × pixel' });
+        L.captions.push({ x: 340, text: 'WEIGHTS · ONE PER PIXEL' });
+        L.captions.push({ x: 545, text: 'WEIGHT × PIXEL' });
+        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: prod.x - prod.size / 2, y2: prod.y, w: 1, layer: 'sum', label: '× pixel' });
+        L.edges.push({ x1: prod.x + prod.size / 2, y1: prod.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ → z' });
       } else {
         const xs = hidden.length === 1 ? [420] : [400, 585];
         const h1 = hidden[0];
@@ -234,15 +244,15 @@ window.Viz = (function () {
         L.captions.push({ x: xs[0], text: `HIDDEN ${hidden.length > 1 ? '1' : ''} · ${h1} ${m.activationLabel.toUpperCase()}` });
         for (const s of squares) L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 6], [s.x - s.size / 2, s.y - s.size / 2], [s.x - s.size / 2, s.y + s.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 6]], j: s.j });
         L.bandLabel = { x: (img.x + img.w / 2 + xs[0] - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max |w|' };
-        let prev = squares;
+        let prevCol = squares;
         if (hidden.length > 1) {
           const col = spread(hidden[1], yc, Math.min(46, (NET_H - 110) / Math.max(1, hidden[1] - 1))).map((y, j) => add({ kind: 'unit', l: 1, j, x: xs[1], y, r: 17 }));
           unitColumns.push(col);
           L.captions.push({ x: xs[1], text: `HIDDEN 2 · ${hidden[1]} ${m.activationLabel.toUpperCase()}` });
-          prev.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: a.x + a.size / 2 + 14, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
-          prev = col;
+          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: a.x + a.size / 2 + 14, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
+          prevCol = col;
         }
-        prev.forEach((a, i) => L.edges.push({ x1: a.x + (a.r || a.size / 2 + 14), y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
+        prevCol.forEach((a, i) => L.edges.push({ x1: a.x + (a.r || a.size / 2 + 14), y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
       }
     } else {
       const K = conv.K;
@@ -262,17 +272,17 @@ window.Viz = (function () {
       const F = net.featureCount;
       const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [520] : [485, 610];
       const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
-      let prev = null;
+      let prevCol = null;
       hidden.forEach((h, l) => {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
         if (l === 0) { for (const u of col) L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [u.x - u.r, u.y - u.r], [u.x - u.r, u.y + u.r], [poolBox.x1, poolBox.yBot]], unit: u }); L.bandLabel2 = { x: (poolBox.x1 + xs[0]) / 2, y: 44, text: `${fmtInt(F)} weights per unit` }; }
-        else prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
-        prev = col;
+        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
+        prevCol = col;
       });
       if (!hidden.length) { L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [output.x - output.r, output.y - output.r], [output.x - output.r, output.y + output.r], [poolBox.x1, poolBox.yBot]] }); L.bandLabel2 = { x: (poolBox.x1 + output.x) / 2, y: 44, text: `${fmtInt(F)} weights` }; }
-      else prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
+      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
     }
     L.captions.push({ x: output.x, text: 'OUTPUT' });
     L.output = output; L.unitColumns = unitColumns;
@@ -346,20 +356,35 @@ window.Viz = (function () {
     if (L.bandLabel2) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16);
     if (L.bands.length && L.bands[0].label) ctx.fillText(L.bands[0].label, L.bandLabel ? L.bandLabel.x : 300, NET_H - 16);
 
-    // edges, weak first so strong ones sit on top
-    const maxAbs = {};
-    for (const e of L.edges) maxAbs[e.layer] = Math.max(maxAbs[e.layer] || 1e-9, Math.abs(e.w));
-    const edges = L.edges.slice().sort((a, b) => Math.abs(a.w) / maxAbs[a.layer] - Math.abs(b.w) / maxAbs[b.layer]);
+    // edges, weak first so strong ones sit on top. Thickness is |w| against a fixed floor (EDGE_FLOOR), so connections
+    // visibly grow from thin to thick during training instead of being re-normalised every frame.
+    const maxAbs = {}, maxDelta = {};
+    for (const e of L.edges) {
+      maxAbs[e.layer] = Math.max(maxAbs[e.layer] || 1e-9, Math.abs(e.w));
+      e.delta = e.prev == null ? 0 : Math.abs(e.w - e.prev);
+      maxDelta[e.layer] = Math.max(maxDelta[e.layer] || 1e-12, e.delta);
+    }
+    const norm = layer => Math.max(EDGE_FLOOR, maxAbs[layer] || 0);
+    const edges = L.edges.slice().sort((a, b) => Math.abs(a.w) / norm(a.layer) - Math.abs(b.w) / norm(b.layer));
     for (const e of edges) {
-      const rel = Math.abs(e.w) / maxAbs[e.layer];
+      const rel = Math.min(1, Math.abs(e.w) / norm(e.layer));
       const hov = hovered === e;
-      if (e.layer === 'sum') { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 2; }
+      let width;
+      if (e.layer === 'sum') { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = width = 2; }
       else {
         const rgb = e.w < 0 ? c.rgb.regular : c.rgb.irregular;
-        ctx.strokeStyle = rgbStr(rgb, hov ? 1 : 0.18 + 0.82 * rel);
-        ctx.lineWidth = (0.6 + 5 * Math.pow(rel, 0.9)) * (hov ? 1.4 : 1);
+        ctx.strokeStyle = rgbStr(rgb, hov ? 1 : 0.15 + 0.85 * rel);
+        ctx.lineWidth = width = (0.6 + 5.5 * Math.pow(rel, 0.9)) * (hov ? 1.4 : 1);
       }
       ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+      // spark: a bright core on the connections the last training step moved most
+      if (e.layer !== 'sum' && e.delta > 0 && maxDelta[e.layer] > 1e-9) {
+        const drel = e.delta / maxDelta[e.layer];
+        if (drel > 0.2) {
+          ctx.strokeStyle = rgbStr(c.rgb.ink, 0.15 + 0.6 * drel); ctx.lineWidth = Math.max(0.8, width * 0.3);
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+        }
+      }
       if (e.label) { ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(e.label, (e.x1 + e.x2) / 2, e.y1 - 6); }
     }
 
@@ -382,16 +407,20 @@ window.Viz = (function () {
         ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x0 - 4, y0 - 4, n.w + 8, n.h + 8);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillText(m.specimen ? `${m.size}×${m.size} ink, mean removed` : '', n.x, y0 + n.h + 12);
-      } else if (n.kind === 'map' || n.kind === 'square' || n.kind === 'filter') {
-        let tile;
-        if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size);
-        else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size);
-        else tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f);
+      } else if (n.kind === 'map' || n.kind === 'square' || n.kind === 'filter' || n.kind === 'product') {
+        let tile = null;
+        if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size, { floor: TILE_FLOOR.map });
+        else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size, { floor: TILE_FLOOR.square });
+        else if (n.kind === 'filter') tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f, { floor: TILE_FLOOR.filter });
+        else if (m.x) { const prod = new Float64Array(net.D); let sum = 0; for (let i = 0; i < net.D; i++) { prod[i] = net.Wo[i] * m.x[i]; sum += prod[i]; } tile = tileCanvas('prod', prod, 0, m.size, m.size); tile.sum = sum; }
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        if (tile) ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        else { ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size); }
         ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
-        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) { ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3); }
+        ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
+        if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : 'select a nucleus', n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'square') {
           const a = fw && stage >= 1 ? fw.a[1][n.j] : null;
           circleNode(ctx, n.x + n.size / 2 + 2, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null || n.size < 40 ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);
@@ -459,6 +488,11 @@ window.Viz = (function () {
         const w = net.Wo[j * m.size + i];
         return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
       }
+      if (n.kind === 'product' && inBox(n, 0) && m.x) {
+        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const k = j * m.size + i;
+        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}): weight ${fmtSigned(net.Wo[k], 3)} × input ${fmtSigned(m.x[k], 2)} = ${fmtSigned(net.Wo[k] * m.x[k], 3)}` };
+      }
       if (n.kind === 'filter' && inBox(n, 2)) {
         let mm = 0; const f = net.conv.f; for (let i = 0; i < f * f; i++) mm = Math.max(mm, Math.abs(net.Wc[n.k * f * f + i]));
         return { kind: 'node', ref: n, text: `filter ${n.k + 1}: ${f}×${f} weights, max |w| ${mm.toFixed(3)} · bias ${fmtSigned(net.bc[n.k], 3)}` };
@@ -481,7 +515,11 @@ window.Viz = (function () {
       const d = Math.hypot(x - (e.x1 + t * dx), y - (e.y1 + t * dy));
       if (d < bestD) { bestD = d; best = e; }
     }
-    if (best) return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}` };
+    if (best) {
+      const contrib = best.fromIdx != null && m.x ? ` × input ${fmtSigned(m.x[best.fromIdx], 2)} = ${fmtSigned(best.w * m.x[best.fromIdx], 3)}` : '';
+      const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
+      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}` };
+    }
     return null;
   }
 

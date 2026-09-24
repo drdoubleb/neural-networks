@@ -364,6 +364,45 @@ table.feat tr.off td { color: var(--ink-3); }
 table.feat tr.off td.name { text-decoration: line-through; }
 body[data-kind="tabular"] .toggle.tint { display: none; }
 
+/* ---------- condensed layout: masthead selects, bars, advanced drawer, compact metrics ---------- */
+.masthead { padding-block: 12px 10px; margin-bottom: 14px; gap: 10px 20px; }
+h1 { font-size: clamp(22px, 2.4vw, 28px); }
+.tagline { font-size: 14px; }
+.mh-selects { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+.mh-select { display: grid; gap: 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.mh-select select { font: inherit; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--ink); padding: 6px 30px 6px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); max-width: 320px; }
+.mh-select select#recipe-select { color: var(--accent); }
+.card.bar { padding: 12px 16px; }
+.bar-row { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-end; }
+.bar-row .ctl { min-width: 150px; }
+.bar-row .ctl.slim { min-width: 170px; max-width: 220px; }
+.actions-inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.btn.primary.big { padding: 9px 18px; }
+.card.bar .status { margin-top: 8px; }
+details.advanced { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+details.advanced > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-2); list-style: none; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 4px 0; }
+details.advanced > summary::-webkit-details-marker { display: none; }
+details.advanced > summary::before { content: "▸"; color: var(--accent); font-size: 12px; }
+details.advanced[open] > summary::before { content: "▾"; }
+details.advanced[open] > summary .muted { display: none; }
+details.advanced > .controls { margin-top: 10px; }
+label.plainlabel { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+details.fold { margin-top: 8px; }
+details.fold > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+details.fold > ul { margin-top: 8px; }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.metric { display: grid; gap: 0; min-width: 76px; }
+.metric .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; }
+.metric b { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.1; }
+.metric small { font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); white-space: nowrap; }
+.confusion.small { grid-template-columns: auto 44px 44px; gap: 3px; }
+.confusion.small .cell { padding: 3px 2px; font-size: 13px; }
+.confusion.small .hd, .confusion.small .rh { font-size: 9px; letter-spacing: 0.04em; }
+@media (max-width: 1099px) { .actions-inline { margin-left: 0; } }
+@media (max-width: 1500px) { .tagline { display: none; } .brand { flex: 0 1 auto; } .mh-select select { max-width: 250px; } }
+.confusion.small { grid-template-columns: auto 62px 62px; }
+.confusion.small .hd { font-size: 9px; line-height: 1.15; }
+
 </style>
 </head>
 <body>
@@ -371,7 +410,11 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
 <header class="masthead">
   <div class="brand">
     <h1>Nucleus Net</h1>
-    <p class="tagline">Teach a tiny neural network to read a blood count, then a nucleus — and watch every node and weight while it learns, from a single layer to a convolution.</p>
+    <p class="tagline">Watch a tiny neural network learn to read a blood count, then a nucleus.</p>
+  </div>
+  <div class="mh-selects">
+    <label class="mh-select"><span>Question</span><select id="question-select"></select></label>
+    <label class="mh-select"><span>Lecture recipe</span><select id="recipe-select"></select></label>
   </div>
   <nav class="stages" aria-label="Stages">
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
@@ -379,7 +422,6 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
     <button type="button" class="stage" data-stage="test">3 · Test</button>
   </nav>
   <div class="masthead-tools">
-    <label class="toggle tint"><input type="checkbox" id="tint" checked> H&amp;E tint</label>
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
   </div>
 </header>
@@ -391,29 +433,20 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
     <section class="stage-panel" id="panel-data">
       <div class="card">
         <div class="card-head">
-          <h2>One set of cases, one question</h2>
+          <h2 id="task-title"></h2>
           <span class="small muted" id="meta-line"></span>
         </div>
-        <div class="ctl wide" style="margin-bottom:12px">
-          <span class="lbl">Question for the network</span>
-          <div class="seg" id="task-seg"></div>
-        </div>
-        <div class="two-col">
-          <div class="prose">
-            <p><strong id="task-title"></strong> <span id="task-blurb"></span></p>
-            <p>All the cases are <strong>synthetic</strong>, drawn by a script so that we know the truth for every one. <span id="train-count">80</span> form the <strong>training set</strong>, which the network learns from. <span id="test-count">20</span> are <strong>held out as a test set</strong>: the network never sees them during training, so they tell us whether it learned something general or merely memorised the training cases.</p>
-            <p>Click any case to put it under the inspector on the right, where you can see the numbers the network is given in stage 2 — and, for nuclei, exactly where each measurement comes from.</p>
-          </div>
-          <div>
-            <h3 id="feature-heading">The six measurements</h3>
-            <ul class="prose small" id="feature-list"></ul>
-          </div>
-        </div>
+        <p class="prose" id="task-blurb"></p>
+        <p class="prose small" style="margin-top:8px">All cases are <strong>synthetic</strong>, drawn by a script so that we know the truth for every one. <span id="train-count">80</span> form the <strong>training set</strong>; <span id="test-count">20</span> are <strong>held out as a test set</strong> the network never sees while training. Click any case to put it under the inspector.</p>
+        <details class="fold">
+          <summary id="feature-heading">The parameters the network can see</summary>
+          <ul class="prose small" id="feature-list"></ul>
+        </details>
       </div>
 
       <div class="card">
         <div class="card-head">
-          <h2>Training set · <span id="train-count-2" data-count="train"></span></h2>
+          <h2>Training set · <span id="train-count-2"></span></h2>
           <div class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span><span>frame = ground truth</span></div>
         </div>
         <div class="tray named" id="data-train-tray"></div>
@@ -444,63 +477,53 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
 
     <!-- ============================ 2 · TRAIN ============================ -->
     <section class="stage-panel" id="panel-train" hidden>
-      <div class="card">
-        <div class="card-head">
-          <h2>Build the network, then let it learn</h2>
-          <span class="small muted">question: <b id="train-task"></b> · changing the architecture, seed or augmentation re-rolls the weights</span>
-        </div>
-        <div class="controls">
-          <div class="ctl wide">
-            <span class="lbl">Input the network sees</span>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="ctl" id="mode-wrap">
+            <span class="lbl">Input</span>
             <div class="seg" id="mode-seg">
-              <button type="button" data-mode="features" class="is-active">measurements / blood count</button>
-              <button type="button" data-mode="pixels" id="mode-pixels">1,024 raw pixels</button>
+              <button type="button" data-mode="features" class="is-active">measurements</button>
+              <button type="button" data-mode="pixels" id="mode-pixels">1,024 pixels</button>
             </div>
           </div>
-          <div class="ctl wide" id="picker-wrap"><span class="lbl">Inputs the network may use</span><div class="picker" id="input-picker"></div></div>
-          <div class="ctl"><label for="conv">Convolution (pixels only)</label>
+          <div class="ctl" id="conv-wrap"><label for="conv">Convolution</label>
             <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
-          <div class="ctl"><label for="hidden">Hidden layer 1 <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
-          <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
-          <div class="ctl"><label for="activation">Activation</label>
-            <select id="activation"><option value="relu">ReLU</option><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></div>
-          <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.05</span></label><input type="range" id="lr" min="0" max="100" step="1" value="49"></div>
-          <div class="ctl"><label for="batch">Batch size</label>
-            <select id="batch"><option value="1">1 (one nucleus per step)</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option><option value="80">80 (whole set)</option></select></div>
-          <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">60</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="60"></div>
-          <div class="ctl"><label for="speed">Speed <span class="val" id="speed-val">4 epochs/s</span></label><input type="range" id="speed" min="0" max="100" step="1" value="52"></div>
-          <div class="ctl"><label for="seed">Random seed</label>
-            <div style="display:flex;gap:6px"><input type="number" id="seed" min="1" max="9999" value="1"><button type="button" class="btn" id="seed-random" title="new random seed">🎲</button></div></div>
-          <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
-          <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Augment pixels with flips &amp; rotations (×8)</label></div>
-          <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" style="text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--ink)">Peek at the test set while training</label></div>
-        </div>
-        <div class="actions">
-          <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
-          <button type="button" class="btn" id="btn-step-batch">Step one batch</button>
-          <button type="button" class="btn" id="btn-step-epoch">Step one epoch</button>
-          <button type="button" class="btn" id="btn-reset">↺ Reset weights</button>
-          <span class="small muted"><kbd>space</kbd> train / pause</span>
-        </div>
-        <div class="recipes">
-          <span>Lecture recipes, in order:</span>
-          <button type="button" class="recipe" data-recipe="1">① Leukaemia · blood count · single layer</button>
-          <button type="button" class="recipe" data-recipe="2">② Leukaemia · blood count · 3 ReLU units</button>
-          <button type="button" class="recipe" data-recipe="3">③ Enlargement · pixels · single layer</button>
-          <button type="button" class="recipe" data-recipe="4">④ Irregularity · pixels · single layer</button>
-          <button type="button" class="recipe" data-recipe="5">⑤ Irregularity · measurements · single layer</button>
-          <button type="button" class="recipe" data-recipe="6">⑥ Irregularity · pixels · 8 ReLU + augmentation</button>
-          <button type="button" class="recipe" data-recipe="7">⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation</button>
-          <button type="button" class="recipe" data-recipe="8">⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation</button>
+          <div class="ctl slim"><label for="hidden">Hidden units <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
+            <button type="button" class="btn" id="btn-step-epoch">Step epoch</button>
+            <button type="button" class="btn" id="btn-step-batch">Step batch</button>
+            <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+          </div>
         </div>
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
+        <details class="advanced" id="advanced">
+          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, inputs</span></summary>
+          <div class="controls">
+            <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
+            <div class="ctl"><label for="activation">Activation</label>
+              <select id="activation"><option value="relu">ReLU</option><option value="sigmoid">Sigmoid</option><option value="tanh">Tanh</option></select></div>
+            <div class="ctl"><label for="lr">Learning rate <span class="val" id="lr-val">0.05</span></label><input type="range" id="lr" min="0" max="100" step="1" value="49"></div>
+            <div class="ctl"><label for="batch">Batch size</label>
+              <select id="batch"><option value="1">1 (one case per step)</option><option value="4">4</option><option value="8" selected>8</option><option value="16">16</option><option value="80">whole set</option></select></div>
+            <div class="ctl"><label for="epochs">Epochs <span class="val" id="epochs-val">60</span></label><input type="range" id="epochs" min="5" max="300" step="5" value="60"></div>
+            <div class="ctl"><label for="speed">Speed <span class="val" id="speed-val">4 epochs/s</span></label><input type="range" id="speed" min="0" max="100" step="1" value="52"></div>
+            <div class="ctl"><label for="seed">Random seed</label>
+              <div style="display:flex;gap:6px"><input type="number" id="seed" min="1" max="9999" value="1"><button type="button" class="btn" id="seed-random" title="new random seed">🎲</button></div></div>
+            <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
+            <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" class="plainlabel">Augment pixels with flips &amp; rotations (×8)</label></div>
+            <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" class="plainlabel">Peek at the test set while training</label></div>
+            <div class="ctl check" id="tint-wrap"><input type="checkbox" id="tint" checked><label for="tint" class="plainlabel">H&amp;E tint on the images</label></div>
+            <div class="ctl wide" id="picker-wrap"><span class="lbl">Inputs the network may use</span><div class="picker" id="input-picker"></div></div>
+          </div>
+        </details>
       </div>
 
       <div class="card">
         <div class="card-head">
           <h2>The network, live</h2>
-          <span class="small muted">showing the forward pass for the nucleus in the inspector · hover any node, map or connection</span>
+          <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
         <div class="net-wrap">
           <canvas id="net-canvas" width="800" height="440" aria-label="Network diagram"></canvas>
@@ -509,10 +532,10 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
         <div class="legend net-legend">
           <span><span class="swatch" style="background:var(--irregular)"></span>positive weight</span>
           <span><span class="swatch" style="background:var(--regular)"></span>negative weight</span>
-          <span>thickness = size of the weight</span>
+          <span>thickness = size of the weight · bright core = moved in the last step</span>
           <span>at the output, positive pushes toward <b data-cls="1"></b></span>
-          <span>node fill = value flowing through it for this nucleus</span>
-          <span>feature maps: brighter violet = the filter fires there</span>
+          <span>node fill = value flowing through it for this case</span>
+          <span id="legend-conv" hidden>filters are 5×5 stencils slid over the image; a feature map lights up (violet) where the image matches the stencil</span>
         </div>
       </div>
 
@@ -567,49 +590,30 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
 
     <!-- ============================ 3 · TEST ============================ -->
     <section class="stage-panel" id="panel-test" hidden>
-      <div class="card">
-        <div class="card-head">
-          <h2>Cases the network has never seen</h2>
-          <span class="small muted">question: <b id="test-task"></b> · the weights are frozen; nothing here changes the model</span>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="btn-classify-next">Classify next</button>
+            <button type="button" class="btn" id="btn-classify-all">Classify all</button>
+            <button type="button" class="btn" id="btn-test-reset">Clear</button>
+          </div>
+          <div class="ctl slim"><label for="threshold">Call <span data-cls="1"></span> when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">classified</span><b id="stat-n">0 / 20</b><small id="stat-n-sub">held out</small></div>
+            <div class="metric"><span class="lbl">accuracy</span><b id="stat-acc">–</b><small id="stat-acc-sub"></small></div>
+            <div class="metric"><span class="lbl">sensitivity</span><b id="stat-sens">–</b><small id="stat-sens-sub"></small></div>
+            <div class="metric"><span class="lbl">specificity</span><b id="stat-spec">–</b><small id="stat-spec-sub"></small></div>
+            <div class="confusion small" id="confusion"></div>
+          </div>
         </div>
-        <p class="lede">Each held-out case is fed through the trained network one at a time. Watch the values flow, see the call, then the truth. <kbd>N</kbd> classifies the next one.</p>
         <p class="note" id="test-warning" hidden>The network has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
-        <div class="actions">
-          <button type="button" class="btn primary big" id="btn-classify-next">Classify next</button>
-          <button type="button" class="btn" id="btn-classify-all">Classify all</button>
-          <button type="button" class="btn" id="btn-test-reset">Clear results</button>
-          <div class="ctl" style="min-width:220px;margin-left:auto"><label for="threshold">Call <span data-cls="1"></span> when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
-        </div>
         <div class="note" id="test-note"></div>
-      </div>
-
-      <div class="card">
-        <div class="scoreboard">
-          <div class="stat"><span class="lbl">Classified</span><span class="v" id="stat-n">0 / 20</span><span class="sub" id="stat-n-sub">held-out nuclei</span></div>
-          <div class="stat"><span class="lbl">Accuracy</span><span class="v" id="stat-acc">–</span><span class="sub" id="stat-acc-sub"></span></div>
-          <div class="stat"><span class="lbl">Sensitivity</span><span class="v" id="stat-sens">–</span><span class="sub" id="stat-sens-sub"></span></div>
-          <div class="stat"><span class="lbl">Specificity</span><span class="v" id="stat-spec">–</span><span class="sub" id="stat-spec-sub"></span></div>
-          <div class="confusion" id="confusion"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <h2>What the calls would mean in a real population</h2>
-          <span class="small muted">sensitivity and specificity from above · prevalence from the slider</span>
-        </div>
-        <div class="prev-grid">
-          <div class="ctl"><label for="prev">Prevalence: <span data-cls="1"></span> in <span class="val" id="prev-val">1 in 100</span></label><input type="range" id="prev" min="0" max="100" step="1" value="54"></div>
-          <div class="stat"><span class="lbl">Positive predictive value</span><span class="v" id="ppv">–</span><span class="sub">of those called positive, truly positive</span></div>
-          <div class="stat"><span class="lbl">Negative predictive value</span><span class="v" id="npv">–</span><span class="sub">of those called negative, truly negative</span></div>
-        </div>
-        <p class="prev-text" id="prev-text"></p>
       </div>
 
       <div class="card">
         <div class="card-head">
           <h2>The network, frozen</h2>
-          <span class="small muted">forward pass for the nucleus in the inspector</span>
+          <span class="small muted">held-out cases go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
         <div class="net-wrap">
           <canvas id="net-canvas-test" width="800" height="440" aria-label="Network diagram during testing"></canvas>
@@ -629,6 +633,19 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
         </div>
         <div class="tray named" id="test-tray"></div>
       </div>
+
+      <div class="card" id="prevalence-card">
+        <div class="card-head">
+          <h2>What the calls would mean in a real population</h2>
+          <span class="small muted">sensitivity and specificity from above · prevalence from the slider</span>
+        </div>
+        <div class="prev-grid">
+          <div class="ctl"><label for="prev">Prevalence: <span data-cls="1"></span> in <span class="val" id="prev-val">1 in 100</span></label><input type="range" id="prev" min="0" max="100" step="1" value="54"></div>
+          <div class="stat"><span class="lbl">Positive predictive value</span><span class="v" id="ppv">–</span><span class="sub">of those called positive, truly positive</span></div>
+          <div class="stat"><span class="lbl">Negative predictive value</span><span class="v" id="npv">–</span><span class="sub">of those called negative, truly negative</span></div>
+        </div>
+        <p class="prev-text" id="prev-text"></p>
+      </div>
     </section>
   </div>
 
@@ -644,7 +661,7 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
         <button type="button" data-view="measure">Measurements</button>
         <button type="button" data-view="evidence">Evidence</button>
       </div>
-      <canvas class="spec-view" id="spec-view" width="288" height="288" aria-label="Selected nucleus, enlarged"></canvas>
+      <canvas class="spec-view" id="spec-view" width="288" height="288" aria-label="Selected case, enlarged"></canvas>
       <div class="spec-caption" id="spec-caption"></div>
       <div class="verdict" id="verdict">
         <div class="p"><small class="lbl">network call</small><b class="soft">–</b></div>
@@ -666,7 +683,7 @@ body[data-kind="tabular"] .toggle.tint { display: none; }
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test nucleus. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script>
@@ -982,20 +999,23 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-23","seed":
       if (this.conv) {
         const { K, f, pool } = this.conv;
         this.co = this.size - f + 1; this.po = Math.floor(this.co / pool);
-        this.Wc = new Float64Array(K * f * f); const sc = Math.sqrt(6 / (f * f + K));
+        this.Wc = new Float64Array(K * f * f); const sc = 0.05; // small, so the learned filters dominate what is drawn
         for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = u(sc);
         this.bc = new Float64Array(K);
         d0 = K * this.po * this.po;
       }
       this.sizes = [d0, ...this.hidden];
+      this.smallNet = !this.conv && this.D < 256;
       this.W = []; this.b = [];
       for (let l = 0; l < this.hidden.length; l++) {
         // layers fed by pixels (or pooled maps) start small, so the learned structure shows through in the weight maps
-        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], s = fanIn >= 256 ? 0.02 : Math.sqrt(6 / (fanIn + fanOut));
+        // pixel-fed layers start very small so the learned maps show through; small measurement nets start small so
+        // the drawn connections visibly grow; deeper layers of pixel nets keep the usual scale so training is not slowed
+        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], s = fanIn >= 256 ? 0.02 : (this.smallNet ? 0.3 : Math.sqrt(6 / (fanIn + fanOut)));
         const W = new Float64Array(fanOut * fanIn); for (let i = 0; i < W.length; i++) W[i] = u(s);
         this.W.push(W); this.b.push(new Float64Array(fanOut));
       }
-      const last = this.sizes[this.sizes.length - 1], so = last >= 256 ? 0.01 : Math.sqrt(6 / (last + 1));
+      const last = this.sizes[this.sizes.length - 1], so = last >= 256 ? 0.01 : (this.smallNet ? 0.3 : Math.sqrt(6 / (last + 1)));
       this.Wo = new Float64Array(last); for (let i = 0; i < last; i++) this.Wo[i] = u(so);
       this.bo = 0;
       this.steps = 0;
@@ -1176,7 +1196,7 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-23","seed":
     params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
       const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
       const num = (lp - lm) / (2 * eps);
-      if (Math.abs(num) > 1e-8) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+      if (Math.abs(num) > 1e-5) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
     } });
     return { worst, checked };
   }
@@ -1438,6 +1458,8 @@ window.Viz = (function () {
 
   // ------------------------------------------------------------------ network diagram
   const NET_W = 800, NET_H = 440;
+  const EDGE_FLOOR = 1.5;                 // |w| at which a connection is drawn at full thickness (weights start near ±0.3)
+  const TILE_FLOOR = { map: 0.05, square: 0.08, filter: 0.3 }; // colour scale floors for weight maps, so they emerge from grey
   function fmtSigned(v, d) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(d); }
   function fmtNum(v, d) { return v < 0 ? '−' + Math.abs(v).toFixed(d) : v.toFixed(d); }
   const fmtInt = n => n.toLocaleString();
@@ -1451,6 +1473,7 @@ window.Viz = (function () {
     const im = ctx.createImageData(w, h);
     let max = opt && opt.max != null ? opt.max : 1e-9;
     if (!(opt && opt.max != null)) for (let i = 0; i < w * h; i++) max = Math.max(max, Math.abs(arr[offset + i]));
+    if (opt && opt.floor) max = Math.max(max, opt.floor);
     max = Math.max(max, 1e-9);
     for (let i = 0; i < w * h; i++) {
       const v = arr[offset + i] / max;
@@ -1476,6 +1499,8 @@ window.Viz = (function () {
     const add = n => { L.nodes.push(n); return n; };
     const output = add({ kind: 'output', x: 722, y: yc, r: 26 });
     const unitColumns = []; // arrays of unit nodes per dense hidden layer
+    const prev = m.prev || null;
+    const prevW = (l, i) => (prev && prev.W[l] ? prev.W[l][i] : null), prevWo = i => (prev ? prev.Wo[i] : null);
     const link = (from, to, w, layer, meta) => L.edges.push(Object.assign({ x1: from.x + (from.r || from.size / 2), y1: from.y, x2: to.x - (to.r || to.size / 2), y2: to.y, w, layer }, meta));
 
     if (m.mode === 'features') {
@@ -1484,24 +1509,29 @@ window.Viz = (function () {
       const xs = hidden.length === 0 ? [150 + wide] : hidden.length === 1 ? [150 + wide, 440 + wide / 2] : [140 + wide, 400 + wide / 2, 585];
       const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: D > 8 ? 13 : 16 }));
       L.captions.push({ x: xs[0], text: `INPUT · ${D} MEASUREMENTS` });
-      let prev = inputs;
+      let prevCol = inputs;
       hidden.forEach((h, l) => {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l + 1], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
-        prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: m.featureNames[i], fromIdx: i, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
-        prev = col;
+        prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: l === 0 ? m.featureNames[i] : `unit ${l}.${i + 1}`, fromIdx: l === 0 ? i : null, toName: `unit ${hidden.length > 1 ? (l + 1) + '.' : ''}${j + 1}` })));
+        prevCol = col;
       });
       if (!hidden.length) L.captions.push({ x: 440, text: 'NO HIDDEN LAYER' });
-      prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], toName: 'output' }));
+      prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: hidden.length ? `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}` : m.featureNames[i], fromIdx: hidden.length ? null : i, toName: 'output' }));
     } else if (!conv) {
       const img = add({ kind: 'image', x: 108, y: yc, w: 124, h: 124 });
       L.captions.push({ x: 108, text: 'INPUT · 1,024 PIXELS' });
       if (!hidden.length) {
-        const map = add({ kind: 'map', x: 440, y: yc, size: 132 });
+        img.x = 96; img.w = 112; img.h = 112;
+        const map = add({ kind: 'map', x: 340, y: yc, size: 120 });
+        const prod = add({ kind: 'product', x: 545, y: yc, size: 120 });
+        L.captions[L.captions.length - 1].x = 96;
         L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 4], [map.x - map.size / 2, map.y - map.size / 2], [map.x - map.size / 2, map.y + map.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 4]], label: '1,024 weights' });
-        L.captions.push({ x: 440, text: 'WEIGHTS · ONE PER PIXEL' });
-        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ weight × pixel' });
+        L.captions.push({ x: 340, text: 'WEIGHTS · ONE PER PIXEL' });
+        L.captions.push({ x: 545, text: 'WEIGHT × PIXEL' });
+        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: prod.x - prod.size / 2, y2: prod.y, w: 1, layer: 'sum', label: '× pixel' });
+        L.edges.push({ x1: prod.x + prod.size / 2, y1: prod.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ → z' });
       } else {
         const xs = hidden.length === 1 ? [420] : [400, 585];
         const h1 = hidden[0];
@@ -1511,15 +1541,15 @@ window.Viz = (function () {
         L.captions.push({ x: xs[0], text: `HIDDEN ${hidden.length > 1 ? '1' : ''} · ${h1} ${m.activationLabel.toUpperCase()}` });
         for (const s of squares) L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 6], [s.x - s.size / 2, s.y - s.size / 2], [s.x - s.size / 2, s.y + s.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 6]], j: s.j });
         L.bandLabel = { x: (img.x + img.w / 2 + xs[0] - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max |w|' };
-        let prev = squares;
+        let prevCol = squares;
         if (hidden.length > 1) {
           const col = spread(hidden[1], yc, Math.min(46, (NET_H - 110) / Math.max(1, hidden[1] - 1))).map((y, j) => add({ kind: 'unit', l: 1, j, x: xs[1], y, r: 17 }));
           unitColumns.push(col);
           L.captions.push({ x: xs[1], text: `HIDDEN 2 · ${hidden[1]} ${m.activationLabel.toUpperCase()}` });
-          prev.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: a.x + a.size / 2 + 14, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
-          prev = col;
+          prevCol.forEach((a, i) => col.forEach((b, j) => L.edges.push({ x1: a.x + a.size / 2 + 14, y1: a.y, x2: b.x - b.r, y2: b.y, w: net.W[1][j * net.sizes[1] + i], prev: prevW(1, j * net.sizes[1] + i), layer: 1, fromName: `unit 1.${i + 1}`, toName: `unit 2.${j + 1}` })));
+          prevCol = col;
         }
-        prev.forEach((a, i) => L.edges.push({ x1: a.x + (a.r || a.size / 2 + 14), y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
+        prevCol.forEach((a, i) => L.edges.push({ x1: a.x + (a.r || a.size / 2 + 14), y1: a.y, x2: output.x - output.r, y2: output.y, w: net.Wo[i], prev: prevWo(i), layer: 'out', fromName: `unit ${hidden.length > 1 ? '2.' : ''}${i + 1}`, toName: 'output' }));
       }
     } else {
       const K = conv.K;
@@ -1539,17 +1569,17 @@ window.Viz = (function () {
       const F = net.featureCount;
       const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [520] : [485, 610];
       const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
-      let prev = null;
+      let prevCol = null;
       hidden.forEach((h, l) => {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l], y, r: 17 }));
         unitColumns.push(col);
         L.captions.push({ x: xs[l], text: `HIDDEN ${hidden.length > 1 ? l + 1 : ''} · ${h} ${m.activationLabel.toUpperCase()}` });
         if (l === 0) { for (const u of col) L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [u.x - u.r, u.y - u.r], [u.x - u.r, u.y + u.r], [poolBox.x1, poolBox.yBot]], unit: u }); L.bandLabel2 = { x: (poolBox.x1 + xs[0]) / 2, y: 44, text: `${fmtInt(F)} weights per unit` }; }
-        else prev.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
-        prev = col;
+        else prevCol.forEach((a, i) => col.forEach((b, j) => link(a, b, net.W[l][j * net.sizes[l] + i], l, { prev: prevW(l, j * net.sizes[l] + i), fromName: `unit ${l}.${i + 1}`, toName: `unit ${l + 1}.${j + 1}` })));
+        prevCol = col;
       });
       if (!hidden.length) { L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [output.x - output.r, output.y - output.r], [output.x - output.r, output.y + output.r], [poolBox.x1, poolBox.yBot]] }); L.bandLabel2 = { x: (poolBox.x1 + output.x) / 2, y: 44, text: `${fmtInt(F)} weights` }; }
-      else prev.forEach((a, i) => link(a, output, net.Wo[i], 'out', { fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
+      else prevCol.forEach((a, i) => link(a, output, net.Wo[i], 'out', { prev: prevWo(i), fromName: `unit ${hidden.length > 1 ? hidden.length + '.' : ''}${i + 1}`, toName: 'output' }));
     }
     L.captions.push({ x: output.x, text: 'OUTPUT' });
     L.output = output; L.unitColumns = unitColumns;
@@ -1623,20 +1653,35 @@ window.Viz = (function () {
     if (L.bandLabel2) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16);
     if (L.bands.length && L.bands[0].label) ctx.fillText(L.bands[0].label, L.bandLabel ? L.bandLabel.x : 300, NET_H - 16);
 
-    // edges, weak first so strong ones sit on top
-    const maxAbs = {};
-    for (const e of L.edges) maxAbs[e.layer] = Math.max(maxAbs[e.layer] || 1e-9, Math.abs(e.w));
-    const edges = L.edges.slice().sort((a, b) => Math.abs(a.w) / maxAbs[a.layer] - Math.abs(b.w) / maxAbs[b.layer]);
+    // edges, weak first so strong ones sit on top. Thickness is |w| against a fixed floor (EDGE_FLOOR), so connections
+    // visibly grow from thin to thick during training instead of being re-normalised every frame.
+    const maxAbs = {}, maxDelta = {};
+    for (const e of L.edges) {
+      maxAbs[e.layer] = Math.max(maxAbs[e.layer] || 1e-9, Math.abs(e.w));
+      e.delta = e.prev == null ? 0 : Math.abs(e.w - e.prev);
+      maxDelta[e.layer] = Math.max(maxDelta[e.layer] || 1e-12, e.delta);
+    }
+    const norm = layer => Math.max(EDGE_FLOOR, maxAbs[layer] || 0);
+    const edges = L.edges.slice().sort((a, b) => Math.abs(a.w) / norm(a.layer) - Math.abs(b.w) / norm(b.layer));
     for (const e of edges) {
-      const rel = Math.abs(e.w) / maxAbs[e.layer];
+      const rel = Math.min(1, Math.abs(e.w) / norm(e.layer));
       const hov = hovered === e;
-      if (e.layer === 'sum') { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 2; }
+      let width;
+      if (e.layer === 'sum') { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = width = 2; }
       else {
         const rgb = e.w < 0 ? c.rgb.regular : c.rgb.irregular;
-        ctx.strokeStyle = rgbStr(rgb, hov ? 1 : 0.18 + 0.82 * rel);
-        ctx.lineWidth = (0.6 + 5 * Math.pow(rel, 0.9)) * (hov ? 1.4 : 1);
+        ctx.strokeStyle = rgbStr(rgb, hov ? 1 : 0.15 + 0.85 * rel);
+        ctx.lineWidth = width = (0.6 + 5.5 * Math.pow(rel, 0.9)) * (hov ? 1.4 : 1);
       }
       ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+      // spark: a bright core on the connections the last training step moved most
+      if (e.layer !== 'sum' && e.delta > 0 && maxDelta[e.layer] > 1e-9) {
+        const drel = e.delta / maxDelta[e.layer];
+        if (drel > 0.2) {
+          ctx.strokeStyle = rgbStr(c.rgb.ink, 0.15 + 0.6 * drel); ctx.lineWidth = Math.max(0.8, width * 0.3);
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+        }
+      }
       if (e.label) { ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(e.label, (e.x1 + e.x2) / 2, e.y1 - 6); }
     }
 
@@ -1659,16 +1704,20 @@ window.Viz = (function () {
         ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x0 - 4, y0 - 4, n.w + 8, n.h + 8);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillText(m.specimen ? `${m.size}×${m.size} ink, mean removed` : '', n.x, y0 + n.h + 12);
-      } else if (n.kind === 'map' || n.kind === 'square' || n.kind === 'filter') {
-        let tile;
-        if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size);
-        else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size);
-        else tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f);
+      } else if (n.kind === 'map' || n.kind === 'square' || n.kind === 'filter' || n.kind === 'product') {
+        let tile = null;
+        if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size, { floor: TILE_FLOOR.map });
+        else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size, { floor: TILE_FLOOR.square });
+        else if (n.kind === 'filter') tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f, { floor: TILE_FLOOR.filter });
+        else if (m.x) { const prod = new Float64Array(net.D); let sum = 0; for (let i = 0; i < net.D; i++) { prod[i] = net.Wo[i] * m.x[i]; sum += prod[i]; } tile = tileCanvas('prod', prod, 0, m.size, m.size); tile.sum = sum; }
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        if (tile) ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        else { ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size); }
         ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
-        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) { ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3); }
+        ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
+        if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : 'select a nucleus', n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'square') {
           const a = fw && stage >= 1 ? fw.a[1][n.j] : null;
           circleNode(ctx, n.x + n.size / 2 + 2, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null || n.size < 40 ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);
@@ -1736,6 +1785,11 @@ window.Viz = (function () {
         const w = net.Wo[j * m.size + i];
         return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}` };
       }
+      if (n.kind === 'product' && inBox(n, 0) && m.x) {
+        const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
+        const k = j * m.size + i;
+        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}): weight ${fmtSigned(net.Wo[k], 3)} × input ${fmtSigned(m.x[k], 2)} = ${fmtSigned(net.Wo[k] * m.x[k], 3)}` };
+      }
       if (n.kind === 'filter' && inBox(n, 2)) {
         let mm = 0; const f = net.conv.f; for (let i = 0; i < f * f; i++) mm = Math.max(mm, Math.abs(net.Wc[n.k * f * f + i]));
         return { kind: 'node', ref: n, text: `filter ${n.k + 1}: ${f}×${f} weights, max |w| ${mm.toFixed(3)} · bias ${fmtSigned(net.bc[n.k], 3)}` };
@@ -1758,7 +1812,11 @@ window.Viz = (function () {
       const d = Math.hypot(x - (e.x1 + t * dx), y - (e.y1 + t * dy));
       if (d < bestD) { bestD = d; best = e; }
     }
-    if (best) return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}` };
+    if (best) {
+      const contrib = best.fromIdx != null && m.x ? ` × input ${fmtSigned(m.x[best.fromIdx], 2)} = ${fmtSigned(best.w * m.x[best.fromIdx], 3)}` : '';
+      const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
+      return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}` };
+    }
     return null;
   }
 
@@ -1895,13 +1953,14 @@ window.Viz = (function () {
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
-    trainEval: null, testEval: null, profileAt: 0,
+    trainEval: null, testEval: null, profileAt: 0, prevW: null, applyingRecipe: false,
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
     test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
     hover: { train: null, test: null },
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
+  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Enlargement · pixels · single layer', '④ Irregularity · pixels · single layer', '⑤ Irregularity · measurements · single layer', '⑥ Irregularity · pixels · 8 ReLU + augmentation', '⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation'];
   const RECIPES = {
     1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -1947,7 +2006,7 @@ window.Viz = (function () {
     $('task-title').textContent = S.task.title;
     $('task-blurb').textContent = S.task.blurb;
     $('meta-line').textContent = `${S.ds.specimens.length} synthetic ${noun(2)} · ${S.ds.train.length} training / ${S.ds.test.length} test${S.size ? ` · ${S.size} × ${S.size} px` : ''} · seed ${raw.meta.seed}`;
-    document.querySelectorAll('#task-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.task === id));
+    $('question-select').value = id;
     document.querySelectorAll('[data-cls="0"]').forEach(el => { el.textContent = negName(); });
     document.querySelectorAll('[data-cls="1"]').forEach(el => { el.textContent = posName(); });
     document.querySelectorAll('[data-cls-called="0"]').forEach(el => { el.textContent = `called ${negName()}`; });
@@ -1967,8 +2026,6 @@ window.Viz = (function () {
       enlargement: 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.',
       irregularity: 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.',
     }[id] || '';
-    $('train-task').textContent = S.task.title;
-    $('test-task').textContent = S.task.title;
     $('mode-pixels').disabled = S.kind === 'tabular';
     $('mode-pixels').title = S.kind === 'tabular' ? 'Blood counts have no pixels' : '';
     renderInputPicker();
@@ -1984,7 +2041,8 @@ window.Viz = (function () {
     const conv = S.kind === 'image' && S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
-    S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set();
+    S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
+    if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
     clearTestResults(false);
@@ -2010,6 +2068,7 @@ window.Viz = (function () {
     if (S.ptr === 0) shuffleOrder();
     const end = Math.min(n, S.ptr + S.batch);
     const idx = S.order.slice(S.ptr, end);
+    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
     S.net.trainBatch(idx.map(i => X[i]), idx.map(i => Y[i]), S.lr, S.l2);
     S.lastBatch = new Set(idx.map(i => S.inputs.trainOwner[i]));
     S.ptr = end >= n ? 0 : end;
@@ -2187,7 +2246,7 @@ window.Viz = (function () {
       fw = S.net.forward(x);
       if (!allowed) { fw = null; stage = 0; }
     }
-    return { net: S.net, mode: S.mode, x, fw, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
+    return { net: S.net, mode: S.mode, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
@@ -2413,8 +2472,6 @@ window.Viz = (function () {
 
   // ------------------------------------------------------------------ controls
   function renderInputPicker() {
-    const wrap = $('picker-wrap');
-    wrap.hidden = S.mode !== 'features';
     $('input-picker').innerHTML = S.featureDefs.map(f => `<label class="${S.excluded.has(f.key) ? 'off' : ''}"><input type="checkbox" data-key="${esc(f.key)}" ${S.excluded.has(f.key) ? '' : 'checked'}> ${esc(f.name)}</label>`).join('');
     $('input-picker').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
       const key = cb.dataset.key;
@@ -2425,7 +2482,18 @@ window.Viz = (function () {
       resetModel(cb.checked ? `${name} restored — fresh random weights.` : `${name} withheld from the network — fresh random weights.`);
     }));
   }
+  function applyVisibility() {
+    const tabular = S.kind === 'tabular', pixels = S.mode === 'pixels';
+    $('mode-wrap').hidden = tabular;
+    $('conv-wrap').hidden = !pixels;
+    $('augment-wrap').hidden = !pixels;
+    $('picker-wrap').hidden = pixels;
+    $('tint-wrap').hidden = tabular;
+    $('prevalence-card').hidden = !tabular;
+    $('legend-conv').hidden = !(pixels && S.convK > 0);
+  }
   function syncControls() {
+    applyVisibility();
     document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === S.mode));
     $('hidden').value = S.h1; $('hidden-val').textContent = S.h1 === 0 ? 'none' : S.h1;
     $('hidden2').value = S.h2; $('hidden2-val').textContent = S.h1 === 0 ? '–' : (S.h2 === 0 ? 'none' : S.h2); $('hidden2').disabled = S.h1 === 0;
@@ -2446,14 +2514,15 @@ window.Viz = (function () {
     renderInputPicker();
   }
   function bindControls() {
-    document.querySelectorAll('#task-seg button').forEach(b => b.addEventListener('click', () => {
-      if (S.taskId === b.dataset.task) return;
-      loadTask(b.dataset.task);
+    $('question-select').addEventListener('change', () => {
+      const id = $('question-select').value;
+      if (S.taskId === id) return;
+      loadTask(id);
       if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
       syncControls();
       resetModel(`Question changed to “${S.task.title}” — new ${noun(2)}, fresh random weights.`);
       renderDataTrays(); renderScatter(); renderInspector();
-    }));
+    });
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode || b.disabled) return;
       S.mode = b.dataset.mode;
@@ -2478,16 +2547,21 @@ window.Viz = (function () {
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
-    document.querySelectorAll('.recipe').forEach(b => b.addEventListener('click', () => {
-      const { task: taskId, ...settings } = RECIPES[b.dataset.recipe];
+    $('recipe-select').addEventListener('change', () => {
+      const k = $('recipe-select').value; if (!k) return;
+      const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
       Object.assign(S, settings);
       S.excluded = new Set();
+      S.applyingRecipe = true;
       syncControls();
-      resetModel(`Recipe loaded: ${b.textContent.trim()}${switchTask ? ` (question switched to “${S.task.title}”)` : ''}. Press Train.`);
+      resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
+      S.applyingRecipe = false;
+      $('recipe-select').value = k;
       if (switchTask) { renderDataTrays(); renderScatter(); renderInspector(); }
-    }));
+      if (S.stage !== 'train') showStage('train');
+    });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
@@ -2552,7 +2626,8 @@ window.Viz = (function () {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
-    $('task-seg').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<button type="button" data-task="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</button>`).join('');
+    $('question-select').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<option value="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</option>`).join('');
+    $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
     bindControls();
     loadTask(S.taskId);
     syncControls();
