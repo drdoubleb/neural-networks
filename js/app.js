@@ -18,7 +18,7 @@
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
     test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
     hover: { train: null, test: null },
-    lesson: null, lastLesson: null,
+    lesson: null, lastLesson: null, lessonCursor: 0,
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
@@ -105,7 +105,7 @@
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
-    S.lesson = null; S.lastLesson = null; renderLessonLine();
+    S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
     if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -171,26 +171,47 @@
     if (S.running) requestAnimationFrame(tick);
   }
   // ------------------------------------------------------------------ the lesson: one case teaches the network
-  // A walk-through of one gradient step on the selected training case, phase by phase: the forward pass, the error
-  // (call − truth), the blame flowing back to each hidden unit, the nudge every weight receives, and the same case
-  // again with its new call. The step is real training: a batch of one at the current learning rate.
-  const LESSON_MS = { forward: 1500, error: 2200, blame: 2600, blame2: 3400, nudge: 3200, after: 2200 };
+  // A walk-through of one gradient step on a training case in six steps (five without a hidden layer):
+  //   1 forward pass   values flow from the inputs to the output, hop by hop
+  //   2 loss           call against truth; the error is the slope of the loss at the output
+  //   3 backward pass  blame flows back to every hidden unit (skipped without hidden units)
+  //   4 gradients      every weight's gradient = blame at its end × activity at its start
+  //   5 update         the weights actually move: w ← w − learning rate × gradient (drawn as a morph)
+  //   6 check          the same case runs forward again with the new weights
+  // The step is real training: a batch of one at the current learning rate.
+  const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600 };
+  const LESSON_TITLES = { forward: 'Forward pass', loss: 'Loss', blame: 'Backward pass', gradient: 'Gradients', update: 'Update', check: 'Check' };
   function lessonPhases() {
     const L = S.net.hidden.length;
-    const ph = [['forward', LESSON_MS.forward], ['error', LESSON_MS.error]];
+    const ph = [['forward', LESSON_MS.forward], ['loss', LESSON_MS.loss]];
     if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['nudge', LESSON_MS.nudge], ['after', LESSON_MS.after]);
+    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', LESSON_MS.check]);
     return ph;
   }
-  function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv && S.selected && S.selected.split === 'train'); }
+  function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
+  // the case the next lesson will use: a training case the user picked, else the one after the last lesson
+  function nextLessonCase() {
+    const tr = S.ds.train;
+    if (S.selected && S.selected.split === 'train' && !(S.lastLesson && S.lastLesson.s === S.selected)) return S.selected;
+    return tr[S.lessonCursor % tr.length];
+  }
   function updateTeachButton() {
     const b = $('btn-teach'); if (!b || !S.net) return;
     b.disabled = !canTeach() && !S.lesson;
-    b.textContent = S.lesson ? 'Skip ▸' : 'Teach this case';
+    b.textContent = S.lesson ? 'Skip ▸' : 'Teach next case';
     b.title = S.net.conv ? 'The walk-through covers dense networks: switch the convolution off'
-      : S.selected && S.selected.split !== 'train' ? `Pick a training ${noun(1)}: test ${noun(2)} are never taught`
-      : `Watch ${S.selected ? S.selected.name : 'this case'} teach the network one step (T)`;
-    $('btn-teach-next').title = 'the training case the network currently gets most wrong (N)';
+      : `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
+  }
+  function teachNext() {
+    if (S.lesson) { S.lesson.skip = true; return; }
+    if (!canTeach()) return;
+    startLesson(nextLessonCase());
+  }
+  function snapParams() { return { W: S.net.W.map(w => Float64Array.from(w)), b: S.net.b.map(b => Float64Array.from(b)), Wo: Float64Array.from(S.net.Wo), bo: S.net.bo }; }
+  function setParams(p) { p.W.forEach((w, l) => S.net.W[l].set(w)); p.b.forEach((b, l) => S.net.b[l].set(b)); S.net.Wo.set(p.Wo); S.net.bo = p.bo; }
+  function lerpParams(a, b, t) {
+    const mix = (x, y) => { const o = new Float64Array(x.length); for (let i = 0; i < x.length; i++) o[i] = x[i] + (y[i] - x[i]) * t; return o; };
+    return { W: a.W.map((w, l) => mix(w, b.W[l])), b: a.b.map((v, l) => mix(v, b.b[l])), Wo: mix(a.Wo, b.Wo), bo: a.bo + (b.bo - a.bo) * t };
   }
   function startLesson(s) {
     if (!s || s.split !== 'train' || !S.net || S.net.conv) return;
@@ -198,97 +219,96 @@
     if (S.selected !== s) selectSpecimen(s);
     const x = S.inputs.xOf(s), y = s.label;
     const res = S.net.lesson(x, y);
+    const hops = S.net.hidden.length + (S.mode === 'pixels' && !S.net.hidden.length ? 2 : 1); // a single layer on pixels shows image → product map → output
     S.lastLesson = null;
-    S.lesson = { s, x, y, res, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, applied: false };
+    S.lesson = { s, x, y, res, hops, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, morph: null };
     updateTeachButton(); renderLessonLine();
     requestAnimationFrame(lessonFrame);
   }
+  // the update itself: applied once, then drawn as a morph from the old weights to the new ones
   function applyLesson() {
-    const les = S.lesson;
-    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
+    const les = S.lesson; if (les.morph) return;
+    const before = snapParams();
+    S.prevW = { W: before.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(before.Wo) };
     S.net.applyGradient(les.res.g, 1, S.lr, S.l2);
-    les.pAfter = S.net.forward(les.x).p; les.applied = true;
+    les.morph = { before, after: snapParams() };
+    les.pAfter = S.net.forward(les.x).p;
+  }
+  function settleLesson() { // leave the network on the new weights and refresh what depends on them
+    const les = S.lesson;
+    if (!les.morph) applyLesson();
+    setParams(les.morph.after);
     if (S.test.results.size) clearTestResults(true);
     evaluateAll(); renderStatus();
   }
+  const easeInOut = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
   function lessonFrame(now) {
     const les = S.lesson; if (!les) return;
     const t = les.skip ? Infinity : now - les.t0;
     let acc = 0, phase = null, frac = 1;
     for (const [name, ms] of les.phases) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
-    if (!phase) {
-      if (!les.applied) applyLesson();
-      S.lastLesson = { s: les.s, calls: [les.pBefore, les.pAfter] };
-      S.lesson = null;
-      renderTraining(true); renderLessonLine(); updateTeachButton();
-      return;
-    }
-    if (phase === 'after' && !les.applied) applyLesson();
+    if (!phase) { finishLesson(); return; }
+    if (phase === 'update') { applyLesson(); setParams(lerpParams(les.morph.before, les.morph.after, easeInOut(frac))); }
+    if (phase === 'check' && !les.settled) { settleLesson(); les.settled = true; }
     les.phase = phase; les.frac = frac;
     renderTrainGraph(); renderLessonLine();
     requestAnimationFrame(lessonFrame);
   }
-  function endLesson() { // finish a running lesson at once (its step still counts) and clear the strip
-    const les = S.lesson;
-    if (les && !les.applied) applyLesson();
-    S.lesson = null; S.lastLesson = null;
+  function finishLesson() {
+    const les = S.lesson; if (!les) return;
+    if (!les.settled) settleLesson();
+    const tr = S.ds.train;
+    S.lessonCursor = (tr.indexOf(les.s) + 1) % tr.length;
+    S.lastLesson = { s: les.s, pBefore: les.pBefore, pAfter: les.pAfter };
+    S.lesson = null;
+    renderTraining(true); renderLessonLine(); updateTeachButton();
+  }
+  function endLesson() { // a reset or a normal training step supersedes the lesson: settle it and clear the strip
+    if (S.lesson) { if (!S.lesson.settled) settleLesson(); S.lesson = null; }
+    S.lastLesson = null;
     renderLessonLine(); updateTeachButton();
   }
   function lessonView() {
     const les = S.lesson; if (!les) return null;
-    const g = les.res.g;
-    return { phase: les.phase, frac: les.frac, error: les.res.error, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
+    const g = les.res.g, hops = les.hops;
+    let reveal = hops; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
+    if (les.phase === 'forward' || les.phase === 'check') reveal = Math.min(hops, Math.floor(Math.min(0.9999, les.frac) * (hops + 1)));
+    return { phase: les.phase, frac: les.frac, hops, reveal, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
   }
+  function fmtPair(a, b) { const d = a.toFixed(2) === b.toFixed(2) ? 3 : 2; return `${a.toFixed(d)} → ${b.toFixed(d)}`; }
   function renderLessonLine() {
     const box = $('lesson'); if (!box) return;
     const les = S.lesson, last = S.lastLesson;
     if (!les && !last) { box.hidden = true; $('legend-lesson').hidden = true; return; }
     box.hidden = false; $('legend-lesson').hidden = !les;
-    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !!les;
     let html;
     if (les) {
       const n = les.phases.findIndex(p => p[0] === les.phase) + 1, total = les.phases.length;
-      const hidden = S.net.hidden.length, blame = hidden ? 'blame' : 'error';
+      const hidden = S.net.hidden.length, pixels = S.mode === 'pixels';
       const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
       const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
-      const pair = les.pAfter == null ? `${p} → …` : fmtCalls([les.pBefore, les.pAfter]);
+      const pair = les.pAfter == null ? `${p} → …` : fmtPair(les.pBefore, les.pAfter);
       const texts = {
-        forward: `Forward pass: the network calls <b>${p}</b> (${esc(call)}). The truth is <b>${esc(className(les.y))}</b>.`,
-        error: `Error = call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
+        forward: `The inputs flow through the weights to the output. The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
+        loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: hidden > 1
-          ? 'Back-propagation: the error flows back one layer at a time, shared out along the connections in proportion to their weights. A unit that was switched off gets no blame.'
-          : 'Back-propagation: the error is shared out to the hidden units in proportion to their weights to the output. A unit that was switched off gets no blame.',
-        nudge: allSilent
-          ? 'Every hidden unit was switched off for this case, so none of them learns from it: only the output bias moves. A ReLU unit that is off passes no blame back.'
-          : S.mode === 'pixels'
-          ? `Every weight moves by −learning rate × ${blame} × its input. On pixels that is a faint copy of the ${noun(1)} itself, added to ${hidden ? 'each weight map, scaled by that unit’s blame' : 'the weight map'} (orange = weight up, blue = weight down).`
-          : `Every weight moves by −learning rate × ${blame} × its input (orange = weight up, blue = weight down): large inputs get large nudges. Hover a connection for the arithmetic.`,
-        after: sure ? `The call was already right and sure, so the nudge is tiny: <b>${pair}</b>. Pick a case it gets wrong for a bigger lesson.` : `The same case again: <b>${pair}</b>. It learned a little.`,
+          ? 'How much is each hidden unit to blame? The error flows back one layer at a time: a unit’s blame = the blame of the units it feeds × the weights between them × 1 if the unit was on, 0 if it was off. The dots carry it back.'
+          : 'How much is each hidden unit to blame? blame = error × its weight to the output × 1 if the unit was on, 0 if it was off. The dots carry the error back; a unit that was off gets none.',
+        gradient: allSilent
+          ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
+          : hidden
+          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the ${noun(1)} itself, scaled by the unit’s blame.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the ${noun(1)} itself, scaled by the error.` : ''}`,
+        update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. Watch the connections${pixels ? ' and weight maps' : ''} change.`,
+        check: sure
+          ? `The same case runs forward again. It was already right and sure, so the step was tiny: <b>${pair}</b>.`
+          : `The same case runs forward again with the new weights: <b>${pair}</b>. One case, one small step; training repeats this for every case, many times over.`,
       };
-      html = `<span class="step">${n} / ${total}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
+      html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
     } else {
-      const calls = last.calls;
-      html = `<span class="step">✓</span> <span><b>${esc(last.s.name)}</b> (truth ${esc(className(last.s.label))}) taught ${calls.length - 1}×: ${fmtCalls(calls)}.${calls.length > 2 ? ' One case repeated is memorised; the next case will pull the weights its own way.' : ''}</span>`;
+      html = `<span class="step">✓ ${esc(last.s.name)}</span> <span>(truth ${esc(className(last.s.label))}) ${fmtPair(last.pBefore, last.pAfter)}. Next up: <b>${esc(nextLessonCase().name)}</b>.</span>`;
     }
     $('lesson-text').innerHTML = html;
-  }
-  function fmtCalls(calls) { const d = new Set(calls.map(v => v.toFixed(2))).size < calls.length ? 3 : 2; return calls.map(v => v.toFixed(d)).join(' → '); }
-  function teachAgain(n) {
-    const last = S.lastLesson; if (!last || S.lesson || S.running) return;
-    const x = S.inputs.xOf(last.s), y = last.s.label;
-    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
-    for (let i = 0; i < n; i++) { S.net.trainBatch([x], [y], S.lr, S.l2); last.calls.push(S.net.forward(x).p); }
-    if (S.test.results.size) clearTestResults(true);
-    renderTraining(true); renderLessonLine();
-  }
-  function worstTrainingCase(exclude) {
-    let worst = null, worstErr = -1;
-    for (const s of S.ds.train) { if (s === exclude) continue; const e = Math.abs(S.net.forward(S.inputs.xOf(s)).p - s.label); if (e > worstErr) { worstErr = e; worst = s; } }
-    return worst;
-  }
-  function teachNext() {
-    if (S.lesson || S.running || !S.net || S.net.conv) return;
-    startLesson(worstTrainingCase(S.lastLesson ? S.lastLesson.s : null));
   }
 
   function stepBatch() { stopTraining(); trainStep(); renderTraining(true); if (S.ptr === 0) note(`Epoch ${S.epoch} complete.`); }
@@ -441,7 +461,7 @@
   function renderTrainGraph() {
     const cv = $('net-canvas');
     const m = graphModel(S.selected || null, 2, S.hover.train);
-    if (S.lesson) m.lesson = lessonView();
+    if (S.lesson) { const lv = lessonView(); m.lesson = lv; m.reveal = lv.reveal; m.hops = lv.hops; if (lv.phase !== 'check') m.fw = S.lesson.res.fw; }
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -768,9 +788,7 @@
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
-    $('btn-teach').addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; else startLesson(S.selected); });
-    $('btn-teach-again').addEventListener('click', () => teachAgain(10));
-    $('btn-teach-next').addEventListener('click', teachNext);
+    $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
       const { task: taskId, ...settings } = RECIPES[k];
@@ -827,8 +845,7 @@
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (S.lastLesson) teachNext(); }
-      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (canTeach()) startLesson(S.selected); }
+      else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && S.stage === 'train') teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
     window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
