@@ -98,7 +98,7 @@
             <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
             <button type="button" class="btn" id="btn-step-epoch">Step epoch</button>
             <button type="button" class="btn" id="btn-step-batch">Step batch</button>
-            <button type="button" class="btn" id="btn-teach" title="">Teach this case</button>
+            <button type="button" class="btn" id="btn-teach" title="">Teach next case</button>
             <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
           </div>
         </div>
@@ -131,10 +131,7 @@
           <h2>The network, live</h2>
           <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
-        <div class="lesson" id="lesson" hidden>
-          <span id="lesson-text"></span>
-          <span class="lesson-actions"><button type="button" class="btn" id="btn-teach-again" hidden>Teach it 10× more</button><button type="button" class="btn" id="btn-teach-next" hidden>Worst case next ▸</button></span>
-        </div>
+        <div class="lesson" id="lesson" hidden><span id="lesson-text"></span></div>
         <div class="net-wrap">
           <canvas id="net-canvas" width="800" height="440" aria-label="Network diagram"></canvas>
           <div class="tip" id="net-tip" hidden></div>
@@ -146,7 +143,7 @@
           <span>at the output, positive pushes toward <b data-cls="1"></b></span>
           <span>node fill = value flowing through it for this case</span>
           <span id="legend-conv" hidden>filters are 5×5 stencils slid over the image; a feature map lights up (violet) where the image matches the stencil</span>
-          <span id="legend-lesson" hidden>during a lesson: violet dots carry the error back, pills show each unit’s blame, glows show each weight’s nudge (orange up, blue down)</span>
+          <span id="legend-lesson" hidden>during a lesson: violet dots are values flowing forward or blame flowing back, pills show each unit’s blame, glows show each weight’s gradient (orange: the weight will rise, blue: fall)</span>
         </div>
       </div>
 

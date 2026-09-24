@@ -432,8 +432,8 @@ window.Viz = (function () {
         if (n.kind === 'map') tile = tileCanvas('out', net.Wo, 0, m.size, m.size, { floor: TILE_FLOOR.map });
         else if (n.kind === 'square') tile = tileCanvas('h' + n.j, net.W[0], n.j * net.sizes[0], m.size, m.size, { floor: TILE_FLOOR.square });
         else if (n.kind === 'filter') tile = tileCanvas('f' + n.k, net.Wc, n.k * net.conv.f * net.conv.f, net.conv.f, net.conv.f, { floor: TILE_FLOOR.filter });
-        else if (n.kind === 'product' && m.x && stage >= 1) { const prod = new Float64Array(net.D); let sum = 0; for (let i = 0; i < net.D; i++) { prod[i] = net.Wo[i] * m.x[i]; sum += prod[i]; } tile = tileCanvas('prod', prod, 0, m.size, m.size); tile.sum = sum; }
-        else if (n.kind === 'uprod' && m.x && stage >= 1) { const D = net.D, off = n.j * D, prod = new Float64Array(D); for (let i = 0; i < D; i++) prod[i] = net.W[0][off + i] * m.x[i]; tile = tileCanvas('uprod' + n.j, prod, 0, m.size, m.size); }
+        else if (n.kind === 'product' && m.x && (m.reveal != null ? m.reveal >= 1 : stage >= 1)) { const prod = new Float64Array(net.D); let sum = 0; for (let i = 0; i < net.D; i++) { prod[i] = net.Wo[i] * m.x[i]; sum += prod[i]; } tile = tileCanvas('prod', prod, 0, m.size, m.size); tile.sum = sum; }
+        else if (n.kind === 'uprod' && m.x && (m.reveal != null ? m.reveal >= 1 : stage >= 1)) { const D = net.D, off = n.j * D, prod = new Float64Array(D); for (let i = 0; i < D; i++) prod[i] = net.W[0][off + i] * m.x[i]; tile = tileCanvas('uprod' + n.j, prod, 0, m.size, m.size); }
         ctx.imageSmoothingEnabled = false;
         if (tile) ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         else { ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size); }
@@ -443,7 +443,7 @@ window.Viz = (function () {
         if (n.kind === 'map' || (n.kind === 'square' && n.captioned)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : 'select a nucleus', n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'uprod') { // activation badge: sum of the products plus the bias, through the activation
-          const a = fw && stage >= 1 ? fw.a[1][n.j] : null;
+          const a = fw && (m.reveal != null ? m.reveal >= 1 : stage >= 1) ? fw.a[1][n.j] : null;
           circleNode(ctx, n.x + n.size / 2 + 16, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);
         }
       } else if (n.kind === 'fmap' || n.kind === 'pooled') {
@@ -491,13 +491,13 @@ window.Viz = (function () {
         const prevX = n.kind === 'fmap' ? n.x - n.size / 2 - 8 : n.x - n.size / 2 - 6;
         ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(prevX - 8, n.y); ctx.lineTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y - 3); ctx.moveTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y + 3); ctx.stroke();
       } else if (n.kind === 'unit') {
-        const acts = fw && stage >= 1 ? fw.a[n.l + 1] : null;
+        const acts = fw && (m.reveal != null ? m.reveal >= n.l + 1 : stage >= 1) ? fw.a[n.l + 1] : null;
         const a = acts ? acts[n.j] : null;
         circleNode(ctx, n.x, n.y, n.r, unitFill(a, acts || [], signed), a == null ? '·' : fmtNum(a, 2), null, isHov);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        if (L.unitColumns[n.l].length <= 8 && !(m.lesson && m.lesson.phase !== 'forward' && m.lesson.phase !== 'error')) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
+        if (L.unitColumns[n.l].length <= 8 && !(m.lesson && m.lesson.phase !== 'forward' && m.lesson.phase !== 'loss')) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
       } else if (n.kind === 'output') {
-        const p = fw && stage >= 2 ? fw.p : null;
+        const p = fw && (m.reveal != null ? m.reveal >= m.hops : stage >= 2) ? fw.p : null;
         circleNode(ctx, n.x, n.y, n.r, p == null ? pending : diverging((p - 0.5) * 2), p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
         ctx.font = labelFont; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         ctx.fillText(`P(${m.positiveName})`, n.x, n.y + n.r + 6);
@@ -531,9 +531,10 @@ window.Viz = (function () {
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
 
-  // The lesson walk-through: one case's error, the blame each hidden unit receives, and the nudge every weight gets.
-  // m.lesson = { phase: forward | error | blame | nudge | after, frac (0..1 within the phase), error (call − truth),
-  //   y, truthName, pBefore, pAfter, delta[l][j] (d loss / d pre-activation of each hidden unit), gW, gWo, lr, fwBefore }
+  // The lesson walk-through, one training case in six steps (five without a hidden layer):
+  //   forward → loss → blame (backward pass) → gradient → update → check
+  // m.lesson = { phase, frac (0..1 within the phase), hops, reveal, error, loss, y, truthName, pBefore, pAfter,
+  //   delta[l][j] (blame of each hidden unit), gW, gWo, lr, fwBefore }
   function drawLesson(ctx, L, m) {
     const les = m.lesson, c = colors(), net = m.net, out = L.output;
     const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
@@ -541,29 +542,59 @@ window.Viz = (function () {
     const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
+    const nL = net.hidden.length, hops = les.hops, ph = les.phase;
+    // a banner along the bottom naming the step, with an arrow for the passes
+    const banner = (text, dir) => {
+      const y = NET_H - 34;
+      ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(text, 400, y);
+      if (dir) {
+        const gap = ctx.measureText(text).width / 2 + 12, x0 = 150, x1 = 650;
+        ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(400 - gap, y); ctx.moveTo(400 + gap, y); ctx.lineTo(x1, y); ctx.stroke();
+        const hx = dir > 0 ? x1 : x0, sg = dir > 0 ? -1 : 1;
+        ctx.beginPath(); ctx.moveTo(hx, y); ctx.lineTo(hx + sg * 8, y - 4.5); ctx.lineTo(hx + sg * 8, y + 4.5); ctx.closePath(); ctx.fill();
+      }
+    };
+    // which connections make up hop k of the forward sweep: the bands (pixels into the first maps), a dense layer, or the output
+    const hopKey = k => (m.mode === 'pixels' ? (k === 0 ? 'band' : (nL && k < nL ? k : (nL ? 'out' : 'sum'))) : (k < nL ? k : 'out'));
+    const dots = (key, t) => {
+      ctx.fillStyle = c.accent;
+      const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); };
+      if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
+      for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
+    };
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
-    if (les.phase === 'forward') return;
-    // call against truth on a 0..1 scale beside the output; the gap between them is the error
+
+    // 1 · forward pass (and 6 · check): values flow hop by hop
+    const seg = 1 / (hops + 1);
+    if (ph === 'forward' || ph === 'check') {
+      const k = Math.floor(Math.min(0.9999, les.frac) / seg);
+      if (k < hops) dots(hopKey(k), (les.frac - k * seg) / seg);
+      banner(ph === 'forward' ? 'forward pass' : 'forward pass again, with the new weights', 1);
+      if (ph === 'forward') return;
+    }
+
+    // 2 · loss: the call against the truth on a 0..1 scale beside the output; the gap is the error
     const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
     ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
     ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
     const ty = yOf(les.y);
-    const pv = les.phase === 'after' && les.pAfter != null ? les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, les.frac)) : les.pBefore;
+    let pv = les.pBefore;
+    if (ph === 'check' && les.pAfter != null) { const s0 = hops * seg; pv = les.frac <= s0 ? les.pBefore : les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, (les.frac - s0) / (1 - s0))); }
     ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
     ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
     ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
-    if (les.phase === 'after' && les.pAfter != null) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 74); }
-    if (les.phase === 'error') return;
+    ctx.fillStyle = c.ink3; ctx.fillText(`loss ${les.loss.toFixed(2)}`, out.x, out.y + out.r + 74);
+    if (ph === 'check' && les.pAfter != null && les.reveal >= hops) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 90); }
+    if (ph === 'loss') { banner('loss: how wrong was the call?', 0); return; }
 
-    // blame flows back one layer at a time: violet dots run from each target back to its source, then every unit
-    // shows its share of the error (d loss / d pre-activation); a unit that was switched off gets none
-    const nL = net.hidden.length;
+    // 3 · backward pass: blame flows back one layer at a time; every unit then shows its share, a unit that was off gets none
     if (nL) {
-      const prog = les.phase === 'blame' ? les.frac * nL : nL;
+      const prog = ph === 'blame' ? les.frac * nL : nL;
       for (let k = 0; k < nL; k++) {
         const l = nL - 1 - k, t = Math.min(1, prog - k);
         if (t <= 0) continue;
@@ -579,45 +610,54 @@ window.Viz = (function () {
           });
         }
       }
+      if (ph === 'blame') { banner('backward pass: blame', -1); return; }
     }
-    if (les.phase !== 'nudge') return;
+    if (ph === 'check') return;
 
-    // the nudge: every weight moves by −lr × blame × its input. Connections glow in the colour of their change
-    // (orange up, blue down), and on pixels a scaled copy of the image slides along the band into each weight map.
+    // 4 · gradients: every weight's gradient = blame at its end × activity at its start. Connections glow in the colour of
+    // the step the weight will take (orange up, blue down); on pixels a scaled copy of the image slides into each weight map.
+    // 5 · update: the weights themselves move (the app morphs them); the glows and copies fade out.
     const fr = Math.min(1, les.frac);
-    const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
-    const maxDw = {};
-    for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
-    ctx.lineCap = 'round';
-    for (const e of L.edges) {
-      const dw = dwOf(e); if (!dw) continue;
-      const rel = Math.abs(dw) / maxDw[e.layer];
-      ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.25 + 0.65 * Math.min(1, fr * 2));
-      ctx.lineWidth = 2 + 8 * rel;
-      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+    const fade = ph === 'update' ? Math.max(0, 1 - fr / 0.4) : Math.min(1, fr * 2);
+    if (fade > 0) {
+      const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
+      const maxDw = {};
+      for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
+      ctx.lineCap = 'round';
+      for (const e of L.edges) {
+        const dw = dwOf(e); if (!dw) continue;
+        const rel = Math.abs(dw) / maxDw[e.layer];
+        ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.9 * fade);
+        ctx.lineWidth = 2 + 8 * rel;
+        ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
+      if (m.mode === 'pixels' && m.x && !net.conv) {
+        const img = L.nodes.find(n => n.kind === 'image');
+        const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
+        const D = m.x.length;
+        let common = 1e-9, xmax = 1e-9;
+        for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
+        for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
+        ctx.globalAlpha = fade;
+        targets.forEach((t, j) => {
+          const n = t.node; if (!n || !img) return;
+          const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
+          const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
+          if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
+          const cx = ph === 'update' ? x1 : x0 + (x1 - x0) * ease(fr);
+          const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
+          const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
+          ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
+          if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+        });
+        ctx.globalAlpha = 1;
+      }
     }
-    ctx.lineCap = 'butt';
-    if (m.mode === 'pixels' && m.x && !net.conv) {
-      const img = L.nodes.find(n => n.kind === 'image');
-      const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
-      const D = m.x.length;
-      let common = 1e-9, xmax = 1e-9;
-      for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
-      for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
-      targets.forEach((t, j) => {
-        const n = t.node; if (!n || !img) return;
-        const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
-        const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
-        if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
-        const cx = x0 + (x1 - x0) * ease(fr);
-        const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
-        const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
-        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
-        if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
-      });
-    }
+    if (ph === 'gradient') banner(nL ? 'gradient of every weight = blame at its end × activity at its start' : 'gradient of every weight = error × its input', 0);
+    if (ph === 'update') banner(`update: every weight steps against its gradient, w ← w − ${les.lr} × gradient`, 0);
   }
   function pill(ctx, x, y, text, col, c) {
     ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
@@ -707,7 +747,7 @@ window.Viz = (function () {
         let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
         const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
         const w = net.W[0][n.j * net.sizes[0] + Math.max(0, Math.min(net.D - 1, j * m.size + i))];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
+        const lessonTxt = m.lesson && (m.lesson.phase === 'gradient' || m.lesson.phase === 'update' || m.lesson.phase === 'check') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
         return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
@@ -721,7 +761,7 @@ window.Viz = (function () {
       if (n.kind === 'map' && inBox(n, 0)) {
         const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const w = net.Wo[j * m.size + i];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
+        const lessonTxt = m.lesson && (m.lesson.phase === 'gradient' || m.lesson.phase === 'update' || m.lesson.phase === 'check') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
         return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
       }
       if (n.kind === 'product' && inBox(n, 0) && m.x) {
@@ -757,7 +797,7 @@ window.Viz = (function () {
       const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
       let lessonTxt = '';
       const les = m.lesson;
-      if (les && best.wi != null && (les.phase === 'nudge' || les.phase === 'after')) {
+      if (les && best.wi != null && (les.phase === 'gradient' || les.phase === 'update' || les.phase === 'check')) {
         const arr = best.layer === 'out' ? les.gWo : les.gW[best.layer], fwB = les.fwBefore;
         const inp = best.layer === 'out' ? fwB.a[fwB.a.length - 1][best.fi] : best.layer === 0 ? m.x[best.fi] : fwB.a[best.layer][best.fi];
         const blame = best.layer === 'out' ? les.error : les.delta[best.layer][best.ti];
