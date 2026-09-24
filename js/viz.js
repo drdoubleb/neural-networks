@@ -434,7 +434,10 @@ window.Viz = (function () {
         if (show) {
           const arr = n.kind === 'fmap' ? fw.conv.act : fw.conv.v;
           let maskBefore = null;
-          if (anim) maskBefore = n.kind === 'fmap' ? (anim.phase === 'scan' ? anim.pos : side * side) : (anim.phase === 'pool' ? anim.posP : anim.phase === 'scan' ? 0 : side * side);
+          if (anim) {
+            if (n.kind === 'fmap') maskBefore = anim.phase === 'scan1' ? (n.k === 0 ? anim.pos : 0) : anim.phase === 'scan' ? (n.k === 0 ? side * side : anim.pos) : side * side;
+            else maskBefore = anim.phase === 'pool' ? anim.posP : (anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
+          }
           const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax, maskBefore });
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
@@ -443,7 +446,7 @@ window.Viz = (function () {
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         // highlights: the cell being written during the scan, the block being pooled, or the hovered position
         const cs = n.size / side;
-        if (n.kind === 'fmap' && anim && anim.phase === 'scan' && anim.pos > 0 && n.k === anim.showFilter) {
+        if (n.kind === 'fmap' && anim && anim.pos > 0 && ((anim.phase === 'scan1' && n.k === 0) || (anim.phase === 'scan' && n.k > 0))) {
           const p = anim.pos - 1, py = Math.floor(p / side), px = p % side;
           ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
         }
@@ -483,7 +486,7 @@ window.Viz = (function () {
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
       let spot = null;
-      if (m.anim && m.anim.phase === 'scan' && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
+      if (m.anim && (m.anim.phase === 'scan1' || m.anim.phase === 'scan') && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
       else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'fmap' && m.hover.i != null) spot = { k: m.hover.ref.k, oy: m.hover.j, ox: m.hover.i };
       if (spot && img) {
         drawWindow(ctx, img, m.size, spot.oy, spot.ox, net.conv.f);

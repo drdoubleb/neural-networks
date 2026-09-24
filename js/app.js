@@ -330,19 +330,22 @@
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
-  // Classify-next walk-through for convolutional networks: the window scans the image while the feature maps fill,
-  // the pooling blocks collapse, then the dense units and the output fire.
+  // Classify-next walk-through for convolutional networks, about 30 s in all:
+  //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~14 s)
+  //   2. the remaining filters scan together at a quicker pace (~8 s)
+  //   3. the pooling blocks collapse, unhurried (~5 s)
+  //   4. the dense units and the output fire, then the truth is revealed
   function animateConvClassify(s) {
     const net = S.net, total = net.co * net.co, cells = net.po * net.po;
-    const T1 = 1800, T2 = 2000, T3 = 900, T4 = 350, T5 = 350, T6 = 450; // ms per phase
+    const T1 = 14000, T2 = net.conv.K > 1 ? 8000 : 0, T3 = 5000, T4 = 700, T5 = 700, T6 = 600; // ms per phase
     const t0 = performance.now();
     S.test.skip = false;
     const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
     const frame = now => {
       if (!S.test.animating || S.selected !== s) return;
       const t = S.test.skip ? Infinity : now - t0;
-      if (t < T1) renderTestGraph(0, { phase: 'scan', pos: Math.min(net.co, Math.floor(t / T1 * net.co)), showFilter: 0 });
-      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, net.co + Math.floor((t - T1) / T2 * (total - net.co))), showFilter: 0 });
+      if (t < T1) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(t / T1 * total)), showFilter: 0 });
+      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor((t - T1) / T2 * total)), showFilter: 1 });
       else if (t < T1 + T2 + T3) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor((t - T1 - T2) / T3 * cells)), showFilter: 0 });
       else if (t < T1 + T2 + T3 + T4) renderTestGraph(1, null);
       else if (t < T1 + T2 + T3 + T4 + T5) renderTestGraph(2, null);
@@ -710,7 +713,7 @@
       stopTraining(); renderTestPanel();
       if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
       renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution: the 5×5 window scans the nucleus while the feature maps fill in, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }

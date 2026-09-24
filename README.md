@@ -59,9 +59,9 @@ network never sees it; the page uses it to show which hidden units respond to wh
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
 3. **Test.** The weights are frozen. The held-out cases are classified one at a time (values animate through the
    network, then the truth is revealed) or all at once. For a convolutional network, *Classify next* walks through the
-   convolution: the 5 × 5 window scans the nucleus while all the feature maps fill in behind it, with the arithmetic of
-   the current position shown, then the 4 × 4 pooling blocks collapse into the pooled maps, then the dense units and
-   the output fire. Press N or click the diagram to skip ahead. Accuracy, sensitivity, specificity and a confusion matrix
+   convolution in about 30 seconds: filter 1 alone scans the nucleus slowly with the arithmetic of each position shown,
+   the remaining filters sweep together at a quicker pace, then the 4 × 4 pooling blocks collapse into the pooled maps,
+   then the dense units and the output fire. Press N or click the diagram to skip ahead. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population.
 

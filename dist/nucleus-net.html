@@ -1731,7 +1731,10 @@ window.Viz = (function () {
         if (show) {
           const arr = n.kind === 'fmap' ? fw.conv.act : fw.conv.v;
           let maskBefore = null;
-          if (anim) maskBefore = n.kind === 'fmap' ? (anim.phase === 'scan' ? anim.pos : side * side) : (anim.phase === 'pool' ? anim.posP : anim.phase === 'scan' ? 0 : side * side);
+          if (anim) {
+            if (n.kind === 'fmap') maskBefore = anim.phase === 'scan1' ? (n.k === 0 ? anim.pos : 0) : anim.phase === 'scan' ? (n.k === 0 ? side * side : anim.pos) : side * side;
+            else maskBefore = anim.phase === 'pool' ? anim.posP : (anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
+          }
           const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax, maskBefore });
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
@@ -1740,7 +1743,7 @@ window.Viz = (function () {
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         // highlights: the cell being written during the scan, the block being pooled, or the hovered position
         const cs = n.size / side;
-        if (n.kind === 'fmap' && anim && anim.phase === 'scan' && anim.pos > 0 && n.k === anim.showFilter) {
+        if (n.kind === 'fmap' && anim && anim.pos > 0 && ((anim.phase === 'scan1' && n.k === 0) || (anim.phase === 'scan' && n.k > 0))) {
           const p = anim.pos - 1, py = Math.floor(p / side), px = p % side;
           ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
         }
@@ -1780,7 +1783,7 @@ window.Viz = (function () {
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
       let spot = null;
-      if (m.anim && m.anim.phase === 'scan' && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
+      if (m.anim && (m.anim.phase === 'scan1' || m.anim.phase === 'scan') && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
       else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'fmap' && m.hover.i != null) spot = { k: m.hover.ref.k, oy: m.hover.j, ox: m.hover.i };
       if (spot && img) {
         drawWindow(ctx, img, m.size, spot.oy, spot.ox, net.conv.f);
@@ -2339,19 +2342,22 @@ window.Viz = (function () {
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
-  // Classify-next walk-through for convolutional networks: the window scans the image while the feature maps fill,
-  // the pooling blocks collapse, then the dense units and the output fire.
+  // Classify-next walk-through for convolutional networks, about 30 s in all:
+  //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~14 s)
+  //   2. the remaining filters scan together at a quicker pace (~8 s)
+  //   3. the pooling blocks collapse, unhurried (~5 s)
+  //   4. the dense units and the output fire, then the truth is revealed
   function animateConvClassify(s) {
     const net = S.net, total = net.co * net.co, cells = net.po * net.po;
-    const T1 = 1800, T2 = 2000, T3 = 900, T4 = 350, T5 = 350, T6 = 450; // ms per phase
+    const T1 = 14000, T2 = net.conv.K > 1 ? 8000 : 0, T3 = 5000, T4 = 700, T5 = 700, T6 = 600; // ms per phase
     const t0 = performance.now();
     S.test.skip = false;
     const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
     const frame = now => {
       if (!S.test.animating || S.selected !== s) return;
       const t = S.test.skip ? Infinity : now - t0;
-      if (t < T1) renderTestGraph(0, { phase: 'scan', pos: Math.min(net.co, Math.floor(t / T1 * net.co)), showFilter: 0 });
-      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, net.co + Math.floor((t - T1) / T2 * (total - net.co))), showFilter: 0 });
+      if (t < T1) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(t / T1 * total)), showFilter: 0 });
+      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor((t - T1) / T2 * total)), showFilter: 1 });
       else if (t < T1 + T2 + T3) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor((t - T1 - T2) / T3 * cells)), showFilter: 0 });
       else if (t < T1 + T2 + T3 + T4) renderTestGraph(1, null);
       else if (t < T1 + T2 + T3 + T4 + T5) renderTestGraph(2, null);
@@ -2719,7 +2725,7 @@ window.Viz = (function () {
       stopTraining(); renderTestPanel();
       if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
       renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution: the 5×5 window scans the nucleus while the feature maps fill in, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
