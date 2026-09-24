@@ -331,25 +331,28 @@
     Viz.drawNetwork(cv, m);
   }
   // Classify-next walk-through for convolutional networks, about 30 s in all:
-  //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~14 s)
-  //   2. the remaining filters scan together at a quicker pace (~8 s)
-  //   3. the pooling blocks collapse, unhurried (~5 s)
-  //   4. the dense units and the output fire, then the truth is revealed
+  //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~12 s)
+  //   2. the remaining filters scan together at a quicker pace (~7 s)
+  //   3. map 1 is pooled slowly, block by block, with the block and its maximum shown (~4 s)
+  //   4. the remaining maps are pooled together (~2.5 s)
+  //   5. the dense units and the output fire, then the truth is revealed
   function animateConvClassify(s) {
-    const net = S.net, total = net.co * net.co, cells = net.po * net.po;
-    const T1 = 14000, T2 = net.conv.K > 1 ? 8000 : 0, T3 = 5000, T4 = 700, T5 = 700, T6 = 600; // ms per phase
+    const net = S.net, total = net.co * net.co, cells = net.po * net.po, multi = net.conv.K > 1;
+    const T = [12000, multi ? 7000 : 0, 4000, multi ? 2500 : 0, 700, 700, 600]; // ms per phase
+    const ends = T.map((_, i) => T.slice(0, i + 1).reduce((a, b) => a + b, 0));
     const t0 = performance.now();
     S.test.skip = false;
     const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
+    const frac = (t, i) => (t - (i ? ends[i - 1] : 0)) / T[i];
     const frame = now => {
       if (!S.test.animating || S.selected !== s) return;
       const t = S.test.skip ? Infinity : now - t0;
-      if (t < T1) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(t / T1 * total)), showFilter: 0 });
-      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor((t - T1) / T2 * total)), showFilter: 1 });
-      else if (t < T1 + T2 + T3) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor((t - T1 - T2) / T3 * cells)), showFilter: 0 });
-      else if (t < T1 + T2 + T3 + T4) renderTestGraph(1, null);
-      else if (t < T1 + T2 + T3 + T4 + T5) renderTestGraph(2, null);
-      else if (t < T1 + T2 + T3 + T4 + T5 + T6) renderTestGraph(2, null);
+      if (t < ends[0]) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(frac(t, 0) * total)), showFilter: 0 });
+      else if (t < ends[1]) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor(frac(t, 1) * total)), showFilter: 1 });
+      else if (t < ends[2]) renderTestGraph(0, { phase: 'pool1', posP: Math.min(cells, Math.floor(frac(t, 2) * cells)) });
+      else if (t < ends[3]) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor(frac(t, 3) * cells)) });
+      else if (t < ends[4]) renderTestGraph(1, null);
+      else if (t < ends[6]) renderTestGraph(2, null);
       else { finish(); return; }
       requestAnimationFrame(frame);
     };
@@ -681,7 +684,7 @@
         S.hover[key] = hit;
         if (hit) { tip.hidden = false; tip.textContent = hit.text; tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
         else tip.hidden = true;
-        if ((prev && prev.ref) !== (hit && hit.ref) || (hit && hit.ref && (hit.ref.kind === 'map' || hit.ref.kind === 'fmap'))) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
+        if ((prev && prev.ref) !== (hit && hit.ref) || (hit && hit.ref && (hit.ref.kind === 'map' || hit.ref.kind === 'fmap' || hit.ref.kind === 'pooled' || hit.ref.kind === 'product'))) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
       if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
@@ -713,7 +716,7 @@
       stopTraining(); renderTestPanel();
       if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
       renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then map 1 is pooled block by block and the other maps follow. Press N or click the diagram to skip ahead.';
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
