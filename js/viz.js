@@ -270,6 +270,7 @@ window.Viz = (function () {
       L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2], [xF - fs / 2 - 4, ys[0] - fs / 2], [xF - fs / 2 - 4, ys[K - 1] + fs / 2], [img.x + img.w / 2, img.y + img.h / 2]], label: '' });
       L.bandLabel = { x: (img.x + img.w / 2 + xF - fs / 2) / 2, y: 44, text: 'each filter slides over the image' };
       L.footnotes = [{ x: xF, text: 'filters' }, { x: xM, text: 'feature maps' }, { x: xP, text: 'pooled' }];
+      L.poolCaption = { x: xP, text: `each cell = largest of a ${conv.pool}×${conv.pool} block` };
       const F = net.featureCount;
       const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [530] : [495, 615];
       const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
@@ -345,6 +346,7 @@ window.Viz = (function () {
     for (const cap of L.captions) { ctx.textAlign = cap.align || 'center'; ctx.fillText(cap.text, cap.x, 10); }
     ctx.textAlign = 'center';
     if (L.footnotes) { ctx.font = monoFont; for (const f of L.footnotes) ctx.fillText(f.text, f.x, 25); }
+    if (L.poolCaption) { ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(L.poolCaption.text, L.poolCaption.x, NET_H - 16); ctx.textBaseline = 'top'; }
 
     // bands
     for (const b of L.bands) {
@@ -436,7 +438,7 @@ window.Viz = (function () {
           let maskBefore = null;
           if (anim) {
             if (n.kind === 'fmap') maskBefore = anim.phase === 'scan1' ? (n.k === 0 ? anim.pos : 0) : anim.phase === 'scan' ? (n.k === 0 ? side * side : anim.pos) : side * side;
-            else maskBefore = anim.phase === 'pool' ? anim.posP : (anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
+            else maskBefore = anim.phase === 'pool1' ? (n.k === 0 ? anim.posP : 0) : anim.phase === 'pool' ? (n.k === 0 ? side * side : anim.posP) : (anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
           }
           const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax, maskBefore });
           ctx.imageSmoothingEnabled = false;
@@ -450,11 +452,19 @@ window.Viz = (function () {
           const p = anim.pos - 1, py = Math.floor(p / side), px = p % side;
           ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
         }
-        if (anim && anim.phase === 'pool' && anim.posP > 0) {
+        if (anim && (anim.phase === 'pool1' || anim.phase === 'pool') && anim.posP > 0 && ((anim.phase === 'pool1' && n.k === 0) || (anim.phase === 'pool' && n.k > 0))) {
           const p = anim.posP - 1, py = Math.floor(p / net.po), px = p % net.po, bs = net.conv.pool;
           ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5;
           if (n.kind === 'fmap') ctx.strokeRect(n.x - n.size / 2 + px * bs * cs, n.y - n.size / 2 + py * bs * cs, bs * cs, bs * cs);
           else ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
+        }
+        // hover linkage: a feature-map pixel marks the pooled cell it feeds; a pooled cell marks its source block
+        if (!anim && m.hover && m.hover.ref && m.hover.i != null && m.hover.ref.k === n.k) {
+          const bs = net.conv.pool;
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5;
+          if (m.hover.ref.kind === 'fmap' && n.kind === 'pooled') { const px = Math.floor(m.hover.i / bs), py = Math.floor(m.hover.j / bs); ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2); }
+          if (m.hover.ref.kind === 'pooled' && n.kind === 'fmap') ctx.strokeRect(n.x - n.size / 2 + m.hover.i * bs * cs, n.y - n.size / 2 + m.hover.j * bs * cs, bs * cs, bs * cs);
+          if (m.hover.ref.kind === 'pooled' && n.kind === 'pooled') ctx.strokeRect(n.x - n.size / 2 + m.hover.i * cs - 1, n.y - n.size / 2 + m.hover.j * cs - 1, cs + 2, cs + 2);
         }
         if (n.kind === 'fmap' && hovered === n && m.hover && m.hover.i != null) {
           ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + m.hover.i * cs - 1, n.y - n.size / 2 + m.hover.j * cs - 1, cs + 2, cs + 2);
@@ -491,10 +501,11 @@ window.Viz = (function () {
       if (spot && img) {
         drawWindow(ctx, img, m.size, spot.oy, spot.ox, net.conv.f);
         drawConvPanel(ctx, m, spot.k, spot.oy, spot.ox, { x: 24, y: img.y + img.h / 2 + 40 });
-      } else if (m.anim && m.anim.phase === 'pool' && img) {
-        ctx.font = `500 11px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-        ctx.fillText(`max-pool: each ${net.conv.pool}×${net.conv.pool} block of a feature map`, 24, img.y + img.h / 2 + 40);
-        ctx.fillText('keeps only its largest value', 24, img.y + img.h / 2 + 54);
+      } else if (img) {
+        let cellSpot = null;
+        if (m.anim && (m.anim.phase === 'pool1' || m.anim.phase === 'pool') && m.anim.posP > 0) { const p = m.anim.posP - 1; cellSpot = { k: m.anim.phase === 'pool1' ? 0 : 1, py: Math.floor(p / net.po), px: p % net.po }; }
+        else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'pooled' && m.hover.i != null) cellSpot = { k: m.hover.ref.k, py: m.hover.j, px: m.hover.i };
+        if (cellSpot && fw && fw.conv) drawPoolPanel(ctx, m, cellSpot.k, cellSpot.py, cellSpot.px, { x: 24, y: img.y + img.h / 2 + 40 }, fmapMax);
       }
     }
     return L;
@@ -528,6 +539,33 @@ window.Viz = (function () {
     ctx.fillText(`ReLU → ${act.toFixed(2)}`, at.x, at.y + gw + 19);
     ctx.fillStyle = c.ink3;
     ctx.fillText(`→ map ${k + 1}, col ${ox}, row ${oy}`, at.x, at.y + gw + 32);
+  }
+  function drawPoolPanel(ctx, m, k, py, px, at, fmapMax) {
+    const c = colors(), net = m.net, fw = m.fw;
+    if (!fw || !fw.conv) return;
+    const bs = net.conv.pool, co = net.co, cell = 12, gw = bs * cell;
+    let best = -Infinity, bi = 0;
+    const vals = [];
+    for (let dy = 0; dy < bs; dy++) for (let dx = 0; dx < bs; dx++) { const v = fw.conv.act[(k * co + py * bs + dy) * co + px * bs + dx]; vals.push(v); if (v > best) { best = v; bi = vals.length - 1; } }
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
+    ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.fillText(`${bs}×${bs} block of map ${k + 1}`, at.x, at.y - 3); ctx.textAlign = 'center';
+    for (let i = 0; i < vals.length; i++) { ctx.fillStyle = sequential(Math.max(0, vals[i]) / Math.max(1e-9, fmapMax)); ctx.fillRect(at.x + (i % bs) * cell, at.y + Math.floor(i / bs) * cell, cell - 1, cell - 1); }
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(at.x - 0.5, at.y - 0.5, gw, gw);
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(at.x + (bi % bs) * cell - 1, at.y + Math.floor(bi / bs) * cell - 1, cell + 1, cell + 1);
+    // arrow and the pooled cell
+    const ax = at.x + gw + 10;
+    ctx.fillStyle = c.ink2; ctx.font = `500 11px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'middle';
+    ctx.fillText('max →', ax + 18, at.y + gw / 2);
+    const rx = ax + 44, rs = 24;
+    ctx.fillStyle = sequential(Math.max(0, best) / Math.max(1e-9, fmapMax)); ctx.fillRect(rx, at.y + gw / 2 - rs / 2, rs, rs);
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(rx, at.y + gw / 2 - rs / 2, rs, rs);
+    ctx.fillStyle = c.ink3; ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
+    ctx.fillText('pooled', rx + rs / 2, at.y + gw / 2 - rs / 2 - 3);
+    ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`largest of ${bs * bs} values = ${best.toFixed(2)}`, at.x, at.y + gw + 6);
+    ctx.fillStyle = c.ink3;
+    ctx.fillText(`→ pooled map ${k + 1}, col ${px}, row ${py}`, at.x, at.y + gw + 19);
+    ctx.fillText('the other 15 values are dropped', at.x, at.y + gw + 32);
   }
   function drawWindow(ctx, imgNode, size, oy, ox, f) {
     const c = colors();
@@ -576,8 +614,9 @@ window.Viz = (function () {
         return { kind: 'node', ref: n, i, j, text: `feature map ${n.k + 1} at column ${i}, row ${j}: ${fmtNum(fw.conv.act[(n.k * net.co + j) * net.co + i], 2)} · see the arithmetic under the image` };
       }
       if (n.kind === 'pooled' && inBox(n, 2)) {
-        const F = net.po * net.po;
-        return { kind: 'node', ref: n, text: `pooled map ${n.k + 1}: the largest response in each ${net.conv.pool}×${net.conv.pool} block (${net.po}×${net.po} = ${F} values to the next layer)` };
+        const i = Math.max(0, Math.min(net.po - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * net.po))), j = Math.max(0, Math.min(net.po - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * net.po)));
+        const v = fw && fw.conv ? ` = ${fmtNum(fw.conv.v[(n.k * net.po + j) * net.po + i], 2)}` : '';
+        return { kind: 'node', ref: n, i, j, text: `pooled map ${n.k + 1}, col ${i}, row ${j}${v}: the largest of the ${net.conv.pool}×${net.conv.pool} block outlined on feature map ${n.k + 1}` };
       }
     }
     let best = null, bestD = 6;
