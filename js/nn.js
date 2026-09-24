@@ -29,14 +29,8 @@
     relu:    { label: 'ReLU',    f: z => (z > 0 ? z : 0),        df: (z, a) => (z > 0 ? 1 : 0), signed: false },
   };
   const sigmoid = z => 1 / (1 + Math.exp(-z));
-  // Evaluate training loss from the logit: no epsilon changes the objective whose derivative is p − y.
-  const bce = (p, y) => (y === 0 ? 0 : -y * Math.log(p)) + (y === 1 ? 0 : -(1 - y) * Math.log1p(-p));
-  const bceFromLogit = (z, y) => Math.max(z, 0) - z * y + Math.log1p(Math.exp(-Math.abs(z)));
-  function parameterStep(before, gradient, lr, l2 = 0, bias = false) {
-    const decayGradient = bias ? 0 : l2 * before;
-    const after = before * (1 - lr * (bias ? 0 : l2)) - lr * gradient;
-    return { before, gradient, decayGradient, totalGradient: gradient + decayGradient, after, change: after - before };
-  }
+  const EPS = 1e-7;
+  const bce = (p, y) => -(y * Math.log(p + EPS) + (1 - y) * Math.log(1 - p + EPS));
 
   class Net {
     /*
@@ -129,9 +123,7 @@
         const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
         const dn = new Float64Array(fanIn);
         for (let j = 0; j < fanOut; j++) {
-          const slope = act.df(fw.pre[l][j], fw.a[l + 1][j]);
-          const dj = d[j] * slope;
-          if (g && g.upstream) { g.upstream[l][j] = d[j]; g.slopes[l][j] = slope; }
+          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]);
           if (g && g.delta) g.delta[l][j] = dj;
           if (dj === 0) continue;
           if (g) g.gb[l][j] += dj;
@@ -160,7 +152,7 @@
     // forward + backward for one case, adding its gradient into g; returns the case's loss
     accumulate(x, y, g, fw) {
       fw = fw || this.forward(x);
-      const loss = bceFromLogit(fw.z, y);
+      const loss = bce(fw.p, y);
       const d0 = this.backDense(fw, fw.p - y, g);
       if (this.conv) {
         const { K, f } = this.conv, size = this.size, co = this.co;
@@ -192,16 +184,13 @@
       this.applyGradient(g, n, lr, l2);
       return loss / n;
     }
-    // A read-only snapshot of one case. All chain-rule factors use the SAME pre-update parameters.
-    // upstream = dL/da; slopes = da/dz; delta = dL/dz. Apply g once with applyGradient(g, 1, lr, l2).
+    // one case's lesson, not yet applied: its forward pass, error (call − truth), the blame each hidden unit receives
+    // (g.delta[l][j] = d loss / d pre-activation) and the gradient of every weight. Apply with applyGradient(g, 1, lr, l2).
     lesson(x, y) {
       const g = this.newGradient(); g.delta = this.hidden.map(h => new Float64Array(h));
-      g.upstream = this.hidden.map(h => new Float64Array(h));
-      g.slopes = this.hidden.map(h => new Float64Array(h));
       const fw = this.forward(x);
       const loss = this.accumulate(x, y, g, fw);
-      const before = { W: this.W.map(w => w.slice()), b: this.b.map(b => b.slice()), Wo: this.Wo.slice(), bo: this.bo };
-      return { fw, error: fw.p - y, loss, g, before };
+      return { fw, error: fw.p - y, loss, g };
     }
 
     // d(score z)/d(input): how much each input nudges the score toward the positive class
@@ -227,7 +216,7 @@
       for (let k = 0; k < xs.length; k++) {
         const fw = this.forward(xs[k]);
         const p = fw.p;
-        probs[k] = p; loss += bceFromLogit(fw.z, ys[k]);
+        probs[k] = p; loss += bce(p, ys[k]);
         if (acts) acts[k] = fw.a[1];
         if ((p >= threshold ? 1 : 0) === ys[k]) correct++;
       }
@@ -272,7 +261,7 @@
     const rnd = mulberry32(11);
     const x = new Float64Array(net.D); for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1;
     const y = 1, eps = 1e-6;
-    const lossAt = () => bceFromLogit(net.forward(x).z, y);
+    const lossAt = () => bce(net.forward(x).p, y);
     // analytic gradient via one lr=1 step on a batch of one (new = old - grad), then restore
     const params = [...(net.conv ? [net.Wc, net.bc] : []), ...net.W, ...net.b, net.Wo];
     const before = params.map(p => Float64Array.from(p)); const bo = net.bo;
@@ -288,5 +277,5 @@
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, bceFromLogit, parameterStep, sigmoid, gradientCheck };
+  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck };
 });
