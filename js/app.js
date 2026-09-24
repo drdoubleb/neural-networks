@@ -105,7 +105,7 @@
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
-    pauseLesson(); S.lesson = null; S.lastLesson = null; renderLessonLine();
+    S.lesson = null; S.lastLesson = null; renderLessonLine();
     if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -170,115 +170,107 @@
     if (did) renderTraining(ended || S.kind === 'tabular');
     if (S.running) requestAnimationFrame(tick);
   }
-  // ------------------------------------------------------------------ one-case backpropagation walkthrough
-  // Navigation is read-only. Only the explicit Apply button changes the live model, once.
-  const BP = window.Backprop;
+  // ------------------------------------------------------------------ the lesson: one case teaches the network
+  // A walk-through of one gradient step on the selected training case, phase by phase: the forward pass, the error
+  // (call − truth), the blame flowing back to each hidden unit, the nudge every weight receives, and the same case
+  // again with its new call. The step is real training: a batch of one at the current learning rate.
+  const LESSON_MS = { forward: 1500, error: 2200, blame: 2600, blame2: 3400, nudge: 3200, after: 2200 };
+  function lessonPhases() {
+    const L = S.net.hidden.length;
+    const ph = [['forward', LESSON_MS.forward], ['error', LESSON_MS.error]];
+    if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
+    ph.push(['nudge', LESSON_MS.nudge], ['after', LESSON_MS.after]);
+    return ph;
+  }
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv && S.selected && S.selected.split === 'train'); }
   function updateTeachButton() {
     const b = $('btn-teach'); if (!b || !S.net) return;
     b.disabled = !canTeach() && !S.lesson;
-    b.textContent = S.lesson ? (S.lesson.applied ? 'Close walkthrough' : 'Cancel walkthrough') : 'Teach this case';
-    b.title = S.net.conv ? 'The walkthrough covers dense networks; convolution is not covered yet.'
-      : S.selected && S.selected.split !== 'train' ? 'Select a training case. Test cases cannot be taught.'
-      : 'Follow one case, then apply one update (T).';
-    $('btn-teach-next').title = 'The training case the network currently gets most wrong (N).';
-  }
-  function lessonContext() {
-    return { net: S.net, mode: S.mode, size: S.size, featureNames: S.inputs.featureNames || [], truthName: className(S.lesson.y), positiveName: posName() };
+    b.textContent = S.lesson ? 'Skip ▸' : 'Teach this case';
+    b.title = S.net.conv ? 'The walk-through covers dense networks: switch the convolution off'
+      : S.selected && S.selected.split !== 'train' ? `Pick a training ${noun(1)}: test ${noun(2)} are never taught`
+      : `Watch ${S.selected ? S.selected.name : 'this case'} teach the network one step (T)`;
+    $('btn-teach-next').title = 'the training case the network currently gets most wrong (N)';
   }
   function startLesson(s) {
     if (!s || s.split !== 'train' || !S.net || S.net.conv) return;
-    stopTraining(); endLesson();
+    stopTraining();
     if (S.selected !== s) selectSpecimen(s);
-    const x = S.inputs.xOf(s), y = s.label, res = S.net.lesson(x, y);
-    S.lesson = { s, x, y, res, phases: BP.phases(S.net.hidden), index: 0, phase: 'forward', frac: 1,
-      lr: S.lr, l2: S.l2, target: 'out:0', input: BP.bestInput(res, 'out:0', S.lr, S.l2),
-      pBefore: res.fw.p, pAfter: null, applied: false, playing: false, playbackRate: 1, raf: null,
-      trainLossBefore: S.trainEval.loss };
-    renderLessonLine(); renderTrainGraph(); updateTeachButton();
-  }
-  function pauseLesson() {
-    const les = S.lesson; if (!les) return;
-    les.playing = false; if (les.raf != null) cancelAnimationFrame(les.raf); les.raf = null;
-  }
-  function setLessonStep(index, autoplay = false) {
-    const les = S.lesson; if (!les) return;
-    if (!autoplay) pauseLesson();
-    // Never let autoplay or navigation apply an update, or visit its result before it exists.
-    const last = les.phases.length - (les.applied ? 1 : 2);
-    les.index = Math.max(0, Math.min(last, index));
-    const step = les.phases[les.index]; les.phase = step.phase; les.layer = step.layer;
-    les.frac = autoplay && !reducedMotion ? 0 : 1; les.t0 = performance.now();
-    if (les.phase === 'blame') {
-      const d = les.res.g.delta[les.layer]; let j = 0;
-      d.forEach((v, k) => { if (Math.abs(v) > Math.abs(d[j])) j = k; });
-      les.target = `${les.layer}:${j}`; les.input = BP.bestInput(les.res, les.target, les.lr, les.l2);
-    }
-    if (les.phase === 'nudge' || les.phase === 'after') pauseLesson();
-    renderLessonLine(); renderTrainGraph();
-  }
-  function toggleLessonPlayback() {
-    const les = S.lesson; if (!les) return;
-    if (les.playing) { pauseLesson(); renderLessonLine(); return; }
-    if (les.phase === 'nudge' || les.phase === 'after') setLessonStep(0);
-    les.playing = true; les.t0 = performance.now(); les.frac = reducedMotion ? 1 : 0;
-    renderLessonLine(); les.raf = requestAnimationFrame(lessonFrame);
-  }
-  function lessonFrame(now) {
-    const les = S.lesson; if (!les || !les.playing) return;
-    const duration = 5000 / les.playbackRate;
-    les.frac = reducedMotion ? 1 : Math.min(1, (now - les.t0) / duration);
-    renderTrainGraph();
-    if (now - les.t0 >= duration) setLessonStep(les.index + 1, true);
-    if (S.lesson === les && les.playing) les.raf = requestAnimationFrame(lessonFrame);
+    const x = S.inputs.xOf(s), y = s.label;
+    const res = S.net.lesson(x, y);
+    S.lastLesson = null;
+    S.lesson = { s, x, y, res, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, applied: false };
+    updateTeachButton(); renderLessonLine();
+    requestAnimationFrame(lessonFrame);
   }
   function applyLesson() {
-    const les = S.lesson; if (!les || les.applied || les.phase !== 'nudge') return;
-    pauseLesson(); S.prevW = les.res.before;
-    S.net.applyGradient(les.res.g, 1, les.lr, les.l2);
-    const fw = S.net.forward(les.x);
-    les.pAfter = fw.p; les.lossAfter = NN.bceFromLogit(fw.z, les.y); les.fwAfter = fw; les.applied = true;
-    if (S.test.results.size) clearTestResults(true);
-    evaluateAll(); les.trainLossAfter = S.trainEval.loss;
-    setLessonStep(les.phases.length - 1);
-    renderTraining(true); updateTeachButton();
-  }
-  function endLesson() {
     const les = S.lesson;
-    pauseLesson();
-    S.lastLesson = les && les.applied ? { s: les.s, calls: [les.pBefore, les.pAfter] } : null;
-    S.lesson = null;
+    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
+    S.net.applyGradient(les.res.g, 1, S.lr, S.l2);
+    les.pAfter = S.net.forward(les.x).p; les.applied = true;
+    if (S.test.results.size) clearTestResults(true);
+    evaluateAll(); renderStatus();
+  }
+  function lessonFrame(now) {
+    const les = S.lesson; if (!les) return;
+    const t = les.skip ? Infinity : now - les.t0;
+    let acc = 0, phase = null, frac = 1;
+    for (const [name, ms] of les.phases) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
+    if (!phase) {
+      if (!les.applied) applyLesson();
+      S.lastLesson = { s: les.s, calls: [les.pBefore, les.pAfter] };
+      S.lesson = null;
+      renderTraining(true); renderLessonLine(); updateTeachButton();
+      return;
+    }
+    if (phase === 'after' && !les.applied) applyLesson();
+    les.phase = phase; les.frac = frac;
+    renderTrainGraph(); renderLessonLine();
+    requestAnimationFrame(lessonFrame);
+  }
+  function endLesson() { // finish a running lesson at once (its step still counts) and clear the strip
+    const les = S.lesson;
+    if (les && !les.applied) applyLesson();
+    S.lesson = null; S.lastLesson = null;
     renderLessonLine(); updateTeachButton();
   }
   function lessonView() {
     const les = S.lesson; if (!les) return null;
     const g = les.res.g;
-    return { ...les, error: les.res.error, truthName: className(les.y), delta: g.delta, gW: g.gW, gWo: g.gWo,
-      before: les.res.before, fwBefore: les.res.fw };
+    return { phase: les.phase, frac: les.frac, error: les.res.error, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
   }
   function renderLessonLine() {
     const box = $('lesson'); if (!box) return;
     const les = S.lesson, last = S.lastLesson;
-    box.hidden = !les && !last; $('legend-lesson').hidden = !les;
-    $('lesson-controls').hidden = !les; $('lesson-steps').hidden = !les;
-    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !last || !!les;
-    if (!les) {
-      $('lesson-details').hidden = true;
-      $('lesson-caption').textContent = '';
-      $('lesson-text').textContent = last ? `${last.s.name} · truth ${className(last.s.label)} · ${last.calls.length - 1} update(s): ${fmtCalls(last.calls)}. Repeating one case can memorize it; evaluate unseen cases separately.` : '';
-      return;
+    if (!les && !last) { box.hidden = true; $('legend-lesson').hidden = true; return; }
+    box.hidden = false; $('legend-lesson').hidden = !les;
+    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !!les;
+    let html;
+    if (les) {
+      const n = les.phases.findIndex(p => p[0] === les.phase) + 1, total = les.phases.length;
+      const hidden = S.net.hidden.length, blame = hidden ? 'blame' : 'error';
+      const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
+      const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
+      const pair = les.pAfter == null ? `${p} → …` : fmtCalls([les.pBefore, les.pAfter]);
+      const texts = {
+        forward: `Forward pass: the network calls <b>${p}</b> (${esc(call)}). The truth is <b>${esc(className(les.y))}</b>.`,
+        error: `Error = call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
+        blame: hidden > 1
+          ? 'Back-propagation: the error flows back one layer at a time, shared out along the connections in proportion to their weights. A unit that was switched off gets no blame.'
+          : 'Back-propagation: the error is shared out to the hidden units in proportion to their weights to the output. A unit that was switched off gets no blame.',
+        nudge: allSilent
+          ? 'Every hidden unit was switched off for this case, so none of them learns from it: only the output bias moves. A ReLU unit that is off passes no blame back.'
+          : S.mode === 'pixels'
+          ? `Every weight moves by −learning rate × ${blame} × its input. On pixels that is a faint copy of the ${noun(1)} itself, added to ${hidden ? 'each weight map, scaled by that unit’s blame' : 'the weight map'} (orange = weight up, blue = weight down).`
+          : `Every weight moves by −learning rate × ${blame} × its input (orange = weight up, blue = weight down): large inputs get large nudges. Hover a connection for the arithmetic.`,
+        after: sure ? `The call was already right and sure, so the nudge is tiny: <b>${pair}</b>. Pick a case it gets wrong for a bigger lesson.` : `The same case again: <b>${pair}</b>. It learned a little.`,
+      };
+      html = `<span class="step">${n} / ${total}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
+    } else {
+      const calls = last.calls;
+      html = `<span class="step">✓</span> <span><b>${esc(last.s.name)}</b> (truth ${esc(className(last.s.label))}) taught ${calls.length - 1}×: ${fmtCalls(calls)}.${calls.length > 2 ? ' One case repeated is memorised; the next case will pull the weights its own way.' : ''}</span>`;
     }
-    $('lesson-text').textContent = `${les.s.name} · one training case · ${les.applied ? 'One update applied; earlier steps show the saved calculation' : 'Weights unchanged until Apply'} · η ${les.lr} · λ ${les.l2}`;
-    $('lesson-steps').innerHTML = les.phases.map((p, i) => `<button type="button" class="bp-step ${i === les.index ? 'is-current' : ''}" data-lesson-step="${i}" ${i === les.index ? 'aria-current="step"' : ''} ${p.phase === 'after' && !les.applied ? 'disabled' : ''}><span>${i + 1}</span>${p.title}</button>`).join('');
-    $('btn-lesson-back').disabled = les.index === 0;
-    $('btn-lesson-forward').disabled = les.phase === 'after' || (les.phase === 'nudge' && !les.applied);
-    $('btn-lesson-play').textContent = les.playing ? 'Pause' : les.phase === 'after' || les.phase === 'nudge' ? 'Replay steps' : 'Play steps';
-    $('btn-lesson-apply').hidden = les.phase !== 'nudge'; $('btn-lesson-apply').disabled = les.applied;
-    $('btn-lesson-apply').textContent = les.applied ? 'Update already applied' : 'Apply one update';
-    $('lesson-playback').value = les.playbackRate;
-    $('btn-lesson-close').textContent = les.applied ? 'Finish' : 'Cancel';
-    BP.render(les, lessonContext());
-    $('lesson-caption').textContent = BP.summary(les, lessonContext());
+    $('lesson-text').innerHTML = html;
   }
   function fmtCalls(calls) { const d = new Set(calls.map(v => v.toFixed(2))).size < calls.length ? 3 : 2; return calls.map(v => v.toFixed(d)).join(' → '); }
   function teachAgain(n) {
@@ -449,12 +441,7 @@
   function renderTrainGraph() {
     const cv = $('net-canvas');
     const m = graphModel(S.selected || null, 2, S.hover.train);
-    if (S.lesson) {
-      const les = S.lesson;
-      m.lesson = lessonView(); m.x = les.x; m.specimen = les.s;
-      m.fw = les.phase === 'after' ? les.fwAfter : les.res.fw;
-      if (les.phase !== 'after') { m.net = Object.assign(Object.create(Object.getPrototypeOf(S.net)), S.net, les.res.before); m.prev = null; }
-    }
+    if (S.lesson) m.lesson = lessonView();
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -595,7 +582,6 @@
 
   // ------------------------------------------------------------------ rendering: inspector
   function selectSpecimen(s, opts) {
-    if (S.lesson && S.lesson.s !== s) endLesson();
     S.selected = s;
     renderDataTrays();
     if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); }
@@ -782,36 +768,7 @@
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
-    $('btn-teach').addEventListener('click', () => { if (S.lesson) { endLesson(); renderTraining(true); } else startLesson(S.selected); });
-    $('btn-lesson-back').addEventListener('click', () => setLessonStep(S.lesson.index - 1));
-    $('btn-lesson-forward').addEventListener('click', () => setLessonStep(S.lesson.index + 1));
-    $('btn-lesson-play').addEventListener('click', toggleLessonPlayback);
-    $('btn-lesson-apply').addEventListener('click', applyLesson);
-    $('btn-lesson-close').addEventListener('click', () => { endLesson(); renderTraining(true); });
-    $('lesson-playback').addEventListener('change', () => { if (S.lesson) { S.lesson.playbackRate = +$('lesson-playback').value; S.lesson.t0 = performance.now(); } });
-    $('lesson-steps').addEventListener('click', ev => { const b = ev.target.closest('[data-lesson-step]'); if (b) setLessonStep(+b.dataset.lessonStep); });
-    const inspect = (target, input, focusId) => {
-      const les = S.lesson; if (!les) return;
-      pauseLesson(); les.target = target || les.target;
-      les.input = input == null ? BP.bestInput(les.res, les.target, les.lr, les.l2) : Math.max(0, Math.min(BP.targetInfo(les.res, les.target).input.length - 1, input));
-      renderLessonLine(); renderTrainGraph();
-      const focus = focusId && document.querySelector(focusId); if (focus) focus.focus({ preventScroll: true });
-    };
-    $('lesson-details').addEventListener('change', ev => {
-      if (ev.target.id === 'bp-target') inspect(ev.target.value, null, '#bp-target');
-      if (ev.target.id === 'bp-input') inspect(null, Math.floor(+ev.target.value || 1) - 1, '#bp-input');
-    });
-    $('lesson-details').addEventListener('click', ev => {
-      const unit = ev.target.closest('[data-bp-unit]'), input = ev.target.closest('[data-bp-input]'), map = ev.target.closest('[data-bp-map]');
-      if (unit) inspect(unit.dataset.bpUnit, null, `[data-bp-unit="${unit.dataset.bpUnit}"]`);
-      if (input) inspect(null, +input.dataset.bpInput, '#bp-input');
-      if (map) { const r = map.getBoundingClientRect(), col = Math.min(S.size - 1, Math.floor((ev.clientX - r.left) / r.width * S.size)), row = Math.min(S.size - 1, Math.floor((ev.clientY - r.top) / r.height * S.size)); inspect(null, row * S.size + col, `[data-bp-map="${map.dataset.bpMap}"]`); }
-    });
-    $('lesson-details').addEventListener('keydown', ev => {
-      if (!ev.target.matches('[data-bp-map]') || !S.lesson) return;
-      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -S.size, ArrowDown: S.size }[ev.key];
-      if (step) { ev.preventDefault(); ev.stopPropagation(); inspect(null, S.lesson.input + step, `[data-bp-map="${ev.target.dataset.bpMap}"]`); }
-    });
+    $('btn-teach').addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; else startLesson(S.selected); });
     $('btn-teach-again').addEventListener('click', () => teachAgain(10));
     $('btn-teach-next').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
@@ -863,29 +820,15 @@
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
       if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
-      if (key === 'train') cv.addEventListener('click', ev => {
-        if (!S.lesson || !['blame', 'gradient', 'nudge', 'after'].includes(S.lesson.phase)) return;
-        const r = cv.getBoundingClientRect(), hit = Viz.hitNetwork(cv, ev.clientX - r.left, ev.clientY - r.top, cv._model);
-        if (!hit) return;
-        const ref = hit.ref;
-        if (hit.kind === 'edge' && ref.wi != null) inspect(ref.layer === 'out' ? 'out:0' : `${ref.layer}:${ref.ti}`, ref.fi);
-        else if (ref.kind === 'output' || ref.kind === 'map') inspect('out:0', hit.pixelIndex);
-        else if (['unit', 'square', 'uprod'].includes(ref.kind)) inspect(`${ref.l || 0}:${ref.j}`, hit.pixelIndex);
-      });
+      if (key === 'train') cv.addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; });
     }
     document.addEventListener('keydown', ev => {
       if (ev.target.matches('input, select, textarea')) return;
-      if (S.lesson && S.stage === 'train') {
-        if (ev.key === ' ' && !ev.target.matches('button')) { ev.preventDefault(); toggleLessonPlayback(); return; }
-        if (['ArrowRight', 'n', 'N', 't', 'T'].includes(ev.key)) { ev.preventDefault(); setLessonStep(S.lesson.index + 1); return; }
-        if (ev.key === 'ArrowLeft') { ev.preventDefault(); setLessonStep(S.lesson.index - 1); return; }
-        if (ev.key === 'Escape') { endLesson(); renderTraining(true); return; }
-      }
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lastLesson) teachNext(); }
-      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (canTeach()) startLesson(S.selected); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (S.lastLesson) teachNext(); }
+      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (canTeach()) startLesson(S.selected); }
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
     window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
@@ -895,12 +838,10 @@
     const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
-    if (S.lesson) renderLessonLine();
     if (S.stage === 'train') { renderTrainGraph(); renderProfile(true); } if (S.stage === 'test') renderTestGraph();
     renderInspector();
   }
   function showStage(name) {
-    if (S.lesson && name !== 'train') endLesson();
     S.stage = name;
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test';
@@ -912,7 +853,6 @@
       renderTestGraph(); renderInspector(); renderDataTrays();
       if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then map 1 is pooled block by block and the other maps follow. Press N or click the diagram to skip ahead.';
     }
-    updateTeachButton();
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
 

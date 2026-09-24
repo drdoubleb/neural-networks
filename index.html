@@ -132,18 +132,7 @@
           <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
         <div class="lesson" id="lesson" hidden>
-          <span id="lesson-text" role="status" aria-live="polite"></span>
-          <div id="lesson-steps" class="bp-steps" aria-label="Backpropagation steps"></div>
-          <div id="lesson-controls" class="bp-controls">
-            <button type="button" class="btn" id="btn-lesson-back">← Back</button>
-            <button type="button" class="btn" id="btn-lesson-play">Play steps</button>
-            <label>Playback <select id="lesson-playback"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
-            <button type="button" class="btn" id="btn-lesson-forward">Next →</button>
-            <button type="button" class="btn primary" id="btn-lesson-apply" hidden>Apply one update</button>
-            <button type="button" class="btn" id="btn-lesson-close">Cancel</button>
-            <span class="small muted">← → steps · space play/pause · Esc close</span>
-          </div>
-          <p id="lesson-caption" class="bp-caption" aria-live="polite"></p>
+          <span id="lesson-text"></span>
           <span class="lesson-actions"><button type="button" class="btn" id="btn-teach-again" hidden>Teach it 10× more</button><button type="button" class="btn" id="btn-teach-next" hidden>Worst case next ▸</button></span>
         </div>
         <div class="net-wrap">
@@ -157,9 +146,8 @@
           <span>at the output, positive pushes toward <b data-cls="1"></b></span>
           <span>node fill = value flowing through it for this case</span>
           <span id="legend-conv" hidden>filters are 5×5 stencils slid over the image; a feature map lights up (violet) where the image matches the stencil</span>
-          <span id="legend-lesson" hidden>walkthrough: violet arrows follow the current calculation; δ = loss gradient at a unit’s score; update glows = total weight change (orange ↑, blue ↓). Inspect the numbers below.</span>
+          <span id="legend-lesson" hidden>during a lesson: violet dots carry the error back, pills show each unit’s blame, glows show each weight’s nudge (orange up, blue down)</span>
         </div>
-        <section id="lesson-details" class="bp-details" aria-label="Backpropagation calculation" hidden></section>
       </div>
 
       <div class="card" id="scorecard" hidden>
@@ -317,7 +305,6 @@
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>
-<script src="js/backprop.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
