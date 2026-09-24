@@ -14,13 +14,14 @@
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
-    trainEval: null, testEval: null, profileAt: 0,
+    trainEval: null, testEval: null, profileAt: 0, prevW: null, applyingRecipe: false,
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
     test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
     hover: { train: null, test: null },
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
+  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Enlargement · pixels · single layer', '④ Irregularity · pixels · single layer', '⑤ Irregularity · measurements · single layer', '⑥ Irregularity · pixels · 8 ReLU + augmentation', '⑦ Irregularity · pixels · 8 + 8 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 8 ReLU + augmentation'];
   const RECIPES = {
     1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -66,7 +67,7 @@
     $('task-title').textContent = S.task.title;
     $('task-blurb').textContent = S.task.blurb;
     $('meta-line').textContent = `${S.ds.specimens.length} synthetic ${noun(2)} · ${S.ds.train.length} training / ${S.ds.test.length} test${S.size ? ` · ${S.size} × ${S.size} px` : ''} · seed ${raw.meta.seed}`;
-    document.querySelectorAll('#task-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.task === id));
+    $('question-select').value = id;
     document.querySelectorAll('[data-cls="0"]').forEach(el => { el.textContent = negName(); });
     document.querySelectorAll('[data-cls="1"]').forEach(el => { el.textContent = posName(); });
     document.querySelectorAll('[data-cls-called="0"]').forEach(el => { el.textContent = `called ${negName()}`; });
@@ -86,8 +87,6 @@
       enlargement: 'Area against darkness separates the classes with a straight line; solidity against contour roughness is now the decoy pair.',
       irregularity: 'Try the decoys, area against darkness, then solidity against contour roughness. A single straight line separates the classes on the second pair; that is what a one-layer network has to find.',
     }[id] || '';
-    $('train-task').textContent = S.task.title;
-    $('test-task').textContent = S.task.title;
     $('mode-pixels').disabled = S.kind === 'tabular';
     $('mode-pixels').title = S.kind === 'tabular' ? 'Blood counts have no pixels' : '';
     renderInputPicker();
@@ -103,7 +102,8 @@
     const conv = S.kind === 'image' && S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
-    S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set();
+    S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
+    if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
     clearTestResults(false);
@@ -129,6 +129,7 @@
     if (S.ptr === 0) shuffleOrder();
     const end = Math.min(n, S.ptr + S.batch);
     const idx = S.order.slice(S.ptr, end);
+    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
     S.net.trainBatch(idx.map(i => X[i]), idx.map(i => Y[i]), S.lr, S.l2);
     S.lastBatch = new Set(idx.map(i => S.inputs.trainOwner[i]));
     S.ptr = end >= n ? 0 : end;
@@ -306,7 +307,7 @@
       fw = S.net.forward(x);
       if (!allowed) { fw = null; stage = 0; }
     }
-    return { net: S.net, mode: S.mode, x, fw, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
+    return { net: S.net, mode: S.mode, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
@@ -532,8 +533,6 @@
 
   // ------------------------------------------------------------------ controls
   function renderInputPicker() {
-    const wrap = $('picker-wrap');
-    wrap.hidden = S.mode !== 'features';
     $('input-picker').innerHTML = S.featureDefs.map(f => `<label class="${S.excluded.has(f.key) ? 'off' : ''}"><input type="checkbox" data-key="${esc(f.key)}" ${S.excluded.has(f.key) ? '' : 'checked'}> ${esc(f.name)}</label>`).join('');
     $('input-picker').querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
       const key = cb.dataset.key;
@@ -544,7 +543,18 @@
       resetModel(cb.checked ? `${name} restored — fresh random weights.` : `${name} withheld from the network — fresh random weights.`);
     }));
   }
+  function applyVisibility() {
+    const tabular = S.kind === 'tabular', pixels = S.mode === 'pixels';
+    $('mode-wrap').hidden = tabular;
+    $('conv-wrap').hidden = !pixels;
+    $('augment-wrap').hidden = !pixels;
+    $('picker-wrap').hidden = pixels;
+    $('tint-wrap').hidden = tabular;
+    $('prevalence-card').hidden = !tabular;
+    $('legend-conv').hidden = !(pixels && S.convK > 0);
+  }
   function syncControls() {
+    applyVisibility();
     document.querySelectorAll('#mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === S.mode));
     $('hidden').value = S.h1; $('hidden-val').textContent = S.h1 === 0 ? 'none' : S.h1;
     $('hidden2').value = S.h2; $('hidden2-val').textContent = S.h1 === 0 ? '–' : (S.h2 === 0 ? 'none' : S.h2); $('hidden2').disabled = S.h1 === 0;
@@ -565,14 +575,15 @@
     renderInputPicker();
   }
   function bindControls() {
-    document.querySelectorAll('#task-seg button').forEach(b => b.addEventListener('click', () => {
-      if (S.taskId === b.dataset.task) return;
-      loadTask(b.dataset.task);
+    $('question-select').addEventListener('change', () => {
+      const id = $('question-select').value;
+      if (S.taskId === id) return;
+      loadTask(id);
       if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
       syncControls();
       resetModel(`Question changed to “${S.task.title}” — new ${noun(2)}, fresh random weights.`);
       renderDataTrays(); renderScatter(); renderInspector();
-    }));
+    });
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode || b.disabled) return;
       S.mode = b.dataset.mode;
@@ -597,16 +608,21 @@
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
-    document.querySelectorAll('.recipe').forEach(b => b.addEventListener('click', () => {
-      const { task: taskId, ...settings } = RECIPES[b.dataset.recipe];
+    $('recipe-select').addEventListener('change', () => {
+      const k = $('recipe-select').value; if (!k) return;
+      const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
       Object.assign(S, settings);
       S.excluded = new Set();
+      S.applyingRecipe = true;
       syncControls();
-      resetModel(`Recipe loaded: ${b.textContent.trim()}${switchTask ? ` (question switched to “${S.task.title}”)` : ''}. Press Train.`);
+      resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
+      S.applyingRecipe = false;
+      $('recipe-select').value = k;
       if (switchTask) { renderDataTrays(); renderScatter(); renderInspector(); }
-    }));
+      if (S.stage !== 'train') showStage('train');
+    });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
@@ -671,7 +687,8 @@
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
-    $('task-seg').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<button type="button" data-task="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</button>`).join('');
+    $('question-select').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<option value="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</option>`).join('');
+    $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
     bindControls();
     loadTask(S.taskId);
     syncControls();

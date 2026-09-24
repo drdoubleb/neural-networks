@@ -352,3 +352,42 @@ table.feat td.ref { font-family: var(--font-mono); color: var(--ink-3); white-sp
 table.feat tr.off td { color: var(--ink-3); }
 table.feat tr.off td.name { text-decoration: line-through; }
 body[data-kind="tabular"] .toggle.tint { display: none; }
+
+/* ---------- condensed layout: masthead selects, bars, advanced drawer, compact metrics ---------- */
+.masthead { padding-block: 12px 10px; margin-bottom: 14px; gap: 10px 20px; }
+h1 { font-size: clamp(22px, 2.4vw, 28px); }
+.tagline { font-size: 14px; }
+.mh-selects { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+.mh-select { display: grid; gap: 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.mh-select select { font: inherit; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--ink); padding: 6px 30px 6px 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface); max-width: 320px; }
+.mh-select select#recipe-select { color: var(--accent); }
+.card.bar { padding: 12px 16px; }
+.bar-row { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-end; }
+.bar-row .ctl { min-width: 150px; }
+.bar-row .ctl.slim { min-width: 170px; max-width: 220px; }
+.actions-inline { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-left: auto; }
+.btn.primary.big { padding: 9px 18px; }
+.card.bar .status { margin-top: 8px; }
+details.advanced { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 6px; }
+details.advanced > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ink-2); list-style: none; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; padding: 4px 0; }
+details.advanced > summary::-webkit-details-marker { display: none; }
+details.advanced > summary::before { content: "▸"; color: var(--accent); font-size: 12px; }
+details.advanced[open] > summary::before { content: "▾"; }
+details.advanced[open] > summary .muted { display: none; }
+details.advanced > .controls { margin-top: 10px; }
+label.plainlabel { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 500; color: var(--ink); }
+details.fold { margin-top: 8px; }
+details.fold > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+details.fold > ul { margin-top: 8px; }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.metric { display: grid; gap: 0; min-width: 76px; }
+.metric .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; }
+.metric b { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.1; }
+.metric small { font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); white-space: nowrap; }
+.confusion.small { grid-template-columns: auto 44px 44px; gap: 3px; }
+.confusion.small .cell { padding: 3px 2px; font-size: 13px; }
+.confusion.small .hd, .confusion.small .rh { font-size: 9px; letter-spacing: 0.04em; }
+@media (max-width: 1099px) { .actions-inline { margin-left: 0; } }
+@media (max-width: 1500px) { .tagline { display: none; } .brand { flex: 0 1 auto; } .mh-select select { max-width: 250px; } }
+.confusion.small { grid-template-columns: auto 62px 62px; }
+.confusion.small .hd { font-size: 9px; line-height: 1.15; }

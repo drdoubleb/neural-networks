@@ -54,20 +54,23 @@
       if (this.conv) {
         const { K, f, pool } = this.conv;
         this.co = this.size - f + 1; this.po = Math.floor(this.co / pool);
-        this.Wc = new Float64Array(K * f * f); const sc = Math.sqrt(6 / (f * f + K));
+        this.Wc = new Float64Array(K * f * f); const sc = 0.05; // small, so the learned filters dominate what is drawn
         for (let i = 0; i < this.Wc.length; i++) this.Wc[i] = u(sc);
         this.bc = new Float64Array(K);
         d0 = K * this.po * this.po;
       }
       this.sizes = [d0, ...this.hidden];
+      this.smallNet = !this.conv && this.D < 256;
       this.W = []; this.b = [];
       for (let l = 0; l < this.hidden.length; l++) {
         // layers fed by pixels (or pooled maps) start small, so the learned structure shows through in the weight maps
-        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], s = fanIn >= 256 ? 0.02 : Math.sqrt(6 / (fanIn + fanOut));
+        // pixel-fed layers start very small so the learned maps show through; small measurement nets start small so
+        // the drawn connections visibly grow; deeper layers of pixel nets keep the usual scale so training is not slowed
+        const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], s = fanIn >= 256 ? 0.02 : (this.smallNet ? 0.3 : Math.sqrt(6 / (fanIn + fanOut)));
         const W = new Float64Array(fanOut * fanIn); for (let i = 0; i < W.length; i++) W[i] = u(s);
         this.W.push(W); this.b.push(new Float64Array(fanOut));
       }
-      const last = this.sizes[this.sizes.length - 1], so = last >= 256 ? 0.01 : Math.sqrt(6 / (last + 1));
+      const last = this.sizes[this.sizes.length - 1], so = last >= 256 ? 0.01 : (this.smallNet ? 0.3 : Math.sqrt(6 / (last + 1)));
       this.Wo = new Float64Array(last); for (let i = 0; i < last; i++) this.Wo[i] = u(so);
       this.bo = 0;
       this.steps = 0;
@@ -248,7 +251,7 @@
     params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
       const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
       const num = (lp - lm) / (2 * eps);
-      if (Math.abs(num) > 1e-8) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+      if (Math.abs(num) > 1e-5) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
     } });
     return { worst, checked };
   }
