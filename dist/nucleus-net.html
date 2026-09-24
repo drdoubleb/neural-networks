@@ -407,6 +407,66 @@ details.fold > ul { margin-top: 8px; }
 .confusion.small { grid-template-columns: auto 62px 62px; }
 .confusion.small .hd { font-size: 9px; line-height: 1.15; }
 
+/* Backpropagation: paced steps, signed arithmetic, and linked parameter maps. */
+.lesson { display: block; padding: 12px; font-size: 14px; }
+.lesson .lesson-actions { margin-top: 8px; }
+.bp-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.bp-step { display: flex; align-items: center; gap: 6px; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink-2); background: var(--surface); cursor: pointer; font: inherit; font-size: 12px; }
+.bp-step span { font-family: var(--font-mono); font-weight: 700; }
+.bp-step.is-current { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.bp-step:disabled { opacity: .5; cursor: default; }
+.bp-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lesson .bp-controls .btn { font-size: 13px; padding: 7px 10px; min-height: 34px; }
+.bp-controls label { font-size: 12px; }
+.bp-caption { margin: 12px 0 0; font-size: 14px; line-height: 1.6; color: var(--ink); }
+.bp-controls select, .bp-inspect-controls select, .bp-inspect-controls input { background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); padding: 6px; border-radius: 6px; font: inherit; max-width: 100%; }
+.bp-details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.bp-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 20px; }
+.bp-metrics > div { background: var(--surface-2); border-radius: 8px; padding: 12px; }
+.bp-metrics span, .bp-factors span { display: block; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+.bp-metrics b { font-size: 17px; overflow-wrap: anywhere; }
+.bp-explanation h3 { font-size: 20px; text-transform: none; letter-spacing: 0; color: var(--ink); }
+.bp-explanation p { margin: 10px 0; }
+.bp-equation { background: var(--accent-soft); color: var(--ink); border-radius: 7px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; line-height: 1.8; }
+.bp-number { font-family: var(--font-mono); font-weight: 600; color: var(--accent); white-space: nowrap; }
+.bp-inspector { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.bp-inspect-controls { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+.bp-inspect-controls label { display: flex; flex-direction: column; gap: 6px; flex: 1 1 180px; min-width: 0; color: var(--ink-2); font-size: 13px; }
+.bp-table-wrap { overflow-x: auto; margin: 10px 0; }
+.bp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.bp-table caption { text-align: left; font-size: 12px; color: var(--ink-2); padding-bottom: 8px; }
+.bp-table th, .bp-table td { text-align: right; border-bottom: 1px solid var(--line); padding: 9px 8px; }
+.bp-table td { font-family: var(--font-mono); white-space: nowrap; }
+.bp-table th:first-child { text-align: left; }
+.bp-table thead th { color: var(--ink-2); font-weight: 600; font-size: 11px; }
+.bp-table .is-selected { background: var(--accent-soft); }
+.bp-table button { color: var(--accent); background: none; border: 0; font: inherit; font-weight: 600; text-align: left; cursor: pointer; padding: 4px 0; text-decoration: underline; text-underline-offset: 3px; }
+.bp-factors { display: flex; align-items: center; gap: 10px; }
+.bp-factors > div { flex: 1; min-width: 0; background: var(--surface-2); border-radius: 7px; padding: 12px; }
+.bp-factors b { font: 600 18px var(--font-mono); overflow-wrap: anywhere; }
+.bp-factors i { font-size: 20px; color: var(--accent); }
+.bp-up { color: var(--irregular); }
+.bp-down { color: var(--regular); }
+.bp-all summary { cursor: pointer; color: var(--accent); font-weight: 600; padding: 8px 0; }
+.bp-map-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.bp-map-grid figure { margin: 0; padding: 10px; background: var(--surface-2); border-radius: 8px; min-width: 0; }
+.bp-map-grid figcaption { font-size: 12px; font-weight: 600; min-height: 3em; }
+.bp-map-grid canvas { width: 100%; max-width: 192px; aspect-ratio: 1; display: block; image-rendering: pixelated; margin: 8px auto; cursor: crosshair; border: 1px solid var(--line-strong); }
+.bp-map-grid canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.bp-map-grid .small { display: block; font: 11px/1.6 var(--font-mono); overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .bp-table-wrap::before { content: "Swipe across the table to see every column →"; display: block; position: sticky; left: 0; color: var(--ink-2); font-size: 11px; margin-bottom: 6px; }
+  .bp-metrics { grid-template-columns: 1fr; }
+  .bp-metrics > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .bp-metrics span { margin: 0; }
+  .bp-metrics b { font-size: 14px; }
+  .bp-factors { flex-wrap: wrap; }
+  .bp-factors > div { flex-basis: 100%; }
+  .bp-factors i { display: none; }
+  .bp-map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bp-step { flex: 1 1 120px; }
+}
+
 </style>
 </head>
 <body>
@@ -531,7 +591,18 @@ details.fold > ul { margin-top: 8px; }
           <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
         <div class="lesson" id="lesson" hidden>
-          <span id="lesson-text"></span>
+          <span id="lesson-text" role="status" aria-live="polite"></span>
+          <div id="lesson-steps" class="bp-steps" aria-label="Backpropagation steps"></div>
+          <div id="lesson-controls" class="bp-controls">
+            <button type="button" class="btn" id="btn-lesson-back">← Back</button>
+            <button type="button" class="btn" id="btn-lesson-play">Play steps</button>
+            <label>Playback <select id="lesson-playback"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label>
+            <button type="button" class="btn" id="btn-lesson-forward">Next →</button>
+            <button type="button" class="btn primary" id="btn-lesson-apply" hidden>Apply one update</button>
+            <button type="button" class="btn" id="btn-lesson-close">Cancel</button>
+            <span class="small muted">← → steps · space play/pause · Esc close</span>
+          </div>
+          <p id="lesson-caption" class="bp-caption" aria-live="polite"></p>
           <span class="lesson-actions"><button type="button" class="btn" id="btn-teach-again" hidden>Teach it 10× more</button><button type="button" class="btn" id="btn-teach-next" hidden>Worst case next ▸</button></span>
         </div>
         <div class="net-wrap">
@@ -545,8 +616,9 @@ details.fold > ul { margin-top: 8px; }
           <span>at the output, positive pushes toward <b data-cls="1"></b></span>
           <span>node fill = value flowing through it for this case</span>
           <span id="legend-conv" hidden>filters are 5×5 stencils slid over the image; a feature map lights up (violet) where the image matches the stencil</span>
-          <span id="legend-lesson" hidden>during a lesson: violet dots carry the error back, pills show each unit’s blame, glows show each weight’s nudge (orange up, blue down)</span>
+          <span id="legend-lesson" hidden>walkthrough: violet arrows follow the current calculation; δ = loss gradient at a unit’s score; update glows = total weight change (orange ↑, blue ↓). Inspect the numbers below.</span>
         </div>
+        <section id="lesson-details" class="bp-details" aria-label="Backpropagation calculation" hidden></section>
       </div>
 
       <div class="card" id="scorecard" hidden>
@@ -991,8 +1063,14 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
     relu:    { label: 'ReLU',    f: z => (z > 0 ? z : 0),        df: (z, a) => (z > 0 ? 1 : 0), signed: false },
   };
   const sigmoid = z => 1 / (1 + Math.exp(-z));
-  const EPS = 1e-7;
-  const bce = (p, y) => -(y * Math.log(p + EPS) + (1 - y) * Math.log(1 - p + EPS));
+  // Evaluate training loss from the logit: no epsilon changes the objective whose derivative is p − y.
+  const bce = (p, y) => (y === 0 ? 0 : -y * Math.log(p)) + (y === 1 ? 0 : -(1 - y) * Math.log1p(-p));
+  const bceFromLogit = (z, y) => Math.max(z, 0) - z * y + Math.log1p(Math.exp(-Math.abs(z)));
+  function parameterStep(before, gradient, lr, l2 = 0, bias = false) {
+    const decayGradient = bias ? 0 : l2 * before;
+    const after = before * (1 - lr * (bias ? 0 : l2)) - lr * gradient;
+    return { before, gradient, decayGradient, totalGradient: gradient + decayGradient, after, change: after - before };
+  }
 
   class Net {
     /*
@@ -1085,7 +1163,9 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
         const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
         const dn = new Float64Array(fanIn);
         for (let j = 0; j < fanOut; j++) {
-          const dj = d[j] * act.df(fw.pre[l][j], fw.a[l + 1][j]);
+          const slope = act.df(fw.pre[l][j], fw.a[l + 1][j]);
+          const dj = d[j] * slope;
+          if (g && g.upstream) { g.upstream[l][j] = d[j]; g.slopes[l][j] = slope; }
           if (g && g.delta) g.delta[l][j] = dj;
           if (dj === 0) continue;
           if (g) g.gb[l][j] += dj;
@@ -1114,7 +1194,7 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
     // forward + backward for one case, adding its gradient into g; returns the case's loss
     accumulate(x, y, g, fw) {
       fw = fw || this.forward(x);
-      const loss = bce(fw.p, y);
+      const loss = bceFromLogit(fw.z, y);
       const d0 = this.backDense(fw, fw.p - y, g);
       if (this.conv) {
         const { K, f } = this.conv, size = this.size, co = this.co;
@@ -1146,13 +1226,16 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
       this.applyGradient(g, n, lr, l2);
       return loss / n;
     }
-    // one case's lesson, not yet applied: its forward pass, error (call − truth), the blame each hidden unit receives
-    // (g.delta[l][j] = d loss / d pre-activation) and the gradient of every weight. Apply with applyGradient(g, 1, lr, l2).
+    // A read-only snapshot of one case. All chain-rule factors use the SAME pre-update parameters.
+    // upstream = dL/da; slopes = da/dz; delta = dL/dz. Apply g once with applyGradient(g, 1, lr, l2).
     lesson(x, y) {
       const g = this.newGradient(); g.delta = this.hidden.map(h => new Float64Array(h));
+      g.upstream = this.hidden.map(h => new Float64Array(h));
+      g.slopes = this.hidden.map(h => new Float64Array(h));
       const fw = this.forward(x);
       const loss = this.accumulate(x, y, g, fw);
-      return { fw, error: fw.p - y, loss, g };
+      const before = { W: this.W.map(w => w.slice()), b: this.b.map(b => b.slice()), Wo: this.Wo.slice(), bo: this.bo };
+      return { fw, error: fw.p - y, loss, g, before };
     }
 
     // d(score z)/d(input): how much each input nudges the score toward the positive class
@@ -1178,7 +1261,7 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
       for (let k = 0; k < xs.length; k++) {
         const fw = this.forward(xs[k]);
         const p = fw.p;
-        probs[k] = p; loss += bce(p, ys[k]);
+        probs[k] = p; loss += bceFromLogit(fw.z, ys[k]);
         if (acts) acts[k] = fw.a[1];
         if ((p >= threshold ? 1 : 0) === ys[k]) correct++;
       }
@@ -1223,7 +1306,7 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
     const rnd = mulberry32(11);
     const x = new Float64Array(net.D); for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1;
     const y = 1, eps = 1e-6;
-    const lossAt = () => bce(net.forward(x).p, y);
+    const lossAt = () => bceFromLogit(net.forward(x).z, y);
     // analytic gradient via one lr=1 step on a batch of one (new = old - grad), then restore
     const params = [...(net.conv ? [net.Wc, net.bc] : []), ...net.W, ...net.b, net.Wo];
     const before = params.map(p => Float64Array.from(p)); const bo = net.bo;
@@ -1239,7 +1322,7 @@ window.LECTURE_TASKS["irregularity"] = {"meta":{"generated":"2026-09-24","seed":
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck };
+  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, bceFromLogit, parameterStep, sigmoid, gradientCheck };
 });
 
 </script>
@@ -1866,91 +1949,80 @@ window.Viz = (function () {
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
 
-  // The lesson walk-through: one case's error, the blame each hidden unit receives, and the nudge every weight gets.
-  // m.lesson = { phase: forward | error | blame | nudge | after, frac (0..1 within the phase), error (call − truth),
-  //   y, truthName, pBefore, pAfter, delta[l][j] (d loss / d pre-activation of each hidden unit), gW, gWo, lr, fwBefore }
+  // The overlay uses the frozen forward pass and gradients. The ordinary graph still shows weights/activations.
+  // Only update glows encode parameter changes; backprop arrows encode weighted downstream gradients.
   function drawLesson(ctx, L, m) {
     const les = m.lesson, c = colors(), net = m.net, out = L.output;
-    const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
-    const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-    const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
-    const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
-    const truthCol = les.y ? c.irregular : c.regular;
-    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
-    if (les.phase === 'forward') return;
-    // call against truth on a 0..1 scale beside the output; the gap between them is the error
-    const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
-    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
-    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
-    const ty = yOf(les.y);
-    const pv = les.phase === 'after' && les.pAfter != null ? les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, les.frac)) : les.pBefore;
-    ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
-    ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
-    ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
-    ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
-    if (les.phase === 'after' && les.pAfter != null) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 74); }
-    if (les.phase === 'error') return;
-
-    // blame flows back one layer at a time: violet dots run from each target back to its source, then every unit
-    // shows its share of the error (d loss / d pre-activation); a unit that was switched off gets none
+    const backward = les.phase === 'blame', updating = les.phase === 'nudge';
+    const after = les.phase === 'after', phaseIndex = les.index;
     const nL = net.hidden.length;
-    if (nL) {
-      const prog = les.phase === 'blame' ? les.frac * nL : nL;
-      for (let k = 0; k < nL; k++) {
-        const l = nL - 1 - k, t = Math.min(1, prog - k);
-        if (t <= 0) continue;
-        const key = l === nL - 1 ? 'out' : l + 1;  // the connections that leave layer l
-        if (t < 1) {
-          ctx.fillStyle = c.accent;
-          for (const e of L.edges) { if (e.layer !== key) continue; const x = e.x2 + (e.x1 - e.x2) * t, y = e.y2 + (e.y1 - e.y2) * t; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
-        } else {
-          L.unitColumns[l].forEach((u, j) => {
-            const d = les.delta[l][j];
-            const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 7;
-            pill(ctx, px, py, d === 0 ? 'no blame' : `blame ${fmtSigned(d, 2)}`, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
-          });
+    const arrow = (e, reverse, alpha, moving) => {
+      const ax = reverse ? e.x2 : e.x1, ay = reverse ? e.y2 : e.y1;
+      const bx = reverse ? e.x1 : e.x2, by = reverse ? e.y1 : e.y2;
+      const angle = Math.atan2(by - ay, bx - ax), length = Math.hypot(bx - ax, by - ay);
+      if (length < 1) return;
+      ctx.strokeStyle = rgbStr(c.rgb.accent, alpha); ctx.fillStyle = rgbStr(c.rgb.accent, alpha); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      const tx = ax + (bx - ax) * 0.8, ty = ay + (by - ay) * 0.8;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - 9 * Math.cos(angle - 0.45), ty - 9 * Math.sin(angle - 0.45)); ctx.lineTo(tx - 9 * Math.cos(angle + 0.45), ty - 9 * Math.sin(angle + 0.45)); ctx.closePath(); ctx.fill();
+      if (moving && les.playing && les.frac < 1) { const t = (les.frac * 2) % 1; ctx.beginPath(); ctx.arc(ax + (bx - ax) * t, ay + (by - ay) * t, 4, 0, Math.PI * 2); ctx.fill(); }
+    };
+    if (les.phase === 'forward') {
+      for (const e of L.edges) arrow(e, false, 0.45, true);
+    }
+    if (backward) {
+      const key = les.layer === nL - 1 ? 'out' : les.layer + 1;
+      const paths = L.edges.filter(e => e.layer === key);
+      const contribution = e => e.w * (key === 'out' ? les.error : les.delta[key][e.ti]);
+      const max = Math.max(1e-12, ...paths.map(e => Math.abs(contribution(e))));
+      for (const e of paths) { const rel = Math.abs(contribution(e)) / max; arrow(e, true, rel ? 0.35 + 0.65 * rel : 0.12, rel > 0); }
+    }
+    if (updating) {
+      const change = e => {
+        if (e.wi == null || e.layer === 'sum') return 0;
+        const w = e.layer === 'out' ? les.before.Wo[e.wi] : les.before.W[e.layer][e.wi];
+        const g = e.layer === 'out' ? les.gWo[e.wi] : les.gW[e.layer][e.wi];
+        return -les.lr * (g + les.l2 * w);
+      };
+      const max = Math.max(1e-12, ...L.edges.map(e => Math.abs(change(e))));
+      for (const e of L.edges) {
+        const dw = change(e); if (dw === 0) continue;
+        ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.75);
+        ctx.lineWidth = 2 + 6 * Math.abs(dw) / max;
+        ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+      }
+    }
+    // Ring the destination and selected incoming connection so table selection stays connected to the graph.
+    const [ls, js] = les.target.split(':'), layer = ls === 'out' ? 'out' : +ls, j = +js;
+    if (['blame', 'gradient', 'nudge'].includes(les.phase)) {
+      const node = layer === 'out' ? out : L.unitColumns[layer][j];
+      if (node) {
+        ctx.strokeStyle = c.accent; ctx.lineWidth = 3;
+        if (node.kind === 'square') ctx.strokeRect(node.x - node.size / 2 - 4, node.y - node.size / 2 - 4, node.size + 8, node.size + 8);
+        else { ctx.beginPath(); ctx.arc(node.x, node.y, node.r + 5, 0, Math.PI * 2); ctx.stroke(); }
+      }
+      if (!backward) for (const e of L.edges) {
+        if (e.layer === layer && e.fi === les.input && (layer === 'out' || e.ti === j)) {
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke(); ctx.setLineDash([]);
         }
       }
     }
-    if (les.phase !== 'nudge') return;
-
-    // the nudge: every weight moves by −lr × blame × its input. Connections glow in the colour of their change
-    // (orange up, blue down), and on pixels a scaled copy of the image slides along the band into each weight map.
-    const fr = Math.min(1, les.frac);
-    const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
-    const maxDw = {};
-    for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
-    ctx.lineCap = 'round';
-    for (const e of L.edges) {
-      const dw = dwOf(e); if (!dw) continue;
-      const rel = Math.abs(dw) / maxDw[e.layer];
-      ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.25 + 0.65 * Math.min(1, fr * 2));
-      ctx.lineWidth = 2 + 8 * rel;
-      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+    ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = c.ink2;
+    ctx.fillText(`truth: ${les.truthName} (${les.y})`, out.x, out.y + out.r + 42);
+    if (phaseIndex > 0 && !after) pill(ctx, out.x, out.y + out.r + 66, `δ = p − y = ${window.Backprop.signed(les.error)}`, c.accent, c);
+    if (after) {
+      ctx.fillText(`p: ${window.Backprop.num(les.pBefore)} → ${window.Backprop.num(les.pAfter)}`, out.x, out.y + out.r + 60);
+      return;
     }
-    ctx.lineCap = 'butt';
-    if (m.mode === 'pixels' && m.x && !net.conv) {
-      const img = L.nodes.find(n => n.kind === 'image');
-      const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
-      const D = m.x.length;
-      let common = 1e-9, xmax = 1e-9;
-      for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
-      for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
-      targets.forEach((t, j) => {
-        const n = t.node; if (!n || !img) return;
-        const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
-        const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
-        if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
-        const cx = x0 + (x1 - x0) * ease(fr);
-        const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
-        const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
-        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
-        if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+    if (backward || les.phase === 'gradient' || updating) {
+      L.unitColumns.forEach((col, l) => {
+        if (backward && l < les.layer) return;
+        col.forEach((u, k) => {
+          const d = les.delta[l][k], blocked = les.res.g.slopes[l][k] === 0;
+          const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 9;
+          pill(ctx, px, py, blocked ? 'slope 0 → δ 0' : `δ ${window.Backprop.signed(d)}`, blocked ? c.ink3 : c.accent, c);
+        });
       });
     }
   }
@@ -2042,8 +2114,8 @@ window.Viz = (function () {
         let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
         const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
         const w = net.W[0][n.j * net.sizes[0] + Math.max(0, Math.min(net.D - 1, j * m.size + i))];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
-        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
+        const lessonTxt = m.lesson ? ' · click to inspect this pixel’s gradient and update below' : '';
+        return { kind: 'node', ref: n, pixelIndex: Math.max(0, Math.min(net.D - 1, j * m.size + i)), text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
         const D = net.D, off = n.j * D;
@@ -2056,8 +2128,8 @@ window.Viz = (function () {
       if (n.kind === 'map' && inBox(n, 0)) {
         const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const w = net.Wo[j * m.size + i];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
-        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
+        const lessonTxt = m.lesson ? ' · click to inspect this pixel’s gradient and update below' : '';
+        return { kind: 'node', ref: n, pixelIndex: j * m.size + i, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
       }
       if (n.kind === 'product' && inBox(n, 0) && m.x) {
         const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
@@ -2093,10 +2165,9 @@ window.Viz = (function () {
       let lessonTxt = '';
       const les = m.lesson;
       if (les && best.wi != null && (les.phase === 'nudge' || les.phase === 'after')) {
-        const arr = best.layer === 'out' ? les.gWo : les.gW[best.layer], fwB = les.fwBefore;
-        const inp = best.layer === 'out' ? fwB.a[fwB.a.length - 1][best.fi] : best.layer === 0 ? m.x[best.fi] : fwB.a[best.layer][best.fi];
-        const blame = best.layer === 'out' ? les.error : les.delta[best.layer][best.ti];
-        lessonTxt = ` · this lesson: Δw = −${les.lr} × ${best.layer === 'out' ? 'error' : 'blame'} ${fmtSigned(blame, 3)} × input ${fmtSigned(inp, 2)} = ${fmtSigned(-les.lr * arr[best.wi], 4)}`;
+        const target = best.layer === 'out' ? 'out:0' : `${best.layer}:${best.ti}`;
+        const step = window.Backprop.parameter(les.res, target, best.fi, les.lr, les.l2);
+        lessonTxt = ` · saved update: data gradient ${window.Backprop.signed(step.gradient)} + decay ${window.Backprop.signed(step.decayGradient)}; Δw = ${window.Backprop.signed(step.change)}; ${window.Backprop.signed(step.before)} → ${window.Backprop.signed(step.after)}`;
       }
       return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}${lessonTxt}` };
     }
@@ -2220,6 +2291,127 @@ window.Viz = (function () {
 
 </script>
 <script>
+/* Exact, inspectable views of a single dense-network learning step. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./nn.js'));
+  else root.Backprop = factory(root.TinyNet);
+})(typeof self !== 'undefined' ? self : this, function (NN) {
+  'use strict';
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  const num = v => !Number.isFinite(v) ? String(v) : v === 0 ? '0' : Math.abs(v) < 0.0001 ? v.toExponential(2) : v.toFixed(4);
+  const signed = v => (v > 0 ? '+' : '') + num(v);
+  const mono = v => `<span class="bp-number">${v}</span>`;
+  const unitName = (l, j) => l === 'out' ? 'Output' : `Hidden ${l + 1} · unit ${j + 1}`;
+  function phases(hidden) {
+    const p = [{ phase: 'forward', title: 'Predict' }, { phase: 'error', title: 'Measure loss' }];
+    for (let l = hidden.length - 1; l >= 0; l--) p.push({ phase: 'blame', layer: l, title: `Back through H${l + 1}` });
+    return [...p, { phase: 'gradient', title: 'Weight gradients' }, { phase: 'nudge', title: 'Update weights' }, { phase: 'after', title: 'Predict again' }];
+  }
+  function targetInfo(res, target) {
+    const [ls, js] = target.split(':');
+    const l = ls === 'out' ? 'out' : +ls, j = +js || 0;
+    const { fw, g, before } = res;
+    const input = l === 'out' ? fw.a[fw.a.length - 1] : fw.a[l];
+    const offset = l === 'out' ? 0 : j * input.length;
+    const weights = l === 'out' ? before.Wo : before.W[l].subarray(offset, offset + input.length);
+    const gradients = l === 'out' ? g.gWo : g.gW[l].subarray(offset, offset + input.length);
+    return { l, j, input, weights, gradients, delta: l === 'out' ? res.error : g.delta[l][j], bias: l === 'out' ? before.bo : before.b[l][j], name: unitName(l, j) };
+  }
+  function parameter(res, target, i, lr, l2) {
+    const t = targetInfo(res, target), bias = i === 'bias';
+    return { ...NN.parameterStep(bias ? t.bias : t.weights[i], bias ? t.delta : t.gradients[i], lr, l2, bias), input: bias ? 1 : t.input[i], delta: t.delta, bias };
+  }
+  function bestInput(res, target, lr, l2) {
+    const t = targetInfo(res, target); let best = 0, size = -1;
+    t.weights.forEach((w, i) => { const d = Math.abs(parameter(res, target, i, lr, l2).change); if (d > size) { best = i; size = d; } });
+    return best;
+  }
+  function inputName(t, i, c) {
+    const first = t.l === 0 || (t.l === 'out' && !c.net.hidden.length);
+    return first ? c.mode === 'pixels' ? `Pixel (${i % c.size + 1}, ${Math.floor(i / c.size) + 1})` : c.featureNames[i] : `Hidden ${t.l === 'out' ? c.net.hidden.length : t.l} · unit ${i + 1}`;
+  }
+  function targetOptions(c) {
+    let opts = '<option value="out:0">Output</option>';
+    c.net.hidden.forEach((h, l) => { for (let j = 0; j < h; j++) opts += `<option value="${l}:${j}">${unitName(l, j)}</option>`; });
+    return opts;
+  }
+  function metrics(les, c) {
+    const r = les.res, after = les.phase === 'after';
+    return `<div class="bp-metrics"><div><span>Known label y</span><b>${les.y} · ${esc(c.truthName)}</b></div><div><span>P(${esc(c.positiveName)})</span><b>${num(r.fw.p)}${after ? ` → ${num(les.pAfter)}` : ''}</b></div><div><span>Case loss · cross-entropy</span><b>${les.phase === 'forward' ? 'Next step' : `${num(r.loss)}${after ? ` → ${num(les.lossAfter)}` : ''}`}</b></div></div>`;
+  }
+  function explanation(les, c) {
+    const { res: r, phase, layer } = les;
+    if (phase === 'forward') return `<h3>Start with this ${c.mode === 'pixels' ? 'nucleus' : 'case'} and the current weights</h3><p>Each unit multiplies its inputs by its weights and adds a bias. The output score becomes a probability through the sigmoid.</p><div class="bp-equation">z = Σ(w × input) + b = ${mono(signed(r.fw.z))} → sigmoid(z) = ${mono(num(r.fw.p))}</div><p class="small">${c.mode === 'pixels' ? 'The network sees standardized pixel values: a negative value means below the training-set mean at that position. It does not mean a negative brightness.' : 'Inputs are standardized using the training set. A negative input means below its training mean, and reverses the sign of input × weight.'} This forward pass uses the saved weights from before the update.</p>`;
+    if (phase === 'error') return `<h3>How costly was the prediction, and which way should the score move?</h3><p>Loss is a nonnegative penalty. The output gradient is a signed sensitivity: how loss changes if we increase the score z.</p><div class="bp-equation">L = −[y ln(p) + (1 − y) ln(1 − p)] = ${mono(num(r.loss))}</div><div class="bp-equation">δ<sub>out</sub> = ∂L/∂z = p − y = ${mono(num(r.fw.p))} − ${les.y} = ${mono(signed(r.error))}</div><p>${r.error > 0 ? 'Positive gradient → decreasing the score would reduce this case’s loss.' : r.error < 0 ? 'Negative gradient → increasing the score would reduce this case’s loss.' : 'The output gradient is zero at the displayed numerical precision.'} For sigmoid + binary cross-entropy, p − y already includes the sigmoid derivative; do not multiply it by p(1 − p) again.</p>`;
+    if (phase === 'blame') {
+      const slope = c.net.activation === 'relu' ? 'ReLU: 1 when z > 0; 0 when z ≤ 0 (including the chosen derivative at zero)' : c.net.activation === 'tanh' ? 'Tanh: 1 − a²' : 'Sigmoid: a(1 − a)';
+      const rows = Array.from(r.g.delta[layer], (d, j) => `<tr class="${les.target === `${layer}:${j}` ? 'is-selected' : ''}"><th><button type="button" data-bp-unit="${layer}:${j}">H${layer + 1}.${j + 1}</button></th><td>${num(r.fw.pre[layer][j])}</td><td>${num(r.fw.a[layer + 1][j])}</td><td>${signed(r.g.upstream[layer][j])}</td><td>${num(r.g.slopes[layer][j])}</td><td><b>${signed(d)}</b>${r.g.slopes[layer][j] === 0 ? ' · blocked' : ''}</td></tr>`).join('');
+      return `<h3>Back through hidden layer ${layer + 1}</h3><p>For each unit, <b>sum</b> the downstream gradients multiplied by the outgoing weights, then multiply by the local activation derivative. These are sensitivities, not percentages of blame: they can reverse sign, cancel, or grow.</p><div class="bp-equation">δ<sub>unit</sub> = (Σ w<sub>outgoing</sub> × δ<sub>downstream</sub>) × f′(z)</div><p class="small">${slope}. All factors use the weights from the original forward pass.</p><div class="bp-table-wrap"><table class="bp-table"><caption>Every unit in this layer. Select a row to inspect its outgoing paths.</caption><thead><tr><th>Unit</th><th>Score z</th><th>Value a</th><th>Weighted sum ∂L/∂a</th><th>Local slope f′</th><th>Result δ = ∂L/∂z</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    if (phase === 'gradient') return `<h3>Turn each unit’s gradient into gradients for its incoming weights</h3><p>A weight multiplies one input, so its data gradient is <b>that input × the destination unit’s δ</b>. The bias has an implicit input of 1, so its gradient is δ. Backpropagation computes these gradients; the optimizer applies them in the next step.</p><div class="bp-equation">∂L/∂w = input × δ &nbsp; · &nbsp; ∂L/∂b = δ</div><p class="small">Zero input gives zero data gradient for that weight. A negative input reverses the sign. Computing gradients does not change the weights.</p>`;
+    if (phase === 'nudge') return `<h3>${les.applied ? 'Review the update that was applied' : 'Preview one gradient-descent update'}</h3><p>Subtract learning rate × gradient. A <b>positive gradient lowers the weight</b>; a <b>negative gradient raises it</b>. Weight decay adds λw to each weight’s gradient; biases are not decayed.</p><div class="bp-equation">w<sub>new</sub> = w<sub>old</sub> − η(∂L/∂w + λw<sub>old</sub>) &nbsp; · &nbsp; b<sub>new</sub> = b<sub>old</sub> − ηδ</div><p class="small">η = ${les.lr} · λ = ${les.l2}. This is <b>one original training case</b>, batch size 1, with no random augmentation. Normal training averages the data gradients over its batch before adding decay. An inactive ReLU has no data gradient, but its weights can still move through decay.</p>`;
+    const change = les.lossAfter - r.loss;
+    return `<h3>Run the same case through the updated network</h3><p>${Math.abs(change) < 1e-12 ? 'This case’s loss is unchanged at numerical precision.' : change < 0 ? 'This case’s loss decreased.' : 'This case’s loss increased. A large learning rate can overshoot; weight decay can also trade off this case’s loss against smaller weights.'} This measured result is from <b>one update</b>. It does not establish performance on unseen cases.</p><div class="bp-equation">Case loss ${mono(num(r.loss))} → ${mono(num(les.lossAfter))} &nbsp; · &nbsp; training-set loss ${mono(num(les.trainLossBefore))} → ${mono(num(les.trainLossAfter))}</div><p class="small">Every parameter used its pre-update gradient. Back and the step buttons replay the saved calculation without training again. The regularization penalty is excluded from the loss values above.</p>`;
+  }
+  function chainDetail(les, c, t) {
+    if (t.l === 'out') return `<p class="small">Output gradient δ = p − y = ${signed(les.res.error)}.</p>`;
+    const r = les.res, l = t.l, j = t.j, last = l === c.net.hidden.length - 1;
+    const terms = last ? [{ name: 'Output', w: r.before.Wo[j], d: r.error }] : Array.from(r.g.delta[l + 1], (d, k) => ({ name: `H${l + 2}.${k + 1}`, w: r.before.W[l + 1][k * c.net.hidden[l] + j], d }));
+    return `<div class="bp-chain"><b>Trace ${esc(t.name)} to the loss</b><div class="bp-table-wrap"><table class="bp-table"><thead><tr><th>Downstream destination</th><th>Outgoing weight</th><th>Downstream δ</th><th>Product</th></tr></thead><tbody>${terms.map(q => `<tr><th>${q.name}</th><td>${signed(q.w)}</td><td>${signed(q.d)}</td><td>${signed(q.w * q.d)}</td></tr>`).join('')}</tbody></table></div><div class="bp-equation">Sum ${mono(signed(r.g.upstream[l][j]))} × local slope ${mono(num(r.g.slopes[l][j]))} = δ ${mono(signed(t.delta))}</div></div>`;
+  }
+  function inspector(les, c) {
+    const t = targetInfo(les.res, les.target), n = t.weights.length;
+    les.input = Math.min(n - 1, Math.max(0, les.input));
+    const first = t.l === 0 || (t.l === 'out' && !c.net.hidden.length), pixels = first && c.mode === 'pixels';
+    const p = parameter(les.res, les.target, les.input, les.lr, les.l2), b = parameter(les.res, les.target, 'bias', les.lr, les.l2);
+    const controls = `<div class="bp-inspect-controls"><label>Inspect destination <select id="bp-target">${targetOptions(c)}</select></label><label>${pixels ? 'Pixel index (1–1,024)' : 'Incoming connection'} ${pixels ? `<input id="bp-input" type="number" min="1" max="${n}" value="${les.input + 1}">` : `<select id="bp-input">${Array.from(t.input, (_, i) => `<option value="${i + 1}">${esc(inputName(t, i, c))}</option>`).join('')}</select>`}</label></div>`;
+    if (les.phase === 'blame') return controls + chainDetail(les, c, t);
+    const color = p.change > 0 ? 'bp-up' : p.change < 0 ? 'bp-down' : '';
+    const values = `<div class="bp-factors"><div><span>Input · ${esc(inputName(t, les.input, c))}</span><b>${signed(p.input)}</b></div><i>×</i><div><span>Destination gradient δ</span><b>${signed(p.delta)}</b></div><i>=</i><div><span>Data gradient ∂L/∂w</span><b>${signed(p.gradient)}</b></div></div>`;
+    const update = les.phase !== 'gradient' ? `<div class="bp-table-wrap"><table class="bp-table"><caption>Exact update for the selected weight and its destination’s bias</caption><thead><tr><th>Parameter</th><th>Before</th><th>Data gradient</th><th>Decay λw</th><th>Total gradient</th><th>Change −ηg</th><th>${les.applied ? 'After update' : 'Proposed after'}</th></tr></thead><tbody>${[[`Weight · ${inputName(t, les.input, c)}`, p], ['Bias · input = 1', b]].map(([label, v]) => `<tr><th>${esc(label)}</th><td>${signed(v.before)}</td><td>${signed(v.gradient)}</td><td>${signed(v.decayGradient)}</td><td>${signed(v.totalGradient)}</td><td class="${v.change > 0 ? 'bp-up' : v.change < 0 ? 'bp-down' : ''}">${signed(v.change)}</td><td>${signed(v.after)}</td></tr>`).join('')}</tbody></table></div><p class="bp-equation">${mono(signed(p.before))} − ${les.lr} × (${mono(signed(p.gradient))} + ${mono(signed(p.decayGradient))}) = ${mono(signed(p.after))}</p><p class="small ${color}">Selected weight ${p.change > 0 ? 'increases ↑' : p.change < 0 ? 'decreases ↓' : 'does not change'} by ${signed(p.change)}. Orange = an increase; blue = a decrease. These colors show the update, not the sign of the old weight.</p>` : `<p class="bp-equation">Bias data gradient = 1 × δ = ${mono(signed(b.gradient))}</p>`;
+    const all = pixels ? `<div class="bp-pixels" id="bp-pixels"></div>` : `<details class="bp-all"><summary>Compare all ${n} incoming weights</summary><div class="bp-table-wrap"><table class="bp-table"><thead><tr><th>Input</th><th>Input value</th><th>Data gradient</th>${les.phase !== 'gradient' ? '<th>Weight change</th>' : ''}</tr></thead><tbody>${Array.from(t.input, (x, i) => { const q = parameter(les.res, les.target, i, les.lr, les.l2); return `<tr><th><button type="button" data-bp-input="${i}">${esc(inputName(t, i, c))}</button></th><td>${signed(x)}</td><td>${signed(q.gradient)}</td>${les.phase !== 'gradient' ? `<td>${signed(q.change)}</td>` : ''}</tr>`; }).join('')}</tbody></table></div></details>`;
+    return controls + values + update + all;
+  }
+  function drawMaps(les, c) {
+    const box = document.getElementById('bp-pixels'); if (!box) return;
+    const t = targetInfo(les.res, les.target), n = t.input.length;
+    const data = new Float64Array(n), decay = new Float64Array(n), total = new Float64Array(n), after = new Float64Array(n);
+    for (let i = 0; i < n; i++) { const p = parameter(les.res, les.target, i, les.lr, les.l2); data[i] = -les.lr * p.gradient; decay[i] = -les.lr * p.decayGradient; total[i] = p.change; after[i] = p.after; }
+    const max = a => Math.max(0, ...a.map(Math.abs));
+    const deltaScale = Math.max(max(data), max(decay), max(total)), weightScale = Math.max(max(t.weights), max(after));
+    const maps = les.phase === 'gradient' ? [['Standardized input', t.input, max(t.input)], ['Data gradient = input × δ', t.gradients, max(t.gradients)]] : [['Standardized input', t.input, max(t.input)], ['Weight before', t.weights, weightScale], ['Data change −η × input × δ', data, deltaScale], ['Decay change −ηλw', decay, deltaScale], ['Total change = data + decay', total, deltaScale], [les.applied ? 'Weight after' : 'Proposed weight after', after, weightScale]];
+    box.innerHTML = `<p class="small">Each square is the same pixel position across all maps. Click a pixel, or use arrow keys on a map, to inspect its arithmetic. ${les.phase === 'gradient' ? 'Input and gradient use separately labeled scales.' : 'All change maps share one scale; before/after weights share another.'} Values near zero are pale. These are signed parameter calculations, not a saliency map.</p><div class="bp-map-grid">${maps.map(([name, a, scale], k) => `<figure><figcaption>${name}</figcaption><canvas width="192" height="192" tabindex="0" data-bp-map="${k}" aria-label="${name}; select a pixel with arrow keys"></canvas><span class="small">${signed(a[les.input])} at selected pixel<br>scale ±${num(scale)}</span></figure>`).join('')}</div>`;
+    const style = getComputedStyle(document.documentElement), get = key => style.getPropertyValue(key).trim();
+    maps.forEach(([, a, scale], k) => {
+      const canvas = box.querySelector(`[data-bp-map="${k}"]`), ctx = canvas.getContext('2d'), cell = canvas.width / c.size;
+      ctx.fillStyle = get('--surface'); ctx.fillRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < n; i++) { ctx.globalAlpha = scale ? Math.abs(a[i]) / scale : 0; ctx.fillStyle = get(a[i] >= 0 ? '--irregular' : '--regular'); ctx.fillRect(i % c.size * cell, Math.floor(i / c.size) * cell, cell, cell); }
+      ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = get('--ink'); ctx.strokeRect(les.input % c.size * cell, Math.floor(les.input / c.size) * cell, cell, cell);
+    });
+  }
+  function render(les, c) {
+    const el = document.getElementById('lesson-details');
+    el.hidden = !les; if (!les) return;
+    el.innerHTML = metrics(les, c) + `<div class="bp-explanation">${explanation(les, c)}</div>` + (['blame', 'gradient', 'nudge', 'after'].includes(les.phase) ? `<div class="bp-inspector">${inspector(les, c)}</div>` : '');
+    const target = document.getElementById('bp-target'), inp = document.getElementById('bp-input');
+    if (target) target.value = les.target;
+    if (inp) inp.value = les.input + 1;
+    drawMaps(les, c);
+  }
+  function summary(les, c) {
+    const r = les.res, t = targetInfo(r, les.target), p = parameter(r, les.target, les.input, les.lr, les.l2);
+    if (les.phase === 'forward') return `Predict: the inputs travel forward through weighted sums and activations. Score ${signed(r.fw.z)} → P(${c.positiveName}) = ${num(r.fw.p)}. The known label is ${les.y} (${c.truthName}).`;
+    if (les.phase === 'error') return `Loss = ${num(r.loss)}. Output gradient δ = p − y = ${num(r.fw.p)} − ${les.y} = ${signed(r.error)}. ${r.error > 0 ? 'Reducing' : 'Increasing'} the score would reduce this case’s loss.`;
+    if (les.phase === 'blame') return t.l === 'out' ? `Output δ = ${signed(r.error)}. Select a hidden unit below to see how the chain rule carries this gradient backward.` : `${t.name}: sum of weighted downstream gradients ${signed(r.g.upstream[t.l][t.j])} × activation slope ${num(r.g.slopes[t.l][t.j])} = δ ${signed(t.delta)}. Follow the violet arrows from right to left; inspect every path below.`;
+    if (les.phase === 'gradient') return `${inputName(t, les.input, c)} → ${t.name}: input ${signed(p.input)} × destination δ ${signed(p.delta)} = weight gradient ${signed(p.gradient)}. A bias uses input 1. Inspect another connection or pixel below.`;
+    if (les.phase === 'nudge') return `${t.name}, selected weight: ${signed(p.before)} − ${les.lr} × (${signed(p.gradient)} data + ${signed(p.decayGradient)} decay) = ${signed(p.after)}. ${les.applied ? 'This update was already applied.' : 'Press Apply one update when ready; all parameters change together.'}`;
+    return `One update applied: P(${c.positiveName}) ${num(les.pBefore)} → ${num(les.pAfter)}; case loss ${num(r.loss)} → ${num(les.lossAfter)}. Back and Replay inspect the saved steps without training again.`;
+  }
+  return { phases, targetInfo, parameter, bestInput, render, summary, num, signed };
+});
+
+</script>
+<script>
 /*
  * app.js — wires the datasets, the network and the drawings into the three-stage bench.
  */
@@ -2327,7 +2519,7 @@ window.Viz = (function () {
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
-    S.lesson = null; S.lastLesson = null; renderLessonLine();
+    pauseLesson(); S.lesson = null; S.lastLesson = null; renderLessonLine();
     if (!S.applyingRecipe) $('recipe-select').value = '';
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -2392,107 +2584,115 @@ window.Viz = (function () {
     if (did) renderTraining(ended || S.kind === 'tabular');
     if (S.running) requestAnimationFrame(tick);
   }
-  // ------------------------------------------------------------------ the lesson: one case teaches the network
-  // A walk-through of one gradient step on the selected training case, phase by phase: the forward pass, the error
-  // (call − truth), the blame flowing back to each hidden unit, the nudge every weight receives, and the same case
-  // again with its new call. The step is real training: a batch of one at the current learning rate.
-  const LESSON_MS = { forward: 1500, error: 2200, blame: 2600, blame2: 3400, nudge: 3200, after: 2200 };
-  function lessonPhases() {
-    const L = S.net.hidden.length;
-    const ph = [['forward', LESSON_MS.forward], ['error', LESSON_MS.error]];
-    if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['nudge', LESSON_MS.nudge], ['after', LESSON_MS.after]);
-    return ph;
-  }
+  // ------------------------------------------------------------------ one-case backpropagation walkthrough
+  // Navigation is read-only. Only the explicit Apply button changes the live model, once.
+  const BP = window.Backprop;
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv && S.selected && S.selected.split === 'train'); }
   function updateTeachButton() {
     const b = $('btn-teach'); if (!b || !S.net) return;
     b.disabled = !canTeach() && !S.lesson;
-    b.textContent = S.lesson ? 'Skip ▸' : 'Teach this case';
-    b.title = S.net.conv ? 'The walk-through covers dense networks: switch the convolution off'
-      : S.selected && S.selected.split !== 'train' ? `Pick a training ${noun(1)}: test ${noun(2)} are never taught`
-      : `Watch ${S.selected ? S.selected.name : 'this case'} teach the network one step (T)`;
-    $('btn-teach-next').title = 'the training case the network currently gets most wrong (N)';
+    b.textContent = S.lesson ? (S.lesson.applied ? 'Close walkthrough' : 'Cancel walkthrough') : 'Teach this case';
+    b.title = S.net.conv ? 'The walkthrough covers dense networks; convolution is not covered yet.'
+      : S.selected && S.selected.split !== 'train' ? 'Select a training case. Test cases cannot be taught.'
+      : 'Follow one case, then apply one update (T).';
+    $('btn-teach-next').title = 'The training case the network currently gets most wrong (N).';
+  }
+  function lessonContext() {
+    return { net: S.net, mode: S.mode, size: S.size, featureNames: S.inputs.featureNames || [], truthName: className(S.lesson.y), positiveName: posName() };
   }
   function startLesson(s) {
     if (!s || s.split !== 'train' || !S.net || S.net.conv) return;
-    stopTraining();
+    stopTraining(); endLesson();
     if (S.selected !== s) selectSpecimen(s);
-    const x = S.inputs.xOf(s), y = s.label;
-    const res = S.net.lesson(x, y);
-    S.lastLesson = null;
-    S.lesson = { s, x, y, res, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, applied: false };
-    updateTeachButton(); renderLessonLine();
-    requestAnimationFrame(lessonFrame);
+    const x = S.inputs.xOf(s), y = s.label, res = S.net.lesson(x, y);
+    S.lesson = { s, x, y, res, phases: BP.phases(S.net.hidden), index: 0, phase: 'forward', frac: 1,
+      lr: S.lr, l2: S.l2, target: 'out:0', input: BP.bestInput(res, 'out:0', S.lr, S.l2),
+      pBefore: res.fw.p, pAfter: null, applied: false, playing: false, playbackRate: 1, raf: null,
+      trainLossBefore: S.trainEval.loss };
+    renderLessonLine(); renderTrainGraph(); updateTeachButton();
   }
-  function applyLesson() {
-    const les = S.lesson;
-    S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
-    S.net.applyGradient(les.res.g, 1, S.lr, S.l2);
-    les.pAfter = S.net.forward(les.x).p; les.applied = true;
-    if (S.test.results.size) clearTestResults(true);
-    evaluateAll(); renderStatus();
+  function pauseLesson() {
+    const les = S.lesson; if (!les) return;
+    les.playing = false; if (les.raf != null) cancelAnimationFrame(les.raf); les.raf = null;
+  }
+  function setLessonStep(index, autoplay = false) {
+    const les = S.lesson; if (!les) return;
+    if (!autoplay) pauseLesson();
+    // Never let autoplay or navigation apply an update, or visit its result before it exists.
+    const last = les.phases.length - (les.applied ? 1 : 2);
+    les.index = Math.max(0, Math.min(last, index));
+    const step = les.phases[les.index]; les.phase = step.phase; les.layer = step.layer;
+    les.frac = autoplay && !reducedMotion ? 0 : 1; les.t0 = performance.now();
+    if (les.phase === 'blame') {
+      const d = les.res.g.delta[les.layer]; let j = 0;
+      d.forEach((v, k) => { if (Math.abs(v) > Math.abs(d[j])) j = k; });
+      les.target = `${les.layer}:${j}`; les.input = BP.bestInput(les.res, les.target, les.lr, les.l2);
+    }
+    if (les.phase === 'nudge' || les.phase === 'after') pauseLesson();
+    renderLessonLine(); renderTrainGraph();
+  }
+  function toggleLessonPlayback() {
+    const les = S.lesson; if (!les) return;
+    if (les.playing) { pauseLesson(); renderLessonLine(); return; }
+    if (les.phase === 'nudge' || les.phase === 'after') setLessonStep(0);
+    les.playing = true; les.t0 = performance.now(); les.frac = reducedMotion ? 1 : 0;
+    renderLessonLine(); les.raf = requestAnimationFrame(lessonFrame);
   }
   function lessonFrame(now) {
-    const les = S.lesson; if (!les) return;
-    const t = les.skip ? Infinity : now - les.t0;
-    let acc = 0, phase = null, frac = 1;
-    for (const [name, ms] of les.phases) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
-    if (!phase) {
-      if (!les.applied) applyLesson();
-      S.lastLesson = { s: les.s, calls: [les.pBefore, les.pAfter] };
-      S.lesson = null;
-      renderTraining(true); renderLessonLine(); updateTeachButton();
-      return;
-    }
-    if (phase === 'after' && !les.applied) applyLesson();
-    les.phase = phase; les.frac = frac;
-    renderTrainGraph(); renderLessonLine();
-    requestAnimationFrame(lessonFrame);
+    const les = S.lesson; if (!les || !les.playing) return;
+    const duration = 5000 / les.playbackRate;
+    les.frac = reducedMotion ? 1 : Math.min(1, (now - les.t0) / duration);
+    renderTrainGraph();
+    if (now - les.t0 >= duration) setLessonStep(les.index + 1, true);
+    if (S.lesson === les && les.playing) les.raf = requestAnimationFrame(lessonFrame);
   }
-  function endLesson() { // finish a running lesson at once (its step still counts) and clear the strip
+  function applyLesson() {
+    const les = S.lesson; if (!les || les.applied || les.phase !== 'nudge') return;
+    pauseLesson(); S.prevW = les.res.before;
+    S.net.applyGradient(les.res.g, 1, les.lr, les.l2);
+    const fw = S.net.forward(les.x);
+    les.pAfter = fw.p; les.lossAfter = NN.bceFromLogit(fw.z, les.y); les.fwAfter = fw; les.applied = true;
+    if (S.test.results.size) clearTestResults(true);
+    evaluateAll(); les.trainLossAfter = S.trainEval.loss;
+    setLessonStep(les.phases.length - 1);
+    renderTraining(true); updateTeachButton();
+  }
+  function endLesson() {
     const les = S.lesson;
-    if (les && !les.applied) applyLesson();
-    S.lesson = null; S.lastLesson = null;
+    pauseLesson();
+    S.lastLesson = les && les.applied ? { s: les.s, calls: [les.pBefore, les.pAfter] } : null;
+    S.lesson = null;
     renderLessonLine(); updateTeachButton();
   }
   function lessonView() {
     const les = S.lesson; if (!les) return null;
     const g = les.res.g;
-    return { phase: les.phase, frac: les.frac, error: les.res.error, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
+    return { ...les, error: les.res.error, truthName: className(les.y), delta: g.delta, gW: g.gW, gWo: g.gWo,
+      before: les.res.before, fwBefore: les.res.fw };
   }
   function renderLessonLine() {
     const box = $('lesson'); if (!box) return;
     const les = S.lesson, last = S.lastLesson;
-    if (!les && !last) { box.hidden = true; $('legend-lesson').hidden = true; return; }
-    box.hidden = false; $('legend-lesson').hidden = !les;
-    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !!les;
-    let html;
-    if (les) {
-      const n = les.phases.findIndex(p => p[0] === les.phase) + 1, total = les.phases.length;
-      const hidden = S.net.hidden.length, blame = hidden ? 'blame' : 'error';
-      const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
-      const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
-      const pair = les.pAfter == null ? `${p} → …` : fmtCalls([les.pBefore, les.pAfter]);
-      const texts = {
-        forward: `Forward pass: the network calls <b>${p}</b> (${esc(call)}). The truth is <b>${esc(className(les.y))}</b>.`,
-        error: `Error = call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
-        blame: hidden > 1
-          ? 'Back-propagation: the error flows back one layer at a time, shared out along the connections in proportion to their weights. A unit that was switched off gets no blame.'
-          : 'Back-propagation: the error is shared out to the hidden units in proportion to their weights to the output. A unit that was switched off gets no blame.',
-        nudge: allSilent
-          ? 'Every hidden unit was switched off for this case, so none of them learns from it: only the output bias moves. A ReLU unit that is off passes no blame back.'
-          : S.mode === 'pixels'
-          ? `Every weight moves by −learning rate × ${blame} × its input. On pixels that is a faint copy of the ${noun(1)} itself, added to ${hidden ? 'each weight map, scaled by that unit’s blame' : 'the weight map'} (orange = weight up, blue = weight down).`
-          : `Every weight moves by −learning rate × ${blame} × its input (orange = weight up, blue = weight down): large inputs get large nudges. Hover a connection for the arithmetic.`,
-        after: sure ? `The call was already right and sure, so the nudge is tiny: <b>${pair}</b>. Pick a case it gets wrong for a bigger lesson.` : `The same case again: <b>${pair}</b>. It learned a little.`,
-      };
-      html = `<span class="step">${n} / ${total}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
-    } else {
-      const calls = last.calls;
-      html = `<span class="step">✓</span> <span><b>${esc(last.s.name)}</b> (truth ${esc(className(last.s.label))}) taught ${calls.length - 1}×: ${fmtCalls(calls)}.${calls.length > 2 ? ' One case repeated is memorised; the next case will pull the weights its own way.' : ''}</span>`;
+    box.hidden = !les && !last; $('legend-lesson').hidden = !les;
+    $('lesson-controls').hidden = !les; $('lesson-steps').hidden = !les;
+    $('btn-teach-again').hidden = $('btn-teach-next').hidden = !last || !!les;
+    if (!les) {
+      $('lesson-details').hidden = true;
+      $('lesson-caption').textContent = '';
+      $('lesson-text').textContent = last ? `${last.s.name} · truth ${className(last.s.label)} · ${last.calls.length - 1} update(s): ${fmtCalls(last.calls)}. Repeating one case can memorize it; evaluate unseen cases separately.` : '';
+      return;
     }
-    $('lesson-text').innerHTML = html;
+    $('lesson-text').textContent = `${les.s.name} · one training case · ${les.applied ? 'One update applied; earlier steps show the saved calculation' : 'Weights unchanged until Apply'} · η ${les.lr} · λ ${les.l2}`;
+    $('lesson-steps').innerHTML = les.phases.map((p, i) => `<button type="button" class="bp-step ${i === les.index ? 'is-current' : ''}" data-lesson-step="${i}" ${i === les.index ? 'aria-current="step"' : ''} ${p.phase === 'after' && !les.applied ? 'disabled' : ''}><span>${i + 1}</span>${p.title}</button>`).join('');
+    $('btn-lesson-back').disabled = les.index === 0;
+    $('btn-lesson-forward').disabled = les.phase === 'after' || (les.phase === 'nudge' && !les.applied);
+    $('btn-lesson-play').textContent = les.playing ? 'Pause' : les.phase === 'after' || les.phase === 'nudge' ? 'Replay steps' : 'Play steps';
+    $('btn-lesson-apply').hidden = les.phase !== 'nudge'; $('btn-lesson-apply').disabled = les.applied;
+    $('btn-lesson-apply').textContent = les.applied ? 'Update already applied' : 'Apply one update';
+    $('lesson-playback').value = les.playbackRate;
+    $('btn-lesson-close').textContent = les.applied ? 'Finish' : 'Cancel';
+    BP.render(les, lessonContext());
+    $('lesson-caption').textContent = BP.summary(les, lessonContext());
   }
   function fmtCalls(calls) { const d = new Set(calls.map(v => v.toFixed(2))).size < calls.length ? 3 : 2; return calls.map(v => v.toFixed(d)).join(' → '); }
   function teachAgain(n) {
@@ -2663,7 +2863,12 @@ window.Viz = (function () {
   function renderTrainGraph() {
     const cv = $('net-canvas');
     const m = graphModel(S.selected || null, 2, S.hover.train);
-    if (S.lesson) m.lesson = lessonView();
+    if (S.lesson) {
+      const les = S.lesson;
+      m.lesson = lessonView(); m.x = les.x; m.specimen = les.s;
+      m.fw = les.phase === 'after' ? les.fwAfter : les.res.fw;
+      if (les.phase !== 'after') { m.net = Object.assign(Object.create(Object.getPrototypeOf(S.net)), S.net, les.res.before); m.prev = null; }
+    }
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -2804,6 +3009,7 @@ window.Viz = (function () {
 
   // ------------------------------------------------------------------ rendering: inspector
   function selectSpecimen(s, opts) {
+    if (S.lesson && S.lesson.s !== s) endLesson();
     S.selected = s;
     renderDataTrays();
     if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); }
@@ -2990,7 +3196,36 @@ window.Viz = (function () {
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
-    $('btn-teach').addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; else startLesson(S.selected); });
+    $('btn-teach').addEventListener('click', () => { if (S.lesson) { endLesson(); renderTraining(true); } else startLesson(S.selected); });
+    $('btn-lesson-back').addEventListener('click', () => setLessonStep(S.lesson.index - 1));
+    $('btn-lesson-forward').addEventListener('click', () => setLessonStep(S.lesson.index + 1));
+    $('btn-lesson-play').addEventListener('click', toggleLessonPlayback);
+    $('btn-lesson-apply').addEventListener('click', applyLesson);
+    $('btn-lesson-close').addEventListener('click', () => { endLesson(); renderTraining(true); });
+    $('lesson-playback').addEventListener('change', () => { if (S.lesson) { S.lesson.playbackRate = +$('lesson-playback').value; S.lesson.t0 = performance.now(); } });
+    $('lesson-steps').addEventListener('click', ev => { const b = ev.target.closest('[data-lesson-step]'); if (b) setLessonStep(+b.dataset.lessonStep); });
+    const inspect = (target, input, focusId) => {
+      const les = S.lesson; if (!les) return;
+      pauseLesson(); les.target = target || les.target;
+      les.input = input == null ? BP.bestInput(les.res, les.target, les.lr, les.l2) : Math.max(0, Math.min(BP.targetInfo(les.res, les.target).input.length - 1, input));
+      renderLessonLine(); renderTrainGraph();
+      const focus = focusId && document.querySelector(focusId); if (focus) focus.focus({ preventScroll: true });
+    };
+    $('lesson-details').addEventListener('change', ev => {
+      if (ev.target.id === 'bp-target') inspect(ev.target.value, null, '#bp-target');
+      if (ev.target.id === 'bp-input') inspect(null, Math.floor(+ev.target.value || 1) - 1, '#bp-input');
+    });
+    $('lesson-details').addEventListener('click', ev => {
+      const unit = ev.target.closest('[data-bp-unit]'), input = ev.target.closest('[data-bp-input]'), map = ev.target.closest('[data-bp-map]');
+      if (unit) inspect(unit.dataset.bpUnit, null, `[data-bp-unit="${unit.dataset.bpUnit}"]`);
+      if (input) inspect(null, +input.dataset.bpInput, '#bp-input');
+      if (map) { const r = map.getBoundingClientRect(), col = Math.min(S.size - 1, Math.floor((ev.clientX - r.left) / r.width * S.size)), row = Math.min(S.size - 1, Math.floor((ev.clientY - r.top) / r.height * S.size)); inspect(null, row * S.size + col, `[data-bp-map="${map.dataset.bpMap}"]`); }
+    });
+    $('lesson-details').addEventListener('keydown', ev => {
+      if (!ev.target.matches('[data-bp-map]') || !S.lesson) return;
+      const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -S.size, ArrowDown: S.size }[ev.key];
+      if (step) { ev.preventDefault(); ev.stopPropagation(); inspect(null, S.lesson.input + step, `[data-bp-map="${ev.target.dataset.bpMap}"]`); }
+    });
     $('btn-teach-again').addEventListener('click', () => teachAgain(10));
     $('btn-teach-next').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
@@ -3042,15 +3277,29 @@ window.Viz = (function () {
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
       if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
-      if (key === 'train') cv.addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; });
+      if (key === 'train') cv.addEventListener('click', ev => {
+        if (!S.lesson || !['blame', 'gradient', 'nudge', 'after'].includes(S.lesson.phase)) return;
+        const r = cv.getBoundingClientRect(), hit = Viz.hitNetwork(cv, ev.clientX - r.left, ev.clientY - r.top, cv._model);
+        if (!hit) return;
+        const ref = hit.ref;
+        if (hit.kind === 'edge' && ref.wi != null) inspect(ref.layer === 'out' ? 'out:0' : `${ref.layer}:${ref.ti}`, ref.fi);
+        else if (ref.kind === 'output' || ref.kind === 'map') inspect('out:0', hit.pixelIndex);
+        else if (['unit', 'square', 'uprod'].includes(ref.kind)) inspect(`${ref.l || 0}:${ref.j}`, hit.pixelIndex);
+      });
     }
     document.addEventListener('keydown', ev => {
       if (ev.target.matches('input, select, textarea')) return;
+      if (S.lesson && S.stage === 'train') {
+        if (ev.key === ' ' && !ev.target.matches('button')) { ev.preventDefault(); toggleLessonPlayback(); return; }
+        if (['ArrowRight', 'n', 'N', 't', 'T'].includes(ev.key)) { ev.preventDefault(); setLessonStep(S.lesson.index + 1); return; }
+        if (ev.key === 'ArrowLeft') { ev.preventDefault(); setLessonStep(S.lesson.index - 1); return; }
+        if (ev.key === 'Escape') { endLesson(); renderTraining(true); return; }
+      }
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (S.lastLesson) teachNext(); }
-      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (S.lesson) S.lesson.skip = true; else if (canTeach()) startLesson(S.selected); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'train') { if (S.lastLesson) teachNext(); }
+      else if ((ev.key === 't' || ev.key === 'T') && S.stage === 'train') { if (canTeach()) startLesson(S.selected); }
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
     window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
@@ -3060,10 +3309,12 @@ window.Viz = (function () {
     const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
+    if (S.lesson) renderLessonLine();
     if (S.stage === 'train') { renderTrainGraph(); renderProfile(true); } if (S.stage === 'test') renderTestGraph();
     renderInspector();
   }
   function showStage(name) {
+    if (S.lesson && name !== 'train') endLesson();
     S.stage = name;
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test';
@@ -3075,6 +3326,7 @@ window.Viz = (function () {
       renderTestGraph(); renderInspector(); renderDataTrays();
       if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 30 s): filter 1 scans the nucleus slowly with its arithmetic shown, the other filters follow together, then map 1 is pooled block by block and the other maps follow. Press N or click the diagram to skip ahead.';
     }
+    updateTeachButton();
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
 
