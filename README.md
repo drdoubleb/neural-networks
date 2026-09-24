@@ -15,7 +15,8 @@ pixels to a convolutional network, with the reasons for each step visible along 
   inlined. Rebuild it with `node tools/build_single_file.js`.
 - **GitHub Pages:** repository settings → Pages → *Deploy from a branch* → the default branch, root folder.
 
-Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `N` classifies the next test case.
+Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `T` teaches the selected training case one
+step, `N` moves to the case the network gets most wrong (Train) or classifies the next test case (Test).
 
 The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
 each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
@@ -56,7 +57,15 @@ style). The network never sees it; the page uses it to show which hidden units r
    Each row reads **image × weights = weight × pixel** (the image arrives along the band, pixel by pixel), with the
    activation badge after it (sum plus bias, through the activation). Hovering a feature-map pixel of a convolutional network shows the arithmetic of that
    position under the image: the 5 × 5 patch, the filter, their products, the sum and the ReLU. A
-   single-layer network is also shown as a **weighted checklist** (every weight, largest first). With hidden units, a
+   single-layer network is also shown as a **weighted checklist** (every weight, largest first). **Teach this case** shows
+   back-propagation on the selected training case as a walk-through: the forward pass and the truth; the error (call −
+   truth) on a scale beside the output; the blame flowing back along the connections to each hidden unit, one layer at a
+   time, with a pill on each unit (a unit that was switched off gets none); the nudge every weight receives, −learning
+   rate × blame × input, drawn as a glow on each connection and, on pixels, as a copy of the nucleus sliding into each
+   weight map, scaled by that unit's blame; then the same case again with its new call. The step is real training, a
+   batch of one at the current learning rate. *Teach it 10× more* repeats the case to show memorisation; *Worst case
+   next* teaches the training case the network currently gets most wrong, so the tug of war between cases is visible.
+   Convolutional networks are not covered by the walk-through yet. With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
@@ -127,7 +136,7 @@ perimeter of the smooth ellipse with the same area and elongation). Standardizat
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts
 js/app.js                  state, task switch, training loop, the three stages, the inspector, unit heatmap, prevalence
