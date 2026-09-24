@@ -175,7 +175,8 @@
     renderTestPanel();
   }
   function classifyNext(quiet) {
-    if (S.test.animating || S.test.next >= S.ds.test.length) return false;
+    if (S.test.animating) { S.test.skip = true; return false; }
+    if (S.test.next >= S.ds.test.length) return false;
     const s = S.ds.test[S.test.next++];
     const fw = S.net.forward(S.inputs.xOf(s));
     S.test.results.set(s.id, { p: fw.p });
@@ -183,6 +184,7 @@
     selectSpecimen(s, { silent: true });
     if (quiet || reducedMotion) { S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); renderTestGraph(); return true; }
     S.test.animating = true;
+    if (S.net.conv) { renderTestPanel(); renderInspector(); animateConvClassify(s); return true; }
     const stages = [0, 1, 2];
     let k = 0;
     const run = () => {
@@ -316,7 +318,7 @@
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
-  function renderTestGraph(stage) {
+  function renderTestGraph(stage, anim) {
     const cv = $('net-canvas-test');
     const s = S.selected;
     let st = 2;
@@ -324,8 +326,31 @@
     if (s && s.split === 'test' && S.test.results.has(s.id) && stage != null) st = stage;
     const m = graphModel(s, st, S.hover.test);
     if (s && s.split === 'test' && S.test.results.has(s.id) && !S.test.revealed.has(s.id)) { m.fw = S.net.forward(m.x); }
+    m.anim = anim || null;
     cv._model = m;
     Viz.drawNetwork(cv, m);
+  }
+  // Classify-next walk-through for convolutional networks: the window scans the image while the feature maps fill,
+  // the pooling blocks collapse, then the dense units and the output fire.
+  function animateConvClassify(s) {
+    const net = S.net, total = net.co * net.co, cells = net.po * net.po;
+    const T1 = 1800, T2 = 2000, T3 = 900, T4 = 350, T5 = 350, T6 = 450; // ms per phase
+    const t0 = performance.now();
+    S.test.skip = false;
+    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
+    const frame = now => {
+      if (!S.test.animating || S.selected !== s) return;
+      const t = S.test.skip ? Infinity : now - t0;
+      if (t < T1) renderTestGraph(0, { phase: 'scan', pos: Math.min(net.co, Math.floor(t / T1 * net.co)), showFilter: 0 });
+      else if (t < T1 + T2) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, net.co + Math.floor((t - T1) / T2 * (total - net.co))), showFilter: 0 });
+      else if (t < T1 + T2 + T3) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor((t - T1 - T2) / T3 * cells)), showFilter: 0 });
+      else if (t < T1 + T2 + T3 + T4) renderTestGraph(1, null);
+      else if (t < T1 + T2 + T3 + T4 + T5) renderTestGraph(2, null);
+      else if (t < T1 + T2 + T3 + T4 + T5 + T6) renderTestGraph(2, null);
+      else { finish(); return; }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
   }
   function renderCharts() {
     Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs });
@@ -646,6 +671,7 @@
       const cv = $(cvId), tip = $(tipId);
       cv.addEventListener('mousemove', ev => {
         const m = cv._model; if (!m) return;
+        if (key === 'test' && S.test.animating) return;
         const r = cv.getBoundingClientRect();
         const hit = Viz.hitNetwork(cv, ev.clientX - r.left, ev.clientY - r.top, m);
         const prev = S.hover[key];
@@ -655,9 +681,11 @@
         if ((prev && prev.ref) !== (hit && hit.ref) || (hit && hit.ref && (hit.ref.kind === 'map' || hit.ref.kind === 'fmap'))) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
+      if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
     }
     document.addEventListener('keydown', ev => {
-      if (ev.target.matches('input, select, textarea, button')) return;
+      if (ev.target.matches('input, select, textarea')) return;
+      if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
@@ -678,7 +706,12 @@
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test';
     if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
     if (name === 'train') { if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0]; renderTraining(true); }
-    if (name === 'test') { stopTraining(); renderTestPanel(); if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; } renderTestGraph(); renderInspector(); renderDataTrays(); }
+    if (name === 'test') {
+      stopTraining(); renderTestPanel();
+      if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
+      renderTestGraph(); renderInspector(); renderDataTrays();
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution: the 5×5 window scans the nucleus while the feature maps fill in, then the pooling blocks collapse. Press N or click the diagram to skip ahead.';
+    }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
 
