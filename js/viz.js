@@ -198,7 +198,7 @@ window.Viz = (function () {
    */
   function layoutNetwork(m) {
     const net = m.net, hidden = net.hidden, conv = net.conv;
-    const L = { W: NET_W, H: NET_H, nodes: [], edges: [], bands: [], captions: [], mode: m.mode };
+    const L = { W: NET_W, H: NET_H, nodes: [], edges: [], bands: [], captions: [], ops: [], mode: m.mode };
     const yc = NET_H / 2 + 8;
     const add = n => { L.nodes.push(n); return n; };
     const output = add({ kind: 'output', x: 722, y: yc, r: 26 });
@@ -234,19 +234,26 @@ window.Viz = (function () {
         L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 4], [map.x - map.size / 2, map.y - map.size / 2], [map.x - map.size / 2, map.y + map.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 4]], label: '1,024 weights' });
         L.captions.push({ x: 340, text: 'WEIGHTS · ONE PER PIXEL' });
         L.captions.push({ x: 545, text: 'WEIGHT × PIXEL' });
-        L.edges.push({ x1: map.x + map.size / 2, y1: map.y, x2: prod.x - prod.size / 2, y2: prod.y, w: 1, layer: 'sum', label: '× pixel' });
+        // the row reads image × weights = weight × pixel: the image arrives along the band, so the × sits where the band meets the weight map
+        L.ops.push({ x: map.x - map.size / 2 - 12, y: map.y, text: '×' }, { x: (map.x + map.size / 2 + prod.x - prod.size / 2) / 2, y: map.y, text: '=' });
         L.edges.push({ x1: prod.x + prod.size / 2, y1: prod.y, x2: output.x - output.r, y2: output.y, w: 1, layer: 'sum', label: 'Σ → z' });
       } else {
         const xW = hidden.length === 1 ? 330 : 312, xP = xW + 92, xs = [xW, 590];
         const h1 = hidden[0];
-        const size = Math.min(66, (NET_H - 100) / h1 - 8);
-        const ys = spread(h1, yc, size + 8);
-        const squares = ys.map((y, j) => add({ kind: 'square', j, x: xW, y, size }));
+        const captioned = (NET_H - 100) / h1 - 18 >= 48; // room for a map of useful size plus its ±max caption below
+        const gap = captioned ? 18 : 8;
+        const size = Math.min(66, (NET_H - 100) / h1 - gap);
+        const ys = spread(h1, yc, size + gap);
+        const squares = ys.map((y, j) => add({ kind: 'square', j, x: xW, y, size, captioned }));
         const prods = ys.map((y, j) => add({ kind: 'uprod', j, x: xP, y, size }));
         unitColumns.push(squares);
         L.captions.push({ x: (xW + xP) / 2, text: `HIDDEN ${hidden.length > 1 ? '1' : ''} · ${h1} ${m.activationLabel.toUpperCase()}` });
-        L.footnotes = [{ x: xW, text: 'weights' }, { x: xP, text: 'weight × pixel' }, { x: xP + size / 2 + 62, text: `Σ → ${m.activationLabel}` }];
-        for (const s of squares) L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 6], [s.x - s.size / 2, s.y - s.size / 2], [s.x - s.size / 2, s.y + s.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 6]], j: s.j });
+        L.footnotes = [{ x: xW, text: 'weights' }, { x: xP, text: 'weight × pixel' }, { x: xP + Math.max(size / 2 + 62, 88), text: `Σ → ${m.activationLabel}` }];
+        for (const s of squares) {
+          L.bands.push({ pts: [[img.x + img.w / 2, img.y - img.h / 2 + 6], [s.x - s.size / 2, s.y - s.size / 2], [s.x - s.size / 2, s.y + s.size / 2], [img.x + img.w / 2, img.y + img.h / 2 - 6]], j: s.j });
+          // each row reads image × weights = weight × pixel: the image arrives along the band, so the × sits where the band meets the weight map
+          L.ops.push({ x: s.x - s.size / 2 - 12, y: s.y, text: '×' }, { x: (xW + xP) / 2, y: s.y, text: '=' });
+        }
         L.bandLabel = { x: (img.x + img.w / 2 + xW - size / 2) / 2, text: '1,024 weights per unit · each map scaled to its own max' };
         const badgeX = xP + size / 2 + 16; // the activation badge sits after the product map: Σ weight × pixel + bias, through the activation
         let prevCol = prods;
@@ -362,6 +369,9 @@ window.Viz = (function () {
     if (L.bandLabel) ctx.fillText(L.bandLabel.text, L.bandLabel.x, L.bandLabel.y || NET_H - 16);
     if (L.bandLabel2) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16);
     if (L.bands.length && L.bands[0].label) ctx.fillText(L.bands[0].label, L.bandLabel ? L.bandLabel.x : 300, NET_H - 16);
+    // operator glyphs: image × weights = weight × pixel
+    ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2;
+    for (const op of L.ops) ctx.fillText(op.text, op.x, op.y);
 
     // edges, weak first so strong ones sit on top. Thickness is |w| against a fixed floor (EDGE_FLOOR), so connections
     // visibly grow from thin to thick during training instead of being re-normalised every frame.
@@ -427,12 +437,8 @@ window.Viz = (function () {
         ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        if (n.kind === 'map' || (n.kind === 'square' && n.size >= 56)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
+        if (n.kind === 'map' || (n.kind === 'square' && n.captioned)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : 'select a nucleus', n.x, n.y + n.size / 2 + 3);
-        if (n.kind === 'square') { // the multiplication sign between the weight map and the product map
-          ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText('×', n.x + 46, n.y);
-        }
         if (n.kind === 'uprod') { // activation badge: sum of the products plus the bias, through the activation
           const a = fw && stage >= 1 ? fw.a[1][n.j] : null;
           circleNode(ctx, n.x + n.size / 2 + 16, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);

@@ -51,8 +51,9 @@ network never sees it; the page uses it to show which hidden units respond to wh
    convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps.
    Connections are drawn against a fixed scale so they visibly grow as the network learns, and a bright core marks the
    ones the last training step moved most. A single-layer network on pixels also shows the **weight × pixel** product
-   map whose sum is the score, and every pixel-fed hidden unit shows its own weight × pixel map beside its weight map,
-   with the activation badge after it (sum plus bias, through the activation). Hovering a feature-map pixel of a convolutional network shows the arithmetic of that
+   map whose sum is the score, and every pixel-fed hidden unit shows its own weight × pixel map beside its weight map.
+   Each row reads **image × weights = weight × pixel** (the image arrives along the band, pixel by pixel), with the
+   activation badge after it (sum plus bias, through the activation). Hovering a feature-map pixel of a convolutional network shows the arithmetic of that
    position under the image: the 5 × 5 patch, the filter, their products, the sum and the ReLU. A
    single-layer network is also shown as a **weighted checklist** (every weight, largest first). With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
