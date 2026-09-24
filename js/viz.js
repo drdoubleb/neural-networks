@@ -178,10 +178,11 @@ window.Viz = (function () {
     if (!(opt && opt.max != null)) for (let i = 0; i < w * h; i++) max = Math.max(max, Math.abs(arr[offset + i]));
     if (opt && opt.floor) max = Math.max(max, opt.floor);
     max = Math.max(max, 1e-9);
+    const limit = opt && opt.maskBefore != null ? opt.maskBefore : w * h;
     for (let i = 0; i < w * h; i++) {
       const v = arr[offset + i] / max;
       const c = opt && opt.mode === 'sequential' ? sequentialRgb(Math.max(0, v)) : divergingRgb(v);
-      im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = 255;
+      im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = i < limit ? 255 : 0;
     }
     ctx.putImageData(im, 0, 0);
     return { canvas: cv, max };
@@ -260,7 +261,7 @@ window.Viz = (function () {
       L.captions.push({ x: 30, text: 'INPUT · 1,024 PX', align: 'left' });
       const rowStep = (NET_H - 100) / K;
       const fs = Math.min(38, rowStep - 6), ms = Math.min(50, rowStep - 4), ps = Math.min(32, rowStep - 8);
-      const xF = 212, xM = 282, xP = 350;
+      const xF = 228, xM = 298, xP = 366;
       const ys = spread(K, yc, rowStep);
       const filters = ys.map((y, k) => add({ kind: 'filter', k, x: xF, y, size: fs }));
       const fmaps = ys.map((y, k) => add({ kind: 'fmap', k, x: xM, y, size: ms }));
@@ -270,7 +271,7 @@ window.Viz = (function () {
       L.bandLabel = { x: (img.x + img.w / 2 + xF - fs / 2) / 2, y: 44, text: 'each filter slides over the image' };
       L.footnotes = [{ x: xF, text: 'filters' }, { x: xM, text: 'feature maps' }, { x: xP, text: 'pooled' }];
       const F = net.featureCount;
-      const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [520] : [485, 610];
+      const xs = hidden.length === 0 ? [] : hidden.length === 1 ? [530] : [495, 615];
       const poolBox = { x1: xP + ps / 2, yTop: ys[0] - ps / 2, yBot: ys[K - 1] + ps / 2 };
       let prevCol = null;
       hidden.forEach((h, l) => {
@@ -427,15 +428,34 @@ window.Viz = (function () {
         }
       } else if (n.kind === 'fmap' || n.kind === 'pooled') {
         const side = n.kind === 'fmap' ? net.co : net.po;
-        const show = fw && fw.conv && stage >= 1;
+        const anim = m.anim;
+        const show = fw && fw.conv && (stage >= 1 || anim);
+        ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         if (show) {
           const arr = n.kind === 'fmap' ? fw.conv.act : fw.conv.v;
-          const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax });
+          let maskBefore = null;
+          if (anim) maskBefore = n.kind === 'fmap' ? (anim.phase === 'scan' ? anim.pos : side * side) : (anim.phase === 'pool' ? anim.posP : anim.phase === 'scan' ? 0 : side * side);
+          const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax, maskBefore });
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
-        } else { ctx.fillStyle = pending; ctx.fillRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size); }
+        }
         ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+        // highlights: the cell being written during the scan, the block being pooled, or the hovered position
+        const cs = n.size / side;
+        if (n.kind === 'fmap' && anim && anim.phase === 'scan' && anim.pos > 0 && n.k === anim.showFilter) {
+          const p = anim.pos - 1, py = Math.floor(p / side), px = p % side;
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
+        }
+        if (anim && anim.phase === 'pool' && anim.posP > 0) {
+          const p = anim.posP - 1, py = Math.floor(p / net.po), px = p % net.po, bs = net.conv.pool;
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5;
+          if (n.kind === 'fmap') ctx.strokeRect(n.x - n.size / 2 + px * bs * cs, n.y - n.size / 2 + py * bs * cs, bs * cs, bs * cs);
+          else ctx.strokeRect(n.x - n.size / 2 + px * cs - 1, n.y - n.size / 2 + py * cs - 1, cs + 2, cs + 2);
+        }
+        if (n.kind === 'fmap' && hovered === n && m.hover && m.hover.i != null) {
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(n.x - n.size / 2 + m.hover.i * cs - 1, n.y - n.size / 2 + m.hover.j * cs - 1, cs + 2, cs + 2);
+        }
         // small arrows between filter -> map -> pooled
         const prevX = n.kind === 'fmap' ? n.x - n.size / 2 - 8 : n.x - n.size / 2 - 6;
         ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(prevX - 8, n.y); ctx.lineTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y - 3); ctx.moveTo(prevX, n.y); ctx.lineTo(prevX - 3, n.y + 3); ctx.stroke();
@@ -459,9 +479,59 @@ window.Viz = (function () {
         }
       }
     }
+    // convolution walk-through: the sliding window on the image and the arithmetic of the current position
+    if (net.conv && m.x) {
+      const img = L.nodes.find(n => n.kind === 'image');
+      let spot = null;
+      if (m.anim && m.anim.phase === 'scan' && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
+      else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'fmap' && m.hover.i != null) spot = { k: m.hover.ref.k, oy: m.hover.j, ox: m.hover.i };
+      if (spot && img) {
+        drawWindow(ctx, img, m.size, spot.oy, spot.ox, net.conv.f);
+        drawConvPanel(ctx, m, spot.k, spot.oy, spot.ox, { x: 24, y: img.y + img.h / 2 + 40 });
+      } else if (m.anim && m.anim.phase === 'pool' && img) {
+        ctx.font = `500 11px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.fillText(`max-pool: each ${net.conv.pool}×${net.conv.pool} block of a feature map`, 24, img.y + img.h / 2 + 40);
+        ctx.fillText('keeps only its largest value', 24, img.y + img.h / 2 + 54);
+      }
+    }
     return L;
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
+
+  // one position of one filter, spelled out: image patch × filter = products, summed, through ReLU
+  function drawConvPanel(ctx, m, k, oy, ox, at) {
+    const c = colors(), net = m.net, f = net.conv.f, size = m.size, x = m.x;
+    if (!x) return;
+    const cell = 9, gap = 12, gw = f * cell;
+    const patch = [], filt = [], prod = [];
+    let maxP = 1e-9, maxW = TILE_FLOOR.filter, maxQ = 1e-9, sum = net.bc[k];
+    for (let dy = 0; dy < f; dy++) for (let dx = 0; dx < f; dx++) {
+      const p = x[(oy + dy) * size + ox + dx], w = net.Wc[(k * f + dy) * f + dx], q = p * w;
+      patch.push(p); filt.push(w); prod.push(q); sum += q;
+      maxP = Math.max(maxP, Math.abs(p)); maxW = Math.max(maxW, Math.abs(w)); maxQ = Math.max(maxQ, Math.abs(q));
+    }
+    const act = sum > 0 ? sum : 0;
+    const grids = [['image patch', patch, maxP], [`filter ${k + 1}`, filt, maxW], ['products', prod, maxQ]];
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
+    grids.forEach(([label, vals, mx], g) => {
+      const gx = at.x + g * (gw + gap);
+      ctx.fillStyle = c.ink3; ctx.fillText(label, gx + gw / 2, at.y - 3);
+      for (let i = 0; i < f * f; i++) { ctx.fillStyle = diverging(vals[i] / mx); ctx.fillRect(gx + (i % f) * cell, at.y + Math.floor(i / f) * cell, cell - 1, cell - 1); }
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(gx - 0.5, at.y - 0.5, gw, gw);
+      if (g < 2) { ctx.fillStyle = c.ink2; ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'middle'; ctx.fillText(g === 0 ? '×' : '=', gx + gw + gap / 2, at.y + gw / 2); ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; }
+    });
+    ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`Σ + bias ${fmtSigned(net.bc[k], 2)} = ${fmtSigned(sum, 2)}`, at.x, at.y + gw + 6);
+    ctx.fillText(`ReLU → ${act.toFixed(2)}`, at.x, at.y + gw + 19);
+    ctx.fillStyle = c.ink3;
+    ctx.fillText(`→ map ${k + 1}, col ${ox}, row ${oy}`, at.x, at.y + gw + 32);
+  }
+  function drawWindow(ctx, imgNode, size, oy, ox, f) {
+    const c = colors();
+    const px = imgNode.w / size, x0 = imgNode.x - imgNode.w / 2 + ox * px, y0 = imgNode.y - imgNode.h / 2 + oy * px;
+    ctx.fillStyle = rgbStr(c.rgb.accent, 0.18); ctx.fillRect(x0, y0, f * px, f * px);
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, f * px, f * px);
+  }
 
   // hit-test in logical coordinates; returns { kind, ref, text } or null
   function hitNetwork(canvas, px, py, m) {
@@ -498,9 +568,9 @@ window.Viz = (function () {
         return { kind: 'node', ref: n, text: `filter ${n.k + 1}: ${f}×${f} weights, max |w| ${mm.toFixed(3)} · bias ${fmtSigned(net.bc[n.k], 3)}` };
       }
       if (n.kind === 'fmap' && inBox(n, 2)) {
-        if (!fw || !fw.conv) return { kind: 'node', ref: n, text: `feature map ${n.k + 1}: where filter ${n.k + 1} fires (${net.co}×${net.co})` };
         const i = Math.max(0, Math.min(net.co - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * net.co))), j = Math.max(0, Math.min(net.co - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * net.co)));
-        return { kind: 'node', ref: n, text: `feature map ${n.k + 1} at (${i}, ${j}): ${fmtNum(fw.conv.act[(n.k * net.co + j) * net.co + i], 2)} · ${net.co}×${net.co} values` };
+        if (!fw || !fw.conv) return { kind: 'node', ref: n, i, j, text: `feature map ${n.k + 1}: where filter ${n.k + 1} fires (${net.co}×${net.co}) · the panel shows the arithmetic at column ${i}, row ${j}` };
+        return { kind: 'node', ref: n, i, j, text: `feature map ${n.k + 1} at column ${i}, row ${j}: ${fmtNum(fw.conv.act[(n.k * net.co + j) * net.co + i], 2)} · see the arithmetic under the image` };
       }
       if (n.kind === 'pooled' && inBox(n, 2)) {
         const F = net.po * net.po;

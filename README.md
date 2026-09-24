@@ -51,13 +51,17 @@ network never sees it; the page uses it to show which hidden units respond to wh
    convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps.
    Connections are drawn against a fixed scale so they visibly grow as the network learns, and a bright core marks the
    ones the last training step moved most. A single-layer network on pixels also shows the **weight × pixel** product
-   map whose sum is the score. A
+   map whose sum is the score. Hovering a feature-map pixel of a convolutional network shows the arithmetic of that
+   position under the image: the 5 × 5 patch, the filter, their products, the sum and the ReLU. A
    single-layer network is also shown as a **weighted checklist** (every weight, largest first). With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
 3. **Test.** The weights are frozen. The held-out cases are classified one at a time (values animate through the
-   network, then the truth is revealed) or all at once. Accuracy, sensitivity, specificity and a confusion matrix
+   network, then the truth is revealed) or all at once. For a convolutional network, *Classify next* walks through the
+   convolution: the 5 × 5 window scans the nucleus while all the feature maps fill in behind it, with the arithmetic of
+   the current position shown, then the 4 × 4 pooling blocks collapse into the pooled maps, then the dense units and
+   the output fire. Press N or click the diagram to skip ahead. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population.
 
