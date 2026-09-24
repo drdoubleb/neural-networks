@@ -531,91 +531,80 @@ window.Viz = (function () {
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
 
-  // The lesson walk-through: one case's error, the blame each hidden unit receives, and the nudge every weight gets.
-  // m.lesson = { phase: forward | error | blame | nudge | after, frac (0..1 within the phase), error (call − truth),
-  //   y, truthName, pBefore, pAfter, delta[l][j] (d loss / d pre-activation of each hidden unit), gW, gWo, lr, fwBefore }
+  // The overlay uses the frozen forward pass and gradients. The ordinary graph still shows weights/activations.
+  // Only update glows encode parameter changes; backprop arrows encode weighted downstream gradients.
   function drawLesson(ctx, L, m) {
     const les = m.lesson, c = colors(), net = m.net, out = L.output;
-    const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
-    const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
-    const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
-    const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
-    const truthCol = les.y ? c.irregular : c.regular;
-    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
-    if (les.phase === 'forward') return;
-    // call against truth on a 0..1 scale beside the output; the gap between them is the error
-    const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
-    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx, top); ctx.lineTo(bx, bot); ctx.stroke();
-    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-    ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
-    const ty = yOf(les.y);
-    const pv = les.phase === 'after' && les.pAfter != null ? les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, les.frac)) : les.pBefore;
-    ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
-    ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
-    ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
-    ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
-    if (les.phase === 'after' && les.pAfter != null) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 74); }
-    if (les.phase === 'error') return;
-
-    // blame flows back one layer at a time: violet dots run from each target back to its source, then every unit
-    // shows its share of the error (d loss / d pre-activation); a unit that was switched off gets none
+    const backward = les.phase === 'blame', updating = les.phase === 'nudge';
+    const after = les.phase === 'after', phaseIndex = les.index;
     const nL = net.hidden.length;
-    if (nL) {
-      const prog = les.phase === 'blame' ? les.frac * nL : nL;
-      for (let k = 0; k < nL; k++) {
-        const l = nL - 1 - k, t = Math.min(1, prog - k);
-        if (t <= 0) continue;
-        const key = l === nL - 1 ? 'out' : l + 1;  // the connections that leave layer l
-        if (t < 1) {
-          ctx.fillStyle = c.accent;
-          for (const e of L.edges) { if (e.layer !== key) continue; const x = e.x2 + (e.x1 - e.x2) * t, y = e.y2 + (e.y1 - e.y2) * t; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
-        } else {
-          L.unitColumns[l].forEach((u, j) => {
-            const d = les.delta[l][j];
-            const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 7;
-            pill(ctx, px, py, d === 0 ? 'no blame' : `blame ${fmtSigned(d, 2)}`, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
-          });
+    const arrow = (e, reverse, alpha, moving) => {
+      const ax = reverse ? e.x2 : e.x1, ay = reverse ? e.y2 : e.y1;
+      const bx = reverse ? e.x1 : e.x2, by = reverse ? e.y1 : e.y2;
+      const angle = Math.atan2(by - ay, bx - ax), length = Math.hypot(bx - ax, by - ay);
+      if (length < 1) return;
+      ctx.strokeStyle = rgbStr(c.rgb.accent, alpha); ctx.fillStyle = rgbStr(c.rgb.accent, alpha); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      const tx = ax + (bx - ax) * 0.8, ty = ay + (by - ay) * 0.8;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(tx - 9 * Math.cos(angle - 0.45), ty - 9 * Math.sin(angle - 0.45)); ctx.lineTo(tx - 9 * Math.cos(angle + 0.45), ty - 9 * Math.sin(angle + 0.45)); ctx.closePath(); ctx.fill();
+      if (moving && les.playing && les.frac < 1) { const t = (les.frac * 2) % 1; ctx.beginPath(); ctx.arc(ax + (bx - ax) * t, ay + (by - ay) * t, 4, 0, Math.PI * 2); ctx.fill(); }
+    };
+    if (les.phase === 'forward') {
+      for (const e of L.edges) arrow(e, false, 0.45, true);
+    }
+    if (backward) {
+      const key = les.layer === nL - 1 ? 'out' : les.layer + 1;
+      const paths = L.edges.filter(e => e.layer === key);
+      const contribution = e => e.w * (key === 'out' ? les.error : les.delta[key][e.ti]);
+      const max = Math.max(1e-12, ...paths.map(e => Math.abs(contribution(e))));
+      for (const e of paths) { const rel = Math.abs(contribution(e)) / max; arrow(e, true, rel ? 0.35 + 0.65 * rel : 0.12, rel > 0); }
+    }
+    if (updating) {
+      const change = e => {
+        if (e.wi == null || e.layer === 'sum') return 0;
+        const w = e.layer === 'out' ? les.before.Wo[e.wi] : les.before.W[e.layer][e.wi];
+        const g = e.layer === 'out' ? les.gWo[e.wi] : les.gW[e.layer][e.wi];
+        return -les.lr * (g + les.l2 * w);
+      };
+      const max = Math.max(1e-12, ...L.edges.map(e => Math.abs(change(e))));
+      for (const e of L.edges) {
+        const dw = change(e); if (dw === 0) continue;
+        ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.75);
+        ctx.lineWidth = 2 + 6 * Math.abs(dw) / max;
+        ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+      }
+    }
+    // Ring the destination and selected incoming connection so table selection stays connected to the graph.
+    const [ls, js] = les.target.split(':'), layer = ls === 'out' ? 'out' : +ls, j = +js;
+    if (['blame', 'gradient', 'nudge'].includes(les.phase)) {
+      const node = layer === 'out' ? out : L.unitColumns[layer][j];
+      if (node) {
+        ctx.strokeStyle = c.accent; ctx.lineWidth = 3;
+        if (node.kind === 'square') ctx.strokeRect(node.x - node.size / 2 - 4, node.y - node.size / 2 - 4, node.size + 8, node.size + 8);
+        else { ctx.beginPath(); ctx.arc(node.x, node.y, node.r + 5, 0, Math.PI * 2); ctx.stroke(); }
+      }
+      if (!backward) for (const e of L.edges) {
+        if (e.layer === layer && e.fi === les.input && (layer === 'out' || e.ti === j)) {
+          ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+          ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke(); ctx.setLineDash([]);
         }
       }
     }
-    if (les.phase !== 'nudge') return;
-
-    // the nudge: every weight moves by −lr × blame × its input. Connections glow in the colour of their change
-    // (orange up, blue down), and on pixels a scaled copy of the image slides along the band into each weight map.
-    const fr = Math.min(1, les.frac);
-    const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
-    const maxDw = {};
-    for (const e of L.edges) { const a = Math.abs(dwOf(e)); if (a > (maxDw[e.layer] || 0)) maxDw[e.layer] = a; }
-    ctx.lineCap = 'round';
-    for (const e of L.edges) {
-      const dw = dwOf(e); if (!dw) continue;
-      const rel = Math.abs(dw) / maxDw[e.layer];
-      ctx.strokeStyle = rgbStr(dw > 0 ? c.rgb.irregular : c.rgb.regular, 0.25 + 0.65 * Math.min(1, fr * 2));
-      ctx.lineWidth = 2 + 8 * rel;
-      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
+    ctx.font = '600 11px "IBM Plex Sans", system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillStyle = c.ink2;
+    ctx.fillText(`truth: ${les.truthName} (${les.y})`, out.x, out.y + out.r + 42);
+    if (phaseIndex > 0 && !after) pill(ctx, out.x, out.y + out.r + 66, `δ = p − y = ${window.Backprop.signed(les.error)}`, c.accent, c);
+    if (after) {
+      ctx.fillText(`p: ${window.Backprop.num(les.pBefore)} → ${window.Backprop.num(les.pAfter)}`, out.x, out.y + out.r + 60);
+      return;
     }
-    ctx.lineCap = 'butt';
-    if (m.mode === 'pixels' && m.x && !net.conv) {
-      const img = L.nodes.find(n => n.kind === 'image');
-      const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
-      const D = m.x.length;
-      let common = 1e-9, xmax = 1e-9;
-      for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
-      for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
-      targets.forEach((t, j) => {
-        const n = t.node; if (!n || !img) return;
-        const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
-        const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
-        if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
-        const cx = x0 + (x1 - x0) * ease(fr);
-        const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
-        const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
-        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
-        if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+    if (backward || les.phase === 'gradient' || updating) {
+      L.unitColumns.forEach((col, l) => {
+        if (backward && l < les.layer) return;
+        col.forEach((u, k) => {
+          const d = les.delta[l][k], blocked = les.res.g.slopes[l][k] === 0;
+          const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 9;
+          pill(ctx, px, py, blocked ? 'slope 0 → δ 0' : `δ ${window.Backprop.signed(d)}`, blocked ? c.ink3 : c.accent, c);
+        });
       });
     }
   }
@@ -707,8 +696,8 @@ window.Viz = (function () {
         let mm = 0; for (let i = 0; i < net.sizes[0]; i++) mm = Math.max(mm, Math.abs(net.W[0][n.j * net.sizes[0] + i]));
         const i = Math.floor((x - (n.x - n.size / 2)) / n.size * m.size), j = Math.floor((y - (n.y - n.size / 2)) / n.size * m.size);
         const w = net.W[0][n.j * net.sizes[0] + Math.max(0, Math.min(net.D - 1, j * m.size + i))];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
-        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
+        const lessonTxt = m.lesson ? ' · click to inspect this pixel’s gradient and update below' : '';
+        return { kind: 'node', ref: n, pixelIndex: Math.max(0, Math.min(net.D - 1, j * m.size + i)), text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
         const D = net.D, off = n.j * D;
@@ -721,8 +710,8 @@ window.Viz = (function () {
       if (n.kind === 'map' && inBox(n, 0)) {
         const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
         const w = net.Wo[j * m.size + i];
-        const lessonTxt = m.lesson && (m.lesson.phase === 'nudge' || m.lesson.phase === 'after') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.error, 3)} × image to the map` : '';
-        return { kind: 'node', ref: n, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
+        const lessonTxt = m.lesson ? ' · click to inspect this pixel’s gradient and update below' : '';
+        return { kind: 'node', ref: n, pixelIndex: j * m.size + i, text: `pixel (${i}, ${j}) weight ${fmtSigned(w, 3)}${m.x ? ` × input ${fmtSigned(m.x[j * m.size + i], 2)}` : ''}${lessonTxt}` };
       }
       if (n.kind === 'product' && inBox(n, 0) && m.x) {
         const i = Math.min(m.size - 1, Math.floor((x - (n.x - n.size / 2)) / n.size * m.size)), j = Math.min(m.size - 1, Math.floor((y - (n.y - n.size / 2)) / n.size * m.size));
@@ -758,10 +747,9 @@ window.Viz = (function () {
       let lessonTxt = '';
       const les = m.lesson;
       if (les && best.wi != null && (les.phase === 'nudge' || les.phase === 'after')) {
-        const arr = best.layer === 'out' ? les.gWo : les.gW[best.layer], fwB = les.fwBefore;
-        const inp = best.layer === 'out' ? fwB.a[fwB.a.length - 1][best.fi] : best.layer === 0 ? m.x[best.fi] : fwB.a[best.layer][best.fi];
-        const blame = best.layer === 'out' ? les.error : les.delta[best.layer][best.ti];
-        lessonTxt = ` · this lesson: Δw = −${les.lr} × ${best.layer === 'out' ? 'error' : 'blame'} ${fmtSigned(blame, 3)} × input ${fmtSigned(inp, 2)} = ${fmtSigned(-les.lr * arr[best.wi], 4)}`;
+        const target = best.layer === 'out' ? 'out:0' : `${best.layer}:${best.ti}`;
+        const step = window.Backprop.parameter(les.res, target, best.fi, les.lr, les.l2);
+        lessonTxt = ` · saved update: data gradient ${window.Backprop.signed(step.gradient)} + decay ${window.Backprop.signed(step.decayGradient)}; Δw = ${window.Backprop.signed(step.change)}; ${window.Backprop.signed(step.before)} → ${window.Backprop.signed(step.after)}`;
       }
       return { kind: 'edge', ref: best, text: `weight ${best.fromName} → ${best.toName}: ${fmtSigned(best.w, 3)}${contrib}${moved}${lessonTxt}` };
     }

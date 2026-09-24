@@ -16,7 +16,7 @@ pixels to a convolutional network, with the reasons for each step visible along 
 - **GitHub Pages:** repository settings → Pages → *Deploy from a branch* → the default branch, root folder.
 
 Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `T` teaches the selected training case one
-step, `N` moves to the case the network gets most wrong (Train) or classifies the next test case (Test).
+step (`←` / `→` navigate it, `space` plays/pauses it, `Esc` closes it), `N` moves to the case the network gets most wrong (Train) or classifies the next test case (Test).
 
 The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
 each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
@@ -57,14 +57,24 @@ style). The network never sees it; the page uses it to show which hidden units r
    Each row reads **image × weights = weight × pixel** (the image arrives along the band, pixel by pixel), with the
    activation badge after it (sum plus bias, through the activation). Hovering a feature-map pixel of a convolutional network shows the arithmetic of that
    position under the image: the 5 × 5 patch, the filter, their products, the sum and the ReLU. A
-   single-layer network is also shown as a **weighted checklist** (every weight, largest first). **Teach this case** shows
-   back-propagation on the selected training case as a walk-through: the forward pass and the truth; the error (call −
-   truth) on a scale beside the output; the blame flowing back along the connections to each hidden unit, one layer at a
-   time, with a pill on each unit (a unit that was switched off gets none); the nudge every weight receives, −learning
-   rate × blame × input, drawn as a glow on each connection and, on pixels, as a copy of the nucleus sliding into each
-   weight map, scaled by that unit's blame; then the same case again with its new call. The step is real training, a
-   batch of one at the current learning rate. *Teach it 10× more* repeats the case to show memorisation; *Worst case
-   next* teaches the training case the network currently gets most wrong, so the tug of war between cases is visible.
+   single-layer network is also shown as a **weighted checklist** (every weight, largest first). **Teach this case** opens a paused, inspectable backpropagation walkthrough:
+   predict → measure loss and the output gradient → back through each hidden layer (last to first) → compute weight
+   gradients → preview an update → predict again. **Back / Next**, the numbered steps, and **Play / Pause** control the
+   pace; playback stops at the update preview. Only **Apply one update** changes the network, once. Canceling, selecting
+   another case, or leaving Train discards an unapplied preview. Replaying a completed calculation never trains again.
+   Hidden-unit tables show the weighted sum of *all* downstream gradients, the local activation derivative, and their
+   product δ = ∂L/∂z. These signed sensitivities are not percentages of blame. Select any unit or connection to trace its
+   arithmetic. The parameter inspector shows input × δ, the bias gradient, the weight-decay term, and exact before /
+   change / after values. On pixel inputs, clickable and keyboard-accessible maps link the standardized input, old
+   weight, data change, decay change, total change, and new weight at the same pixel; change maps share a scale, as do
+   before/after weights. These are parameter calculations, not saliency maps. Both labels and ReLU / sigmoid / tanh are
+   supported in all seven dense recipes, including both hidden layers in recipe 7.
+   A walkthrough uses one original training case (batch size 1, no augmentation) and captures its learning rate and decay
+   when opened. Ordinary training averages data gradients across the batch, then adds weight decay. All gradients use
+   the same pre-update parameters, biases are not decayed, and inactive ReLU weights can still change through decay.
+   The last step reports actual before/after probability, case loss, and training-set loss; a large learning rate or
+   regularization can increase case loss. **Finish**, then *Teach it 10× more*, repeats the case to demonstrate
+   memorization; *Worst case next* selects the training case with the largest probability error.
    Convolutional networks are not covered by the walk-through yet. With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
@@ -139,9 +149,24 @@ js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts
+js/backprop.js             walkthrough phases, exact parameter inspector, chain-rule tables and linked pixel maps (browser + Node helpers)
 js/app.js                  state, task switch, training loop, the three stages, the inspector, unit heatmap, prevalence
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make both nucleus datasets
+tools/check_backprop.js    finite-difference and exact-update assertions across all seven dense recipes and all activations
+tools/check_backprop_ui.cjs browser interaction checks (requires Playwright)
 tools/check_training.js    gradient check + the eight recipes in Node
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
+
+## Backpropagation verification
+
+Run `node tools/check_backprop.js` for finite-difference checks of the displayed gradients and comparisons of the
+predicted parameter changes with the actual optimizer. It covers both labels, zero and negative inputs, output and
+hidden biases, 0–2 hidden layers, all three activations, every dense recipe, inactive ReLUs with decay, extreme logits,
+and a deliberately oversized update. Training and evaluation use numerically stable cross-entropy from logits, whose
+score derivative is exactly sigmoid(z) − y. Displayed case/training losses exclude the regularization penalty.
+
+With Playwright and Chromium available, run `node tools/check_backprop_ui.cjs` (or set `PLAYWRIGHT_MODULE` to a local
+Playwright installation). It checks step navigation, update-once behavior, cancel/reset/case/stage isolation, playback,
+parameter and pixel selection, reduced motion, desktop/mobile layouts, and the portable HTML build.
