@@ -182,10 +182,10 @@
   const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600 };
   const LESSON_TITLES = { forward: 'Forward pass', loss: 'Loss', blame: 'Backward pass', gradient: 'Gradients', update: 'Update', check: 'Check' };
   function lessonPhases() {
-    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode);
+    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode), replay = Viz.sweepPlan(S.net, S.mode, { prep: false });
     const ph = [['forward', plan.total], ['loss', LESSON_MS.loss]];
     if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(plan.total / 3) : plan.total]); // the check replays a pixel sweep at triple speed
+    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(replay.total / 3) : replay.total]); // the check replays a pixel sweep at triple speed, the subtraction already done
     return ph;
   }
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
@@ -272,7 +272,7 @@
     const les = S.lesson; if (!les) return null;
     const g = les.res.g, hops = les.hops;
     let reveal = hops; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
-    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode), les.frac).reveal;
+    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode, { prep: les.phase !== 'check' }), les.frac).reveal;
     return { phase: les.phase, frac: les.frac, hops, reveal, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
   }
   // what the forward sweep shows, for the strip
@@ -308,8 +308,8 @@
         gradient: allSilent
           ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
           : hidden
-          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the ${noun(1)} itself, scaled by the unit’s blame.` : ''}`
-          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the ${noun(1)} itself, scaled by the error.` : ''}`,
+          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees), scaled by the unit’s blame.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees), scaled by the error.` : ''}`,
         update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. Watch the connections${pixels ? ' and weight maps' : ''} change.`,
         check: sure
           ? `The same case runs forward again. It was already right and sure, so the step was tiny: <b>${pair}</b>.`
