@@ -185,7 +185,7 @@
     const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode);
     const ph = [['forward', plan.total], ['loss', LESSON_MS.loss]];
     if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(plan.total / 2) : plan.total]);
+    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(plan.total / 3) : plan.total]); // the check replays a pixel sweep at triple speed
     return ph;
   }
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
