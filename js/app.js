@@ -279,9 +279,10 @@
   function forwardText() {
     const hidden = S.net.hidden.length;
     if (S.mode === 'pixels' && !S.net.conv) {
-      return hidden
-        ? `The ${noun(1)} is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
-        : `The ${noun(1)} is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`;
+      const prep = `First the mean training ${noun(1)} is subtracted from this one: the network sees the difference (orange = more ink than average, blue = less), which is large at the membrane and near zero in the centre. `;
+      return prep + (hidden
+        ? `That difference is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
+        : `That difference is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`);
     }
     return 'Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output.';
   }
@@ -457,6 +458,7 @@
       if (!allowed) { fw = null; stage = 0; }
     }
     return { net: S.net, mode: S.mode, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
+      inputMean: S.mode === 'pixels' && S.inputs.std ? S.inputs.std.mean : null,
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {

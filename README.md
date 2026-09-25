@@ -62,7 +62,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    back-propagation on one training case as a six-step walk-through (five without a hidden layer), each step named in a
    strip above the diagram: (1) the forward pass, each dense connection wiping from source to target with thickness =
    weight × the value at its start and the colour of its sign, so each node's sum can be read off, hop by hop to the output
-   (on pixels the nucleus is laid over each weight map, the product map forms cell by cell and is set aside, a scan line
+   (on pixels the mean training nucleus is first subtracted from this one, so the network sees the difference, which is
+   large at the membrane and near zero in the centre; that difference is laid over each weight map, the product map forms cell by cell and is set aside, a scan line
    sums it with orange cells against blue, and the bias and the ReLU, or the sigmoid at the output, finish the unit,
    with a magnifier showing one 4×4 block of the arithmetic; the first unit runs slowly, the rest together); (2) the loss, the call against
    the truth on a scale beside the output, with the error as its slope; (3) the backward pass, blame flowing back along
