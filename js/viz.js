@@ -568,10 +568,10 @@ window.Viz = (function () {
     const nL = net.hidden.length, segs = [];
     if (mode === 'pixels' && !net.conv) {
       const rows = nL ? net.hidden[0] : 1;
-      segs.push({ key: 'image', ms: 4000 + (rows > 1 ? 2000 : 0) });
-      if (!nL) segs.push({ key: 'sum', ms: 800 });
-      else for (let k = 1; k <= nL; k++) segs.push({ key: k < nL ? k : 'out', ms: 800 });
-      segs.push({ key: 'final', ms: 500 });
+      segs.push({ key: 'image', ms: 12000 + (rows > 1 ? 6000 : 0) }); // the first unit slowly (12 s), the rest together (6 s)
+      if (!nL) segs.push({ key: 'sum', ms: 1200 });
+      else for (let k = 1; k <= nL; k++) segs.push({ key: k < nL ? k : 'out', ms: 1200 });
+      segs.push({ key: 'final', ms: 800 });
     } else {
       const hops = nL + 1, ms = 2600 / (hops + 1);
       for (let k = 0; k < hops; k++) segs.push({ key: k < nL ? k : 'out', ms });
@@ -607,7 +607,7 @@ window.Viz = (function () {
     const img = L.nodes.find(n => n.kind === 'image');
     const rows = nL ? L.unitColumns[0] : [L.nodes.find(n => n.kind === 'map')];
     const n = rows.length, D = net.D;
-    const T1 = 4000, T2 = n > 1 ? 2000 : 0, tm = t * (T1 + T2);
+    const T1 = 12000, T2 = n > 1 ? 6000 : 0, tm = t * (T1 + T2);
     const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
     const badgeFont = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
     const fmtA = v => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
