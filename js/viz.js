@@ -535,8 +535,8 @@ window.Viz = (function () {
 
   // ---- shared by the lesson and the test walk-through
   // a banner along the bottom of the diagram naming the step, with an arrow for the passes (dir +1 forward, −1 back)
-  function drawBanner(ctx, c, text, dir) {
-    const y = NET_H - 34;
+  function drawBanner(ctx, c, L, text, dir) {
+    const y = L.bandLabel || L.poolCaption ? NET_H - 34 : NET_H - 16; // above the band label of the pixel layouts, else along the free bottom edge
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, 400, y);
     if (dir) {
@@ -554,6 +554,37 @@ window.Viz = (function () {
     if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
     for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
   }
+  // the value at the start of a connection for the case on screen: an input, a hidden activation, or the top layer
+  function sourceValue(m, e) {
+    const fw = m.fw; if (e.fi == null) return null;
+    if (e.layer === 'out') return fw ? fw.a[fw.a.length - 1][e.fi] : null;
+    if (e.layer === 0) return m.x ? m.x[e.fi] : null;
+    return fw ? fw.a[e.layer][e.fi] : null;
+  }
+  // The forward sweep. On dense connections a wipe grows from source to target with thickness = |weight × value at the
+  // source| and the colour of its sign, so the sum arriving at each node can be read off the diagram. The bands (pixels
+  // into the first weight maps) and the Σ edge of the single-layer pixel network keep a travelling dot for now.
+  function drawForwardSweep(ctx, L, c, m, frac, hops) {
+    const nL = m.net.hidden.length, seg = 1 / (hops + 1);
+    const k = Math.floor(Math.min(0.9999, frac) / seg), t = Math.min(1, (frac - k * seg) / seg);
+    for (let h = 0; h < Math.min(k + 1, hops); h++) {
+      const key = hopKeyFor(m, nL, h), tt = h < k ? 1 : t;
+      if (key === 'band' || key === 'sum') { if (h === k) drawHopDots(ctx, L, c, key, t); continue; }
+      drawHopWipe(ctx, L, c, m, key, tt);
+    }
+  }
+  function drawHopWipe(ctx, L, c, m, key, t) {
+    const items = [];
+    let max = 1e-9;
+    for (const e of L.edges) { if (e.layer !== key) continue; const v = sourceValue(m, e); if (v == null) continue; const p = e.w * v; items.push({ e, p }); max = Math.max(max, Math.abs(p)); }
+    ctx.lineCap = 'round';
+    for (const { e, p } of items) {
+      ctx.strokeStyle = rgbStr(p >= 0 ? c.rgb.irregular : c.rgb.regular, 0.9);
+      ctx.lineWidth = 1.5 + 9 * Math.abs(p) / max;
+      ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+  }
   function drawTruthLabel(ctx, c, out, y, name, mark) {
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = y ? c.irregular : c.regular; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${name}${mark ? ' ' + mark : ''}`, out.x, out.y + out.r + 42);
@@ -562,15 +593,14 @@ window.Viz = (function () {
   // m.sweep = { phase: forward | call | reveal, frac, hops, reveal, p, called, threshold, truthName, y, correct }
   function drawTestSweep(ctx, L, m) {
     const sw = m.sweep, c = colors(), nL = m.net.hidden.length;
+    drawForwardSweep(ctx, L, c, m, sw.phase === 'forward' ? sw.frac : 1, sw.hops);
     if (sw.phase === 'forward') {
-      const seg = 1 / (sw.hops + 1), k = Math.floor(Math.min(0.9999, sw.frac) / seg);
-      if (k < sw.hops) drawHopDots(ctx, L, c, hopKeyFor(m, nL, k), (sw.frac - k * seg) / seg);
-      drawBanner(ctx, c, 'forward pass through the frozen weights', 1);
+      drawBanner(ctx, c, L, 'forward pass: each connection carries weight × value', 1);
     } else if (sw.phase === 'call') {
-      drawBanner(ctx, c, `P(${m.positiveName}) = ${sw.p.toFixed(2)} ${sw.p >= sw.threshold ? '≥' : '<'} ${sw.threshold.toFixed(2)}, so the call is ${sw.called}`, 0);
+      drawBanner(ctx, c, L, `P(${m.positiveName}) = ${sw.p.toFixed(2)} ${sw.p >= sw.threshold ? '≥' : '<'} ${sw.threshold.toFixed(2)}, so the call is ${sw.called}`, 0);
     } else {
       drawTruthLabel(ctx, c, L.output, sw.y, sw.truthName, sw.correct ? '✓' : '✗');
-      drawBanner(ctx, c, `truth: ${sw.truthName} · ${sw.correct ? 'correct' : 'wrong'}`, 0);
+      drawBanner(ctx, c, L, `truth: ${sw.truthName} · ${sw.correct ? 'correct' : 'wrong'}`, 0);
     }
   }
 
@@ -586,20 +616,17 @@ window.Viz = (function () {
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
     const nL = net.hidden.length, hops = les.hops, ph = les.phase;
-    const banner = (text, dir) => drawBanner(ctx, c, text, dir);
-    const hopKey = k => hopKeyFor(m, nL, k);
-    const dots = (key, t) => drawHopDots(ctx, L, c, key, t);
+    const banner = (text, dir) => drawBanner(ctx, c, L, text, dir);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
     // 1 · forward pass (and 6 · check): values flow hop by hop
     const seg = 1 / (hops + 1);
     if (ph === 'forward' || ph === 'check') {
-      const k = Math.floor(Math.min(0.9999, les.frac) / seg);
-      if (k < hops) dots(hopKey(k), (les.frac - k * seg) / seg);
-      banner(ph === 'forward' ? 'forward pass' : 'forward pass again, with the new weights', 1);
+      drawForwardSweep(ctx, L, c, m, les.frac, hops);
+      banner(ph === 'forward' ? 'forward pass: each connection carries weight × value' : 'forward pass again, with the new weights', 1);
       if (ph === 'forward') return;
-    }
+    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1, hops);
 
     // 2 · loss: the call against the truth on a 0..1 scale beside the output; the gap is the error
     const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
@@ -819,7 +846,8 @@ window.Viz = (function () {
       if (d < bestD) { bestD = d; best = e; }
     }
     if (best) {
-      const contrib = best.fromIdx != null && m.x ? ` × input ${fmtSigned(m.x[best.fromIdx], 2)} = ${fmtSigned(best.w * m.x[best.fromIdx], 3)}` : '';
+      const sv = sourceValue(m, best);
+      const contrib = sv != null ? ` × ${best.fromIdx != null ? 'input' : 'value'} ${fmtSigned(sv, 2)} = ${fmtSigned(best.w * sv, 3)}` : '';
       const moved = best.prev != null && Math.abs(best.w - best.prev) > 1e-9 ? ` · last step ${fmtSigned(best.w - best.prev, 4)}` : '';
       let lessonTxt = '';
       const les = m.lesson;

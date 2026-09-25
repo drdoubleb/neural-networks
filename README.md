@@ -60,7 +60,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    position under the image: the 5 × 5 patch, the filter, their products, the sum and the ReLU. A
    single-layer network is also shown as a **weighted checklist** (every weight, largest first). **Teach next case** shows
    back-propagation on one training case as a six-step walk-through (five without a hidden layer), each step named in a
-   strip above the diagram: (1) the forward pass, values flowing hop by hop to the output; (2) the loss, the call against
+   strip above the diagram: (1) the forward pass, each dense connection wiping from source to target with thickness =
+   weight × the value at its start and the colour of its sign, so each node's sum can be read off, hop by hop to the output; (2) the loss, the call against
    the truth on a scale beside the output, with the error as its slope; (3) the backward pass, blame flowing back along
    the connections to each hidden unit one layer at a time, with a pill on each unit (a unit that was switched off gets
    none); (4) the gradients, blame at one end of a connection × activity at the other, drawn as a glow on each
@@ -73,7 +74,7 @@ style). The network never sees it; the page uses it to show which hidden units r
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
 3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
-   the frozen weights, values flowing hop by hop while a strip names what is happening, then the call at the threshold,
+   the frozen weights, each connection wiping with the product it carries while a strip names what is happening, then the call at the threshold,
    then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. For a convolutional network, *Classify next* walks through the
    convolution in about 30 seconds: filter 1 alone scans the nucleus slowly with the arithmetic of each position shown,
    the remaining filters sweep together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4
