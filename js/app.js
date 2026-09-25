@@ -182,10 +182,10 @@
   const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600 };
   const LESSON_TITLES = { forward: 'Forward pass', loss: 'Loss', blame: 'Backward pass', gradient: 'Gradients', update: 'Update', check: 'Check' };
   function lessonPhases() {
-    const L = S.net.hidden.length;
-    const ph = [['forward', LESSON_MS.forward], ['loss', LESSON_MS.loss]];
+    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode);
+    const ph = [['forward', plan.total], ['loss', LESSON_MS.loss]];
     if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', LESSON_MS.check]);
+    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(plan.total / 2) : plan.total]);
     return ph;
   }
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
@@ -219,7 +219,7 @@
     if (S.selected !== s) selectSpecimen(s);
     const x = S.inputs.xOf(s), y = s.label;
     const res = S.net.lesson(x, y);
-    const hops = S.net.hidden.length + (S.mode === 'pixels' && !S.net.hidden.length ? 2 : 1); // a single layer on pixels shows image → product map → output
+    const hops = Viz.sweepPlan(S.net, S.mode).hops;
     S.lastLesson = null;
     S.lesson = { s, x, y, res, hops, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, morph: null };
     updateTeachButton(); renderLessonLine();
@@ -272,8 +272,18 @@
     const les = S.lesson; if (!les) return null;
     const g = les.res.g, hops = les.hops;
     let reveal = hops; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
-    if (les.phase === 'forward' || les.phase === 'check') reveal = Math.min(hops, Math.floor(Math.min(0.9999, les.frac) * (hops + 1)));
+    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode), les.frac).reveal;
     return { phase: les.phase, frac: les.frac, hops, reveal, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
+  }
+  // what the forward sweep shows, for the strip
+  function forwardText() {
+    const hidden = S.net.hidden.length;
+    if (S.mode === 'pixels' && !S.net.conv) {
+      return hidden
+        ? `The ${noun(1)} is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
+        : `The ${noun(1)} is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`;
+    }
+    return 'Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output.';
   }
   function fmtPair(a, b) { const d = a.toFixed(2) === b.toFixed(2) ? 3 : 2; return `${a.toFixed(d)} → ${b.toFixed(d)}`; }
   function renderLessonLine() {
@@ -289,7 +299,7 @@
       const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
       const pair = les.pAfter == null ? `${p} → …` : fmtPair(les.pBefore, les.pAfter);
       const texts = {
-        forward: `Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output. The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
+        forward: `${forwardText()} The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
         loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: hidden > 1
           ? 'How much is each hidden unit to blame? The error flows back one layer at a time: a unit’s blame = the blame of the units it feeds × the weights between them × 1 if the unit was on, 0 if it was off. The dots carry it back.'
@@ -474,8 +484,8 @@
   // Classify-next walk-through for dense networks, about 4 s: a forward pass through the frozen weights, hop by hop,
   // then the call at the threshold, then the truth
   function animateDenseClassify(s) {
-    const hops = S.net.hidden.length + (S.mode === 'pixels' && !S.net.hidden.length ? 2 : 1);
-    const T = [['forward', 2600], ['call', 900], ['reveal', 900]];
+    const plan = Viz.sweepPlan(S.net, S.mode), hops = plan.hops;
+    const T = [['forward', plan.total], ['call', 900], ['reveal', 900]];
     const t0 = performance.now();
     S.test.skip = false;
     const x = S.inputs.xOf(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
@@ -487,7 +497,7 @@
       let acc = 0, phase = null, frac = 1;
       for (const [name, ms] of T) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
       if (!phase) { finish(); return; }
-      const reveal = phase === 'forward' ? Math.min(hops, Math.floor(Math.min(0.9999, frac) * (hops + 1))) : hops;
+      const reveal = phase === 'forward' ? Viz.sweepState(plan, frac).reveal : hops;
       if (phase === 'reveal' && !shown) { shown = true; S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); }
       renderTestGraph(phase === 'forward' ? 0 : 2, null, { phase, frac, hops, reveal, p, called: className(called), threshold: S.test.threshold, truthName: className(s.label), y: s.label, correct: called === s.label });
       renderTestLine(s, p, called, phase);
@@ -512,7 +522,7 @@
       dense: `<span class="step">Dense layer</span> <span>The pooled maps feed the hidden units: each unit sums its weights × the pooled values, through ReLU.</span>`,
     };
     if (convTexts[phase]) html = convTexts[phase];
-    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights. Each connection carries weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output. Nothing is learned here.</span>`;
+    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights. ${forwardText()} Nothing is learned here.</span>`;
     else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
     else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
     $('test-lesson-text').innerHTML = html;

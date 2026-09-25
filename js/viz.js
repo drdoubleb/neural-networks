@@ -441,7 +441,7 @@ window.Viz = (function () {
         ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         if (n.kind === 'map' || (n.kind === 'square' && n.captioned)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + n.size / 2 + 3);
-        if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : 'select a nucleus', n.x, n.y + n.size / 2 + 3);
+        if (n.kind === 'product') ctx.fillText(tile ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : (m.reveal != null ? '' : 'select a nucleus'), n.x, n.y + n.size / 2 + 3);
         if (n.kind === 'uprod') { // activation badge: sum of the products plus the bias, through the activation
           const a = fw && (m.reveal != null ? m.reveal >= 1 : stage >= 1) ? fw.a[1][n.j] : null;
           circleNode(ctx, n.x + n.size / 2 + 16, n.y, 11, unitFill(a, fw ? fw.a[1] : [], signed), a == null ? null : (Math.abs(a) >= 10 ? a.toFixed(0) : a.toFixed(1)), `500 10px "IBM Plex Mono", ui-monospace, monospace`);
@@ -536,7 +536,7 @@ window.Viz = (function () {
   // ---- shared by the lesson and the test walk-through
   // a banner along the bottom of the diagram naming the step, with an arrow for the passes (dir +1 forward, −1 back)
   function drawBanner(ctx, c, L, text, dir) {
-    const y = L.bandLabel || L.poolCaption ? NET_H - 34 : NET_H - 16; // above the band label of the pixel layouts, else along the free bottom edge
+    const y = L.bandLabel || L.poolCaption || L.bands.some(b => b.label) ? NET_H - 34 : NET_H - 16; // above the band label of the pixel layouts, else along the free bottom edge
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(text, 400, y);
     if (dir) {
@@ -561,17 +561,172 @@ window.Viz = (function () {
     if (e.layer === 0) return m.x ? m.x[e.fi] : null;
     return fw ? fw.a[e.layer][e.fi] : null;
   }
-  // The forward sweep. On dense connections a wipe grows from source to target with thickness = |weight × value at the
-  // source| and the colour of its sign, so the sum arriving at each node can be read off the diagram. The bands (pixels
-  // into the first weight maps) and the Σ edge of the single-layer pixel network keep a travelling dot for now.
-  function drawForwardSweep(ctx, L, c, m, frac, hops) {
-    const nL = m.net.hidden.length, seg = 1 / (hops + 1);
-    const k = Math.floor(Math.min(0.9999, frac) / seg), t = Math.min(1, (frac - k * seg) / seg);
-    for (let h = 0; h < Math.min(k + 1, hops); h++) {
-      const key = hopKeyFor(m, nL, h), tt = h < k ? 1 : t;
-      if (key === 'band' || key === 'sum') { if (h === k) drawHopDots(ctx, L, c, key, t); continue; }
-      drawHopWipe(ctx, L, c, m, key, tt);
+  // ---- the forward sweep plan: how a forward pass is paced, shared by the lesson and the test walk-through.
+  // One segment per hop: 'image' is the choreographed pixel hop (overlay, product, sum, ReLU), 'sum' the Σ → z edge of
+  // the single-layer pixel network, a number a dense layer, 'out' the output; 'final' is a pause with everything shown.
+  function sweepPlan(net, mode) {
+    const nL = net.hidden.length, segs = [];
+    if (mode === 'pixels' && !net.conv) {
+      const rows = nL ? net.hidden[0] : 1;
+      segs.push({ key: 'image', ms: 4000 + (rows > 1 ? 2000 : 0) });
+      if (!nL) segs.push({ key: 'sum', ms: 800 });
+      else for (let k = 1; k <= nL; k++) segs.push({ key: k < nL ? k : 'out', ms: 800 });
+      segs.push({ key: 'final', ms: 500 });
+    } else {
+      const hops = nL + 1, ms = 2600 / (hops + 1);
+      for (let k = 0; k < hops; k++) segs.push({ key: k < nL ? k : 'out', ms });
+      segs.push({ key: 'final', ms });
     }
+    return { segs, total: segs.reduce((q, g) => q + g.ms, 0), hops: segs.length - 1 };
+  }
+  // where a sweep is at a fraction of its plan: the segment, the progress within it, and the hops that have arrived
+  function sweepState(plan, frac) {
+    const t = Math.max(0, Math.min(0.9999, frac)) * plan.total;
+    let acc = 0;
+    for (let i = 0; i < plan.segs.length; i++) { const g = plan.segs[i]; if (t < acc + g.ms) return { index: i, t: (t - acc) / g.ms, reveal: i, key: g.key }; acc += g.ms; }
+    return { index: plan.segs.length - 1, t: 1, reveal: plan.hops, key: 'final' };
+  }
+  // The forward sweep. On dense connections a wipe grows from source to target with thickness = |weight × value at the
+  // source| and the colour of its sign, so the sum arriving at each node can be read off the diagram. The pixel hop is
+  // choreographed: the nucleus is laid over each weight map, the product map forms and is set aside, a scan line sums it
+  // while the unit counts, then the bias and the ReLU (or the sigmoid at the output) finish the unit.
+  function drawForwardSweep(ctx, L, c, m, frac) {
+    const plan = sweepPlan(m.net, m.mode), st = sweepState(plan, frac);
+    for (let i = 0; i <= Math.min(st.index, plan.hops - 1); i++) {
+      const key = plan.segs[i].key, t = i < st.index ? 1 : st.t;
+      if (key === 'image') { if (i === st.index) drawImageHop(ctx, L, c, m, t); } // once done, the diagram itself shows the products and the units
+      else if (key === 'sum') drawSumEdge(ctx, L, c, m, t);
+      else drawHopWipe(ctx, L, c, m, key, t);
+    }
+  }
+  const IMAGE_STAGES = [['overlay', 0.175], ['wipe', 0.4], ['aside', 0.525], ['sum', 0.825], ['relu', 1]];
+  function imageStage(u) { let lo = 0; for (const [name, end] of IMAGE_STAGES) { if (u < end) return { name, v: (u - lo) / (end - lo) }; lo = end; } return { name: 'done', v: 1 }; }
+  function drawImageHop(ctx, L, c, m, t) {
+    const net = m.net, nL = net.hidden.length, x = m.x, fw = m.fw, S = m.size;
+    if (!x || !fw || !m.specimen) return;
+    const img = L.nodes.find(n => n.kind === 'image');
+    const rows = nL ? L.unitColumns[0] : [L.nodes.find(n => n.kind === 'map')];
+    const n = rows.length, D = net.D;
+    const T1 = 4000, T2 = n > 1 ? 2000 : 0, tm = t * (T1 + T2);
+    const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
+    const badgeFont = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
+    const fmtA = v => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
+    rows.forEach((w, j) => {
+      if (!w) return;
+      const st = j === 0 ? (tm < T1 ? imageStage(tm / T1) : { name: 'done', v: 1 }) : (tm < T1 ? { name: 'wait', v: 0 } : imageStage((tm - T1) / T2));
+      if (st.name === 'wait') return;
+      const pn = nL ? L.nodes.find(q => q.kind === 'uprod' && q.j === j) : L.nodes.find(q => q.kind === 'product');
+      const off = nL ? j * D : 0, Wrow = nL ? net.W[0] : net.Wo;
+      const prod = new Float64Array(D); let pos = 0, neg = 0;
+      for (let i = 0; i < D; i++) { const q = Wrow[off + i] * x[i]; prod[i] = q; if (q > 0) pos += q; else neg += q; }
+      const bias = nL ? net.b[0][j] : net.bo, z = pos + neg + bias, act = nL ? fw.a[1][j] : null;
+      const size = w.size, badgeX = L.badgeX;
+      const tile = () => tileCanvas('sweepprod' + j, prod, 0, S, S).canvas;
+      ctx.imageSmoothingEnabled = false;
+      if (st.name === 'overlay') { // the nucleus slides along the band and settles over the weight map, half transparent
+        const e = st.v * st.v * (3 - 2 * st.v);
+        const cx = img.x + (w.x - img.x) * e, cy = img.y + (w.y - img.y) * e, sz = img.w + (size - img.w) * e;
+        ctx.globalAlpha = 1 - 0.5 * e;
+        ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), cx - sz / 2, cy - sz / 2, sz, sz);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - sz / 2, cy - sz / 2, sz, sz);
+        return;
+      }
+      if (st.name === 'wipe') { // the product map wipes in over the overlay, cell = pixel × weight
+        ctx.globalAlpha = 0.5 * (1 - st.v);
+        ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), w.x - size / 2, w.y - size / 2, size, size);
+        ctx.globalAlpha = 1;
+        ctx.save(); ctx.beginPath(); ctx.rect(w.x - size / 2, w.y - size / 2, size, size * st.v); ctx.clip();
+        ctx.drawImage(tile(), w.x - size / 2, w.y - size / 2, size, size);
+        ctx.restore();
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(w.x - size / 2, w.y - size / 2, size, size);
+        if (j === 0) { const r0 = Math.min(S - 4, 4 * Math.floor(st.v * (S / 4))), c0 = S / 2 - 2; drawWindow(ctx, img, S, r0, c0, 4); drawPixelPanel(ctx, c, m, Wrow, off, r0, c0, { x: 24, y: img.y + img.h / 2 + 40 }); }
+        return;
+      }
+      // from here on the product map exists; it slides to its slot, then is summed
+      const e = st.name === 'aside' ? st.v * st.v * (3 - 2 * st.v) : 1;
+      const px = w.x + (pn.x - w.x) * e, py = w.y + (pn.y - w.y) * e;
+      ctx.drawImage(tile(), px - size / 2, py - size / 2, size, size);
+      ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(px - size / 2, py - size / 2, size, size);
+      if (st.name === 'aside') return;
+      // the sum: a scan line sweeps the map, the unit counts, bars show the positive and negative parts
+      const rowsDone = st.name === 'sum' ? Math.floor(st.v * S) : S;
+      let sum = 0, posNow = 0, negNow = 0;
+      for (let i = 0; i < rowsDone * S; i++) { const q = prod[i]; sum += q; if (q > 0) posNow += q; else negNow += q; }
+      if (st.name === 'sum') { const sy = pn.y - size / 2 + st.v * size; ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pn.x - size / 2, sy); ctx.lineTo(pn.x + size / 2, sy); ctx.stroke(); }
+      const half = size / 2 - 2, maxAbs = Math.max(pos, -neg, 1e-9), by = pn.y + size / 2 + 4;
+      ctx.fillStyle = c.irregular; ctx.fillRect(pn.x, by, posNow / maxAbs * half, 4);
+      ctx.fillStyle = c.regular; ctx.fillRect(pn.x + negNow / maxAbs * half, by, -negNow / maxAbs * half, 4);
+      ctx.fillStyle = c.ink; ctx.fillRect(pn.x + (posNow + negNow) / maxAbs * half - 1, by - 2, 2, 8);
+      if (nL) {
+        const showAct = st.name === 'done' || (st.name === 'relu' && st.v >= 0.5);
+        const label = st.name === 'sum' ? fmtA(sum) : st.name === 'relu' && st.v < 0.5 ? fmtA(z) : fmtA(act);
+        circleNode(ctx, badgeX, pn.y, 11, showAct ? unitFill(act, fw.a[1], ACT_SIGNED(m.activation)) : c.surface2, label, badgeFont);
+        if (size >= 56) {
+          ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+          if (st.name === 'sum') ctx.fillText('Σ so far', badgeX - 8, pn.y + 15);
+          else if (st.name === 'relu' && st.v < 0.5) ctx.fillText(`Σ + b ${fmtSigned(bias, 2)}`, badgeX - 8, pn.y + 15);
+          else if (st.name === 'relu' || st.name === 'done') drawReluGlyph(ctx, c, badgeX, pn.y - 24, z);
+        }
+      } else {
+        ctx.font = monoS; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        const line = st.name === 'sum' ? `Σ so far ${fmtSigned(sum, 2)}` : `Σ = ${fmtSigned(pos + neg, 2)}  + bias ${fmtSigned(bias, 2)}  = z ${fmtSigned(z, 2)}`;
+        ctx.fillText(line, pn.x, by + 8);
+      }
+    });
+  }
+  // the magnifier under the image: one 4×4 block of the multiplication, cell by cell, with the numbers of its largest cell
+  function drawPixelPanel(ctx, c, m, Wrow, off, r0, c0, at) {
+    const S = m.size, x = m.x, cell = 9, gap = 12, gw = 4 * cell;
+    const pix = [], wts = [], prods = [];
+    let maxP = 1e-9, maxW = TILE_FLOOR.square, maxQ = 1e-9, big = 0;
+    for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) {
+      const i = (r0 + dy) * S + c0 + dx, p = x[i], w = Wrow[off + i], q = p * w;
+      pix.push(p); wts.push(w); prods.push(q);
+      maxP = Math.max(maxP, Math.abs(p)); maxW = Math.max(maxW, Math.abs(w)); maxQ = Math.max(maxQ, Math.abs(q));
+      if (Math.abs(q) > Math.abs(prods[big])) big = prods.length - 1;
+    }
+    const grids = [['pixels', pix, maxP], ['weights', wts, maxW], ['products', prods, maxQ]];
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
+    grids.forEach(([label, vals, mx], g) => {
+      const gx = at.x + g * (gw + gap);
+      ctx.fillStyle = c.ink3; ctx.fillText(label, gx + gw / 2, at.y - 3);
+      for (let i = 0; i < 16; i++) { ctx.fillStyle = diverging(vals[i] / mx); ctx.fillRect(gx + (i % 4) * cell, at.y + Math.floor(i / 4) * cell, cell - 1, cell - 1); }
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(gx - 0.5, at.y - 0.5, gw, gw);
+      ctx.strokeStyle = c.ink; ctx.strokeRect(gx + (big % 4) * cell - 0.5, at.y + Math.floor(big / 4) * cell - 0.5, cell, cell);
+      if (g < 2) { ctx.fillStyle = c.ink2; ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'middle'; ctx.fillText(g === 0 ? '×' : '=', gx + gw + gap / 2, at.y + gw / 2); ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; }
+    });
+    ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`${fmtSigned(pix[big], 2)} × ${fmtSigned(wts[big], 3)} = ${fmtSigned(prods[big], 3)}`, at.x, at.y + gw + 6);
+    ctx.fillStyle = c.ink3;
+    ctx.fillText(`4×4 of the ${S}×${S} cells, rows ${r0}–${r0 + 3}`, at.x, at.y + gw + 19);
+  }
+  // the Σ → z edge of the single-layer pixel network: a wipe in the colour of z, its value, and the sigmoid with the point plotted
+  function drawSumEdge(ctx, L, c, m, t) {
+    const e = L.edges.find(q => q.layer === 'sum'); if (!e || !m.fw) return;
+    const z = m.fw.z;
+    ctx.lineCap = 'round'; ctx.strokeStyle = rgbStr(z >= 0 ? c.rgb.irregular : c.rgb.regular, 0.9); ctx.lineWidth = 2 + 8 * Math.min(1, Math.abs(z) / 4);
+    ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); ctx.stroke(); ctx.lineCap = 'butt';
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(`z = ${fmtSigned(z, 2)}`, (e.x1 + e.x2) / 2, e.y1 - 20);
+    if (t > 0.4) { drawSigmoidGlyph(ctx, c, L.output.x - 62, L.output.y - 58, z); ctx.fillStyle = c.ink3; ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillText('sigmoid', L.output.x - 62, L.output.y - 68); }
+  }
+  // small activation glyphs with the point plotted: the ReLU hinge and the sigmoid S
+  function drawReluGlyph(ctx, c, cx, cy, z) {
+    const w = 28, h = 14, x0 = cx - w / 2, y0 = cy + h / 2;
+    ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w / 2, y0); ctx.lineTo(x0 + w, y0 - h); ctx.stroke();
+    const zc = Math.max(-1, Math.min(1, z / 3)), px = x0 + w / 2 + zc * w / 2, py = y0 - Math.max(0, zc) * h;
+    ctx.fillStyle = z > 0 ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+  }
+  function drawSigmoidGlyph(ctx, c, cx, cy, z) {
+    const w = 28, h = 14, x0 = cx - w / 2, y0 = cy + h / 2;
+    ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i <= w; i++) { const zz = (i / w - 0.5) * 8, yy = y0 - h / (1 + Math.exp(-zz)); i ? ctx.lineTo(x0 + i, yy) : ctx.moveTo(x0 + i, yy); }
+    ctx.stroke();
+    const zc = Math.max(-4, Math.min(4, z)), px = x0 + (zc / 8 + 0.5) * w, py = y0 - h / (1 + Math.exp(-zc));
+    ctx.fillStyle = z > 0 ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
   }
   function drawHopWipe(ctx, L, c, m, key, t) {
     const items = [];
@@ -593,7 +748,7 @@ window.Viz = (function () {
   // m.sweep = { phase: forward | call | reveal, frac, hops, reveal, p, called, threshold, truthName, y, correct }
   function drawTestSweep(ctx, L, m) {
     const sw = m.sweep, c = colors(), nL = m.net.hidden.length;
-    drawForwardSweep(ctx, L, c, m, sw.phase === 'forward' ? sw.frac : 1, sw.hops);
+    drawForwardSweep(ctx, L, c, m, sw.phase === 'forward' ? sw.frac : 1);
     if (sw.phase === 'forward') {
       drawBanner(ctx, c, L, 'forward pass: each connection carries weight × value', 1);
     } else if (sw.phase === 'call') {
@@ -615,18 +770,18 @@ window.Viz = (function () {
     const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
-    const nL = net.hidden.length, hops = les.hops, ph = les.phase;
+    const plan = sweepPlan(net, m.mode), nL = net.hidden.length, hops = plan.hops, ph = les.phase;
     const banner = (text, dir) => drawBanner(ctx, c, L, text, dir);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
     // 1 · forward pass (and 6 · check): values flow hop by hop
-    const seg = 1 / (hops + 1);
+    const s0 = 1 - plan.segs[plan.segs.length - 1].ms / plan.total;
     if (ph === 'forward' || ph === 'check') {
-      drawForwardSweep(ctx, L, c, m, les.frac, hops);
+      drawForwardSweep(ctx, L, c, m, les.frac);
       banner(ph === 'forward' ? 'forward pass: each connection carries weight × value' : 'forward pass again, with the new weights', 1);
       if (ph === 'forward') return;
-    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1, hops);
+    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1);
 
     // 2 · loss: the call against the truth on a 0..1 scale beside the output; the gap is the error
     const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
@@ -635,7 +790,7 @@ window.Viz = (function () {
     ctx.fillText('1', bx + 6, top); ctx.fillText('0', bx + 6, bot);
     const ty = yOf(les.y);
     let pv = les.pBefore;
-    if (ph === 'check' && les.pAfter != null) { const s0 = hops * seg; pv = les.frac <= s0 ? les.pBefore : les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, (les.frac - s0) / (1 - s0))); }
+    if (ph === 'check' && les.pAfter != null) pv = les.frac <= s0 ? les.pBefore : les.pBefore + (les.pAfter - les.pBefore) * ease(Math.min(1, (les.frac - s0) / (1 - s0)));
     ctx.strokeStyle = rgbStr(pushRgb, 0.55); ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(bx, yOf(pv)); ctx.lineTo(bx, ty); ctx.stroke();
     ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
@@ -779,6 +934,7 @@ window.Viz = (function () {
     const c = colors();
     const px = imgNode.w / size, x0 = imgNode.x - imgNode.w / 2 + ox * px, y0 = imgNode.y - imgNode.h / 2 + oy * px;
     ctx.fillStyle = rgbStr(c.rgb.accent, 0.18); ctx.fillRect(x0, y0, f * px, f * px);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.strokeRect(x0, y0, f * px, f * px);
     ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, f * px, f * px);
   }
 
@@ -974,5 +1130,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, sweepPlan, sweepState, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();

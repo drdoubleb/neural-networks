@@ -61,7 +61,10 @@ style). The network never sees it; the page uses it to show which hidden units r
    single-layer network is also shown as a **weighted checklist** (every weight, largest first). **Teach next case** shows
    back-propagation on one training case as a six-step walk-through (five without a hidden layer), each step named in a
    strip above the diagram: (1) the forward pass, each dense connection wiping from source to target with thickness =
-   weight × the value at its start and the colour of its sign, so each node's sum can be read off, hop by hop to the output; (2) the loss, the call against
+   weight × the value at its start and the colour of its sign, so each node's sum can be read off, hop by hop to the output
+   (on pixels the nucleus is laid over each weight map, the product map forms cell by cell and is set aside, a scan line
+   sums it with orange cells against blue, and the bias and the ReLU, or the sigmoid at the output, finish the unit,
+   with a magnifier showing one 4×4 block of the arithmetic; the first unit runs slowly, the rest together); (2) the loss, the call against
    the truth on a scale beside the output, with the error as its slope; (3) the backward pass, blame flowing back along
    the connections to each hidden unit one layer at a time, with a pill on each unit (a unit that was switched off gets
    none); (4) the gradients, blame at one end of a connection × activity at the other, drawn as a glow on each
