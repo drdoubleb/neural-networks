@@ -289,7 +289,7 @@
       const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
       const pair = les.pAfter == null ? `${p} → …` : fmtPair(les.pBefore, les.pAfter);
       const texts = {
-        forward: `The inputs flow through the weights to the output. The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
+        forward: `Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output. The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
         loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: hidden > 1
           ? 'How much is each hidden unit to blame? The error flows back one layer at a time: a unit’s blame = the blame of the units it feeds × the weights between them × 1 if the unit was on, 0 if it was off. The dots carry it back.'
@@ -512,7 +512,7 @@
       dense: `<span class="step">Dense layer</span> <span>The pooled maps feed the hidden units: each unit sums its weights × the pooled values, through ReLU.</span>`,
     };
     if (convTexts[phase]) html = convTexts[phase];
-    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights, hop by hop, to the output. Nothing is learned here.</span>`;
+    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights. Each connection carries weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output. Nothing is learned here.</span>`;
     else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
     else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
     $('test-lesson-text').innerHTML = html;
