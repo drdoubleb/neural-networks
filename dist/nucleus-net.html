@@ -1897,11 +1897,11 @@ window.Viz = (function () {
   // ---- the forward sweep plan: how a forward pass is paced, shared by the lesson and the test walk-through.
   // One segment per hop: 'image' is the choreographed pixel hop (overlay, product, sum, ReLU), 'sum' the Σ → z edge of
   // the single-layer pixel network, a number a dense layer, 'out' the output; 'final' is a pause with everything shown.
-  function sweepPlan(net, mode) {
+  function sweepPlan(net, mode, opts) {
     const nL = net.hidden.length, segs = [];
     if (mode === 'pixels' && !net.conv) {
       const rows = nL ? net.hidden[0] : 1;
-      segs.push({ key: 'prep', ms: 4000 }); // this nucleus − the mean nucleus = what the network sees
+      if (!(opts && opts.prep === false)) segs.push({ key: 'prep', ms: 4000 }); // this nucleus − the mean nucleus = what the network sees
       segs.push({ key: 'image', ms: 12000 + (rows > 1 ? 6000 : 0) }); // the first unit slowly (12 s), the rest together (6 s)
       if (!nL) segs.push({ key: 'sum', ms: 1200 });
       else for (let k = 1; k <= nL; k++) segs.push({ key: k < nL ? k : 'out', ms: 1200 });
@@ -1925,8 +1925,9 @@ window.Viz = (function () {
   // source| and the colour of its sign, so the sum arriving at each node can be read off the diagram. The pixel hop is
   // choreographed: the nucleus is laid over each weight map, the product map forms and is set aside, a scan line sums it
   // while the unit counts, then the bias and the ReLU (or the sigmoid at the output) finish the unit.
-  function drawForwardSweep(ctx, L, c, m, frac) {
-    const plan = sweepPlan(m.net, m.mode), st = sweepState(plan, frac);
+  function drawForwardSweep(ctx, L, c, m, frac, plan) {
+    plan = plan || sweepPlan(m.net, m.mode);
+    const st = sweepState(plan, frac);
     for (let i = 0; i <= Math.min(st.index, plan.segs.length - 2); i++) {
       const key = plan.segs[i].key, cur = i === st.index, t = cur ? st.t : 1;
       if (key === 'prep') { if (cur) drawPrep(ctx, L, c, m, t); else drawPrepDone(ctx, L, c, m); }
@@ -1937,14 +1938,14 @@ window.Viz = (function () {
   }
   // The preprocessing shown before the pixel hop, in the free space above the input node: this nucleus − the mean
   // training nucleus = the difference the network sees (orange: more ink than average, blue: less). The difference then
-  // drops into the input node for the rest of the sweep, and it is the copy that is laid over the weight maps.
-  function drawPrep(ctx, L, c, m, t) {
-    const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x || !m.specimen || !m.inputMean) return;
-    const S = m.size, size = 44, gap = 30, at = { x: 24, y: img.y - img.h / 2 - 96 };
-    const xs = [at.x, at.x + size + gap, at.x + 2 * (size + gap)];
+  // drops into the input node, and it is the copy that is laid over the weight maps. The row and the difference stay on
+  // screen for the rest of the walk-through (drawPrepDone), so every later step can be read against what the network sees.
+  function prepRowAt(L, img) { const size = 44, gap = 30, x = 16; return { size, gap, at: { x, y: img.y - img.h / 2 - 96 }, xs: [x, x + size + gap, x + 2 * (size + gap)] }; }
+  function drawPrepRow(ctx, L, c, m, t) { // the three tiles, fading in one after another; t = 1 shows the finished row
+    const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x || !m.specimen || !m.inputMean) return null;
+    const S = m.size, { size, gap, at, xs } = prepRowAt(L, img);
     const pxMean = new Uint8ClampedArray(S * S); for (let i = 0; i < S * S; i++) pxMean[i] = Math.round(255 * (1 - m.inputMean[i]));
     const diff = tileCanvas('xin', m.x, 0, S, S).canvas;
-    const ease = u => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
     const fade = (a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
     const label = (text, x) => { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(text, x + size / 2, at.y - 4); };
     const glyph = (text, x) => { ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, at.y + size / 2); };
@@ -1959,17 +1960,24 @@ window.Viz = (function () {
     glyph('=', xs[1] + size + gap / 2);
     ctx.drawImage(diff, xs[2], at.y, size, size); frame(xs[2]); label('difference', xs[2]);
     ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('the network sees the difference', at.x, at.y + size + 6);
+    ctx.fillText('what the network sees', at.x, at.y + size + 6);
     ctx.fillStyle = c.ink3; ctx.fillText('orange: more ink than average', at.x, at.y + size + 19); ctx.fillText('blue: less ink than average', at.x, at.y + size + 32);
     ctx.globalAlpha = 1;
+    return { img, diff, size, at, xs };
+  }
+  function drawPrep(ctx, L, c, m, t) {
+    const row = drawPrepRow(ctx, L, c, m, t); if (!row) return;
+    const { img, diff, size, at, xs } = row;
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
     if (t > 0.72) { // the difference drops into the input node and takes the place of the raw nucleus
       const e = ease((t - 0.72) / 0.28);
       const cx = xs[2] + size / 2 + (img.x - xs[2] - size / 2) * e, cy = at.y + size / 2 + (img.y - at.y - size / 2) * e, sz = size + (img.w - size) * e;
       ctx.drawImage(diff, cx - sz / 2, cy - sz / 2, sz, sz); ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - sz / 2, cy - sz / 2, sz, sz);
     }
   }
-  function drawPrepDone(ctx, L, c, m) { // after the preprocessing step the input node shows what the network sees
+  function drawPrepDone(ctx, L, c, m) { // after the preprocessing step: the row stays up and the input node shows what the network sees
     const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x) return;
+    drawPrepRow(ctx, L, c, m, 1);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(tileCanvas('xin', m.x, 0, m.size, m.size).canvas, img.x - img.w / 2, img.y - img.h / 2, img.w, img.h);
     ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(img.x - img.w / 2, img.y - img.h / 2, img.w, img.h);
@@ -2139,24 +2147,31 @@ window.Viz = (function () {
   // m.lesson = { phase, frac (0..1 within the phase), hops, reveal, error, loss, y, truthName, pBefore, pAfter,
   //   delta[l][j] (blame of each hidden unit), gW, gWo, lr, fwBefore }
   function drawLesson(ctx, L, m) {
+    drawLessonSteps(ctx, L, m);
+    const ph = m.lesson.phase; // the preprocessing row stays up after the forward pass; here it goes on top of the step's overlays
+    if (m.mode === 'pixels' && !m.net.conv && (ph === 'blame' || ph === 'gradient' || ph === 'update')) drawPrepDone(ctx, L, colors(), m);
+  }
+  function drawLessonSteps(ctx, L, m) {
     const les = m.lesson, c = colors(), net = m.net, out = L.output;
     const monoS = `500 10px "IBM Plex Mono", ui-monospace, monospace`;
     const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
     const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
-    const plan = sweepPlan(net, m.mode), nL = net.hidden.length, hops = plan.hops, ph = les.phase;
+    const ph = les.phase, plan = sweepPlan(net, m.mode, { prep: ph !== 'check' }), nL = net.hidden.length, hops = plan.hops;
+    const prepped = m.mode === 'pixels' && !net.conv && ph === 'check'; // the check replays the sweep with the preprocessing already done
     const banner = (text, dir) => drawBanner(ctx, c, L, text, dir);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
     // 1 · forward pass (and 6 · check): values flow hop by hop
     const s0 = 1 - plan.segs[plan.segs.length - 1].ms / plan.total;
+    if (prepped) drawPrepDone(ctx, L, c, m);
     if (ph === 'forward' || ph === 'check') {
-      drawForwardSweep(ctx, L, c, m, les.frac);
+      drawForwardSweep(ctx, L, c, m, les.frac, plan);
       banner(ph === 'forward' ? 'forward pass: each connection carries weight × value' : 'forward pass again, with the new weights', 1);
       if (ph === 'forward') return;
-    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1);
+    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1, plan);
 
     // 2 · loss: the call against the truth on a 0..1 scale beside the output; the gap is the error
     const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
@@ -2226,8 +2241,14 @@ window.Viz = (function () {
         targets.forEach((t, j) => {
           const n = t.node; if (!n || !img) return;
           const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
-          const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 10 - size / 2;
-          if (t.scalar === 0) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('silent · no change', (x0 + x1) / 2 - 12, n.y); return; }
+          const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 22 - size / 2; // lands short of the × glyph
+          if (t.scalar === 0) { // nothing arrives: an empty slot where the gradient tile would land, in the caption style of the other rows
+            ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center';
+            ctx.setLineDash([3, 3]); ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.strokeRect(x1 - size / 2 + 0.5, n.y - size / 2 + 0.5, size - 1, size - 1); ctx.setLineDash([]);
+            ctx.textBaseline = 'middle'; ctx.fillText(nL ? 'off' : 'error 0', x1, n.y);
+            if (size >= 40) { ctx.textBaseline = 'top'; ctx.fillText('no change', x1, n.y + size / 2 + 3); }
+            return;
+          }
           const cx = ph === 'update' ? x1 : x0 + (x1 - x0) * ease(fr);
           const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
           const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
@@ -2694,10 +2715,10 @@ window.Viz = (function () {
   const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600 };
   const LESSON_TITLES = { forward: 'Forward pass', loss: 'Loss', blame: 'Backward pass', gradient: 'Gradients', update: 'Update', check: 'Check' };
   function lessonPhases() {
-    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode);
+    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode), replay = Viz.sweepPlan(S.net, S.mode, { prep: false });
     const ph = [['forward', plan.total], ['loss', LESSON_MS.loss]];
     if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(plan.total / 3) : plan.total]); // the check replays a pixel sweep at triple speed
+    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(replay.total / 3) : replay.total]); // the check replays a pixel sweep at triple speed, the subtraction already done
     return ph;
   }
   function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
@@ -2784,7 +2805,7 @@ window.Viz = (function () {
     const les = S.lesson; if (!les) return null;
     const g = les.res.g, hops = les.hops;
     let reveal = hops; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
-    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode), les.frac).reveal;
+    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode, { prep: les.phase !== 'check' }), les.frac).reveal;
     return { phase: les.phase, frac: les.frac, hops, reveal, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
   }
   // what the forward sweep shows, for the strip
@@ -2820,8 +2841,8 @@ window.Viz = (function () {
         gradient: allSilent
           ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
           : hidden
-          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the ${noun(1)} itself, scaled by the unit’s blame.` : ''}`
-          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the ${noun(1)} itself, scaled by the error.` : ''}`,
+          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees), scaled by the unit’s blame.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees), scaled by the error.` : ''}`,
         update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. Watch the connections${pixels ? ' and weight maps' : ''} change.`,
         check: sure
           ? `The same case runs forward again. It was already right and sure, so the step was tiny: <b>${pair}</b>.`
