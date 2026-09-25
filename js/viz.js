@@ -511,6 +511,8 @@ window.Viz = (function () {
       }
     }
     if (m.lesson) drawLesson(ctx, L, m);
+    else if (m.sweep) drawTestSweep(ctx, L, m);
+    else if (m.truth) drawTruthLabel(ctx, colors(), L.output, m.truth.y, m.truth.name, m.truth.mark);
     // convolution walk-through: the sliding window on the image and the arithmetic of the current position
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
@@ -531,6 +533,47 @@ window.Viz = (function () {
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
 
+  // ---- shared by the lesson and the test walk-through
+  // a banner along the bottom of the diagram naming the step, with an arrow for the passes (dir +1 forward, −1 back)
+  function drawBanner(ctx, c, text, dir) {
+    const y = NET_H - 34;
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 400, y);
+    if (dir) {
+      const gap = ctx.measureText(text).width / 2 + 12, x0 = 150, x1 = 650;
+      ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(400 - gap, y); ctx.moveTo(400 + gap, y); ctx.lineTo(x1, y); ctx.stroke();
+      const hx = dir > 0 ? x1 : x0, sg = dir > 0 ? -1 : 1;
+      ctx.beginPath(); ctx.moveTo(hx, y); ctx.lineTo(hx + sg * 8, y - 4.5); ctx.lineTo(hx + sg * 8, y + 4.5); ctx.closePath(); ctx.fill();
+    }
+  }
+  // which connections make up hop k of a forward sweep: the bands (pixels into the first maps), a dense layer, or the output
+  function hopKeyFor(m, nL, k) { return m.mode === 'pixels' ? (k === 0 ? 'band' : (nL && k < nL ? k : (nL ? 'out' : 'sum'))) : (k < nL ? k : 'out'); }
+  function drawHopDots(ctx, L, c, key, t) {
+    ctx.fillStyle = c.accent;
+    const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); };
+    if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
+    for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
+  }
+  function drawTruthLabel(ctx, c, out, y, name, mark) {
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = y ? c.irregular : c.regular; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`truth: ${name}${mark ? ' ' + mark : ''}`, out.x, out.y + out.r + 42);
+  }
+  // The test walk-through: one held-out case through the frozen weights, then the call at the threshold, then the truth.
+  // m.sweep = { phase: forward | call | reveal, frac, hops, reveal, p, called, threshold, truthName, y, correct }
+  function drawTestSweep(ctx, L, m) {
+    const sw = m.sweep, c = colors(), nL = m.net.hidden.length;
+    if (sw.phase === 'forward') {
+      const seg = 1 / (sw.hops + 1), k = Math.floor(Math.min(0.9999, sw.frac) / seg);
+      if (k < sw.hops) drawHopDots(ctx, L, c, hopKeyFor(m, nL, k), (sw.frac - k * seg) / seg);
+      drawBanner(ctx, c, 'forward pass through the frozen weights', 1);
+    } else if (sw.phase === 'call') {
+      drawBanner(ctx, c, `P(${m.positiveName}) = ${sw.p.toFixed(2)} ${sw.p >= sw.threshold ? '≥' : '<'} ${sw.threshold.toFixed(2)}, so the call is ${sw.called}`, 0);
+    } else {
+      drawTruthLabel(ctx, c, L.output, sw.y, sw.truthName, sw.correct ? '✓' : '✗');
+      drawBanner(ctx, c, `truth: ${sw.truthName} · ${sw.correct ? 'correct' : 'wrong'}`, 0);
+    }
+  }
+
   // The lesson walk-through, one training case in six steps (five without a hidden layer):
   //   forward → loss → blame (backward pass) → gradient → update → check
   // m.lesson = { phase, frac (0..1 within the phase), hops, reveal, error, loss, y, truthName, pBefore, pAfter,
@@ -543,26 +586,9 @@ window.Viz = (function () {
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
     const nL = net.hidden.length, hops = les.hops, ph = les.phase;
-    // a banner along the bottom naming the step, with an arrow for the passes
-    const banner = (text, dir) => {
-      const y = NET_H - 34;
-      ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(text, 400, y);
-      if (dir) {
-        const gap = ctx.measureText(text).width / 2 + 12, x0 = 150, x1 = 650;
-        ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(400 - gap, y); ctx.moveTo(400 + gap, y); ctx.lineTo(x1, y); ctx.stroke();
-        const hx = dir > 0 ? x1 : x0, sg = dir > 0 ? -1 : 1;
-        ctx.beginPath(); ctx.moveTo(hx, y); ctx.lineTo(hx + sg * 8, y - 4.5); ctx.lineTo(hx + sg * 8, y + 4.5); ctx.closePath(); ctx.fill();
-      }
-    };
-    // which connections make up hop k of the forward sweep: the bands (pixels into the first maps), a dense layer, or the output
-    const hopKey = k => (m.mode === 'pixels' ? (k === 0 ? 'band' : (nL && k < nL ? k : (nL ? 'out' : 'sum'))) : (k < nL ? k : 'out'));
-    const dots = (key, t) => {
-      ctx.fillStyle = c.accent;
-      const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); };
-      if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
-      for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
-    };
+    const banner = (text, dir) => drawBanner(ctx, c, text, dir);
+    const hopKey = k => hopKeyFor(m, nL, k);
+    const dots = (key, t) => drawHopDots(ctx, L, c, key, t);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
