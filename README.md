@@ -81,11 +81,15 @@ style). The network never sees it; the page uses it to show which hidden units r
 3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
    the frozen weights, each connection wiping with the product it carries while a strip names what is happening, then the call at the threshold,
    then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. For a convolutional network, *Classify next* walks through the
-   convolution in about 30 seconds: filter 1 alone scans the nucleus slowly with the arithmetic of each position shown,
-   the remaining filters sweep together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4
-   block shown with its largest value and the single pooled cell it becomes), the other maps follow together, then the
-   dense units and the output fire. Press N or click the diagram to skip ahead. In any convolutional diagram, hovering
-   a pooled cell outlines its source block and hovering a feature-map pixel marks the pooled cell it feeds. Accuracy, sensitivity, specificity and a confusion matrix
+   convolution in about 45 seconds: the mean training nucleus is subtracted first (the three tiles stay up), filter 1
+   alone scans the difference image slowly with the arithmetic of each position shown, the remaining filters sweep
+   together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4 block shown with its largest value
+   and the single pooled cell it becomes), the other maps follow together, then hidden unit 1 sums the pooled maps: its
+   weight maps (one per pooled map) appear beside the pooled column, the product maps form, a scan line sums them map by
+   map while the unit counts, and the bias and the ReLU finish it; the other units follow one by one, the units' values
+   wipe to the output, and the call is made. Press N or click the diagram to skip ahead. In any convolutional diagram,
+   hovering a pooled cell outlines its source block, hovering a feature-map pixel marks the pooled cell it feeds, and
+   hovering a hidden unit shows its weight maps and products beside the pooled maps. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population.
 

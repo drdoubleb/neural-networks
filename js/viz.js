@@ -369,8 +369,9 @@ window.Viz = (function () {
       ctx.strokeStyle = rgbStr(c.rgb.accent, 0.35); ctx.lineWidth = 1; ctx.stroke();
     }
     ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (L.bandLabel) ctx.fillText(L.bandLabel.text, L.bandLabel.x, L.bandLabel.y || NET_H - 16);
-    if (L.bandLabel2) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16);
+    if (L.bandLabel && !(m.anim && net.conv)) ctx.fillText(L.bandLabel.text, L.bandLabel.x, L.bandLabel.y || NET_H - 16); // the walk-through puts the preprocessing row there
+    const unitHopShown = net.conv && m.x && ((m.anim && m.anim.phase === 'unit') || (!m.anim && hovered && hovered.kind === 'unit' && hovered.l === 0 && fw));
+    if (L.bandLabel2 && !unitHopShown) ctx.fillText(L.bandLabel2.text, L.bandLabel2.x, L.bandLabel2.y || NET_H - 16); // the unit hop labels its own columns
     if (L.bands.length && L.bands[0].label) ctx.fillText(L.bands[0].label, L.bandLabel ? L.bandLabel.x : 300, NET_H - 16);
     // operator glyphs: image × weights = weight × pixel
     ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2;
@@ -455,8 +456,8 @@ window.Viz = (function () {
           const arr = n.kind === 'fmap' ? fw.conv.act : fw.conv.v;
           let maskBefore = null;
           if (anim) {
-            if (n.kind === 'fmap') maskBefore = anim.phase === 'scan1' ? (n.k === 0 ? anim.pos : 0) : anim.phase === 'scan' ? (n.k === 0 ? side * side : anim.pos) : side * side;
-            else maskBefore = anim.phase === 'pool1' ? (n.k === 0 ? anim.posP : 0) : anim.phase === 'pool' ? (n.k === 0 ? side * side : anim.posP) : (anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
+            if (n.kind === 'fmap') maskBefore = anim.phase === 'prep' ? 0 : anim.phase === 'scan1' ? (n.k === 0 ? anim.pos : 0) : anim.phase === 'scan' ? (n.k === 0 ? side * side : anim.pos) : side * side;
+            else maskBefore = anim.phase === 'pool1' ? (n.k === 0 ? anim.posP : 0) : anim.phase === 'pool' ? (n.k === 0 ? side * side : anim.posP) : (anim.phase === 'prep' || anim.phase === 'scan1' || anim.phase === 'scan') ? 0 : side * side;
           }
           const tile = tileCanvas(n.kind + n.k, arr, n.k * side * side, side, side, { mode: 'sequential', max: fmapMax, maskBefore });
           ctx.imageSmoothingEnabled = false;
@@ -513,9 +514,12 @@ window.Viz = (function () {
     if (m.lesson) drawLesson(ctx, L, m);
     else if (m.sweep) drawTestSweep(ctx, L, m);
     else if (m.truth) drawTruthLabel(ctx, colors(), L.output, m.truth.y, m.truth.name, m.truth.mark);
-    // convolution walk-through: the sliding window on the image and the arithmetic of the current position
+    // convolution walk-through: the preprocessing row, the sliding window on the difference image with the arithmetic of
+    // the current position, the pooling of one block, each unit's weight maps and products beside the pooled maps, the
+    // wipes to the output, then the call and the truth. Hovering a first-layer unit shows its maps in the frozen diagram.
     if (net.conv && m.x) {
-      const img = L.nodes.find(n => n.kind === 'image');
+      const img = L.nodes.find(n => n.kind === 'image'), anim = m.anim;
+      if (anim && img) { if (anim.phase === 'prep') drawPrep(ctx, L, c, m, anim.t); else drawPrepDone(ctx, L, c, m); }
       let spot = null;
       if (m.anim && (m.anim.phase === 'scan1' || m.anim.phase === 'scan') && m.anim.pos > 0) { const p = m.anim.pos - 1; spot = { k: m.anim.showFilter, oy: Math.floor(p / net.co), ox: p % net.co }; }
       else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'fmap' && m.hover.i != null) spot = { k: m.hover.ref.k, oy: m.hover.j, ox: m.hover.i };
@@ -528,6 +532,11 @@ window.Viz = (function () {
         else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'pooled' && m.hover.i != null) cellSpot = { k: m.hover.ref.k, py: m.hover.j, px: m.hover.i };
         if (cellSpot && fw && fw.conv) drawPoolPanel(ctx, m, cellSpot.k, cellSpot.py, cellSpot.px, { x: 24, y: img.y + img.h / 2 + 40 }, fmapMax);
       }
+      if (anim && anim.phase === 'unit') drawUnitHop(ctx, L, c, m, anim.j, anim.stage, anim.done);
+      else if (!anim && hovered && hovered.kind === 'unit' && hovered.l === 0 && fw) drawUnitHop(ctx, L, c, m, hovered.j, { name: 'done', v: 1 }, []);
+      if (anim && anim.wipes) for (const key of anim.wipes) drawHopWipe(ctx, L, c, m, key, key === anim.key ? anim.t : 1); // finished hops stay drawn, the current one grows
+      if (anim && anim.phase === 'reveal') drawTruthLabel(ctx, c, L.output, anim.y, anim.truthName, anim.correct ? '✓' : '✗');
+      if (anim && anim.banner) drawBanner(ctx, c, L, anim.banner, anim.dir || 0);
     }
     return L;
   }
@@ -607,10 +616,13 @@ window.Viz = (function () {
   // training nucleus = the difference the network sees (orange: more ink than average, blue: less). The difference then
   // drops into the input node, and it is the copy that is laid over the weight maps. The row and the difference stay on
   // screen for the rest of the walk-through (drawPrepDone), so every later step can be read against what the network sees.
-  function prepRowAt(L, img) { const size = 44, gap = 30, x = 16; return { size, gap, at: { x, y: img.y - img.h / 2 - 96 }, xs: [x, x + size + gap, x + 2 * (size + gap)] }; }
+  function prepRowAt(L, img, m) {
+    const size = m.net.conv ? 36 : 44, gap = m.net.conv ? 36 : 30, x = 16, legendPx = m.net.conv ? 9 : 10; // the convolution layout has less room above its image
+    return { size, gap, at: { x, y: m.net.conv ? 52 : img.y - img.h / 2 - 96 }, xs: [x, x + size + gap, x + 2 * (size + gap)], legendPx };
+  }
   function drawPrepRow(ctx, L, c, m, t) { // the three tiles, fading in one after another; t = 1 shows the finished row
     const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x || !m.specimen || !m.inputMean) return null;
-    const S = m.size, { size, gap, at, xs } = prepRowAt(L, img);
+    const S = m.size, { size, gap, at, xs, legendPx } = prepRowAt(L, img, m), lh = legendPx + 3;
     const pxMean = new Uint8ClampedArray(S * S); for (let i = 0; i < S * S; i++) pxMean[i] = Math.round(255 * (1 - m.inputMean[i]));
     const diff = tileCanvas('xin', m.x, 0, S, S).canvas;
     const fade = (a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
@@ -626,9 +638,9 @@ window.Viz = (function () {
     ctx.globalAlpha = fade(0.44, 0.6);
     glyph('=', xs[1] + size + gap / 2);
     ctx.drawImage(diff, xs[2], at.y, size, size); frame(xs[2]); label('difference', xs[2]);
-    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.font = `500 ${legendPx}px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
     ctx.fillText('what the network sees', at.x, at.y + size + 6);
-    ctx.fillStyle = c.ink3; ctx.fillText('orange: more ink than average', at.x, at.y + size + 19); ctx.fillText('blue: less ink than average', at.x, at.y + size + 32);
+    ctx.fillStyle = c.ink3; ctx.fillText('orange: more ink than average', at.x, at.y + size + 6 + lh); ctx.fillText('blue: less ink than average', at.x, at.y + size + 6 + 2 * lh);
     ctx.globalAlpha = 1;
     return { img, diff, size, at, xs };
   }
@@ -966,6 +978,75 @@ window.Viz = (function () {
     ctx.fillStyle = c.ink3;
     ctx.fillText(`→ map ${k + 1}, col ${ox}, row ${oy}`, at.x, at.y + gw + 32);
   }
+  // The dense hop of a convolutional network, one unit at a time: the unit's weight maps (one per pooled map) appear
+  // beside the pooled column, the product maps form (pooled value × weight), a scan line sums them map by map while the
+  // unit counts, then the bias and the ReLU (the sigmoid when the pooled maps feed the output directly) finish the unit.
+  // st = { name: weights | products | sum | relu | done, v }; done = the units already finished, which keep their values.
+  function drawUnitHop(ctx, L, c, m, j, st, done) {
+    const net = m.net, fw = m.fw, nL = net.hidden.length, K = net.conv.K, po = net.po, F = net.featureCount;
+    if (!m.x || !fw || !fw.conv) return;
+    const pooled = L.nodes.filter(n => n.kind === 'pooled'); if (pooled.length !== K) return;
+    const target = nL ? L.unitColumns[0][j] : L.output;
+    const Wrow = nL ? net.W[0] : net.Wo, off = nL ? j * F : 0, bias = nL ? net.b[0][j] : net.bo, cells = po * po;
+    const ps = pooled[0].size, left = pooled[0].x + ps / 2, right = target.x - target.r - 8, gap = 18;
+    const qs = Math.max(16, Math.min(ps, Math.floor((right - left - 2 * gap) / 2)));
+    const xW = left + gap + qs / 2, xQ = xW + qs / 2 + gap + qs / 2;
+    const prod = new Float64Array(F);
+    let wmax = TILE_FLOOR.square, qmax = 1e-9, pos = 0, neg = 0;
+    for (let i = 0; i < F; i++) { const w = Wrow[off + i], q = w * fw.conv.v[i]; prod[i] = q; wmax = Math.max(wmax, Math.abs(w)); qmax = Math.max(qmax, Math.abs(q)); if (q > 0) pos += q; else neg += q; }
+    const z = pos + neg + bias, act = nL ? fw.a[1][j] : fw.p;
+    const fmtA = v => (Math.abs(v) >= 10 ? v.toFixed(0) : v.toFixed(1));
+    const alphaW = st.name === 'weights' ? st.v : 1;
+    const wipe = st.name === 'weights' ? 0 : st.name === 'products' ? st.v : 1;
+    const totalRows = K * po, rowsDone = st.name === 'sum' ? Math.floor(st.v * totalRows) : (st.name === 'weights' || st.name === 'products') ? 0 : totalRows;
+    let sum = 0, posNow = 0, negNow = 0;
+    for (let r = 0; r < rowsDone; r++) { const k = Math.floor(r / po), row = r % po; for (let cc = 0; cc < po; cc++) { const q = prod[k * cells + row * po + cc]; sum += q; if (q > 0) posNow += q; else negNow += q; } }
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono13 = `500 13px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.imageSmoothingEnabled = false;
+    const who = nL ? `unit ${j + 1}` : 'output', top = pooled[0].y - qs / 2 - 4;
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.globalAlpha = alphaW; ctx.fillText(who, xW, top - 10); ctx.fillText('weights', xW, top);
+    ctx.globalAlpha = wipe > 0 ? 1 : 0; ctx.textAlign = 'left'; ctx.fillText('products', xQ - qs / 2 + 2, top); ctx.textAlign = 'center';
+    ctx.globalAlpha = 1;
+    pooled.forEach((pn, k) => {
+      const y = pn.y;
+      ctx.globalAlpha = alphaW;
+      ctx.font = mono13; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×', left + gap / 2, y);
+      ctx.drawImage(tileCanvas(`uw${j}_${k}`, Wrow, off + k * cells, po, po, { max: wmax }).canvas, xW - qs / 2, y - qs / 2, qs, qs);
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(xW - qs / 2 - 0.5, y - qs / 2 - 0.5, qs + 1, qs + 1);
+      ctx.globalAlpha = 1;
+      if (wipe <= 0) return;
+      ctx.fillText('=', xW + qs / 2 + gap / 2, y);
+      ctx.save(); ctx.beginPath(); ctx.rect(xQ - qs / 2, y - qs / 2, qs, qs * wipe); ctx.clip();
+      ctx.drawImage(tileCanvas(`uq${j}_${k}`, prod, k * cells, po, po, { max: qmax }).canvas, xQ - qs / 2, y - qs / 2, qs, qs);
+      ctx.restore();
+      ctx.strokeStyle = c.lineStrong; ctx.strokeRect(xQ - qs / 2 - 0.5, y - qs / 2 - 0.5, qs + 1, qs + 1);
+      if (st.name === 'sum' && Math.floor(rowsDone / po) === k) { // the scan line on the map being summed
+        const sy = y - qs / 2 + ((rowsDone % po) / po) * qs;
+        ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xQ - qs / 2, sy); ctx.lineTo(xQ + qs / 2, sy); ctx.stroke();
+      }
+    });
+    if (nL) for (const d of done || []) { const u = L.unitColumns[0][d], a = fw.a[1][d]; circleNode(ctx, u.x, u.y, u.r, unitFill(a, fw.a[1], ACT_SIGNED(m.activation)), fmtNum(a, 2), null); }
+    if (st.name === 'weights' || st.name === 'products') return;
+    // the running total: bars under the bottom product map, the count on the unit itself, then the bias and the activation
+    const last = pooled[K - 1], by = last.y + qs / 2 + 4, half = qs / 2 - 1, maxAbs = Math.max(pos, -neg, 1e-9);
+    if (by + 6 <= NET_H - 40) { // with many filters the bottom map sits on the banner, and the count on the unit has to do
+      ctx.fillStyle = c.irregular; ctx.fillRect(xQ, by, posNow / maxAbs * half, 4);
+      ctx.fillStyle = c.regular; ctx.fillRect(xQ + negNow / maxAbs * half, by, -negNow / maxAbs * half, 4);
+      ctx.fillStyle = c.ink; ctx.fillRect(xQ + (posNow + negNow) / maxAbs * half - 1, by - 2, 2, 8);
+    }
+    const showAct = st.name === 'done' || (st.name === 'relu' && st.v >= 0.5);
+    const label = st.name === 'sum' ? fmtA(sum) : (st.name === 'relu' && st.v < 0.5) ? fmtA(z) : (nL ? fmtNum(act, 2) : act.toFixed(2));
+    if (nL) circleNode(ctx, target.x, target.y, target.r, showAct ? unitFill(act, fw.a[1], ACT_SIGNED(m.activation)) : c.surface2, label, null);
+    else circleNode(ctx, target.x, target.y, target.r, showAct ? diverging((act - 0.5) * 2) : c.surface2, label, `600 14px "IBM Plex Mono", ui-monospace, monospace`);
+    const rx = nL ? target.x : Math.min(target.x, NET_W - 125), ry = 30;
+    const text = st.name === 'sum' ? `${who} · Σ so far ${fmtSigned(sum, 2)}`
+      : (st.name === 'relu' && st.v < 0.5) ? `${who} · Σ + b ${fmtSigned(bias, 2)} = ${fmtSigned(z, 2)}`
+      : nL ? `${who} · ReLU(${fmtSigned(z, 2)}) = ${fmtNum(act, 2)}` : `${who} · sigmoid(${fmtSigned(z, 2)}) = ${act.toFixed(2)}`;
+    ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, rx, ry);
+    if (showAct) { const gx = rx + ctx.measureText(text).width / 2 + 22; if (nL) drawReluGlyph(ctx, c, gx, ry, z); else drawSigmoidGlyph(ctx, c, gx, ry, z); }
+  }
   function drawPoolPanel(ctx, m, k, py, px, at, fmapMax) {
     const c = colors(), net = m.net, fw = m.fw;
     if (!fw || !fw.conv) return;
@@ -1012,7 +1093,8 @@ window.Viz = (function () {
       if (n.kind === 'unit' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) {
         const a = fw ? ` · activation ${fmtNum(fw.a[n.l + 1][n.j], 3)}` : '';
         const out = n.l === net.hidden.length - 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
-        return { kind: 'node', ref: n, text: `hidden unit ${net.hidden.length > 1 ? (n.l + 1) + '.' : ''}${n.j + 1}${a} · bias ${fmtSigned(net.b[n.l][n.j], 3)}${out}` };
+        const maps = net.conv && n.l === 0 && fw && m.x ? ' · its weight maps and products are shown beside the pooled maps' : '';
+        return { kind: 'node', ref: n, text: `hidden unit ${net.hidden.length > 1 ? (n.l + 1) + '.' : ''}${n.j + 1}${a} · bias ${fmtSigned(net.b[n.l][n.j], 3)}${out}${maps}` };
       }
       if (n.kind === 'input' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: `${m.featureNames[n.i]}${m.x ? ` · standardized value ${fmtSigned(m.x[n.i], 2)}` : ''}` };
       if (n.kind === 'square' && inBox(n, 2)) {
