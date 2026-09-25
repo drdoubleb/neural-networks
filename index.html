@@ -95,10 +95,10 @@
             <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
           <div class="ctl slim"><label for="hidden">Hidden units <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
           <div class="actions-inline">
-            <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
-            <button type="button" class="btn" id="btn-step-epoch">Step epoch</button>
-            <button type="button" class="btn" id="btn-step-batch">Step batch</button>
             <button type="button" class="btn" id="btn-teach" title="">Teach next case</button>
+            <button type="button" class="btn" id="btn-step-batch" title="one gradient step on the next batch of cases">Step batch</button>
+            <button type="button" class="btn" id="btn-step-epoch" title="one pass through every training case">Step epoch</button>
+            <button type="button" class="btn primary big" id="btn-train" title="run the remaining epochs (space)">▶ Complete training</button>
             <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
           </div>
         </div>
@@ -223,6 +223,7 @@
           <h2>The network, frozen</h2>
           <span class="small muted">held-out cases go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
+        <div class="lesson" id="test-lesson" hidden><span id="test-lesson-text"></span></div>
         <div class="net-wrap">
           <canvas id="net-canvas-test" width="800" height="440" aria-label="Network diagram during testing"></canvas>
           <div class="tip" id="net-tip-test" hidden></div>

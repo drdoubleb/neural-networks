@@ -20,7 +20,8 @@ Keys during a lecture: `1` `2` `3` switch stages, `space` trains/pauses, `T` or 
 
 The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
 each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
-(input, convolution, hidden units, Train / Step / Reset); everything else lives under *Advanced settings*. Controls that
+(input, convolution, hidden units, and the training buttons in the order a resident should try them: Teach next case,
+Step batch, Step epoch, Complete training, Reset); everything else lives under *Advanced settings*. Controls that
 do not apply to the current question are hidden.
 
 ## Four questions, one page
@@ -47,8 +48,8 @@ style). The network never sees it; the page uses it to show which hidden units r
 2. **Train.** Choose the input (the measurements or blood count, or all 1,024 raw pixels), tick which inputs the network
    may use (withhold blasts and watch it lean on cytopenias), an optional convolutional layer (4 or 8 filters of 5 × 5,
    ReLU, 4 × 4 max-pooling), zero to two dense hidden layers with a ReLU / sigmoid / tanh activation, and the learning
-   rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Press *Train*, or step one batch or one
-   epoch at a time. The diagram redraws every frame: connection thickness and colour show each weight, node fill shows
+   rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Teach one case, step one batch or one
+   epoch, or press *Complete training*. The diagram redraws every frame: connection thickness and colour show each weight, node fill shows
    the value flowing through for the selected case, first-layer weights on pixels are drawn as 32 × 32 maps, and with a
    convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps.
    Connections are drawn against a fixed scale so they visibly grow as the network learns, and a bright core marks the
@@ -71,8 +72,9 @@ style). The network never sees it; the page uses it to show which hidden units r
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
-3. **Test.** The weights are frozen. The held-out cases are classified one at a time (values animate through the
-   network, then the truth is revealed) or all at once. For a convolutional network, *Classify next* walks through the
+3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
+   the frozen weights, values flowing hop by hop while a strip names what is happening, then the call at the threshold,
+   then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. For a convolutional network, *Classify next* walks through the
    convolution in about 30 seconds: filter 1 alone scans the nucleus slowly with the arithmetic of each position shown,
    the remaining filters sweep together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4
    block shown with its largest value and the single pooled cell it becomes), the other maps follow together, then the

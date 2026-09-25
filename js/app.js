@@ -153,7 +153,7 @@
   }
   function stopTraining(msg) {
     S.running = false;
-    const b = $('btn-train'); if (b) b.textContent = '▶ Train';
+    const b = $('btn-train'); if (b) b.textContent = '▶ Complete training';
     if (msg) note(msg);
   }
   function tick(now) {
@@ -317,6 +317,7 @@
   // ------------------------------------------------------------------ test phase
   function clearTestResults(notify) {
     S.test.results.clear(); S.test.next = 0; S.test.revealed.clear(); S.test.animating = false;
+    renderTestLine(null);
     if (notify) $('test-note').textContent = 'The model changed, so the test results were cleared. Classify again to score the new weights.';
     renderTestPanel();
   }
@@ -330,22 +331,12 @@
     selectSpecimen(s, { silent: true });
     if (quiet || reducedMotion) { S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); renderTestGraph(); return true; }
     S.test.animating = true;
-    if (S.net.conv) { renderTestPanel(); renderInspector(); animateConvClassify(s); return true; }
-    const stages = [0, 1, 2];
-    let k = 0;
-    const run = () => {
-      renderTestGraph(stages[k]);
-      k++;
-      if (k < stages.length) setTimeout(run, 260);
-      else setTimeout(() => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); }, 420);
-    };
     renderTestPanel(); renderInspector();
-    run();
+    if (S.net.conv) animateConvClassify(s); else animateDenseClassify(s);
     return true;
   }
   function classifyAll() {
-    if (S.test.animating) return;
-    const go = () => { if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
+    const go = () => { if (S.test.animating) { S.test.skip = true; setTimeout(go, 50); return; } if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
     go();
   }
   function testStats() {
@@ -465,7 +456,7 @@
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
-  function renderTestGraph(stage, anim) {
+  function renderTestGraph(stage, anim, sweep) {
     const cv = $('net-canvas-test');
     const s = S.selected;
     let st = 2;
@@ -474,8 +465,57 @@
     const m = graphModel(s, st, S.hover.test);
     if (s && s.split === 'test' && S.test.results.has(s.id) && !S.test.revealed.has(s.id)) { m.fw = S.net.forward(m.x); }
     m.anim = anim || null;
+    m.sweep = sweep || null;
+    if (sweep) { m.reveal = sweep.reveal; m.hops = sweep.hops; }
+    else if (s && s.split === 'test' && S.test.revealed.has(s.id)) { const r = S.test.results.get(s.id); m.truth = { name: className(s.label), y: s.label, mark: r ? ((r.p >= S.test.threshold ? 1 : 0) === s.label ? '✓' : '✗') : '' }; }
     cv._model = m;
     Viz.drawNetwork(cv, m);
+  }
+  // Classify-next walk-through for dense networks, about 4 s: a forward pass through the frozen weights, hop by hop,
+  // then the call at the threshold, then the truth
+  function animateDenseClassify(s) {
+    const hops = S.net.hidden.length + (S.mode === 'pixels' && !S.net.hidden.length ? 2 : 1);
+    const T = [['forward', 2600], ['call', 900], ['reveal', 900]];
+    const t0 = performance.now();
+    S.test.skip = false;
+    const x = S.inputs.xOf(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
+    let shown = false;
+    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
+    const frame = now => {
+      if (!S.test.animating || S.selected !== s) return;
+      const t = S.test.skip ? Infinity : now - t0;
+      let acc = 0, phase = null, frac = 1;
+      for (const [name, ms] of T) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
+      if (!phase) { finish(); return; }
+      const reveal = phase === 'forward' ? Math.min(hops, Math.floor(Math.min(0.9999, frac) * (hops + 1))) : hops;
+      if (phase === 'reveal' && !shown) { shown = true; S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); }
+      renderTestGraph(phase === 'forward' ? 0 : 2, null, { phase, frac, hops, reveal, p, called: className(called), threshold: S.test.threshold, truthName: className(s.label), y: s.label, correct: called === s.label });
+      renderTestLine(s, p, called, phase);
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  // the strip above the test diagram: what is happening to the case going through
+  function renderTestLine(s, p, called, phase) {
+    const box = $('test-lesson'); if (!box) return;
+    if (!s) { box.hidden = true; return; }
+    box.hidden = false;
+    const inputDesc = S.mode === 'pixels' ? '1,024 pixels' : `${S.inputs.inputSize} ${S.kind === 'tabular' ? 'parameters' : 'measurements'}`;
+    const thr = S.test.threshold.toFixed(2), pp = p.toFixed(2), calledName = className(called), truth = className(s.label), correct = called === s.label;
+    let html;
+    const K = S.net.conv ? S.net.conv.K : 0, pool = S.net.conv ? S.net.conv.pool : 0;
+    const convTexts = {
+      scan1: `<span class="step">Convolution</span> <span><b>${esc(s.name)}</b>: filter 1 slides over the ${noun(1)}. At each position its 5×5 weights multiply the 5×5 pixels under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.</span>`,
+      scan: `<span class="step">Convolution</span> <span>The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.</span>`,
+      pool1: `<span class="step">Max-pooling</span> <span>Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.</span>`,
+      pool: `<span class="step">Max-pooling</span> <span>The other maps are pooled the same way.</span>`,
+      dense: `<span class="step">Dense layer</span> <span>The pooled maps feed the hidden units: each unit sums its weights × the pooled values, through ReLU.</span>`,
+    };
+    if (convTexts[phase]) html = convTexts[phase];
+    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights, hop by hop, to the output. Nothing is learned here.</span>`;
+    else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
+    else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
+    $('test-lesson-text').innerHTML = html;
   }
   // Classify-next walk-through for convolutional networks, about 30 s in all:
   //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~12 s)
@@ -489,18 +529,21 @@
     const ends = T.map((_, i) => T.slice(0, i + 1).reduce((a, b) => a + b, 0));
     const t0 = performance.now();
     S.test.skip = false;
-    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
+    const p = S.test.results.get(s.id).p, called = p >= S.test.threshold ? 1 : 0;
+    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
     const frac = (t, i) => (t - (i ? ends[i - 1] : 0)) / T[i];
     const frame = now => {
       if (!S.test.animating || S.selected !== s) return;
       const t = S.test.skip ? Infinity : now - t0;
-      if (t < ends[0]) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(frac(t, 0) * total)), showFilter: 0 });
-      else if (t < ends[1]) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor(frac(t, 1) * total)), showFilter: 1 });
-      else if (t < ends[2]) renderTestGraph(0, { phase: 'pool1', posP: Math.min(cells, Math.floor(frac(t, 2) * cells)) });
-      else if (t < ends[3]) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor(frac(t, 3) * cells)) });
-      else if (t < ends[4]) renderTestGraph(1, null);
-      else if (t < ends[6]) renderTestGraph(2, null);
+      let phase;
+      if (t < ends[0]) { phase = 'scan1'; renderTestGraph(0, { phase, pos: Math.min(total, Math.floor(frac(t, 0) * total)), showFilter: 0 }); }
+      else if (t < ends[1]) { phase = 'scan'; renderTestGraph(0, { phase, pos: Math.min(total, Math.floor(frac(t, 1) * total)), showFilter: 1 }); }
+      else if (t < ends[2]) { phase = 'pool1'; renderTestGraph(0, { phase, posP: Math.min(cells, Math.floor(frac(t, 2) * cells)) }); }
+      else if (t < ends[3]) { phase = 'pool'; renderTestGraph(0, { phase, posP: Math.min(cells, Math.floor(frac(t, 3) * cells)) }); }
+      else if (t < ends[4]) { phase = 'dense'; renderTestGraph(1, null); }
+      else if (t < ends[6]) { phase = 'call'; renderTestGraph(2, null); }
       else { finish(); return; }
+      renderTestLine(s, p, called, phase);
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);

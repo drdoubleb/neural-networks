@@ -494,10 +494,10 @@ details.fold > ul { margin-top: 8px; }
             <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
           <div class="ctl slim"><label for="hidden">Hidden units <span class="val" id="hidden-val">none</span></label><input type="range" id="hidden" min="0" max="8" step="1" value="0"></div>
           <div class="actions-inline">
-            <button type="button" class="btn primary big" id="btn-train">▶ Train</button>
-            <button type="button" class="btn" id="btn-step-epoch">Step epoch</button>
-            <button type="button" class="btn" id="btn-step-batch">Step batch</button>
             <button type="button" class="btn" id="btn-teach" title="">Teach next case</button>
+            <button type="button" class="btn" id="btn-step-batch" title="one gradient step on the next batch of cases">Step batch</button>
+            <button type="button" class="btn" id="btn-step-epoch" title="one pass through every training case">Step epoch</button>
+            <button type="button" class="btn primary big" id="btn-train" title="run the remaining epochs (space)">▶ Complete training</button>
             <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
           </div>
         </div>
@@ -622,6 +622,7 @@ details.fold > ul { margin-top: 8px; }
           <h2>The network, frozen</h2>
           <span class="small muted">held-out cases go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
+        <div class="lesson" id="test-lesson" hidden><span id="test-lesson-text"></span></div>
         <div class="net-wrap">
           <canvas id="net-canvas-test" width="800" height="440" aria-label="Network diagram during testing"></canvas>
           <div class="tip" id="net-tip-test" hidden></div>
@@ -1843,6 +1844,8 @@ window.Viz = (function () {
       }
     }
     if (m.lesson) drawLesson(ctx, L, m);
+    else if (m.sweep) drawTestSweep(ctx, L, m);
+    else if (m.truth) drawTruthLabel(ctx, colors(), L.output, m.truth.y, m.truth.name, m.truth.mark);
     // convolution walk-through: the sliding window on the image and the arithmetic of the current position
     if (net.conv && m.x) {
       const img = L.nodes.find(n => n.kind === 'image');
@@ -1863,6 +1866,47 @@ window.Viz = (function () {
   }
   function ACT_SIGNED(name) { return name === 'tanh'; }
 
+  // ---- shared by the lesson and the test walk-through
+  // a banner along the bottom of the diagram naming the step, with an arrow for the passes (dir +1 forward, −1 back)
+  function drawBanner(ctx, c, text, dir) {
+    const y = NET_H - 34;
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, 400, y);
+    if (dir) {
+      const gap = ctx.measureText(text).width / 2 + 12, x0 = 150, x1 = 650;
+      ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(400 - gap, y); ctx.moveTo(400 + gap, y); ctx.lineTo(x1, y); ctx.stroke();
+      const hx = dir > 0 ? x1 : x0, sg = dir > 0 ? -1 : 1;
+      ctx.beginPath(); ctx.moveTo(hx, y); ctx.lineTo(hx + sg * 8, y - 4.5); ctx.lineTo(hx + sg * 8, y + 4.5); ctx.closePath(); ctx.fill();
+    }
+  }
+  // which connections make up hop k of a forward sweep: the bands (pixels into the first maps), a dense layer, or the output
+  function hopKeyFor(m, nL, k) { return m.mode === 'pixels' ? (k === 0 ? 'band' : (nL && k < nL ? k : (nL ? 'out' : 'sum'))) : (k < nL ? k : 'out'); }
+  function drawHopDots(ctx, L, c, key, t) {
+    ctx.fillStyle = c.accent;
+    const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); };
+    if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
+    for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
+  }
+  function drawTruthLabel(ctx, c, out, y, name, mark) {
+    ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = y ? c.irregular : c.regular; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(`truth: ${name}${mark ? ' ' + mark : ''}`, out.x, out.y + out.r + 42);
+  }
+  // The test walk-through: one held-out case through the frozen weights, then the call at the threshold, then the truth.
+  // m.sweep = { phase: forward | call | reveal, frac, hops, reveal, p, called, threshold, truthName, y, correct }
+  function drawTestSweep(ctx, L, m) {
+    const sw = m.sweep, c = colors(), nL = m.net.hidden.length;
+    if (sw.phase === 'forward') {
+      const seg = 1 / (sw.hops + 1), k = Math.floor(Math.min(0.9999, sw.frac) / seg);
+      if (k < sw.hops) drawHopDots(ctx, L, c, hopKeyFor(m, nL, k), (sw.frac - k * seg) / seg);
+      drawBanner(ctx, c, 'forward pass through the frozen weights', 1);
+    } else if (sw.phase === 'call') {
+      drawBanner(ctx, c, `P(${m.positiveName}) = ${sw.p.toFixed(2)} ${sw.p >= sw.threshold ? '≥' : '<'} ${sw.threshold.toFixed(2)}, so the call is ${sw.called}`, 0);
+    } else {
+      drawTruthLabel(ctx, c, L.output, sw.y, sw.truthName, sw.correct ? '✓' : '✗');
+      drawBanner(ctx, c, `truth: ${sw.truthName} · ${sw.correct ? 'correct' : 'wrong'}`, 0);
+    }
+  }
+
   // The lesson walk-through, one training case in six steps (five without a hidden layer):
   //   forward → loss → blame (backward pass) → gradient → update → check
   // m.lesson = { phase, frac (0..1 within the phase), hops, reveal, error, loss, y, truthName, pBefore, pAfter,
@@ -1875,26 +1919,9 @@ window.Viz = (function () {
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
     const nL = net.hidden.length, hops = les.hops, ph = les.phase;
-    // a banner along the bottom naming the step, with an arrow for the passes
-    const banner = (text, dir) => {
-      const y = NET_H - 34;
-      ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = c.accent; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(text, 400, y);
-      if (dir) {
-        const gap = ctx.measureText(text).width / 2 + 12, x0 = 150, x1 = 650;
-        ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(400 - gap, y); ctx.moveTo(400 + gap, y); ctx.lineTo(x1, y); ctx.stroke();
-        const hx = dir > 0 ? x1 : x0, sg = dir > 0 ? -1 : 1;
-        ctx.beginPath(); ctx.moveTo(hx, y); ctx.lineTo(hx + sg * 8, y - 4.5); ctx.lineTo(hx + sg * 8, y + 4.5); ctx.closePath(); ctx.fill();
-      }
-    };
-    // which connections make up hop k of the forward sweep: the bands (pixels into the first maps), a dense layer, or the output
-    const hopKey = k => (m.mode === 'pixels' ? (k === 0 ? 'band' : (nL && k < nL ? k : (nL ? 'out' : 'sum'))) : (k < nL ? k : 'out'));
-    const dots = (key, t) => {
-      ctx.fillStyle = c.accent;
-      const dot = (x, y) => { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); };
-      if (key === 'band') { for (const b of L.bands) { const sx = (b.pts[0][0] + b.pts[3][0]) / 2, sy = (b.pts[0][1] + b.pts[3][1]) / 2, ex = (b.pts[1][0] + b.pts[2][0]) / 2, ey = (b.pts[1][1] + b.pts[2][1]) / 2; dot(sx + (ex - sx) * t, sy + (ey - sy) * t); } return; }
-      for (const e of L.edges) { if (e.layer !== key) continue; dot(e.x1 + (e.x2 - e.x1) * t, e.y1 + (e.y2 - e.y1) * t); }
-    };
+    const banner = (text, dir) => drawBanner(ctx, c, text, dir);
+    const hopKey = k => hopKeyFor(m, nL, k);
+    const dots = (key, t) => drawHopDots(ctx, L, c, key, t);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
@@ -2412,7 +2439,7 @@ window.Viz = (function () {
   }
   function stopTraining(msg) {
     S.running = false;
-    const b = $('btn-train'); if (b) b.textContent = '▶ Train';
+    const b = $('btn-train'); if (b) b.textContent = '▶ Complete training';
     if (msg) note(msg);
   }
   function tick(now) {
@@ -2576,6 +2603,7 @@ window.Viz = (function () {
   // ------------------------------------------------------------------ test phase
   function clearTestResults(notify) {
     S.test.results.clear(); S.test.next = 0; S.test.revealed.clear(); S.test.animating = false;
+    renderTestLine(null);
     if (notify) $('test-note').textContent = 'The model changed, so the test results were cleared. Classify again to score the new weights.';
     renderTestPanel();
   }
@@ -2589,22 +2617,12 @@ window.Viz = (function () {
     selectSpecimen(s, { silent: true });
     if (quiet || reducedMotion) { S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); renderTestGraph(); return true; }
     S.test.animating = true;
-    if (S.net.conv) { renderTestPanel(); renderInspector(); animateConvClassify(s); return true; }
-    const stages = [0, 1, 2];
-    let k = 0;
-    const run = () => {
-      renderTestGraph(stages[k]);
-      k++;
-      if (k < stages.length) setTimeout(run, 260);
-      else setTimeout(() => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); }, 420);
-    };
     renderTestPanel(); renderInspector();
-    run();
+    if (S.net.conv) animateConvClassify(s); else animateDenseClassify(s);
     return true;
   }
   function classifyAll() {
-    if (S.test.animating) return;
-    const go = () => { if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
+    const go = () => { if (S.test.animating) { S.test.skip = true; setTimeout(go, 50); return; } if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
     go();
   }
   function testStats() {
@@ -2724,7 +2742,7 @@ window.Viz = (function () {
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
-  function renderTestGraph(stage, anim) {
+  function renderTestGraph(stage, anim, sweep) {
     const cv = $('net-canvas-test');
     const s = S.selected;
     let st = 2;
@@ -2733,8 +2751,57 @@ window.Viz = (function () {
     const m = graphModel(s, st, S.hover.test);
     if (s && s.split === 'test' && S.test.results.has(s.id) && !S.test.revealed.has(s.id)) { m.fw = S.net.forward(m.x); }
     m.anim = anim || null;
+    m.sweep = sweep || null;
+    if (sweep) { m.reveal = sweep.reveal; m.hops = sweep.hops; }
+    else if (s && s.split === 'test' && S.test.revealed.has(s.id)) { const r = S.test.results.get(s.id); m.truth = { name: className(s.label), y: s.label, mark: r ? ((r.p >= S.test.threshold ? 1 : 0) === s.label ? '✓' : '✗') : '' }; }
     cv._model = m;
     Viz.drawNetwork(cv, m);
+  }
+  // Classify-next walk-through for dense networks, about 4 s: a forward pass through the frozen weights, hop by hop,
+  // then the call at the threshold, then the truth
+  function animateDenseClassify(s) {
+    const hops = S.net.hidden.length + (S.mode === 'pixels' && !S.net.hidden.length ? 2 : 1);
+    const T = [['forward', 2600], ['call', 900], ['reveal', 900]];
+    const t0 = performance.now();
+    S.test.skip = false;
+    const x = S.inputs.xOf(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
+    let shown = false;
+    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
+    const frame = now => {
+      if (!S.test.animating || S.selected !== s) return;
+      const t = S.test.skip ? Infinity : now - t0;
+      let acc = 0, phase = null, frac = 1;
+      for (const [name, ms] of T) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
+      if (!phase) { finish(); return; }
+      const reveal = phase === 'forward' ? Math.min(hops, Math.floor(Math.min(0.9999, frac) * (hops + 1))) : hops;
+      if (phase === 'reveal' && !shown) { shown = true; S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); }
+      renderTestGraph(phase === 'forward' ? 0 : 2, null, { phase, frac, hops, reveal, p, called: className(called), threshold: S.test.threshold, truthName: className(s.label), y: s.label, correct: called === s.label });
+      renderTestLine(s, p, called, phase);
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  // the strip above the test diagram: what is happening to the case going through
+  function renderTestLine(s, p, called, phase) {
+    const box = $('test-lesson'); if (!box) return;
+    if (!s) { box.hidden = true; return; }
+    box.hidden = false;
+    const inputDesc = S.mode === 'pixels' ? '1,024 pixels' : `${S.inputs.inputSize} ${S.kind === 'tabular' ? 'parameters' : 'measurements'}`;
+    const thr = S.test.threshold.toFixed(2), pp = p.toFixed(2), calledName = className(called), truth = className(s.label), correct = called === s.label;
+    let html;
+    const K = S.net.conv ? S.net.conv.K : 0, pool = S.net.conv ? S.net.conv.pool : 0;
+    const convTexts = {
+      scan1: `<span class="step">Convolution</span> <span><b>${esc(s.name)}</b>: filter 1 slides over the ${noun(1)}. At each position its 5×5 weights multiply the 5×5 pixels under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.</span>`,
+      scan: `<span class="step">Convolution</span> <span>The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.</span>`,
+      pool1: `<span class="step">Max-pooling</span> <span>Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.</span>`,
+      pool: `<span class="step">Max-pooling</span> <span>The other maps are pooled the same way.</span>`,
+      dense: `<span class="step">Dense layer</span> <span>The pooled maps feed the hidden units: each unit sums its weights × the pooled values, through ReLU.</span>`,
+    };
+    if (convTexts[phase]) html = convTexts[phase];
+    else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights, hop by hop, to the output. Nothing is learned here.</span>`;
+    else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
+    else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
+    $('test-lesson-text').innerHTML = html;
   }
   // Classify-next walk-through for convolutional networks, about 30 s in all:
   //   1. filter 1 alone scans the whole image slowly, with its arithmetic spelled out (~12 s)
@@ -2748,18 +2815,21 @@ window.Viz = (function () {
     const ends = T.map((_, i) => T.slice(0, i + 1).reduce((a, b) => a + b, 0));
     const t0 = performance.now();
     S.test.skip = false;
-    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); };
+    const p = S.test.results.get(s.id).p, called = p >= S.test.threshold ? 1 : 0;
+    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
     const frac = (t, i) => (t - (i ? ends[i - 1] : 0)) / T[i];
     const frame = now => {
       if (!S.test.animating || S.selected !== s) return;
       const t = S.test.skip ? Infinity : now - t0;
-      if (t < ends[0]) renderTestGraph(0, { phase: 'scan1', pos: Math.min(total, Math.floor(frac(t, 0) * total)), showFilter: 0 });
-      else if (t < ends[1]) renderTestGraph(0, { phase: 'scan', pos: Math.min(total, Math.floor(frac(t, 1) * total)), showFilter: 1 });
-      else if (t < ends[2]) renderTestGraph(0, { phase: 'pool1', posP: Math.min(cells, Math.floor(frac(t, 2) * cells)) });
-      else if (t < ends[3]) renderTestGraph(0, { phase: 'pool', posP: Math.min(cells, Math.floor(frac(t, 3) * cells)) });
-      else if (t < ends[4]) renderTestGraph(1, null);
-      else if (t < ends[6]) renderTestGraph(2, null);
+      let phase;
+      if (t < ends[0]) { phase = 'scan1'; renderTestGraph(0, { phase, pos: Math.min(total, Math.floor(frac(t, 0) * total)), showFilter: 0 }); }
+      else if (t < ends[1]) { phase = 'scan'; renderTestGraph(0, { phase, pos: Math.min(total, Math.floor(frac(t, 1) * total)), showFilter: 1 }); }
+      else if (t < ends[2]) { phase = 'pool1'; renderTestGraph(0, { phase, posP: Math.min(cells, Math.floor(frac(t, 2) * cells)) }); }
+      else if (t < ends[3]) { phase = 'pool'; renderTestGraph(0, { phase, posP: Math.min(cells, Math.floor(frac(t, 3) * cells)) }); }
+      else if (t < ends[4]) { phase = 'dense'; renderTestGraph(1, null); }
+      else if (t < ends[6]) { phase = 'call'; renderTestGraph(2, null); }
       else { finish(); return; }
+      renderTestLine(s, p, called, phase);
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
