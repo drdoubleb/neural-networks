@@ -1901,6 +1901,7 @@ window.Viz = (function () {
     const nL = net.hidden.length, segs = [];
     if (mode === 'pixels' && !net.conv) {
       const rows = nL ? net.hidden[0] : 1;
+      segs.push({ key: 'prep', ms: 4000 }); // this nucleus − the mean nucleus = what the network sees
       segs.push({ key: 'image', ms: 12000 + (rows > 1 ? 6000 : 0) }); // the first unit slowly (12 s), the rest together (6 s)
       if (!nL) segs.push({ key: 'sum', ms: 1200 });
       else for (let k = 1; k <= nL; k++) segs.push({ key: k < nL ? k : 'out', ms: 1200 });
@@ -1910,13 +1911,14 @@ window.Viz = (function () {
       for (let k = 0; k < hops; k++) segs.push({ key: k < nL ? k : 'out', ms });
       segs.push({ key: 'final', ms });
     }
-    return { segs, total: segs.reduce((q, g) => q + g.ms, 0), hops: segs.length - 1 };
+    const offset = segs[0].key === 'prep' ? 1 : 0; // leading segments that are not hops of the network
+    return { segs, total: segs.reduce((q, g) => q + g.ms, 0), hops: segs.length - 1 - offset, offset };
   }
   // where a sweep is at a fraction of its plan: the segment, the progress within it, and the hops that have arrived
   function sweepState(plan, frac) {
     const t = Math.max(0, Math.min(0.9999, frac)) * plan.total;
     let acc = 0;
-    for (let i = 0; i < plan.segs.length; i++) { const g = plan.segs[i]; if (t < acc + g.ms) return { index: i, t: (t - acc) / g.ms, reveal: i, key: g.key }; acc += g.ms; }
+    for (let i = 0; i < plan.segs.length; i++) { const g = plan.segs[i]; if (t < acc + g.ms) return { index: i, t: (t - acc) / g.ms, reveal: Math.max(0, Math.min(plan.hops, i - plan.offset)), key: g.key }; acc += g.ms; }
     return { index: plan.segs.length - 1, t: 1, reveal: plan.hops, key: 'final' };
   }
   // The forward sweep. On dense connections a wipe grows from source to target with thickness = |weight × value at the
@@ -1925,12 +1927,52 @@ window.Viz = (function () {
   // while the unit counts, then the bias and the ReLU (or the sigmoid at the output) finish the unit.
   function drawForwardSweep(ctx, L, c, m, frac) {
     const plan = sweepPlan(m.net, m.mode), st = sweepState(plan, frac);
-    for (let i = 0; i <= Math.min(st.index, plan.hops - 1); i++) {
-      const key = plan.segs[i].key, t = i < st.index ? 1 : st.t;
-      if (key === 'image') { if (i === st.index) drawImageHop(ctx, L, c, m, t); } // once done, the diagram itself shows the products and the units
+    for (let i = 0; i <= Math.min(st.index, plan.segs.length - 2); i++) {
+      const key = plan.segs[i].key, cur = i === st.index, t = cur ? st.t : 1;
+      if (key === 'prep') { if (cur) drawPrep(ctx, L, c, m, t); else drawPrepDone(ctx, L, c, m); }
+      else if (key === 'image') { if (cur) drawImageHop(ctx, L, c, m, t); } // once done, the diagram itself shows the products and the units
       else if (key === 'sum') drawSumEdge(ctx, L, c, m, t);
       else drawHopWipe(ctx, L, c, m, key, t);
     }
+  }
+  // The preprocessing shown before the pixel hop, in the free space above the input node: this nucleus − the mean
+  // training nucleus = the difference the network sees (orange: more ink than average, blue: less). The difference then
+  // drops into the input node for the rest of the sweep, and it is the copy that is laid over the weight maps.
+  function drawPrep(ctx, L, c, m, t) {
+    const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x || !m.specimen || !m.inputMean) return;
+    const S = m.size, size = 44, gap = 30, at = { x: 24, y: img.y - img.h / 2 - 96 };
+    const xs = [at.x, at.x + size + gap, at.x + 2 * (size + gap)];
+    const pxMean = new Uint8ClampedArray(S * S); for (let i = 0; i < S * S; i++) pxMean[i] = Math.round(255 * (1 - m.inputMean[i]));
+    const diff = tileCanvas('xin', m.x, 0, S, S).canvas;
+    const ease = u => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
+    const fade = (a, b) => Math.max(0, Math.min(1, (t - a) / (b - a)));
+    const label = (text, x) => { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(text, x + size / 2, at.y - 4); };
+    const glyph = (text, x) => { ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, at.y + size / 2); };
+    const frame = x => { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, at.y - 0.5, size + 1, size + 1); };
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = fade(0, 0.12);
+    ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), xs[0], at.y, size, size); frame(xs[0]); label('this nucleus', xs[0]);
+    ctx.globalAlpha = fade(0.2, 0.36);
+    glyph('−', xs[0] + size + gap / 2);
+    ctx.drawImage(imageToCanvas(pxMean, S, m.tint), xs[1], at.y, size, size); frame(xs[1]); label('mean nucleus', xs[1]);
+    ctx.globalAlpha = fade(0.44, 0.6);
+    glyph('=', xs[1] + size + gap / 2);
+    ctx.drawImage(diff, xs[2], at.y, size, size); frame(xs[2]); label('difference', xs[2]);
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('the network sees the difference', at.x, at.y + size + 6);
+    ctx.fillStyle = c.ink3; ctx.fillText('orange: more ink than average', at.x, at.y + size + 19); ctx.fillText('blue: less ink than average', at.x, at.y + size + 32);
+    ctx.globalAlpha = 1;
+    if (t > 0.72) { // the difference drops into the input node and takes the place of the raw nucleus
+      const e = ease((t - 0.72) / 0.28);
+      const cx = xs[2] + size / 2 + (img.x - xs[2] - size / 2) * e, cy = at.y + size / 2 + (img.y - at.y - size / 2) * e, sz = size + (img.w - size) * e;
+      ctx.drawImage(diff, cx - sz / 2, cy - sz / 2, sz, sz); ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - sz / 2, cy - sz / 2, sz, sz);
+    }
+  }
+  function drawPrepDone(ctx, L, c, m) { // after the preprocessing step the input node shows what the network sees
+    const img = L.nodes.find(n => n.kind === 'image'); if (!img || !m.x) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tileCanvas('xin', m.x, 0, m.size, m.size).canvas, img.x - img.w / 2, img.y - img.h / 2, img.w, img.h);
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(img.x - img.w / 2, img.y - img.h / 2, img.w, img.h);
   }
   const IMAGE_STAGES = [['overlay', 0.175], ['wipe', 0.4], ['aside', 0.525], ['sum', 0.825], ['relu', 1]];
   function imageStage(u) { let lo = 0; for (const [name, end] of IMAGE_STAGES) { if (u < end) return { name, v: (u - lo) / (end - lo) }; lo = end; } return { name: 'done', v: 1 }; }
@@ -1960,14 +2002,14 @@ window.Viz = (function () {
         const e = st.v * st.v * (3 - 2 * st.v);
         const cx = img.x + (w.x - img.x) * e, cy = img.y + (w.y - img.y) * e, sz = img.w + (size - img.w) * e;
         ctx.globalAlpha = 1 - 0.5 * e;
-        ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), cx - sz / 2, cy - sz / 2, sz, sz);
+        ctx.drawImage(tileCanvas('xin', x, 0, S, S).canvas, cx - sz / 2, cy - sz / 2, sz, sz);
         ctx.globalAlpha = 1;
         ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - sz / 2, cy - sz / 2, sz, sz);
         return;
       }
       if (st.name === 'wipe') { // the product map wipes in over the overlay, cell = pixel × weight
         ctx.globalAlpha = 0.5 * (1 - st.v);
-        ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), w.x - size / 2, w.y - size / 2, size, size);
+        ctx.drawImage(tileCanvas('xin', x, 0, S, S).canvas, w.x - size / 2, w.y - size / 2, size, size);
         ctx.globalAlpha = 1;
         ctx.save(); ctx.beginPath(); ctx.rect(w.x - size / 2, w.y - size / 2, size, size * st.v); ctx.clip();
         ctx.drawImage(tile(), w.x - size / 2, w.y - size / 2, size, size);
@@ -2749,9 +2791,10 @@ window.Viz = (function () {
   function forwardText() {
     const hidden = S.net.hidden.length;
     if (S.mode === 'pixels' && !S.net.conv) {
-      return hidden
-        ? `The ${noun(1)} is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
-        : `The ${noun(1)} is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`;
+      const prep = `First the mean training ${noun(1)} is subtracted from this one: the network sees the difference (orange = more ink than average, blue = less), which is large at the membrane and near zero in the centre. `;
+      return prep + (hidden
+        ? `That difference is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
+        : `That difference is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`);
     }
     return 'Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output.';
   }
@@ -2927,6 +2970,7 @@ window.Viz = (function () {
       if (!allowed) { fw = null; stage = 0; }
     }
     return { net: S.net, mode: S.mode, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
+      inputMean: S.mode === 'pixels' && S.inputs.std ? S.inputs.std.mean : null,
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
