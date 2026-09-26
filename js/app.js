@@ -222,16 +222,19 @@
   //   5 update         the weights actually move: w ← w − learning rate × gradient (drawn as a morph)
   //   6 check          the same case runs forward again with the new weights
   // The step is real training: a batch of one at the current learning rate.
-  const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600 };
+  const LESSON_MS = { forward: 2600, loss: 2600, blame: 2600, blame2: 3400, gradient: 3000, update: 2600, check: 2600,
+    convBlame: 4000, convBlame0: 5200, convGradient: 9000 }; // a convolutional network's extra: the pooled blame and the un-pooling, the filters' gradients
   const LESSON_TITLES = { forward: 'Forward pass', loss: 'Loss', blame: 'Backward pass', gradient: 'Gradients', update: 'Update', check: 'Check' };
   function lessonPhases() {
-    const L = S.net.hidden.length, plan = Viz.sweepPlan(S.net, S.mode), replay = Viz.sweepPlan(S.net, S.mode, { prep: false });
+    const L = S.net.hidden.length, conv = !!S.net.conv;
+    const plan = conv ? Viz.convPlan(S.net, true) : Viz.sweepPlan(S.net, S.mode), replay = conv ? Viz.convPlan(S.net, false) : Viz.sweepPlan(S.net, S.mode, { prep: false });
     const ph = [['forward', plan.total], ['loss', LESSON_MS.loss]];
-    if (L) ph.push(['blame', L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame]);
-    ph.push(['gradient', LESSON_MS.gradient], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(replay.total / 3) : replay.total]); // the check replays a pixel sweep at triple speed, the subtraction already done
+    if (L) ph.push(['blame', (L > 1 ? LESSON_MS.blame2 : LESSON_MS.blame) + (conv ? LESSON_MS.convBlame : 0)]);
+    else if (conv) ph.push(['blame', LESSON_MS.convBlame0]); // without a hidden layer the error still goes back through the pooling
+    ph.push(['gradient', LESSON_MS.gradient + (conv ? LESSON_MS.convGradient : 0)], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(replay.total / 3) : replay.total]); // the check replays a pixel sweep at triple speed, the subtraction already done
     return ph;
   }
-  function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.net.conv); }
+  function canTeach() { return !!(S.net && !S.running && !S.lesson); }
   // the case the next lesson will use: a training case the user picked, else the one after the last lesson
   function nextLessonCase() {
     const tr = S.ds.train;
@@ -242,27 +245,35 @@
     const b = $('btn-teach'); if (!b || !S.net) return;
     b.disabled = !canTeach() && !S.lesson;
     b.textContent = S.lesson ? 'Skip ▸' : 'Teach next case';
-    b.title = S.net.conv ? 'The walk-through covers dense networks: switch the convolution off'
-      : `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
+    b.title = `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
   }
   function teachNext() {
     if (S.lesson) { S.lesson.player.skip(); return; }
     if (!canTeach()) return;
     startLesson(nextLessonCase());
   }
-  function snapParams() { return { W: S.net.W.map(w => Float64Array.from(w)), b: S.net.b.map(b => Float64Array.from(b)), Wo: Float64Array.from(S.net.Wo), bo: S.net.bo }; }
-  function setParams(p) { p.W.forEach((w, l) => S.net.W[l].set(w)); p.b.forEach((b, l) => S.net.b[l].set(b)); S.net.Wo.set(p.Wo); S.net.bo = p.bo; }
+  function snapParams() {
+    const n = S.net, p = { W: n.W.map(w => Float64Array.from(w)), b: n.b.map(b => Float64Array.from(b)), Wo: Float64Array.from(n.Wo), bo: n.bo };
+    if (n.conv) { p.Wc = Float64Array.from(n.Wc); p.bc = Float64Array.from(n.bc); }
+    return p;
+  }
+  function setParams(p) {
+    p.W.forEach((w, l) => S.net.W[l].set(w)); p.b.forEach((b, l) => S.net.b[l].set(b)); S.net.Wo.set(p.Wo); S.net.bo = p.bo;
+    if (p.Wc) { S.net.Wc.set(p.Wc); S.net.bc.set(p.bc); }
+  }
   function lerpParams(a, b, t) {
     const mix = (x, y) => { const o = new Float64Array(x.length); for (let i = 0; i < x.length; i++) o[i] = x[i] + (y[i] - x[i]) * t; return o; };
-    return { W: a.W.map((w, l) => mix(w, b.W[l])), b: a.b.map((v, l) => mix(v, b.b[l])), Wo: mix(a.Wo, b.Wo), bo: a.bo + (b.bo - a.bo) * t };
+    const p = { W: a.W.map((w, l) => mix(w, b.W[l])), b: a.b.map((v, l) => mix(v, b.b[l])), Wo: mix(a.Wo, b.Wo), bo: a.bo + (b.bo - a.bo) * t };
+    if (a.Wc) { p.Wc = mix(a.Wc, b.Wc); p.bc = mix(a.bc, b.bc); }
+    return p;
   }
   function startLesson(s) {
-    if (!s || s.split !== 'train' || !S.net || S.net.conv) return;
+    if (!s || s.split !== 'train' || !S.net) return;
     stopTraining();
     if (S.selected !== s) selectSpecimen(s);
     const x = S.inputs.xOf(s), y = s.label;
     const res = S.net.lesson(x, y);
-    const hops = Viz.sweepPlan(S.net, S.mode).hops;
+    const hops = S.net.conv ? Viz.convPlan(S.net, true).hops : Viz.sweepPlan(S.net, S.mode).hops;
     S.lastLesson = null;
     const player = makePlayer(lessonPhases(), lessonFrame);
     if (reducedMotion) player.t = player.total;
@@ -315,12 +326,19 @@
     S.lastLesson = null;
     renderLessonLine(); updateTeachButton();
   }
+  // where the forward pass of a convolutional lesson is: the segment of the convolution walk-through and the progress in it
+  function lessonConvAt() { const les = S.lesson; return Viz.convAt(Viz.convPlan(S.net, les.phase !== 'check'), les.frac); }
   function lessonView() {
     const les = S.lesson; if (!les) return null;
-    const g = les.res.g, hops = les.hops;
-    let reveal = hops; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
-    if (les.phase === 'forward' || les.phase === 'check') reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode, { prep: les.phase !== 'check' }), les.frac).reveal;
-    return { phase: les.phase, frac: les.frac, hops, reveal, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter, delta: g.delta, gW: g.gW, gWo: g.gWo, lr: S.lr, fwBefore: les.res.fw };
+    const g = les.res.g, hops = les.hops, sweeping = les.phase === 'forward' || les.phase === 'check';
+    let reveal = hops, anim = null; // how many hops of the forward sweep have arrived (everything is visible outside the sweeps)
+    if (S.net.conv) { // the convolution's forward pass is drawn from an anim, as in the test walk-through; the other steps carry a marker for the conv overlays
+      const plan = Viz.convPlan(S.net, les.phase !== 'check');
+      if (sweeping) { const at = Viz.convAt(plan, les.frac); anim = Viz.convAnim(S.net, plan, at.seg, at.frac, { again: les.phase === 'check', finalBanner: 'forward pass done' }); reveal = anim.reveal; }
+      else anim = { phase: 'lesson', hops, reveal: hops, wipes: les.phase === 'loss' ? plan.hopKeys : null };
+    } else if (sweeping) reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode, { prep: les.phase !== 'check' }), les.frac).reveal;
+    return { phase: les.phase, frac: les.frac, hops, reveal, anim, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter,
+      delta: g.delta, gW: g.gW, gWo: g.gWo, gWc: g.gWc, dPooled: g.dPooled, dConv: g.dConv, lr: S.lr, fwBefore: les.res.fw };
   }
   // what the forward sweep shows, for the strip
   function forwardText() {
@@ -342,27 +360,39 @@
     let html;
     if (les) {
       const n = les.phases.findIndex(p => p[0] === les.phase) + 1, total = les.phases.length;
-      const hidden = S.net.hidden.length, pixels = S.mode === 'pixels';
+      const hidden = S.net.hidden.length, pixels = S.mode === 'pixels', conv = !!S.net.conv, q = les.frac, ST = Viz.CONV_STAGES;
       const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
       const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
       const pair = les.pAfter == null ? `${p} → …` : fmtPair(les.pBefore, les.pAfter);
+      const verdict = `The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`;
+      // a convolutional network's forward pass and check are narrated stage by stage, as in the test walk-through
+      const sub = conv && (les.phase === 'forward' || les.phase === 'check') ? (() => { const at = lessonConvAt(); return convPhaseInfo(les.s, at.seg[0], { key: at.seg[2] }, true); })() : null;
+      const pool = conv ? S.net.conv.pool : 0;
+      const convBlame = q < ST.blameDense
+        ? (hidden ? null : 'How much is each pooled cell to blame? The error goes back along Σ → z to the weight map: each pooled cell’s blame is the error × its weight on that cell.')
+        : q < ST.blameDots
+        ? (hidden ? 'Then the blame goes back through the weight maps to the pooled cells: a pooled cell’s blame is Σ over the units of the unit’s blame × its weight on that cell. It wipes back along the bands and is drawn over the pooled maps (blue: the cell should come down, orange: go up).'
+                  : 'The error × each weight is the blame of the pooled cell under it, drawn over the pooled maps (blue: the cell should come down, orange: go up).')
+        : `Then back through the pooling. Each pooled cell kept only the largest value of its ${pool}×${pool} block, so all of its blame lands on that one position of the feature map and none on the rest: the dots. ReLU passes it only where the map was on; a hollow dot was off and gets none.`;
+      const convGradient = q < ST.gradDense ? null
+        : 'The filters last. A filter was used at every position of the image, so its gradient adds up over every position that got blame: the blame there × the 5×5 image patch under the filter. Filter 1 goes position by position (the window on the image, the arithmetic under it: patch → × blame → Σ so far), the other filters all at once. The step, −learning rate × Σ, settles over each filter until the update folds it in.';
       const texts = {
-        forward: `${forwardText()} The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
+        forward: sub ? `${sub.text}${sub.phase === 'final' ? ' ' + verdict : ''}` : `${forwardText()} ${verdict}`,
         loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
-        blame: hidden > 1
+        blame: (conv && convBlame) || (hidden > 1
           ? 'How much is each hidden unit to blame? The error flows back one layer at a time along each connection as blame × weight (thick = large; blue: the unit should come down, orange: go up). A unit adds up what arrives, and ReLU passes it on only if the unit was on: an off unit’s blame is 0. Each pill shows the arithmetic.'
-          : 'How much is each hidden unit to blame? The error flows back along each connection as error × weight (thick = large; blue: the unit should come down, orange: go up). ReLU passes it on only if the unit was on, so a unit that was off gets blame 0. Each pill shows the arithmetic.',
+          : 'How much is each hidden unit to blame? The error flows back along each connection as error × weight (thick = large; blue: the unit should come down, orange: go up). ReLU passes it on only if the unit was on, so a unit that was off gets blame 0. Each pill shows the arithmetic.'),
         gradient: allSilent
-          ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
-          : hidden
-          ? `For every connection, gradient = blame at its end × activity at its start; the labels spell it out. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees) scaled by the unit’s blame: a copy comes back from the blame side onto the weight map.` : ''}`
-          : `For every connection, gradient = error × its input: big inputs, big gradients; the labels spell it out. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees) scaled by the error, which comes back along Σ → z onto the map.` : ''}`,
-        update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. The labels show each weight before → after; watch the connections${pixels ? ' and weight maps' : ''} change.`,
+          ? `Every hidden unit was off for this case, so every blame is zero and no weight map${conv ? ' and no filter' : ''} has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.`
+          : (conv && convGradient) || (hidden
+          ? `For every connection, gradient = blame at its end × activity at its start; the labels spell it out. The glow shows which way the weight should move (orange up, blue down) and how steeply.${conv ? ' A unit’s weight map reads the stacked pooled maps, so its gradient is that map scaled by the unit’s blame: a copy comes back from the blame side onto the weight map.' : pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees) scaled by the unit’s blame: a copy comes back from the blame side onto the weight map.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients; the labels spell it out. Orange = the weight should rise, blue = fall.${conv ? ' The weight map reads the stacked pooled maps, so its gradient is that map scaled by the error, which comes back along Σ → z onto the map.' : pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees) scaled by the error, which comes back along Σ → z onto the map.` : ''}`),
+        update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. The labels show each weight before → after; watch the connections${conv ? ', the weight maps and the filters' : pixels ? ' and weight maps' : ''} change.`,
         check: sure
           ? `The same case runs forward again, only to show what the step did (training itself moves on to the next case). It was already right and sure, so the step was tiny: <b>${pair}</b>.`
-          : `The same case runs forward again with the new weights, only to show what the step did: <b>${pair}</b>. This replay is not part of training, which moves straight on to the next case: one case, one small step, repeated for every case, many times over.`,
+          : `The same case runs forward again with the new ${conv ? 'filters and ' : ''}weights, only to show what the step did: <b>${pair}</b>. This replay is not part of training, which moves straight on to the next case: one case, one small step, repeated for every case, many times over.`,
       };
-      html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead · space pauses · ← → step</span>`;
+      html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}${sub ? ' · ' + sub.title : ''}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead · space pauses · ← → step</span>`;
     } else {
       html = `<span class="step">✓ ${esc(last.s.name)}</span> <span>(truth ${esc(className(last.s.label))}) ${fmtPair(last.pBefore, last.pAfter)}. Next up: <b>${esc(nextLessonCase().name)}</b>.</span>`;
     }
@@ -512,7 +542,7 @@
   function renderTrainGraph() {
     const cv = $('net-canvas');
     const m = graphModel(S.selected || null, 2, S.hover.train);
-    if (S.lesson) { const lv = lessonView(); m.lesson = lv; m.reveal = lv.reveal; m.hops = lv.hops; if (lv.phase !== 'check') m.fw = S.lesson.res.fw; }
+    if (S.lesson) { const lv = lessonView(); m.lesson = lv; m.reveal = lv.reveal; m.hops = lv.hops; m.anim = lv.anim; if (lv.phase !== 'check') m.fw = S.lesson.res.fw; }
     cv._model = m;
     Viz.drawNetwork(cv, m);
   }
@@ -563,30 +593,35 @@
     const inputDesc = S.mode === 'pixels' ? '1,024 pixels' : `${S.inputs.inputSize} ${S.kind === 'tabular' ? 'parameters' : 'measurements'}`;
     const thr = S.test.threshold.toFixed(2), pp = p.toFixed(2), calledName = className(called), truth = className(s.label), correct = called === s.label;
     let html;
-    const K = S.net.conv ? S.net.conv.K : 0, pool = S.net.conv ? S.net.conv.pool : 0, nL = S.net.hidden.length, F = S.net.featureCount;
-    const hop = info && info.key, cols = K <= 4 ? 2 : 4, stack = S.net.conv ? `${Math.ceil(K / cols)}×${cols}` : '';
-    const convTexts = {
-      prep: `<span class="step">Preprocessing</span> <span><b>${esc(s.name)}</b>: the mean training ${noun(1)} is subtracted from this one. The network sees the difference (orange = more ink than average, blue = less), large at the membrane and near zero in the centre.</span>`,
-      scan1: `<span class="step">Convolution</span> <span>Filter 1 slides over the difference image. At each position its 5×5 weights multiply the 5×5 values under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.</span>`,
-      scan: `<span class="step">Convolution</span> <span>The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.</span>`,
-      pool1: `<span class="step">Max-pooling</span> <span>Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.</span>`,
-      pool: `<span class="step">Max-pooling</span> <span>The other maps are pooled the same way.</span>`,
-      units: nL
-        ? `<span class="step">Dense layer</span> <span>The ${K} pooled maps are stacked ${stack} into one map and laid over each hidden unit’s weight map (one weight per pooled cell, ${F}, stacked the same way), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: the unit’s value. Unit 1 slowly, then the rest together.</span>`
-        : `<span class="step">Output</span> <span>The ${K} pooled maps are stacked ${stack} into one map and laid over the output’s weight map (one weight per pooled cell, ${F}), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue; the sum plus the bias is z.</span>`,
-      hop: hop === 'out'
-        ? `<span class="step">Output</span> <span>The units’ values × their weights flow to the output, each connection as thick as the product it carries. Their sum plus the bias is z, and the sigmoid turns z into P(${esc(posName())}).</span>`
-        : hop === 'sum'
-        ? `<span class="step">Output</span> <span>z goes through the sigmoid: P(${esc(posName())}) = 1 / (1 + e<sup>−z</sup>).</span>`
-        : `<span class="step">Hidden layer ${(hop || 0) + 1}</span> <span>Each unit sums weight × value over the layer before, plus its bias, through ${NN.ACTIVATIONS[S.activation].label}.</span>`,
-      final: `<span class="step">Forward pass done</span> <span>Every value is on the diagram. The weights are frozen: nothing is learned here.</span>`,
-    };
-    if (convTexts[phase]) html = convTexts[phase];
+    const ci = S.net.conv ? convPhaseInfo(s, phase, info) : null;
+    if (ci) html = `<span class="step">${ci.title}</span> <span>${ci.text}</span>`;
     else if (phase === 'forward') html = `<span class="step">Forward pass</span> <span><b>${esc(s.name)}</b>: its ${inputDesc} flow through the frozen weights. ${forwardText()} Nothing is learned here.</span>`;
     else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
     else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
     $('test-lesson-text').innerHTML = html;
     renderPlayerControls('test', S.test.animating ? S.test.player : null);
+  }
+  // what each stage of a convolutional network's forward pass shows, for the strips: { phase, title, text }, or null
+  function convPhaseInfo(s, phase, info, lesson) {
+    const K = S.net.conv.K, pool = S.net.conv.pool, nL = S.net.hidden.length, F = S.net.featureCount;
+    const hop = info && info.key, cols = K <= 4 ? 2 : 4, stack = `${Math.ceil(K / cols)}×${cols}`;
+    const texts = {
+      prep: ['Preprocessing', `<b>${esc(s.name)}</b>: the mean training ${noun(1)} is subtracted from this one. The network sees the difference (orange = more ink than average, blue = less), large at the membrane and near zero in the centre.`],
+      scan1: ['Convolution', 'Filter 1 slides over the difference image. At each position its 5×5 weights multiply the 5×5 values under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.'],
+      scan: ['Convolution', `The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.`],
+      pool1: ['Max-pooling', `Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.`],
+      pool: ['Max-pooling', 'The other maps are pooled the same way.'],
+      units: nL
+        ? ['Dense layer', `The ${K} pooled maps are stacked ${stack} into one map and laid over each hidden unit’s weight map (one weight per pooled cell, ${F}, stacked the same way), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: the unit’s value. Unit 1 slowly, then the rest together.`]
+        : ['Output', `The ${K} pooled maps are stacked ${stack} into one map and laid over the output’s weight map (one weight per pooled cell, ${F}), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue; the sum plus the bias is z.`],
+      hop: hop === 'out'
+        ? ['Output', `The units’ values × their weights flow to the output, each connection as thick as the product it carries. Their sum plus the bias is z, and the sigmoid turns z into P(${esc(posName())}).`]
+        : hop === 'sum'
+        ? ['Output', `z goes through the sigmoid: P(${esc(posName())}) = 1 / (1 + e<sup>−z</sup>).`]
+        : [`Hidden layer ${(hop || 0) + 1}`, `Each unit sums weight × value over the layer before, plus its bias, through ${NN.ACTIVATIONS[S.activation].label}.`],
+      final: ['Forward pass done', lesson ? 'Every value is on the diagram.' : 'Every value is on the diagram. The weights are frozen: nothing is learned here.'],
+    };
+    const t = texts[phase]; return t ? { phase, title: t[0], text: t[1] } : null;
   }
   // Classify-next walk-through for convolutional networks, about 45 s in all:
   //   0. the mean nucleus is subtracted: the network sees the difference (4 s)
@@ -598,12 +633,8 @@
   //      pixel hop of the dense recipes: unit 1 slowly (12 s), the rest together (6 s)
   //   6. the remaining dense hops wipe to the output (1.2 s each), then the call at the threshold, then the truth
   function animateConvClassify(s) {
-    const net = S.net, nL = net.hidden.length, total = net.co * net.co, cells = net.po * net.po, multi = net.conv.K > 1, units = nL ? net.hidden[0] : 1;
-    const T = [['prep', 4000], ['scan1', 12000], ['scan', multi ? 7000 : 0], ['pool1', 4000], ['pool', multi ? 2500 : 0], ['units', 12000 + (units > 1 ? 6000 : 0)]];
-    const hopKeys = []; for (let l = 1; l < nL; l++) hopKeys.push(l); hopKeys.push(nL ? 'out' : 'sum');
-    for (const key of hopKeys) T.push(['hop', 1200, key]);
-    T.push(['final', 800], ['call', 900], ['reveal', 900]);
-    const hops = 1 + hopKeys.length; // the pooled-maps hop, the dense hops between hidden layers, the output
+    const net = S.net, plan = Viz.convPlan(net, true), hops = plan.hops; // the pooled-maps hop, the dense hops between hidden layers, the output
+    const T = plan.T.concat([['call', 900], ['reveal', 900]]);
     const p = S.test.results.get(s.id).p, called = p >= S.test.threshold ? 1 : 0, thr = S.test.threshold;
     let shown = false;
     const P = makePlayer(T, null); S.test.player = P;
@@ -612,15 +643,8 @@
       if (!S.test.animating || S.selected !== s || S.test.player !== P) return;
       P.tick(now); const cur = P.at();
       if (!cur) { finish(); return; }
-      const [phase, , arg] = cur.phase, frac = cur.frac;
-      const anim = { phase, hops, reveal: 0, banner: null, dir: 0 };
-      if (phase === 'prep') anim.t = frac;
-      else if (phase === 'scan1' || phase === 'scan') { anim.pos = Math.min(total, Math.floor(frac * total)); anim.showFilter = phase === 'scan1' ? 0 : 1; }
-      else if (phase === 'pool1' || phase === 'pool') anim.posP = Math.min(cells, Math.floor(frac * cells));
-      else if (phase === 'units') { anim.t = frac; anim.banner = nL ? 'dense layer: pooled maps × each unit’s weights, summed, through ReLU' : 'output: pooled maps × weights, summed, plus the bias'; anim.dir = 1; }
-      else if (phase === 'hop') { const i = hopKeys.indexOf(arg); anim.key = arg; anim.t = frac; anim.wipes = hopKeys.slice(0, i + 1); anim.reveal = 1 + i; anim.banner = arg === 'sum' ? 'output: z through the sigmoid' : `${arg === 'out' ? 'output' : 'hidden layer ' + (arg + 1)}: each connection carries weight × value`; anim.dir = 1; }
-      else { anim.wipes = hopKeys; anim.reveal = hops; }
-      if (phase === 'final') anim.banner = 'forward pass done: the weights are frozen, nothing is learned here';
+      const phase = cur.phase[0], frac = cur.frac;
+      const anim = phase === 'call' || phase === 'reveal' ? { phase, hops, reveal: hops, wipes: plan.hopKeys, banner: null, dir: 0 } : Viz.convAnim(net, plan, cur.phase, frac);
       if (phase === 'call') anim.banner = `P(${posName()}) = ${p.toFixed(2)} ${p >= thr ? '≥' : '<'} ${thr.toFixed(2)}, so the call is ${className(called)}`;
       if (phase === 'reveal') {
         Object.assign(anim, { y: s.label, truthName: className(s.label), correct: called === s.label, banner: `truth: ${className(s.label)} · ${called === s.label ? 'correct' : 'wrong'}` });

@@ -335,7 +335,7 @@ window.Viz = (function () {
         const xS = poolBox.x1 + cgap + tw / 2, xU = xS + tw / 2 + cgap + tw / 2;
         const map = add({ kind: 'map', x: xS, y: yc, size: tw, h: th });
         const prod = add({ kind: 'product', x: xU, y: yc, size: tw, h: th });
-        L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [map.x - tw / 2, map.y - th / 2], [map.x - tw / 2, map.y + th / 2], [poolBox.x1, poolBox.yBot]] });
+        L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [map.x - tw / 2, map.y - th / 2], [map.x - tw / 2, map.y + th / 2], [poolBox.x1, poolBox.yBot]], role: 'pool' });
         L.bandLabel2 = { x: (poolBox.x1 + xS - tw / 2) / 2, y: 44, text: `${fmtInt(F)} weights · ${stacked}` };
         L.captions.push({ x: (xS + xU) / 2, text: 'WEIGHT × POOLED' });
         L.footnotes.push({ x: xS, text: 'weights' }, { x: xU, text: 'products' });
@@ -353,7 +353,7 @@ window.Viz = (function () {
         L.captions.push({ x: (xS + xU) / 2, text: `HIDDEN ${two ? '1' : ''} · ${h1} ${m.activationLabel.toUpperCase()}` });
         L.footnotes.push({ x: xS, text: 'weights' }, { x: xU, text: tw >= 56 ? 'weight × pooled' : 'products' });
         for (const sq of squares) {
-          L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [sq.x - tw / 2, sq.y - th / 2], [sq.x - tw / 2, sq.y + th / 2], [poolBox.x1, poolBox.yBot]], j: sq.j });
+          L.bands.push({ pts: [[poolBox.x1, poolBox.yTop], [sq.x - tw / 2, sq.y - th / 2], [sq.x - tw / 2, sq.y + th / 2], [poolBox.x1, poolBox.yBot]], j: sq.j, role: 'pool' });
           L.ops.push({ x: sq.x - tw / 2 - 12, y: sq.y, text: '×' }, { x: (xS + xU) / 2, y: sq.y, text: '=' });
         }
         L.bandLabel2 = { x: (poolBox.x1 + xS - tw / 2) / 2, y: 44, text: `${fmtInt(F)} weights per unit · ${stacked}` };
@@ -605,6 +605,7 @@ window.Viz = (function () {
         else if (!m.anim && m.hover && m.hover.ref && m.hover.ref.kind === 'pooled' && m.hover.i != null) cellSpot = { k: m.hover.ref.k, py: m.hover.j, px: m.hover.i };
         if (cellSpot && fw && fw.conv) drawPoolPanel(ctx, m, cellSpot.k, cellSpot.py, cellSpot.px, { x: 24, y: img.y + img.h / 2 + 40 }, fmapMax);
       }
+      if (m.lesson && anim && anim.phase === 'lesson') drawLessonConv(ctx, L, c, m); // the blame in the pooled maps and on the feature maps, the filters' gradients
       if (anim && anim.phase === 'units') drawImageHop(ctx, L, c, m, anim.t); // the stacked pooled maps × each unit's weight map, as in the pixel recipes
       if (anim && anim.wipes) for (const key of anim.wipes) { const t = key === anim.key ? anim.t : 1; if (key === 'sum') drawSumEdge(ctx, L, c, m, t); else drawHopWipe(ctx, L, c, m, key, t); } // finished hops stay drawn, the current one grows
       if (anim && anim.phase === 'reveal') drawTruthLabel(ctx, c, L.output, anim.y, anim.truthName, anim.correct ? '✓' : '✗');
@@ -661,6 +662,37 @@ window.Viz = (function () {
     }
     const offset = segs[0].key === 'prep' ? 1 : 0; // leading segments that are not hops of the network
     return { segs, total: segs.reduce((q, g) => q + g.ms, 0), hops: segs.length - 1 - offset, offset };
+  }
+  // The forward pass of a convolutional network, as phases: the preprocessing, filter 1 scanning slowly then the others,
+  // map 1 pooled block by block then the others, the pooled maps × each unit's weight map, the dense hops, a final pause.
+  function convPlan(net, withPrep) {
+    const nL = net.hidden.length, multi = net.conv.K > 1, units = nL ? net.hidden[0] : 1;
+    const T = []; if (withPrep) T.push(['prep', 4000]);
+    T.push(['scan1', 12000], ['scan', multi ? 7000 : 0], ['pool1', 4000], ['pool', multi ? 2500 : 0], ['units', 12000 + (units > 1 ? 6000 : 0)]);
+    const hopKeys = []; for (let l = 1; l < nL; l++) hopKeys.push(l); hopKeys.push(nL ? 'out' : 'sum');
+    for (const key of hopKeys) T.push(['hop', 1200, key]);
+    T.push(['final', 800]);
+    return { T, hopKeys, hops: 1 + hopKeys.length, total: T.reduce((a, p) => a + p[1], 0) };
+  }
+  // the segment of a plan at a fraction of its total, with the progress within it
+  function convAt(plan, frac) {
+    const t = Math.max(0, Math.min(0.9999, frac)) * plan.total; let acc = 0;
+    for (const seg of plan.T) { if (seg[1] > 0 && t < acc + seg[1]) return { seg, frac: (t - acc) / seg[1] }; acc += seg[1]; }
+    const last = plan.T[plan.T.length - 1]; return { seg: last, frac: 1 };
+  }
+  // the drawing state of one moment of that pass (m.anim); banners name what is happening
+  function convAnim(net, plan, seg, frac, opts) {
+    const nL = net.hidden.length, total = net.co * net.co, cells = net.po * net.po, [phase, , arg] = seg, again = opts && opts.again;
+    const anim = { phase, hops: plan.hops, reveal: 0, banner: null, dir: 0 };
+    if (phase === 'prep') anim.t = frac;
+    else if (phase === 'scan1' || phase === 'scan') { anim.pos = Math.min(total, Math.floor(frac * total)); anim.showFilter = phase === 'scan1' ? 0 : 1; }
+    else if (phase === 'pool1' || phase === 'pool') anim.posP = Math.min(cells, Math.floor(frac * cells));
+    else if (phase === 'units') { anim.t = frac; anim.banner = nL ? 'dense layer: pooled maps × each unit’s weights, summed, through ReLU' : 'output: pooled maps × weights, summed, plus the bias'; anim.dir = 1; }
+    else if (phase === 'hop') { const i = plan.hopKeys.indexOf(arg); anim.key = arg; anim.t = frac; anim.wipes = plan.hopKeys.slice(0, i + 1); anim.reveal = 1 + i; anim.banner = arg === 'sum' ? 'output: z through the sigmoid' : `${arg === 'out' ? 'output' : 'hidden layer ' + (arg + 1)}: each connection carries weight × value`; anim.dir = 1; }
+    else { anim.wipes = plan.hopKeys; anim.reveal = plan.hops; }
+    if (phase === 'final') anim.banner = again ? 'forward pass again, with the new weights' : (opts && opts.finalBanner) || 'forward pass done: the weights are frozen, nothing is learned here';
+    if (again && anim.banner && phase !== 'final') anim.banner += ' · with the new weights';
+    return anim;
   }
   // where a sweep is at a fraction of its plan: the segment, the progress within it, and the hops that have arrived
   function sweepState(plan, frac) {
@@ -902,20 +934,26 @@ window.Viz = (function () {
     const up = les.error < 0;                       // the score must go up (orange) or come down (blue)
     const pushCol = up ? c.irregular : c.regular, pushRgb = up ? c.rgb.irregular : c.rgb.regular;
     const truthCol = les.y ? c.irregular : c.regular;
-    const ph = les.phase, plan = sweepPlan(net, m.mode, { prep: ph !== 'check' }), nL = net.hidden.length, hops = plan.hops;
-    const prepped = m.mode === 'pixels' && !net.conv && ph === 'check'; // the check replays the sweep with the preprocessing already done
+    const ph = les.phase, conv = !!net.conv, nL = net.hidden.length;
+    const plan = conv ? null : sweepPlan(net, m.mode, { prep: ph !== 'check' }), cplan = conv ? convPlan(net, ph !== 'check') : null;
+    const hops = conv ? cplan.hops : plan.hops;
+    const prepped = m.mode === 'pixels' && !conv && ph === 'check'; // the check replays the sweep with the preprocessing already done
     const banner = (text, dir) => drawBanner(ctx, c, L, text, dir);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
 
-    // 1 · forward pass (and 6 · check): values flow hop by hop
-    const s0 = 1 - plan.segs[plan.segs.length - 1].ms / plan.total;
+    // 1 · forward pass (and 6 · check): values flow hop by hop (a convolutional network's pass is drawn from m.anim)
+    const s0 = conv ? 1 - 800 / cplan.total : 1 - plan.segs[plan.segs.length - 1].ms / plan.total;
     if (prepped) drawPrepDone(ctx, L, c, m);
     if (ph === 'forward' || ph === 'check') {
-      drawForwardSweep(ctx, L, c, m, les.frac, plan);
-      banner(ph === 'forward' ? 'forward pass: each connection carries weight × value' : 'forward pass again, with the new weights', 1);
+      if (!conv) { drawForwardSweep(ctx, L, c, m, les.frac, plan); banner(ph === 'forward' ? 'forward pass: each connection carries weight × value' : 'forward pass again, with the new weights', 1); }
       if (ph === 'forward') return;
-    } else if (ph === 'loss') drawForwardSweep(ctx, L, c, m, 1, plan);
+    } else if (ph === 'loss' && !conv) drawForwardSweep(ctx, L, c, m, 1, plan);
+    // the backward steps of a convolutional network run in sub-stages: the dense part first, then the pooling and the filters
+    const q = les.frac, denseBlame = conv && ph === 'blame' ? Math.min(1, q / CONV_STAGES.blameDense) : 1, denseGrad = conv && ph === 'gradient' ? Math.min(1, q / CONV_STAGES.gradDense) : 1;
+    const convBlameBanner = () => q < CONV_STAGES.blameDense
+      ? (nL ? 'backward pass: each connection carries error × weight back' : 'backward pass: the error comes back along Σ → z to the weight map')
+      : q < CONV_STAGES.blameDots ? `backward pass: each pooled cell’s blame = ${nL ? 'Σ unit blame × its weight' : 'error × its weight'}` : 'backward pass: through the pooling, onto the position that won each block';
 
     // 2 · loss: the call against the truth on a 0..1 scale beside the output; the gap is the error
     const bx = out.x + out.r + 20, top = out.y - 46, bot = out.y + 46, yOf = v => bot - v * (bot - top);
@@ -940,7 +978,7 @@ window.Viz = (function () {
     // thickness = its size (blue: the unit should come down, orange: go up), one layer at a time; the activation then
     // gates what arrived (ReLU passes it only if the unit was on) and every unit shows its blame with the arithmetic
     if (nL) {
-      const prog = ph === 'blame' ? les.frac * nL : nL, fwB = les.fwBefore;
+      const prog = ph === 'blame' ? denseBlame * nL : nL, fwB = les.fwBefore;
       for (let k = 0; k < nL; k++) {
         const l = nL - 1 - k, t = Math.min(1, prog - k);
         if (t <= 0) continue;
@@ -961,6 +999,7 @@ window.Viz = (function () {
         }
         L.unitColumns[l].forEach((u, j) => {
           const d = les.delta[l][j];
+          if (ph !== 'blame' && u.kind === 'square' && out.x - out.r - L.badgeX < 130) return; // on short connections the gradient labels take the pills' room
           // what arrived (error × weight, or Σ blame × weight from the layer above) and the gate the activation applied
           let arrived = 0;
           if (key === 'out') arrived = les.error * net.Wo[j];
@@ -968,14 +1007,17 @@ window.Viz = (function () {
           const on = fwB.pre[l][j] > 0, gate = arrived !== 0 ? d / arrived : 0;
           // the full arithmetic where there is room: not on cramped rows, and not on a last layer that sits next to the
           // output's text when there is a layer before it (the tooltip carries the arithmetic there)
-          const roomy = (u.kind !== 'square' || u.captioned) && !(key === 'out' && nL > 1);
+          // a next column hard by the badges (the convolution's two-layer layout) takes the pills' room: the short form goes under the product map
+          const crowded = u.kind === 'square' && nL > 1 && L.unitColumns[1].length && L.unitColumns[1][0].x - L.badgeX < 80;
+          const roomy = (u.kind !== 'square' || u.captioned) && !(key === 'out' && nL > 1) && !crowded;
           const lead = key === 'out' ? `${fmtSigned(les.error, 2)} × ${fmtSigned(net.Wo[j], 2)}` : `Σ blame × w = ${fmtSigned(arrived, 2)}`;
           let text;
           if (!roomy) text = d === 0 ? (m.activation === 'relu' && !on ? 'off → 0' : 'no blame') : `blame ${fmtSigned(d, 2)}`;
           else if (m.activation === 'relu') text = on ? `${lead}${key === 'out' ? ` = ${fmtSigned(d, 2)}` : ''}` : `${key === 'out' ? lead : `Σ = ${fmtSigned(arrived, 2)}`} · off → 0`;
           else text = `${lead} × slope ${gate.toFixed(2)} = ${fmtSigned(d, 2)}`;
-          let px = u.kind === 'square' ? (roomy ? L.badgeX - 10 : L.badgeX) : u.x;
-          let py = u.kind === 'square' ? (roomy ? u.y + (u.h || u.size) / 2 + 10 : u.y + 20) : u.y + u.r + 7;
+          const under = crowded ? L.nodes.find(n => n.kind === 'uprod' && n.j === u.j) : null;
+          let px = under ? under.x : u.kind === 'square' ? (roomy ? L.badgeX - 10 : L.badgeX) : u.x;
+          let py = under ? u.y + (u.h || u.size) / 2 + 10 : u.kind === 'square' ? (roomy ? u.y + (u.h || u.size) / 2 + 10 : u.y + 20) : u.y + u.r + 7;
           if (u.kind === 'square' && py + 8 > NET_H - 40) { py = u.y + 20; px = L.badgeX; } // the bottom row would sit on the banner
           ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
           const half = ctx.measureText(text).width / 2 + 5, maxRight = out.x - 70; // clear of the truth, error and loss lines under the output
@@ -983,13 +1025,14 @@ window.Viz = (function () {
           pill(ctx, px, py, text, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
         });
       }
-      if (ph === 'blame') { banner('backward pass: each connection carries error × weight back', -1); return; }
+      if (ph === 'blame') { banner(conv ? convBlameBanner() : 'backward pass: each connection carries error × weight back', -1); return; }
     }
+    if (ph === 'blame') { banner(convBlameBanner(), -1); return; } // a convolutional network without a hidden layer still has the pooling to go back through
 
     // 4 · gradients: every weight's gradient = blame at its end × activity at its start. Connections glow in the colour of
     // the step the weight will take (orange up, blue down); on pixels a scaled copy of the image slides into each weight map.
     // 5 · update: the weights themselves move (the app morphs them); the glows and copies fade out.
-    const fr = Math.min(1, les.frac);
+    const fr = conv && ph === 'gradient' ? denseGrad : Math.min(1, les.frac);
     const fade = ph === 'update' ? Math.max(0, 1 - fr / 0.4) : Math.min(1, fr * 2);
     if (fade > 0) {
       const dwOf = e => { if (e.wi == null || e.layer === 'sum') return 0; const arr = e.layer === 'out' ? les.gWo : les.gW[e.layer]; return -les.lr * arr[e.wi]; };
@@ -1004,18 +1047,19 @@ window.Viz = (function () {
         ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke();
       }
       ctx.lineCap = 'butt';
-      if (m.mode === 'pixels' && m.x && !net.conv) {
-        // a weight map's gradient is blame × the image, so it comes back from the blame side: a copy of the image, scaled
-        // by the blame, sets out from the badge (from the output's edge without a hidden layer) and slides back over the
-        // product map onto the weight map, where the update folds it in. Without a hidden layer the error first comes
-        // back along Σ → z.
+      const inp = m.mode === 'pixels' ? firstInput(m) : null;
+      if (inp) {
+        // a weight map's gradient is blame × its input map (the image, or the stacked pooled maps), so it comes back from
+        // the blame side: a copy of the input scaled by the blame sets out from the badge (from the output's edge without
+        // a hidden layer) and slides back over the product map onto the weight map, where the update folds it in.
+        // Without a hidden layer the error first comes back along Σ → z.
         const targets = nL
           ? L.unitColumns[0].map((u, j) => ({ node: u, from: L.badgeX, scalar: -les.lr * les.delta[0][j] }))
           : [{ node: L.nodes.find(n => n.kind === 'map'), from: L.nodes.find(n => n.kind === 'product').x, scalar: -les.lr * les.error }];
-        const D = m.x.length;
+        const D = inp.D, xv = inp.vec, what = conv ? 'pooled' : 'image';
         let common = 1e-9, xmax = 1e-9;
         for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
-        for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
+        for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(xv[i]));
         if (!nL && ph === 'gradient') {
           const e = L.edges.find(q => q.layer === 'sum');
           if (e) { const wt = Math.min(1, fr / 0.3); ctx.lineCap = 'round'; ctx.strokeStyle = rgbStr(les.error > 0 ? c.rgb.regular : c.rgb.irregular, 0.9); ctx.lineWidth = 2 + 8 * Math.min(1, Math.abs(les.error)); ctx.beginPath(); ctx.moveTo(e.x2, e.y2); ctx.lineTo(e.x2 + (e.x1 - e.x2) * wt, e.y2 + (e.y1 - e.y2) * wt); ctx.stroke(); ctx.lineCap = 'butt'; }
@@ -1028,14 +1072,15 @@ window.Viz = (function () {
           ctx.globalAlpha = fade;
           if (t.scalar === 0) { if (captioned) { ctx.fillStyle = c.ink3; ctx.fillText(nL ? 'off · no change' : 'error 0 · no change', n.x, n.y + H / 2 + 3); } ctx.globalAlpha = 1; return; }
           const s0 = Math.max(20, Math.min(44, W - 12)), size = s0 + (W - s0) * move, sizeH = size * H / W, cx = t.from + (n.x - t.from) * move;
-          const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
-          const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
+          const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * xv[i];
+          const tile = tileCanvas('lesson' + j, arr, 0, inp.w, inp.h, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
           ctx.imageSmoothingEnabled = false;
           ctx.globalAlpha = fade * (1 - 0.35 * move); // settles over the weight map, part transparent, until the update folds it in
           ctx.drawImage(tile.canvas, cx - size / 2, n.y - sizeH / 2, size, sizeH);
+          if (conv) drawCompositeDividers(ctx, c, net, cx - size / 2, n.y - sizeH / 2, size, sizeH);
           ctx.globalAlpha = fade;
           ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - sizeH / 2, size, sizeH);
-          if (captioned) { ctx.fillStyle = c.ink2; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, n.x, n.y + H / 2 + 3); }
+          if (captioned) { ctx.fillStyle = c.ink2; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × ${what}`, n.x, n.y + H / 2 + 3 + (!nL && W < 100 ? 12 : 0)); }
           ctx.globalAlpha = 1;
         });
       }
@@ -1046,7 +1091,7 @@ window.Viz = (function () {
     const labelAlpha = ph === 'update' ? Math.min(1, fr / 0.4) : Math.min(1, fr * 2);
     ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.lineJoin = 'round';
     for (const e of L.edges) {
-      if (e.wi == null || e.layer === 'sum' || counts[e.layer] > 16) continue;
+      if (e.wi == null || e.layer === 'sum' || counts[e.layer] > 16 || Math.abs(e.x2 - e.x1) < 60) continue; // no room on the short connections of the convolution's two-layer layout
       const grad = e.layer === 'out' ? les.gWo[e.wi] : les.gW[e.layer][e.wi]; if (!grad) continue;
       let text;
       if (ph === 'update') { const w0 = e.prev != null ? e.prev : e.w, w1 = w0 - les.lr * grad, dp = fmtSigned(w0, 2) === fmtSigned(w1, 2) ? 3 : 2; text = `w ${fmtSigned(w0, dp)} → ${fmtSigned(w1, dp)}`; }
@@ -1054,8 +1099,138 @@ window.Viz = (function () {
       const lx = e.x1 + (e.x2 - e.x1) * 0.4, ly = e.y1 + (e.y2 - e.y1) * 0.4 - 5;
       ctx.globalAlpha = labelAlpha; ctx.strokeStyle = c.surface; ctx.lineWidth = 3; ctx.strokeText(text, lx, ly); ctx.fillStyle = c.ink2; ctx.fillText(text, lx, ly); ctx.globalAlpha = 1;
     }
-    if (ph === 'gradient') banner(nL ? 'gradient of every weight = blame at its end × activity at its start' : 'gradient of every weight = error × its input', 0);
+    if (ph === 'gradient') banner(conv && q >= CONV_STAGES.gradDense ? 'gradient of a filter = Σ over its positions of the blame there × the image patch under it' : nL ? 'gradient of every weight = blame at its end × activity at its start' : 'gradient of every weight = error × its input', 0);
     if (ph === 'update') banner(`update: every weight steps against its gradient, w ← w − ${les.lr} × gradient`, 0);
+  }
+  // The backward steps of a convolutional network, after the dense part, by fractions of the lesson's step:
+  //   blame step: the dense part (wipes and pills) until blameDense; then the blame of each pooled cell (Σ unit blame ×
+  //   weight) wipes back along the bands and is drawn over the pooled maps; from blameDots it goes back through the
+  //   pooling to the one position per block that won the max (dots on the dimmed feature maps; ReLU lets it through only
+  //   where the map was on, a hollow dot where it was off).
+  //   gradient step: the dense part until gradDense; then a filter's gradient, Σ over those positions of the blame there ×
+  //   the 5×5 image patch under it, accumulates position by position for filter 1 (the window on the image, the
+  //   arithmetic under it) until gradOthers, then all at once for the others; its step settles over each filter as
+  //   Δ until the update folds it in.
+  const CONV_STAGES = { blameDense: 0.4, blameDots: 0.7, gradDense: 0.25, gradOthers: 0.8 };
+  function drawLessonConv(ctx, L, c, m) {
+    const les = m.lesson, net = m.net, ph = les.phase, q = les.frac, nL = net.hidden.length;
+    if (!les.dPooled || !les.dConv || !(ph === 'blame' || ph === 'gradient' || ph === 'update')) return;
+    const fwB = les.fwBefore, po = net.po, co = net.co, f = net.conv.f, cells = po * po, S = m.size, x = m.x;
+    const fade = ph === 'update' ? Math.max(0, 1 - q / 0.4) : 1;
+    if (fade <= 0 || !fwB || !fwB.conv) return;
+    const pooled = L.nodes.filter(n => n.kind === 'pooled'), fmaps = L.nodes.filter(n => n.kind === 'fmap'), filters = L.nodes.filter(n => n.kind === 'filter');
+    const img = L.nodes.find(n => n.kind === 'image');
+    const clamp01 = v => Math.max(0, Math.min(1, v));
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`;
+    // the blame wipes back to the pooled cells along the bands, in the colour and strength of each unit's blame (of the
+    // error, without a hidden layer, where it first comes back along Σ → z)
+    if (ph === 'blame') {
+      if (!nL) {
+        const e = L.edges.find(e => e.layer === 'sum');
+        if (e) { const wt = Math.min(1, q / 0.3); ctx.lineCap = 'round'; ctx.strokeStyle = rgbStr(les.error > 0 ? c.rgb.regular : c.rgb.irregular, 0.9); ctx.lineWidth = 2 + 8 * Math.min(1, Math.abs(les.error)); ctx.beginPath(); ctx.moveTo(e.x2, e.y2); ctx.lineTo(e.x2 + (e.x1 - e.x2) * wt, e.y2 + (e.y1 - e.y2) * wt); ctx.stroke(); ctx.lineCap = 'butt'; }
+      }
+      const blameOf = b => (b.j != null && les.delta && les.delta[0] ? les.delta[0][b.j] : les.error);
+      const bands = L.bands.filter(b => b.role === 'pool'), wt = clamp01((q - CONV_STAGES.blameDense) / 0.2);
+      let bmax = 1e-9; for (const b of bands) bmax = Math.max(bmax, Math.abs(blameOf(b)));
+      if (wt > 0) for (const b of bands) {
+        const d = blameOf(b); if (!d) continue;
+        const x1 = b.pts[0][0], x2 = b.pts[1][0], xw = x2 - (x2 - x1) * wt;
+        ctx.save(); ctx.beginPath(); ctx.rect(xw, 0, x2 - xw, NET_H); ctx.clip();
+        ctx.beginPath(); b.pts.forEach((p, i) => (i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]))); ctx.closePath();
+        ctx.fillStyle = rgbStr(d > 0 ? c.rgb.regular : c.rgb.irregular, 0.12 + 0.3 * Math.abs(d) / bmax); ctx.fill();
+        ctx.restore();
+      }
+    }
+    const aPool = ph === 'blame' ? clamp01((q - CONV_STAGES.blameDense) / 0.15) : 1;   // the pooled blame appears
+    const aDots = ph === 'blame' ? clamp01((q - CONV_STAGES.blameDots) / 0.15) : 1;    // then lands on the feature maps
+    if (aPool <= 0) return;
+    let dmax = 1e-9; for (let i = 0; i < les.dPooled.length; i++) dmax = Math.max(dmax, Math.abs(les.dPooled[i]));
+    ctx.imageSmoothingEnabled = false;
+    // the blame of each pooled cell, over the pooled maps
+    ctx.globalAlpha = fade * aPool;
+    pooled.forEach(n => {
+      const tile = tileCanvas('bpool' + n.k, les.dPooled, n.k * cells, po, po, { max: dmax });
+      ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+      ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+    });
+    const labelled = fmaps.length && fmaps[0].y - fmaps[0].size / 2 >= 62; // the column labels need room under the caption row
+    ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    if (labelled) ctx.fillText('blame', pooled[0].x, pooled[0].y - pooled[0].size / 2 - 3);
+    // the blame lands on the one position per block that won the max: dots on the dimmed feature maps
+    if (aDots > 0) {
+      ctx.globalAlpha = fade * aDots;
+      fmaps.forEach(n => {
+        const cs = n.size / co, ds = Math.max(cs + 1, 3), x0 = n.x - n.size / 2, y0 = n.y - n.size / 2;
+        ctx.fillStyle = rgbStr(c.rgb.surface, 0.6); ctx.fillRect(x0, y0, n.size, n.size);
+        for (let j = 0; j < cells; j++) {
+          const i = fwB.conv.arg[n.k * cells + j]; if (i < 0) continue;
+          const li = i - n.k * co * co, oy = Math.floor(li / co), ox = li % co, d = les.dConv[i];
+          const px = x0 + (ox + 0.5) * cs - ds / 2, py = y0 + (oy + 0.5) * cs - ds / 2;
+          if (d) { ctx.fillStyle = diverging(d / dmax); ctx.fillRect(px, py, ds, ds); }
+          else { ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, py + 0.5, ds - 1, ds - 1); } // the map was off there: ReLU passes nothing
+        }
+        ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(x0, y0, n.size, n.size);
+      });
+      ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      if (labelled) ctx.fillText('where it lands', fmaps[0].x, fmaps[0].y - fmaps[0].size / 2 - 3);
+    }
+    ctx.globalAlpha = 1;
+    if (ph === 'blame' || !x || !les.gWc) return;
+    // the filters' gradients: Σ over the dotted positions of the blame there × the image patch under the filter, position
+    // by position for filter 1, all at once for the others; the step (−lr × the sum) settles over each filter
+    const per = fmaps.map(n => { const list = []; for (let j = 0; j < cells; j++) { const i = fwB.conv.arg[n.k * cells + j]; if (i >= 0 && les.dConv[i]) list.push(i); } return list; });
+    const q1 = ph === 'update' ? 1 : clamp01((q - CONV_STAGES.gradDense) / (CONV_STAGES.gradOthers - CONV_STAGES.gradDense));
+    const qr = ph === 'update' ? 1 : clamp01((q - CONV_STAGES.gradOthers) / (1 - CONV_STAGES.gradOthers));
+    let gmax = 1e-9; for (let i = 0; i < les.gWc.length; i++) gmax = Math.max(gmax, Math.abs(les.gWc[i]));
+    const scale = Math.max(les.lr * gmax, 0.3 * TILE_FLOOR.filter);
+    const captioned = filters.length < 2 || filters[1].y - filters[0].y - filters[0].size >= 14; // room for a caption under each filter
+    filters.forEach((n, k) => {
+      const list = per[k], prog = k === 0 ? q1 : qr, nDone = Math.min(list.length, Math.ceil(prog * list.length));
+      const alpha = fade * Math.min(1, prog * 3);
+      if (alpha <= 0) return;
+      ctx.globalAlpha = alpha;
+      ctx.font = mono9; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      if (!list.length) { if (captioned) { ctx.fillStyle = c.ink3; ctx.fillText('no blame · no change', n.x, n.y + n.size / 2 + 3); } ctx.globalAlpha = 1; return; }
+      const gacc = new Float64Array(f * f); // Σ so far of blame × patch, the gradient of the filter
+      for (let t = 0; t < nDone; t++) { const i = list[t], li = i - k * co * co, oy = Math.floor(li / co), ox = li % co, d = les.dConv[i]; for (let dy = 0; dy < f; dy++) for (let dx = 0; dx < f; dx++) gacc[dy * f + dx] += d * x[(oy + dy) * S + ox + dx]; }
+      const step = Float64Array.from(gacc, v => -les.lr * v);
+      const tile = tileCanvas('dfilt' + k, step, 0, f, f, { max: scale });
+      ctx.globalAlpha = alpha * 0.65;
+      ctx.drawImage(tile.canvas, n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(n.x - n.size / 2, n.y - n.size / 2, n.size, n.size);
+      if (captioned) { ctx.fillStyle = c.ink2; ctx.fillText(`Δ filter ${k + 1}${nDone < list.length ? ` · ${nDone}/${list.length}` : ''}`, n.x, n.y + n.size / 2 + 3); }
+      // filter 1 position by position: the window on the image, the dot on the map, the arithmetic under the image
+      if (k === 0 && ph === 'gradient' && nDone > 0 && q1 < 1 && img) {
+        const i = list[nDone - 1], oy = Math.floor(i / co), ox = i % co, fm = fmaps[0], cs = fm.size / co;
+        ctx.globalAlpha = fade; // the window and the panel are legible from the first position
+        drawWindow(ctx, img, S, oy, ox, f);
+        ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(fm.x - fm.size / 2 + ox * cs - 1.5, fm.y - fm.size / 2 + oy * cs - 1.5, cs + 3, cs + 3);
+        drawGradPanel(ctx, c, m, les, oy, ox, nDone, list.length, gacc, gmax, { x: 24, y: img.y + img.h / 2 + 40 });
+      }
+      ctx.globalAlpha = 1;
+    });
+  }
+  // the panel under the image while filter 1's gradient accumulates: the patch under the filter at the current position,
+  // × the blame there, and the sum so far (the geometry of the convolution panel, so the two read alike)
+  function drawGradPanel(ctx, c, m, les, oy, ox, nDone, nAll, gacc, gmax, at) {
+    const net = m.net, f = net.conv.f, S = m.size, x = m.x, co = net.co, cell = 9, gap = 14, gw = f * cell;
+    const d = les.dConv[oy * co + ox];
+    const term = [], patch = []; let maxT = 1e-9, maxP = 1e-9;
+    for (let dy = 0; dy < f; dy++) for (let dx = 0; dx < f; dx++) { const p = x[(oy + dy) * S + ox + dx]; patch.push(p); term.push(d * p); maxP = Math.max(maxP, Math.abs(p)); maxT = Math.max(maxT, Math.abs(d * p)); }
+    const grids = [['image patch', patch, maxP], ['× blame', term, maxT], ['Σ so far', Array.from(gacc), Math.max(gmax, 1e-9)]];
+    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
+    grids.forEach(([label, vals, mx], g) => {
+      const gx = at.x + g * (gw + gap);
+      ctx.fillStyle = c.ink3; ctx.fillText(label, gx + gw / 2, at.y - 3);
+      for (let i = 0; i < f * f; i++) { ctx.fillStyle = diverging(vals[i] / mx); ctx.fillRect(gx + (i % f) * cell, at.y + Math.floor(i / f) * cell, cell - 1, cell - 1); }
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(gx - 0.5, at.y - 0.5, gw, gw);
+      if (g < 2) { ctx.fillStyle = c.ink2; ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'middle'; ctx.fillText(g === 0 ? '→' : '+', gx + gw + gap / 2, at.y + gw / 2); ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; }
+    });
+    ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(`blame ${fmtSigned(d, Math.abs(d) < 0.01 ? 4 : 3)} at col ${ox}, row ${oy}`, at.x, at.y + gw + 6);
+    ctx.fillStyle = c.ink3;
+    ctx.fillText(`Δ = −${les.lr} × Σ · ${nDone} of ${nAll}`, at.x, at.y + gw + 19);
   }
   // the loss against the call: −log p for a positive case, −log(1 − p) for a negative one, with the point plotted
   function drawLossGlyph(ctx, c, cx, cy, y, p) {
@@ -1341,5 +1516,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, sweepPlan, sweepState, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
