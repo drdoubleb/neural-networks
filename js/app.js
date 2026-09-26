@@ -517,20 +517,20 @@
     const thr = S.test.threshold.toFixed(2), pp = p.toFixed(2), calledName = className(called), truth = className(s.label), correct = called === s.label;
     let html;
     const K = S.net.conv ? S.net.conv.K : 0, pool = S.net.conv ? S.net.conv.pool : 0, nL = S.net.hidden.length, F = S.net.featureCount;
-    const hop = info && info.key;
+    const hop = info && info.key, cols = K <= 4 ? 2 : 4, stack = S.net.conv ? `${Math.ceil(K / cols)}×${cols}` : '';
     const convTexts = {
       prep: `<span class="step">Preprocessing</span> <span><b>${esc(s.name)}</b>: the mean training ${noun(1)} is subtracted from this one. The network sees the difference (orange = more ink than average, blue = less), large at the membrane and near zero in the centre.</span>`,
       scan1: `<span class="step">Convolution</span> <span>Filter 1 slides over the difference image. At each position its 5×5 weights multiply the 5×5 values under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.</span>`,
       scan: `<span class="step">Convolution</span> <span>The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.</span>`,
       pool1: `<span class="step">Max-pooling</span> <span>Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.</span>`,
       pool: `<span class="step">Max-pooling</span> <span>The other maps are pooled the same way.</span>`,
-      unit: info && info.j > 0
-        ? `<span class="step">Dense layer</span> <span>Unit ${info.j + 1} does the same with its own weight maps.</span>`
-        : nL
-        ? `<span class="step">Dense layer</span> <span>Hidden unit 1 has one weight per pooled cell (${F}), drawn as ${K} small maps beside the pooled maps. Each pooled value × its weight gives the product maps; a scan line sums them map by map, the bias is added, and ReLU keeps the positive part: the unit’s value.</span>`
-        : `<span class="step">Output</span> <span>The pooled cells feed the output directly, one weight each (${F}), drawn as ${K} small maps beside the pooled maps. Each pooled value × its weight gives the product maps; a scan line sums them map by map, the bias is added, and the sigmoid turns the sum into P(${esc(posName())}).</span>`,
+      units: nL
+        ? `<span class="step">Dense layer</span> <span>The ${K} pooled maps are stacked ${stack} into one map and laid over each hidden unit’s weight map (one weight per pooled cell, ${F}, stacked the same way), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: the unit’s value. Unit 1 slowly, then the rest together.</span>`
+        : `<span class="step">Output</span> <span>The ${K} pooled maps are stacked ${stack} into one map and laid over the output’s weight map (one weight per pooled cell, ${F}), multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue; the sum plus the bias is z.</span>`,
       hop: hop === 'out'
         ? `<span class="step">Output</span> <span>The units’ values × their weights flow to the output, each connection as thick as the product it carries. Their sum plus the bias is z, and the sigmoid turns z into P(${esc(posName())}).</span>`
+        : hop === 'sum'
+        ? `<span class="step">Output</span> <span>z goes through the sigmoid: P(${esc(posName())}) = 1 / (1 + e<sup>−z</sup>).</span>`
         : `<span class="step">Hidden layer ${(hop || 0) + 1}</span> <span>Each unit sums weight × value over the layer before, plus its bias, through ${NN.ACTIVATIONS[S.activation].label}.</span>`,
       final: `<span class="step">Forward pass done</span> <span>Every value is on the diagram. The weights are frozen: nothing is learned here.</span>`,
     };
@@ -546,18 +546,16 @@
   //   2. the remaining filters scan together at a quicker pace (~7 s)
   //   3. map 1 is pooled slowly, block by block, with the block and its maximum shown (~4 s)
   //   4. the remaining maps are pooled together (~2.5 s)
-  //   5. unit 1 sums its weight maps × the pooled maps slowly (6 s), the other units follow one by one (1.5 s each)
+  //   5. the pooled maps, stacked into one map, are laid over each unit's weight map and summed, exactly like the
+  //      pixel hop of the dense recipes: unit 1 slowly (12 s), the rest together (6 s)
   //   6. the remaining dense hops wipe to the output (1.2 s each), then the call at the threshold, then the truth
-  const UNIT_STAGES = [['weights', 0.15], ['products', 0.35], ['sum', 0.8], ['relu', 1]];
-  function unitStage(u) { let lo = 0; for (const [name, end] of UNIT_STAGES) { if (u < end) return { name, v: (u - lo) / (end - lo) }; lo = end; } return { name: 'done', v: 1 }; }
   function animateConvClassify(s) {
     const net = S.net, nL = net.hidden.length, total = net.co * net.co, cells = net.po * net.po, multi = net.conv.K > 1, units = nL ? net.hidden[0] : 1;
-    const T = [['prep', 4000], ['scan1', 12000], ['scan', multi ? 7000 : 0], ['pool1', 4000], ['pool', multi ? 2500 : 0]];
-    for (let j = 0; j < units; j++) T.push(['unit', j === 0 ? 6000 : 1500, j]);
-    const hopKeys = []; for (let l = 1; l < nL; l++) hopKeys.push(l); if (nL) hopKeys.push('out');
+    const T = [['prep', 4000], ['scan1', 12000], ['scan', multi ? 7000 : 0], ['pool1', 4000], ['pool', multi ? 2500 : 0], ['units', 12000 + (units > 1 ? 6000 : 0)]];
+    const hopKeys = []; for (let l = 1; l < nL; l++) hopKeys.push(l); hopKeys.push(nL ? 'out' : 'sum');
     for (const key of hopKeys) T.push(['hop', 1200, key]);
     T.push(['final', 800], ['call', 900], ['reveal', 900]);
-    const hops = nL + 1; // the unit hop, the dense hops between hidden layers, the output
+    const hops = 1 + hopKeys.length; // the pooled-maps hop, the dense hops between hidden layers, the output
     const t0 = performance.now();
     S.test.skip = false;
     const p = S.test.results.get(s.id).p, called = p >= S.test.threshold ? 1 : 0, thr = S.test.threshold;
@@ -574,8 +572,8 @@
       if (phase === 'prep') anim.t = frac;
       else if (phase === 'scan1' || phase === 'scan') { anim.pos = Math.min(total, Math.floor(frac * total)); anim.showFilter = phase === 'scan1' ? 0 : 1; }
       else if (phase === 'pool1' || phase === 'pool') anim.posP = Math.min(cells, Math.floor(frac * cells));
-      else if (phase === 'unit') { anim.j = arg; anim.stage = unitStage(frac); anim.done = Array.from({ length: arg }, (_, i) => i); anim.banner = nL ? 'dense layer: each unit sums weight × pooled value, plus its bias, through ReLU' : 'output: Σ weight × pooled value, plus the bias, through the sigmoid'; }
-      else if (phase === 'hop') { const i = hopKeys.indexOf(arg); anim.key = arg; anim.t = frac; anim.wipes = hopKeys.slice(0, i + 1); anim.reveal = 1 + i; anim.banner = `${arg === 'out' ? 'output' : 'hidden layer ' + (arg + 1)}: each connection carries weight × value`; anim.dir = 1; }
+      else if (phase === 'units') { anim.t = frac; anim.banner = nL ? 'dense layer: pooled maps × each unit’s weights, summed, through ReLU' : 'output: pooled maps × weights, summed, plus the bias'; anim.dir = 1; }
+      else if (phase === 'hop') { const i = hopKeys.indexOf(arg); anim.key = arg; anim.t = frac; anim.wipes = hopKeys.slice(0, i + 1); anim.reveal = 1 + i; anim.banner = arg === 'sum' ? 'output: z through the sigmoid' : `${arg === 'out' ? 'output' : 'hidden layer ' + (arg + 1)}: each connection carries weight × value`; anim.dir = 1; }
       else { anim.wipes = hopKeys; anim.reveal = hops; }
       if (phase === 'final') anim.banner = 'forward pass done: the weights are frozen, nothing is learned here';
       if (phase === 'call') anim.banner = `P(${posName()}) = ${p.toFixed(2)} ${p >= thr ? '≥' : '<'} ${thr.toFixed(2)}, so the call is ${className(called)}`;
@@ -952,7 +950,7 @@
       stopTraining(); renderTestPanel();
       if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
       renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 45 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then each hidden unit sums its weight maps × the pooled maps and the units feed the output. Press N or click the diagram to skip ahead.';
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead.';
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }

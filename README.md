@@ -51,7 +51,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Teach one case, step one batch or one
    epoch, or press *Complete training*. The diagram redraws every frame: connection thickness and colour show each weight, node fill shows
    the value flowing through for the selected case, first-layer weights on pixels are drawn as 32 × 32 maps, and with a
-   convolution you see the learned filters, their feature maps lighting up on the nucleus, and the pooled maps.
+   convolution you see the learned filters, their feature maps lighting up on the nucleus, the pooled maps, and each
+   hidden unit's weights over the pooled cells drawn as one stacked map, with its product map once a case has run.
    Connections are drawn against a fixed scale so they visibly grow as the network learns, and a bright core marks the
    ones the last training step moved most. A single-layer network on pixels also shows the **weight × pixel** product
    map whose sum is the score, and every pixel-fed hidden unit shows its own weight × pixel map beside its weight map.
@@ -84,12 +85,13 @@ style). The network never sees it; the page uses it to show which hidden units r
    convolution in about 45 seconds: the mean training nucleus is subtracted first (the three tiles stay up), filter 1
    alone scans the difference image slowly with the arithmetic of each position shown, the remaining filters sweep
    together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4 block shown with its largest value
-   and the single pooled cell it becomes), the other maps follow together, then hidden unit 1 sums the pooled maps: its
-   weight maps (one per pooled map) appear beside the pooled column, the product maps form, a scan line sums them map by
-   map while the unit counts, and the bias and the ReLU finish it; the other units follow one by one, the units' values
-   wipe to the output, and the call is made. Press N or click the diagram to skip ahead. In any convolutional diagram,
-   hovering a pooled cell outlines its source block, hovering a feature-map pixel marks the pooled cell it feeds, and
-   hovering a hidden unit shows its weight maps and products beside the pooled maps. Accuracy, sensitivity, specificity and a confusion matrix
+   and the single pooled cell it becomes), the other maps follow together, then the dense layer runs exactly like the
+   pixel hop: the pooled maps gather into one stacked map over hidden unit 1's weight map (its weights over the pooled
+   cells, stacked the same way and drawn beside the pooled column at all times), the product map wipes in and slides
+   aside, a scan line sums it while the unit counts, the bias and the ReLU finish it, and the other units follow
+   together; the units' values then wipe to the output and the call is made. Press N or click the diagram to skip ahead.
+   In any convolutional diagram, hovering a pooled cell outlines its source block, hovering a feature-map pixel marks the
+   pooled cell it feeds, and hovering a cell of a stacked weight or product map names the pooled map and cell it belongs to. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population.
 
