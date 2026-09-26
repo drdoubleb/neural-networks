@@ -218,6 +218,10 @@ ul.prose li + li { margin-top: 4px; }
 .lesson .step { font-weight: 700; color: var(--accent); font-family: "IBM Plex Mono", ui-monospace, monospace; white-space: nowrap; }
 .lesson .lesson-actions { display: flex; gap: 6px; margin-left: auto; }
 .lesson .btn { padding: 4px 10px; font-size: 12px; }
+.lesson .player-ctl { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; white-space: nowrap; }
+.lesson .player-ctl .btn { padding: 3px 8px; font-size: 12px; }
+.lesson .player-ctl .speed { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-2); font-family: var(--font-mono); }
+.lesson .player-ctl .speed input { width: 84px; }
 
 /* ---------- network diagram ---------- */
 .net-wrap { position: relative; width: 100%; }

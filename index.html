@@ -131,7 +131,7 @@
           <h2>The network, live</h2>
           <span class="small muted">forward pass for the case in the inspector · hover any node, map or connection</span>
         </div>
-        <div class="lesson" id="lesson" hidden><span id="lesson-text"></span></div>
+        <div class="lesson" id="lesson" hidden><span id="lesson-text"></span><span class="player-ctl" id="lesson-player" hidden><button type="button" class="btn" id="lesson-prev" title="Previous step (←)">⏮</button><button type="button" class="btn" id="lesson-pause" title="Pause or resume (space)">⏸ Pause</button><button type="button" class="btn" id="lesson-next" title="Next step (→)">⏭</button><label class="speed" title="Playback speed"><span>speed</span><input type="range" id="lesson-speed" min="0.25" max="3" step="0.25" value="1"><span id="lesson-speed-val">1×</span></label></span></div>
         <div class="net-wrap">
           <canvas id="net-canvas" width="800" height="440" aria-label="Network diagram"></canvas>
           <div class="tip" id="net-tip" hidden></div>
@@ -223,7 +223,7 @@
           <h2>The network, frozen</h2>
           <span class="small muted">held-out cases go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
-        <div class="lesson" id="test-lesson" hidden><span id="test-lesson-text"></span></div>
+        <div class="lesson" id="test-lesson" hidden><span id="test-lesson-text"></span><span class="player-ctl" id="test-player" hidden><button type="button" class="btn" id="test-prev" title="Previous step (←)">⏮</button><button type="button" class="btn" id="test-pause" title="Pause or resume (space)">⏸ Pause</button><button type="button" class="btn" id="test-next" title="Next step (→)">⏭</button><label class="speed" title="Playback speed"><span>speed</span><input type="range" id="test-speed" min="0.25" max="3" step="0.25" value="1"><span id="test-speed-val">1×</span></label></span></div>
         <div class="net-wrap">
           <canvas id="net-canvas-test" width="800" height="440" aria-label="Network diagram during testing"></canvas>
           <div class="tip" id="net-tip-test" hidden></div>
@@ -292,7 +292,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukaemia/patients_data.js"></script>
