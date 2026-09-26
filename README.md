@@ -68,14 +68,19 @@ style). The network never sees it; the page uses it to show which hidden units r
    difference is laid over each weight map, the product map forms cell by cell and is set aside, a scan line
    sums it with orange cells against blue, and the bias and the ReLU, or the sigmoid at the output, finish the unit,
    with a magnifier showing one 4×4 block of the arithmetic; the first unit runs slowly, the rest together); (2) the loss, the call against
-   the truth on a scale beside the output, with the error as its slope; (3) the backward pass, blame flowing back along
-   the connections to each hidden unit one layer at a time, with a pill on each unit (a unit that was switched off gets
-   none); (4) the gradients, blame at one end of a connection × activity at the other, drawn as a glow on each
-   connection and, on pixels, as a copy of the nucleus sliding into each weight map scaled by the unit's blame; (5) the
-   update, the connections and maps visibly moving to w − learning rate × gradient; (6) the check, the same case
-   running forward again with the new weights. The step is real training, a batch of one at the current learning rate.
-   Each press teaches the next case in the training set (or the case you picked in the tray). Convolutional networks are
-   not covered by the walk-through yet. With hidden units, a
+   the truth on a scale beside the output, with the loss curve above it and the error (p − y) as its slope; (3) the
+   backward pass, the error wiping back along each connection as error × weight (thick = large, blue: the unit should
+   come down, orange: go up), one layer at a time, and a pill on each unit spelling out what arrived and what ReLU let
+   through (a unit that was switched off gets none); (4) the gradients, blame at one end of a connection × activity at
+   the other, drawn as a glow on each connection with the arithmetic written on the connections of small layers and, on
+   pixels, as a copy of the nucleus sliding into each weight map scaled by the unit's blame; (5) the update, the
+   connections and maps visibly moving to w − learning rate × gradient, each labelled connection showing its weight
+   before → after; (6) the check, the same case running forward again with the new weights. The step is real training, a
+   batch of one at the current learning rate. Each press teaches the next case in the training set (or the case you
+   picked in the tray). Convolutional networks are not covered by the walk-through yet. Every walk-through (the lesson and
+   *Classify next*) plays at its normal pace unless you touch the controls in its strip: pause/play, previous and next
+   step, and a speed slider (space pauses, ← → step, N skips ahead); while paused, the step buttons show each step at
+   its end. With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.

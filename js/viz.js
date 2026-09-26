@@ -955,30 +955,60 @@ window.Viz = (function () {
     ctx.strokeStyle = truthCol; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 7, ty); ctx.lineTo(bx + 7, ty); ctx.stroke();
     ctx.beginPath(); ctx.arc(bx, yOf(pv), 4.5, 0, Math.PI * 2); ctx.fillStyle = c.ink; ctx.fill();
     ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`error ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
+    ctx.fillText(`error = p − y = ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
     ctx.fillStyle = c.ink3; ctx.fillText(`loss ${les.loss.toFixed(2)}`, out.x, out.y + out.r + 74);
+    drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the call, with the point plotted: its slope there is the error
     if (ph === 'check' && les.pAfter != null && les.reveal >= hops) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 90); }
     if (ph === 'loss') { banner('loss: how wrong was the call?', 0); return; }
 
-    // 3 · backward pass: blame flows back one layer at a time; every unit then shows its share, a unit that was off gets none
+    // 3 · backward pass: the error flows back along each connection as error × weight, a wipe from the output end with
+    // thickness = its size (blue: the unit should come down, orange: go up), one layer at a time; the activation then
+    // gates what arrived (ReLU passes it only if the unit was on) and every unit shows its blame with the arithmetic
     if (nL) {
-      const prog = ph === 'blame' ? les.frac * nL : nL;
+      const prog = ph === 'blame' ? les.frac * nL : nL, fwB = les.fwBefore;
       for (let k = 0; k < nL; k++) {
         const l = nL - 1 - k, t = Math.min(1, prog - k);
         if (t <= 0) continue;
         const key = l === nL - 1 ? 'out' : l + 1;  // the connections that leave layer l
-        if (t < 1) {
-          ctx.fillStyle = c.accent;
-          for (const e of L.edges) { if (e.layer !== key) continue; const x = e.x2 + (e.x1 - e.x2) * t, y = e.y2 + (e.y1 - e.y2) * t; ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
-        } else {
-          L.unitColumns[l].forEach((u, j) => {
-            const d = les.delta[l][j];
-            const px = u.kind === 'square' ? L.badgeX : u.x, py = u.kind === 'square' ? u.y + 20 : u.y + u.r + 7;
-            pill(ctx, px, py, d === 0 ? 'no blame' : `blame ${fmtSigned(d, 2)}`, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
-          });
+        const flowOf = e => (key === 'out' ? les.error : les.delta[l + 1][e.ti]) * e.w;
+        if (ph === 'blame') {
+          let max = 1e-9; for (const e of L.edges) if (e.layer === key) max = Math.max(max, Math.abs(flowOf(e)));
+          const wt = Math.min(1, t / 0.7);
+          ctx.lineCap = 'round';
+          for (const e of L.edges) {
+            if (e.layer !== key) continue;
+            const f = flowOf(e);
+            ctx.strokeStyle = rgbStr(f > 0 ? c.rgb.regular : c.rgb.irregular, 0.9); ctx.lineWidth = 1.5 + 9 * Math.abs(f) / max;
+            ctx.beginPath(); ctx.moveTo(e.x2, e.y2); ctx.lineTo(e.x2 + (e.x1 - e.x2) * wt, e.y2 + (e.y1 - e.y2) * wt); ctx.stroke();
+          }
+          ctx.lineCap = 'butt';
+          if (t < 0.7) continue;
         }
+        L.unitColumns[l].forEach((u, j) => {
+          const d = les.delta[l][j];
+          // what arrived (error × weight, or Σ blame × weight from the layer above) and the gate the activation applied
+          let arrived = 0;
+          if (key === 'out') arrived = les.error * net.Wo[j];
+          else { const n1 = net.sizes[l + 1]; L.unitColumns[l + 1].forEach((_, q) => { arrived += les.delta[l + 1][q] * net.W[l + 1][q * n1 + j]; }); }
+          const on = fwB.pre[l][j] > 0, gate = arrived !== 0 ? d / arrived : 0;
+          // the full arithmetic where there is room: not on cramped rows, and not on a last layer that sits next to the
+          // output's text when there is a layer before it (the tooltip carries the arithmetic there)
+          const roomy = (u.kind !== 'square' || u.captioned) && !(key === 'out' && nL > 1);
+          const lead = key === 'out' ? `${fmtSigned(les.error, 2)} × ${fmtSigned(net.Wo[j], 2)}` : `Σ blame × w = ${fmtSigned(arrived, 2)}`;
+          let text;
+          if (!roomy) text = d === 0 ? (m.activation === 'relu' && !on ? 'off → 0' : 'no blame') : `blame ${fmtSigned(d, 2)}`;
+          else if (m.activation === 'relu') text = on ? `${lead}${key === 'out' ? ` = ${fmtSigned(d, 2)}` : ''}` : `${key === 'out' ? lead : `Σ = ${fmtSigned(arrived, 2)}`} · off → 0`;
+          else text = `${lead} × slope ${gate.toFixed(2)} = ${fmtSigned(d, 2)}`;
+          let px = u.kind === 'square' ? (roomy ? L.badgeX - 10 : L.badgeX) : u.x;
+          let py = u.kind === 'square' ? (roomy ? u.y + (u.h || u.size) / 2 + 10 : u.y + 20) : u.y + u.r + 7;
+          if (u.kind === 'square' && py + 8 > NET_H - 40) { py = u.y + 20; px = L.badgeX; } // the bottom row would sit on the banner
+          ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
+          const half = ctx.measureText(text).width / 2 + 5, maxRight = out.x - 70; // clear of the truth, error and loss lines under the output
+          if (px + half > maxRight) px = maxRight - half;
+          pill(ctx, px, py, text, d === 0 ? c.ink3 : (d > 0 ? c.regular : c.irregular), c);
+        });
       }
-      if (ph === 'blame') { banner('backward pass: blame', -1); return; }
+      if (ph === 'blame') { banner('backward pass: each connection carries error × weight back', -1); return; }
     }
     if (ph === 'check') return;
 
@@ -1030,8 +1060,35 @@ window.Viz = (function () {
         ctx.globalAlpha = 1;
       }
     }
+    // the numbers on the connections of small layers: blame at the end × activity at the start = gradient, then the
+    // weight before → after
+    const counts = {}; for (const e of L.edges) counts[e.layer] = (counts[e.layer] || 0) + 1;
+    const labelAlpha = ph === 'update' ? Math.min(1, fr / 0.4) : Math.min(1, fr * 2);
+    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.lineJoin = 'round';
+    for (const e of L.edges) {
+      if (e.wi == null || e.layer === 'sum' || counts[e.layer] > 16) continue;
+      const grad = e.layer === 'out' ? les.gWo[e.wi] : les.gW[e.layer][e.wi]; if (!grad) continue;
+      let text;
+      if (ph === 'update') { const w0 = e.prev != null ? e.prev : e.w, w1 = w0 - les.lr * grad, dp = fmtSigned(w0, 2) === fmtSigned(w1, 2) ? 3 : 2; text = `w ${fmtSigned(w0, dp)} → ${fmtSigned(w1, dp)}`; }
+      else { const blame = e.layer === 'out' ? les.error : les.delta[e.layer][e.ti], act = sourceValue(m, e); text = `${fmtSigned(blame, 2)} × ${fmtNum(act, 2)} = ${fmtSigned(grad, 2)}`; }
+      const lx = e.x1 + (e.x2 - e.x1) * 0.4, ly = e.y1 + (e.y2 - e.y1) * 0.4 - 5;
+      ctx.globalAlpha = labelAlpha; ctx.strokeStyle = c.surface; ctx.lineWidth = 3; ctx.strokeText(text, lx, ly); ctx.fillStyle = c.ink2; ctx.fillText(text, lx, ly); ctx.globalAlpha = 1;
+    }
     if (ph === 'gradient') banner(nL ? 'gradient of every weight = blame at its end × activity at its start' : 'gradient of every weight = error × its input', 0);
     if (ph === 'update') banner(`update: every weight steps against its gradient, w ← w − ${les.lr} × gradient`, 0);
+  }
+  // the loss against the call: −log p for a positive case, −log(1 − p) for a negative one, with the point plotted
+  function drawLossGlyph(ctx, c, cx, cy, y, p) {
+    const w = 36, h = 20, x0 = cx - w / 2, y0 = cy + h / 2, lossOf = q => (y ? -Math.log(q) : -Math.log(1 - q)), top = lossOf(0.03);
+    ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i <= w; i++) { const q = 0.03 + 0.94 * i / w, yy = y0 - h * Math.min(1, lossOf(q) / top); i ? ctx.lineTo(x0 + i, yy) : ctx.moveTo(x0 + i, yy); }
+    ctx.stroke();
+    const q = Math.max(0.03, Math.min(0.97, p)), px = x0 + (q - 0.03) / 0.94 * w, py = y0 - h * Math.min(1, lossOf(q) / top);
+    ctx.fillStyle = y ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(y ? '−log p' : '−log(1−p)', cx, cy - h / 2 - 3);
+    ctx.textBaseline = 'top'; ctx.fillText('0', x0, y0 + 2); ctx.fillText('p', cx, y0 + 2); ctx.fillText('1', x0 + w, y0 + 2);
   }
   function pill(ctx, x, y, text, col, c) {
     ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
@@ -1104,6 +1161,17 @@ window.Viz = (function () {
     ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, f * px, f * px);
   }
 
+  // the blame arithmetic of hidden unit j of layer l during a lesson, for the tooltips
+  function blameNote(m, l, j) {
+    const les = m.lesson; if (!les || !les.delta || les.phase === 'forward' || les.phase === 'loss') return '';
+    const net = m.net, nL = net.hidden.length, d = les.delta[l][j], on = les.fwBefore.pre[l][j] > 0;
+    let arrived = 0;
+    if (l === nL - 1) arrived = les.error * net.Wo[j];
+    else { const n1 = net.sizes[l + 1]; for (let q = 0; q < net.hidden[l + 1]; q++) arrived += les.delta[l + 1][q] * net.W[l + 1][q * n1 + j]; }
+    const lead = l === nL - 1 ? `error ${fmtSigned(les.error, 2)} × w ${fmtSigned(net.Wo[j], 2)}` : `Σ blame × w = ${fmtSigned(arrived, 2)}`;
+    if (m.activation === 'relu') return on ? ` · blame: ${lead} = ${fmtSigned(d, 2)}` : ` · blame: ${lead}, unit off → 0`;
+    return ` · blame: ${lead} × slope ${(arrived ? d / arrived : 0).toFixed(2)} = ${fmtSigned(d, 2)}`;
+  }
   // hit-test in logical coordinates; returns { kind, ref, text } or null
   function hitNetwork(canvas, px, py, m) {
     const L = canvas._layout; if (!L) return null;
@@ -1115,7 +1183,7 @@ window.Viz = (function () {
       if (n.kind === 'unit' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) {
         const a = fw ? ` · activation ${fmtNum(fw.a[n.l + 1][n.j], 3)}` : '';
         const out = n.l === net.hidden.length - 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
-        return { kind: 'node', ref: n, text: `hidden unit ${net.hidden.length > 1 ? (n.l + 1) + '.' : ''}${n.j + 1}${a} · bias ${fmtSigned(net.b[n.l][n.j], 3)}${out}` };
+        return { kind: 'node', ref: n, text: `hidden unit ${net.hidden.length > 1 ? (n.l + 1) + '.' : ''}${n.j + 1}${a} · bias ${fmtSigned(net.b[n.l][n.j], 3)}${out}${blameNote(m, n.l, n.j)}` };
       }
       if (n.kind === 'input' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: `${m.featureNames[n.i]}${m.x ? ` · standardized value ${fmtSigned(m.x[n.i], 2)}` : ''}` };
       if (n.kind === 'square' && inBox(n, 2)) {
@@ -1130,7 +1198,7 @@ window.Viz = (function () {
         const a = fw ? fw.a[1][n.j] : null;
         const out = net.hidden.length === 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
         const pix = inBox(n, 0) && inp ? (() => { const { i, j, k } = cellAt(n, W, x, y); return ` · ${cellName(m, i, j)}: ${fmtSigned(W.arr[W.off + k], 3)} × ${fmtSigned(inp.vec[k], 2)} = ${fmtSigned(W.arr[W.off + k] * inp.vec[k], 3)}`; })() : '';
-        return { kind: 'node', ref: n, text: `unit ${n.j + 1}: Σ weight × ${what} ${inp ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}` };
+        return { kind: 'node', ref: n, text: `unit ${n.j + 1}: Σ weight × ${what} ${inp ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}${blameNote(m, 0, n.j)}` };
       }
       if (n.kind === 'map' && inBox(n, 0)) {
         const W = firstWeights(m, null), inp = firstInput(m), { i, j, k } = cellAt(n, W, x, y), w = W.arr[W.off + k];

@@ -11,6 +11,7 @@
   const S = {
     tasks: null, taskId: 'leukaemia', task: null, ds: null, kind: 'tabular', size: 0, featureDefs: [],
     mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
+    animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
@@ -170,6 +171,48 @@
     if (did) renderTraining(ended || S.kind === 'tabular');
     if (S.running) requestAnimationFrame(tick);
   }
+  // ------------------------------------------------------------------ playback: pause, step and slow the walk-throughs
+  // A player paces a phased animation on its own clock, so a lesson or a test walk-through plays at the normal pace
+  // untouched but can be paused, stepped back and forth, slowed or sped up, and skipped. phases = [[name, ms, arg], …];
+  // frame(now) draws the current state and, while playing, schedules the next frame through the player.
+  function makePlayer(phases, frame) {
+    const starts = []; let total = 0; for (const p of phases) { starts.push(total); total += p[1]; }
+    const live = i => phases[i][1] > 0;
+    const P = { phases, starts, total, t: 0, playing: true, last: null, pending: false, frame };
+    P.tick = now => { if (P.playing && P.last != null) P.t += Math.max(0, now - P.last) * S.animSpeed; P.last = now; };
+    P.at = () => { // the phase the clock is in and its progress, or null once the animation has run out
+      if (P.t >= total) return null;
+      let i = 0; while (i < phases.length - 1 && P.t >= starts[i] + phases[i][1]) i++;
+      const ms = phases[i][1]; return { i, phase: phases[i], frac: ms ? Math.min(1, (P.t - starts[i]) / ms) : 1, start: starts[i] };
+    };
+    P.schedule = () => { if (P.pending) return; P.pending = true; requestAnimationFrame(now => { P.pending = false; P.frame(now); }); };
+    P.render = () => P.frame(performance.now());
+    P.pause = () => { P.playing = false; P.render(); };
+    P.resume = () => { if (P.playing) return; P.playing = true; P.last = null; P.schedule(); };
+    P.toggle = () => (P.playing ? P.pause() : P.resume());
+    P.skip = () => { P.t = total; P.playing = true; P.last = null; P.schedule(); };
+    // stepping: while playing, jump to the start of the next (or of this) step and carry on; while paused, show the
+    // steps at their end, one at a time, so each finished picture can be looked at
+    P.next = () => {
+      const cur = P.at(); if (!cur) return;
+      let n = cur.i + 1; while (n < phases.length && !live(n)) n++;
+      if (P.playing) { P.t = n < phases.length ? starts[n] : total; P.last = null; }
+      else { const end = cur.start + cur.phase[1] - 1; P.t = P.t < end - 30 ? end : (n < phases.length ? starts[n] + phases[n][1] - 1 : total); }
+      if (P.t >= total) { P.playing = true; P.last = null; P.schedule(); } else if (!P.playing) P.render();
+    };
+    P.prev = () => {
+      const cur = P.at(), i = cur ? cur.i : phases.length;
+      let p = i - 1; while (p >= 0 && !live(p)) p--;
+      if (P.playing) { P.t = cur && P.t - cur.start > 1000 ? cur.start : (p >= 0 ? starts[p] : 0); P.last = null; }
+      else { P.t = p >= 0 ? starts[p] + phases[p][1] - 1 : 0; P.render(); }
+    };
+    return P;
+  }
+  function setAnimSpeed(v) { S.animSpeed = v; try { localStorage.setItem('nn-anim-speed', String(v)); } catch (e) { /* ignore */ } syncSpeedControls(); }
+  function syncSpeedControls() { for (const key of ['lesson', 'test']) { const r = $(`${key}-speed`), l = $(`${key}-speed-val`); if (r) r.value = S.animSpeed; if (l) l.textContent = `${S.animSpeed}×`; } }
+  function renderPlayerControls(key, P) { const box = $(`${key}-player`); if (!box) return; box.hidden = !P; if (P) $(`${key}-pause`).textContent = P.playing ? '⏸ Pause' : '▶ Play'; }
+  function activePlayer() { return (S.stage === 'train' ? (S.lesson && S.lesson.player) : S.stage === 'test' ? (S.test.animating && S.test.player) : null) || null; }
+
   // ------------------------------------------------------------------ the lesson: one case teaches the network
   // A walk-through of one gradient step on a training case in six steps (five without a hidden layer):
   //   1 forward pass   values flow from the inputs to the output, hop by hop
@@ -203,7 +246,7 @@
       : `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
   }
   function teachNext() {
-    if (S.lesson) { S.lesson.skip = true; return; }
+    if (S.lesson) { S.lesson.player.skip(); return; }
     if (!canTeach()) return;
     startLesson(nextLessonCase());
   }
@@ -221,9 +264,11 @@
     const res = S.net.lesson(x, y);
     const hops = Viz.sweepPlan(S.net, S.mode).hops;
     S.lastLesson = null;
-    S.lesson = { s, x, y, res, hops, phases: lessonPhases(), t0: performance.now(), skip: reducedMotion, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, morph: null };
+    const player = makePlayer(lessonPhases(), lessonFrame);
+    if (reducedMotion) player.t = player.total;
+    S.lesson = { s, x, y, res, hops, phases: player.phases, player, phase: 'forward', frac: 0, pBefore: res.fw.p, pAfter: null, morph: null };
     updateTeachButton(); renderLessonLine();
-    requestAnimationFrame(lessonFrame);
+    player.schedule();
   }
   // the update itself: applied once, then drawn as a morph from the old weights to the new ones
   function applyLesson() {
@@ -244,15 +289,17 @@
   const easeInOut = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
   function lessonFrame(now) {
     const les = S.lesson; if (!les) return;
-    const t = les.skip ? Infinity : now - les.t0;
-    let acc = 0, phase = null, frac = 1;
-    for (const [name, ms] of les.phases) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
-    if (!phase) { finishLesson(); return; }
+    const P = les.player; P.tick(now);
+    const cur = P.at();
+    if (!cur) { finishLesson(); return; }
+    const phase = cur.phase[0], frac = cur.frac;
+    // the weights follow the step (the player can step back): the old ones before the update, morphing during it, the new ones from the check on
     if (phase === 'update') { applyLesson(); setParams(lerpParams(les.morph.before, les.morph.after, easeInOut(frac))); }
-    if (phase === 'check' && !les.settled) { settleLesson(); les.settled = true; }
+    else if (phase === 'check') { if (!les.settled) { settleLesson(); les.settled = true; } else setParams(les.morph.after); }
+    else if (les.morph) setParams(les.morph.before);
     les.phase = phase; les.frac = frac;
     renderTrainGraph(); renderLessonLine();
-    requestAnimationFrame(lessonFrame);
+    if (P.playing) P.schedule();
   }
   function finishLesson() {
     const les = S.lesson; if (!les) return;
@@ -303,23 +350,24 @@
         forward: `${forwardText()} The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`,
         loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: hidden > 1
-          ? 'How much is each hidden unit to blame? The error flows back one layer at a time: a unit’s blame = the blame of the units it feeds × the weights between them × 1 if the unit was on, 0 if it was off. The dots carry it back.'
-          : 'How much is each hidden unit to blame? blame = error × its weight to the output × 1 if the unit was on, 0 if it was off. The dots carry the error back; a unit that was off gets none.',
+          ? 'How much is each hidden unit to blame? The error flows back one layer at a time along each connection as blame × weight (thick = large; blue: the unit should come down, orange: go up). A unit adds up what arrives, and ReLU passes it on only if the unit was on: an off unit’s blame is 0. Each pill shows the arithmetic.'
+          : 'How much is each hidden unit to blame? The error flows back along each connection as error × weight (thick = large; blue: the unit should come down, orange: go up). ReLU passes it on only if the unit was on, so a unit that was off gets blame 0. Each pill shows the arithmetic.',
         gradient: allSilent
           ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
           : hidden
-          ? `For every connection, gradient = blame at its end × activity at its start. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees), scaled by the unit’s blame.` : ''}`
-          : `For every connection, gradient = error × its input: big inputs, big gradients. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees), scaled by the error.` : ''}`,
-        update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. Watch the connections${pixels ? ' and weight maps' : ''} change.`,
+          ? `For every connection, gradient = blame at its end × activity at its start; the labels spell it out. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees), scaled by the unit’s blame.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients; the labels spell it out. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees), scaled by the error.` : ''}`,
+        update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. The labels show each weight before → after; watch the connections${pixels ? ' and weight maps' : ''} change.`,
         check: sure
           ? `The same case runs forward again. It was already right and sure, so the step was tiny: <b>${pair}</b>.`
           : `The same case runs forward again with the new weights: <b>${pair}</b>. One case, one small step; training repeats this for every case, many times over.`,
       };
-      html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead</span>`;
+      html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead · space pauses · ← → step</span>`;
     } else {
       html = `<span class="step">✓ ${esc(last.s.name)}</span> <span>(truth ${esc(className(last.s.label))}) ${fmtPair(last.pBefore, last.pAfter)}. Next up: <b>${esc(nextLessonCase().name)}</b>.</span>`;
     }
     $('lesson-text').innerHTML = html;
+    renderPlayerControls('lesson', les ? les.player : null);
   }
 
   function stepBatch() { stopTraining(); trainStep(); renderTraining(true); if (S.ptr === 0) note(`Epoch ${S.epoch} complete.`); }
@@ -327,13 +375,13 @@
 
   // ------------------------------------------------------------------ test phase
   function clearTestResults(notify) {
-    S.test.results.clear(); S.test.next = 0; S.test.revealed.clear(); S.test.animating = false;
+    S.test.results.clear(); S.test.next = 0; S.test.revealed.clear(); S.test.animating = false; S.test.player = null;
     renderTestLine(null);
     if (notify) $('test-note').textContent = 'The model changed, so the test results were cleared. Classify again to score the new weights.';
     renderTestPanel();
   }
   function classifyNext(quiet) {
-    if (S.test.animating) { S.test.skip = true; return false; }
+    if (S.test.animating) { if (S.test.player) S.test.player.skip(); return false; }
     if (S.test.next >= S.ds.test.length) return false;
     const s = S.ds.test[S.test.next++];
     const fw = S.net.forward(S.inputs.xOf(s));
@@ -347,7 +395,7 @@
     return true;
   }
   function classifyAll() {
-    const go = () => { if (S.test.animating) { S.test.skip = true; setTimeout(go, 50); return; } if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
+    const go = () => { if (S.test.animating) { if (S.test.player) S.test.player.skip(); setTimeout(go, 50); return; } if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
     go();
   }
   function testStats() {
@@ -489,24 +537,23 @@
   function animateDenseClassify(s) {
     const plan = Viz.sweepPlan(S.net, S.mode), hops = plan.hops;
     const T = [['forward', plan.total], ['call', 900], ['reveal', 900]];
-    const t0 = performance.now();
-    S.test.skip = false;
     const x = S.inputs.xOf(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
     let shown = false;
-    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
+    const P = makePlayer(T, null); S.test.player = P;
+    const finish = () => { S.test.player = null; S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
     const frame = now => {
-      if (!S.test.animating || S.selected !== s) return;
-      const t = S.test.skip ? Infinity : now - t0;
-      let acc = 0, phase = null, frac = 1;
-      for (const [name, ms] of T) { if (t < acc + ms) { phase = name; frac = (t - acc) / ms; break; } acc += ms; }
-      if (!phase) { finish(); return; }
+      if (!S.test.animating || S.selected !== s || S.test.player !== P) return;
+      P.tick(now); const cur = P.at();
+      if (!cur) { finish(); return; }
+      const phase = cur.phase[0], frac = cur.frac;
       const reveal = phase === 'forward' ? Viz.sweepState(plan, frac).reveal : hops;
       if (phase === 'reveal' && !shown) { shown = true; S.test.revealed.add(s.id); renderTestPanel(); renderInspector(); }
       renderTestGraph(phase === 'forward' ? 0 : 2, null, { phase, frac, hops, reveal, p, called: className(called), threshold: S.test.threshold, truthName: className(s.label), y: s.label, correct: called === s.label });
       renderTestLine(s, p, called, phase);
-      requestAnimationFrame(frame);
+      if (P.playing) P.schedule();
     };
-    requestAnimationFrame(frame);
+    P.frame = frame;
+    P.schedule();
   }
   // the strip above the test diagram: what is happening to the case going through
   function renderTestLine(s, p, called, phase, info) {
@@ -539,6 +586,7 @@
     else if (phase === 'call') html = `<span class="step">Call</span> <span>P(${esc(posName())}) = <b>${pp}</b>, which is ${p >= S.test.threshold ? 'at or above' : 'below'} the threshold of ${thr}, so the network calls <b>${esc(calledName)}</b>.</span>`;
     else html = `<span class="step">${correct ? '✓' : '✗'} ${esc(s.name)}</span> <span>called <b>${esc(calledName)}</b> (${pp}) · truth <b>${esc(truth)}</b>${correct ? '' : (called ? ' · a false positive' : ' · a false negative')}.</span> <span class="muted small">N classifies the next case</span>`;
     $('test-lesson-text').innerHTML = html;
+    renderPlayerControls('test', S.test.animating ? S.test.player : null);
   }
   // Classify-next walk-through for convolutional networks, about 45 s in all:
   //   0. the mean nucleus is subtracted: the network sees the difference (4 s)
@@ -556,18 +604,15 @@
     for (const key of hopKeys) T.push(['hop', 1200, key]);
     T.push(['final', 800], ['call', 900], ['reveal', 900]);
     const hops = 1 + hopKeys.length; // the pooled-maps hop, the dense hops between hidden layers, the output
-    const t0 = performance.now();
-    S.test.skip = false;
     const p = S.test.results.get(s.id).p, called = p >= S.test.threshold ? 1 : 0, thr = S.test.threshold;
     let shown = false;
-    const finish = () => { S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
+    const P = makePlayer(T, null); S.test.player = P;
+    const finish = () => { S.test.player = null; S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
     const frame = now => {
-      if (!S.test.animating || S.selected !== s) return;
-      const t = S.test.skip ? Infinity : now - t0;
-      let acc = 0, seg = null, frac = 1;
-      for (const g of T) { if (t < acc + g[1]) { seg = g; frac = (t - acc) / g[1]; break; } acc += g[1]; }
-      if (!seg) { finish(); return; }
-      const [phase, , arg] = seg;
+      if (!S.test.animating || S.selected !== s || S.test.player !== P) return;
+      P.tick(now); const cur = P.at();
+      if (!cur) { finish(); return; }
+      const [phase, , arg] = cur.phase, frac = cur.frac;
       const anim = { phase, hops, reveal: 0, banner: null, dir: 0 };
       if (phase === 'prep') anim.t = frac;
       else if (phase === 'scan1' || phase === 'scan') { anim.pos = Math.min(total, Math.floor(frac * total)); anim.showFilter = phase === 'scan1' ? 0 : 1; }
@@ -583,9 +628,10 @@
       }
       renderTestGraph(0, anim);
       renderTestLine(s, p, called, phase, anim);
-      requestAnimationFrame(frame);
+      if (P.playing) P.schedule();
     };
-    requestAnimationFrame(frame);
+    P.frame = frame;
+    P.schedule();
   }
   function renderCharts() {
     Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs });
@@ -919,11 +965,15 @@
         if ((prev && prev.ref) !== (hit && hit.ref) || (hit && hit.ref && (hit.ref.kind === 'map' || hit.ref.kind === 'fmap' || hit.ref.kind === 'pooled' || hit.ref.kind === 'product' || hit.ref.kind === 'uprod' || hit.ref.kind === 'square'))) { key === 'train' ? renderTrainGraph() : renderTestGraph(); }
       });
       cv.addEventListener('mouseleave', () => { S.hover[key] = null; tip.hidden = true; key === 'train' ? renderTrainGraph() : renderTestGraph(); });
-      if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating) S.test.skip = true; });
-      if (key === 'train') cv.addEventListener('click', () => { if (S.lesson) S.lesson.skip = true; });
+      if (key === 'test') cv.addEventListener('click', () => { if (S.test.animating && S.test.player) S.test.player.skip(); });
+      if (key === 'train') cv.addEventListener('click', () => { if (S.lesson) S.lesson.player.skip(); });
     }
     document.addEventListener('keydown', ev => {
       if (ev.target.matches('input, select, textarea')) return;
+      const P = activePlayer(); // a running walk-through takes space and the arrow keys, even from a focused button
+      if (P && ev.key === ' ') { ev.preventDefault(); P.toggle(); return; }
+      if (P && ev.key === 'ArrowRight') { ev.preventDefault(); P.next(); return; }
+      if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
@@ -931,6 +981,16 @@
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
     window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
+    // playback controls in both strips: previous step, pause/play, next step, speed
+    for (const key of ['lesson', 'test']) {
+      const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
+      $(`${key}-prev`).addEventListener('click', ev => { const p = P(); if (p) p.prev(); ev.currentTarget.blur(); });
+      $(`${key}-next`).addEventListener('click', ev => { const p = P(); if (p) p.next(); ev.currentTarget.blur(); });
+      $(`${key}-pause`).addEventListener('click', ev => { const p = P(); if (p) p.toggle(); ev.currentTarget.blur(); });
+      $(`${key}-speed`).addEventListener('input', ev => setAnimSpeed(+ev.target.value));
+    }
+    try { const v = parseFloat(localStorage.getItem('nn-anim-speed')); if (v >= 0.25 && v <= 3) S.animSpeed = v; } catch (e) { /* ignore */ }
+    syncSpeedControls();
   }
   function onThemeChange() {
     Viz.refreshTheme();
@@ -950,7 +1010,7 @@
       stopTraining(); renderTestPanel();
       if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
       renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead.';
+      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead; space pauses, ← → step.';
     }
     try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
   }
