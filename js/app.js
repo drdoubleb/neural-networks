@@ -328,8 +328,8 @@
     if (S.mode === 'pixels' && !S.net.conv) {
       const prep = `First the mean training ${noun(1)} is subtracted from this one: the network sees the difference (orange = more ink than average, blue = less), which is large at the membrane and near zero in the centre. `;
       return prep + (hidden
-        ? `That difference is laid over each weight map and multiplied cell by cell into a product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
-        : `That difference is laid over the weight map and multiplied cell by cell into the product map (the magnifier shows one 4×4 block with its numbers). A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`);
+        ? `That difference is laid over each weight map and multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
+        : `That difference is laid over the weight map and multiplied cell by cell into the product map. A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`);
     }
     return 'Each connection carries its weight × the value at its start (thick = large, orange positive, blue negative) and each node adds up what arrives, hop by hop to the output.';
   }
@@ -355,12 +355,12 @@
         gradient: allSilent
           ? 'Every hidden unit was off for this case, so every blame is zero and no weight map has a gradient: only the output bias does. A ReLU unit that is off cannot learn from a case.'
           : hidden
-          ? `For every connection, gradient = blame at its end × activity at its start; the labels spell it out. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees), scaled by the unit’s blame.` : ''}`
-          : `For every connection, gradient = error × its input: big inputs, big gradients; the labels spell it out. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees), scaled by the error.` : ''}`,
+          ? `For every connection, gradient = blame at its end × activity at its start; the labels spell it out. The glow shows which way the weight should move (orange up, blue down) and how steeply.${pixels ? ` On pixels, a weight map’s gradient is the difference image itself (what the network sees) scaled by the unit’s blame: a copy comes back from the blame side onto the weight map.` : ''}`
+          : `For every connection, gradient = error × its input: big inputs, big gradients; the labels spell it out. Orange = the weight should rise, blue = fall.${pixels ? ` On pixels, the gradient of the whole weight map is the difference image itself (what the network sees) scaled by the error, which comes back along Σ → z onto the map.` : ''}`,
         update: `Every weight takes one small step against its gradient: w ← w − learning rate × gradient, with learning rate ${S.lr}. The labels show each weight before → after; watch the connections${pixels ? ' and weight maps' : ''} change.`,
         check: sure
-          ? `The same case runs forward again. It was already right and sure, so the step was tiny: <b>${pair}</b>.`
-          : `The same case runs forward again with the new weights: <b>${pair}</b>. One case, one small step; training repeats this for every case, many times over.`,
+          ? `The same case runs forward again, only to show what the step did (training itself moves on to the next case). It was already right and sure, so the step was tiny: <b>${pair}</b>.`
+          : `The same case runs forward again with the new weights, only to show what the step did: <b>${pair}</b>. This replay is not part of training, which moves straight on to the next case: one case, one small step, repeated for every case, many times over.`,
       };
       html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead · space pauses · ← → step</span>`;
     } else {
