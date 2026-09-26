@@ -513,7 +513,8 @@ window.Viz = (function () {
         ctx.strokeStyle = isHov ? c.ink : c.lineStrong; ctx.lineWidth = isHov ? 2 : 1;
         ctx.strokeRect(n.x - tw / 2, n.y - th / 2, tw, th);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        if (n.kind === 'map' || (n.kind === 'square' && n.captioned)) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + th / 2 + 3);
+        const learning = m.lesson && (m.lesson.phase === 'gradient' || m.lesson.phase === 'update'); // the gradient tile's caption takes this spot
+        if ((n.kind === 'map' || (n.kind === 'square' && n.captioned)) && !learning) ctx.fillText(`±${tile.max.toFixed(2)}`, n.x, n.y + th / 2 + 3);
         if (n.kind === 'product') ctx.fillText(tile ? (tw >= 100 ? `Σ = ${fmtSigned(tile.sum, 2)}  (bias ${fmtSigned(net.bo, 2)})` : `Σ ${fmtSigned(tile.sum, 2)} + b ${fmtSigned(net.bo, 2)}`) : (m.reveal != null ? '' : 'select a nucleus'), n.x, n.y + th / 2 + 3);
         if (n.kind === 'uprod') { // activation badge: sum of the products plus the bias, through the activation
           const a = fw && (m.reveal != null ? m.reveal >= 1 : stage >= 1) ? fw.a[1][n.j] : null;
@@ -790,7 +791,6 @@ window.Viz = (function () {
         ctx.drawImage(tile(), w.x - size / 2, w.y - sizeH / 2, size, sizeH);
         ctx.restore();
         frameTile(w.x - size / 2, w.y - sizeH / 2, size, sizeH);
-        if (j === 0 && !net.conv) { const r0 = Math.min(S - 4, 4 * Math.floor(st.v * (S / 4))), c0 = S / 2 - 2; drawWindow(ctx, img, S, r0, c0, 4); drawPixelPanel(ctx, c, m, Wrow, off, r0, c0, { x: 24, y: img.y + img.h / 2 + 40 }); }
         return;
       }
       // from here on the product map exists; it slides to its slot, then is summed
@@ -827,32 +827,6 @@ window.Viz = (function () {
         ctx.fillText(line, pn.x, by + 8);
       }
     });
-  }
-  // the magnifier under the image: one 4×4 block of the multiplication, cell by cell, with the numbers of its largest cell
-  function drawPixelPanel(ctx, c, m, Wrow, off, r0, c0, at) {
-    const S = m.size, x = m.x, cell = 9, gap = 12, gw = 4 * cell;
-    const pix = [], wts = [], prods = [];
-    let maxP = 1e-9, maxW = TILE_FLOOR.square, maxQ = 1e-9, big = 0;
-    for (let dy = 0; dy < 4; dy++) for (let dx = 0; dx < 4; dx++) {
-      const i = (r0 + dy) * S + c0 + dx, p = x[i], w = Wrow[off + i], q = p * w;
-      pix.push(p); wts.push(w); prods.push(q);
-      maxP = Math.max(maxP, Math.abs(p)); maxW = Math.max(maxW, Math.abs(w)); maxQ = Math.max(maxQ, Math.abs(q));
-      if (Math.abs(q) > Math.abs(prods[big])) big = prods.length - 1;
-    }
-    const grids = [['pixels', pix, maxP], ['weights', wts, maxW], ['products', prods, maxQ]];
-    ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; ctx.textAlign = 'center';
-    grids.forEach(([label, vals, mx], g) => {
-      const gx = at.x + g * (gw + gap);
-      ctx.fillStyle = c.ink3; ctx.fillText(label, gx + gw / 2, at.y - 3);
-      for (let i = 0; i < 16; i++) { ctx.fillStyle = diverging(vals[i] / mx); ctx.fillRect(gx + (i % 4) * cell, at.y + Math.floor(i / 4) * cell, cell - 1, cell - 1); }
-      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(gx - 0.5, at.y - 0.5, gw, gw);
-      ctx.strokeStyle = c.ink; ctx.strokeRect(gx + (big % 4) * cell - 0.5, at.y + Math.floor(big / 4) * cell - 0.5, cell, cell);
-      if (g < 2) { ctx.fillStyle = c.ink2; ctx.font = `500 13px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'middle'; ctx.fillText(g === 0 ? '×' : '=', gx + gw + gap / 2, at.y + gw / 2); ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textBaseline = 'bottom'; }
-    });
-    ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText(`${fmtSigned(pix[big], 2)} × ${fmtSigned(wts[big], 3)} = ${fmtSigned(prods[big], 3)}`, at.x, at.y + gw + 6);
-    ctx.fillStyle = c.ink3;
-    ctx.fillText(`4×4 of the ${S}×${S} cells, rows ${r0}–${r0 + 3}`, at.x, at.y + gw + 19);
   }
   // the Σ → z edge of the single-layer pixel network: a wipe in the colour of z, its value, and the sigmoid with the point plotted
   function drawSumEdge(ctx, L, c, m, t) {
@@ -960,6 +934,7 @@ window.Viz = (function () {
     drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the call, with the point plotted: its slope there is the error
     if (ph === 'check' && les.pAfter != null && les.reveal >= hops) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 90); }
     if (ph === 'loss') { banner('loss: how wrong was the call?', 0); return; }
+    if (ph === 'check') return; // the replay shows the forward pass alone: the blame and the gradients are behind it
 
     // 3 · backward pass: the error flows back along each connection as error × weight, a wipe from the output end with
     // thickness = its size (blue: the unit should come down, orange: go up), one layer at a time; the activation then
@@ -1010,7 +985,6 @@ window.Viz = (function () {
       }
       if (ph === 'blame') { banner('backward pass: each connection carries error × weight back', -1); return; }
     }
-    if (ph === 'check') return;
 
     // 4 · gradients: every weight's gradient = blame at its end × activity at its start. Connections glow in the colour of
     // the step the weight will take (orange up, blue down); on pixels a scaled copy of the image slides into each weight map.
@@ -1031,33 +1005,39 @@ window.Viz = (function () {
       }
       ctx.lineCap = 'butt';
       if (m.mode === 'pixels' && m.x && !net.conv) {
-        const img = L.nodes.find(n => n.kind === 'image');
-        const targets = nL ? L.unitColumns[0].map((u, j) => ({ node: u, scalar: -les.lr * les.delta[0][j] })) : [{ node: L.nodes.find(n => n.kind === 'map'), scalar: -les.lr * les.error }];
+        // a weight map's gradient is blame × the image, so it comes back from the blame side: a copy of the image, scaled
+        // by the blame, sets out from the badge (from the output's edge without a hidden layer) and slides back over the
+        // product map onto the weight map, where the update folds it in. Without a hidden layer the error first comes
+        // back along Σ → z.
+        const targets = nL
+          ? L.unitColumns[0].map((u, j) => ({ node: u, from: L.badgeX, scalar: -les.lr * les.delta[0][j] }))
+          : [{ node: L.nodes.find(n => n.kind === 'map'), from: L.nodes.find(n => n.kind === 'product').x, scalar: -les.lr * les.error }];
         const D = m.x.length;
         let common = 1e-9, xmax = 1e-9;
         for (const t of targets) common = Math.max(common, Math.abs(t.scalar));
         for (let i = 0; i < D; i++) xmax = Math.max(xmax, Math.abs(m.x[i]));
-        ctx.globalAlpha = fade;
+        if (!nL && ph === 'gradient') {
+          const e = L.edges.find(q => q.layer === 'sum');
+          if (e) { const wt = Math.min(1, fr / 0.3); ctx.lineCap = 'round'; ctx.strokeStyle = rgbStr(les.error > 0 ? c.rgb.regular : c.rgb.irregular, 0.9); ctx.lineWidth = 2 + 8 * Math.min(1, Math.abs(les.error)); ctx.beginPath(); ctx.moveTo(e.x2, e.y2); ctx.lineTo(e.x2 + (e.x1 - e.x2) * wt, e.y2 + (e.y1 - e.y2) * wt); ctx.stroke(); ctx.lineCap = 'butt'; }
+        }
+        const move = ph === 'update' ? 1 : ease(Math.max(0, Math.min(1, (fr - 0.3) / 0.7)));
+        ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         targets.forEach((t, j) => {
-          const n = t.node; if (!n || !img) return;
-          const size = nL ? Math.max(20, Math.min(44, n.size - 12)) : 64;
-          const x0 = img.x + img.w / 2 + 10 + size / 2, x1 = n.x - n.size / 2 - 22 - size / 2; // lands short of the × glyph
-          if (t.scalar === 0) { // nothing arrives: an empty slot where the gradient tile would land, in the caption style of the other rows
-            ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center';
-            ctx.setLineDash([3, 3]); ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.strokeRect(x1 - size / 2 + 0.5, n.y - size / 2 + 0.5, size - 1, size - 1); ctx.setLineDash([]);
-            ctx.textBaseline = 'middle'; ctx.fillText(nL ? 'off' : 'error 0', x1, n.y);
-            if (size >= 40) { ctx.textBaseline = 'top'; ctx.fillText('no change', x1, n.y + size / 2 + 3); }
-            return;
-          }
-          const cx = ph === 'update' ? x1 : x0 + (x1 - x0) * ease(fr);
+          const n = t.node; if (!n) return;
+          const W = n.size, H = n.h || n.size, captioned = W >= 40;
+          ctx.globalAlpha = fade;
+          if (t.scalar === 0) { if (captioned) { ctx.fillStyle = c.ink3; ctx.fillText(nL ? 'off · no change' : 'error 0 · no change', n.x, n.y + H / 2 + 3); } ctx.globalAlpha = 1; return; }
+          const s0 = Math.max(20, Math.min(44, W - 12)), size = s0 + (W - s0) * move, sizeH = size * H / W, cx = t.from + (n.x - t.from) * move;
           const arr = new Float64Array(D); for (let i = 0; i < D; i++) arr[i] = t.scalar * m.x[i];
           const tile = tileCanvas('lesson' + j, arr, 0, m.size, m.size, { max: Math.max(common * xmax, 0.3 * (nL ? TILE_FLOOR.square : TILE_FLOOR.map)) });
           ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(tile.canvas, cx - size / 2, n.y - size / 2, size, size);
-          ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - size / 2, size, size);
-          if (size >= 40) { ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, cx, n.y + size / 2 + 3); }
+          ctx.globalAlpha = fade * (1 - 0.35 * move); // settles over the weight map, part transparent, until the update folds it in
+          ctx.drawImage(tile.canvas, cx - size / 2, n.y - sizeH / 2, size, sizeH);
+          ctx.globalAlpha = fade;
+          ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(cx - size / 2, n.y - sizeH / 2, size, sizeH);
+          if (captioned) { ctx.fillStyle = c.ink2; ctx.fillText(`${fmtSigned(t.scalar, Math.abs(t.scalar) < 0.001 ? 4 : 3)} × image`, n.x, n.y + H / 2 + 3); }
+          ctx.globalAlpha = 1;
         });
-        ctx.globalAlpha = 1;
       }
     }
     // the numbers on the connections of small layers: blame at the end × activity at the start = gradient, then the
