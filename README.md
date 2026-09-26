@@ -78,7 +78,16 @@ style). The network never sees it; the page uses it to show which hidden units r
    showing its weight before → after; (6) the check, the same case running forward again with the new weights, a replay
    to show what the step did rather than a part of training, which moves straight on to the next case. The step is real
    training, a batch of one at the current learning rate. Each press teaches the next case in the training set (or the case you
-   picked in the tray). Convolutional networks are not covered by the walk-through yet. Every walk-through (the lesson and
+   picked in the tray). For a convolutional network the forward pass and the check are the convolution walk-through
+   (preprocessing, the filters scanning, the pooling, the pooled maps × each unit's weight map, the dense hops), and the
+   backward steps go on past the dense layer: in the backward pass the blame of each pooled cell (Σ unit blame × its
+   weight) wipes back along the bands and is drawn over the pooled maps, then goes back through the pooling onto the one
+   position per block that won the max (dots on the feature maps; ReLU passes it only where the map was on, a hollow dot
+   got none); in the gradient step each unit's weight map receives a copy of the stacked pooled maps scaled by its blame,
+   and then the filters, whose gradient adds up over every position that got blame (the blame there × the 5 × 5 image
+   patch under the filter): filter 1 accumulates position by position, with the window on the image and the arithmetic
+   under it (patch → × blame → Σ so far), the other filters all at once, and the step settles over each filter as a Δ
+   until the update folds it in; in the update the filters visibly move too. Every walk-through (the lesson and
    *Classify next*) plays at its normal pace unless you touch the controls in its strip: pause/play, previous and next
    step, and a speed slider (space pauses, ← → step, N skips ahead); while paused, the step buttons show each step at
    its end. With hidden units, a

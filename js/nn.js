@@ -190,6 +190,7 @@
       const g = this.newGradient(); g.delta = this.hidden.map(h => new Float64Array(h));
       const fw = this.forward(x);
       const loss = this.accumulate(x, y, g, fw);
+      if (this.conv) { const d0 = this.backDense(fw, fw.p - y, null); g.dPooled = d0; g.dConv = this.backPool(fw, d0); } // for the walk-through: the blame at the pooled cells and where it lands on the feature maps
       return { fw, error: fw.p - y, loss, g };
     }
 
