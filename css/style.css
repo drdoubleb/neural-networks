@@ -160,6 +160,14 @@ ul.prose li + li { margin-top: 4px; }
 .legend .line { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--accent); vertical-align: middle; margin-right: 5px; }
 .legend .line.test { border-top: 2px dashed var(--test-series); }
 .legend .line.chance { border-top: 1px dashed var(--ink-3); }
+.legend .line.ceiling { border-top: 2px dashed var(--bad); }
+.legend .line.stop { border-top: 2px dotted var(--test-series); }
+.chart svg line.ceiling { stroke: var(--bad); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart svg line.stop { stroke: var(--test-series); stroke-width: 1.5; stroke-dasharray: 2 3; }
+.chart svg text.marker { font-size: 9px; font-family: var(--font-mono); }
+.chart svg text.marker.ceiling { fill: var(--bad); }
+.chart svg text.marker.stop { fill: var(--test-series); }
+.legend .swatch.flip { background: var(--bad); border-radius: 50%; color: #fff; font-size: 10px; line-height: 14px; text-align: center; font-weight: 700; }
 
 /* ---------- thumbnails ---------- */
 .tray { display: grid; grid-template-columns: repeat(auto-fill, 48px); gap: 7px; }
@@ -186,6 +194,8 @@ ul.prose li + li { margin-top: 4px; }
 .tray.named .thumb .name { display: block; bottom: -15px; }
 .thumb .lab { position: absolute; top: -7px; left: -7px; width: 15px; height: 15px; border-radius: 50%; font: 700 9px/15px var(--font-mono); text-align: center; color: #fff; background: var(--ink-3); box-shadow: 0 0 0 2px var(--surface); display: none; }
 .thumb.lab-b.show-lab .lab { display: block; }
+.thumb .flip { position: absolute; bottom: -7px; left: -7px; width: 15px; height: 15px; border-radius: 50%; font: 700 10px/15px var(--font-mono); text-align: center; color: #fff; background: var(--bad); box-shadow: 0 0 0 2px var(--surface); display: none; }
+.thumb.flipped.show-flip .flip { display: block; }
 /* the inspector's pair of scans */
 .labs { display: flex; gap: 14px; justify-content: center; }
 .labs .lab { text-align: center; }

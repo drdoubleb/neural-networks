@@ -79,7 +79,7 @@ style). The network never sees it; the page uses it to show which hidden units r
    showing its weight before → after; (6) the check, the same case running forward again with the new weights, a replay
    to show what the step did rather than a part of training, which moves straight on to the next case. The step is real
    training, a batch of one at the current learning rate. Each press teaches the next case in the training set (or the case you
-   picked in the tray). For a convolutional network the forward pass and the check are the convolution walk-through
+   picked in the tray; with label noise on, the lesson teaches the label the case was given and says so when it is wrong). For a convolutional network the forward pass and the check are the convolution walk-through
    (preprocessing, the filters scanning, the pooling, the pooled maps × each unit's weight map, the dense hops), and the
    backward steps go on past the dense layer: in the backward pass the blame of each pooled cell (Σ unit blame × its
    weight) wipes back along the bands and is drawn over the pooled maps, then goes back through the pooling onto the one
@@ -94,7 +94,11 @@ style). The network never sees it; the page uses it to show which hidden units r
    its end. With hidden units, a
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
-   Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
+   Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting; when peeking, a
+   dotted line marks the epoch of the lowest test loss so far (where early stopping on a held-out set would have
+   stopped), and with label noise on, a dashed line marks the honest ceiling of training accuracy. *Label noise* in the
+   advanced settings flips a share of the training labels, as a second pathologist might have called them; the trays and
+   the inspector then show the label each case was given, and a checkbox marks the mislabelled ones.
 3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
    the frozen weights, each connection wiping with the product it carries while a strip names what is happening, then the call at the threshold,
    then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. A *Test cases from* switch swaps the
@@ -119,7 +123,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the nine recipe buttons
+## The lecture arc: the ten recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js`.
 
@@ -134,6 +138,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
 | ⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
 | ⑨ Irregularity · convolution · the shortcut | 897 | 100% on a test set with the same flaw, ~58% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour, looks perfect on a test set split the same way, and fails on our lab's scans. See *Another lab, and the shortcut*. |
+| ⑩ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong | 137 | ~97% early, ~83% after 300 epochs | Overfitting in its textbook shape. With 20 of the 80 training labels flipped, the network first learns the rule (the test curve peaks early), then memorises the mislabelled cases: training accuracy climbs past the honest ceiling of 75% while the test curve falls. See *Label noise and overfitting*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑥ (four: 79%), 87% on ⑦
@@ -185,6 +190,27 @@ Test accuracy, mean of three seeds (`node tools/check_training.js`):
 | the same, stain normalised per lab | 93% | 90% | 92% | 88% |
 | both labs, mixed at random | 90% | 92% | 90% | 92% |
 
+## Label noise and overfitting
+
+None of the clean recipes overfits in the textbook way: the pixel networks that memorise never generalised in the first
+place, so their test curve never had a peak to fall from, and the measurement and blood-count networks are too small,
+with too clean a signal, to overfit at all. The test *loss* does rise once a pixel network without weight decay trains
+on, from 0.49 at its minimum around epoch 10 to 0.9 by epoch 300 on recipe ⑥, while the test accuracy stays flat: the
+network makes no more errors, it only grows more confident in the errors it makes.
+
+Label noise brings the classic curve out, and it is a pathology-native reason for it: labels are a consensus with
+disagreement in them. Recipe ⑩ trains the atypia measurements with 8 + 8 units and a quarter of the training labels
+flipped (a fixed set of 20, so the lecture is reproducible whatever the seed). The network first learns the rule from
+the majority of right labels, so the test accuracy, scored against the true labels, peaks early; then it memorises the
+mislabelled cases one by one, training accuracy climbs past the **honest ceiling** of 75%, and the test curve falls while
+the test loss rises. Tick *Mark the mislabelled cases* and watch the ✗ badges on them disappear as they are memorised.
+The dotted **lowest test loss** marker shows where early stopping would have stopped. Weight decay, fewer units, or
+stopping early all soften it; the labels stay wrong.
+
+Mean of three seeds (`node tools/check_training.js`): test accuracy peaks at 97% (epochs 2 to 14) and ends at
+83% after 300 epochs; the test loss goes from 0.31 at its minimum to 0.48; training accuracy ends at 88%,
+above the 75% ceiling.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukaemia/`
@@ -223,7 +249,7 @@ index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons (browser + Node)
-js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
+js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts
 js/app.js                  state, task switch, training loop, the three stages, the inspector, unit heatmap, prevalence
 tools/generate_cbc.js      make the blood-count dataset

@@ -940,7 +940,7 @@ window.Viz = (function () {
     const prepped = m.mode === 'pixels' && !conv && ph === 'check'; // the check replays the sweep with the preprocessing already done
     const banner = (text, dir) => drawBanner(ctx, c, L, text, dir);
     ctx.font = `600 11px "IBM Plex Sans", system-ui, sans-serif`; ctx.fillStyle = truthCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-    ctx.fillText(`truth: ${les.truthName}`, out.x, out.y + out.r + 42);
+    ctx.fillText(`${les.truthWord || 'truth'}: ${les.truthName}`, out.x, out.y + out.r + 42);
 
     // 1 · forward pass (and 6 · check): values flow hop by hop (a convolutional network's pass is drawn from m.anim)
     const s0 = conv ? 1 - 800 / cplan.total : 1 - plan.segs[plan.segs.length - 1].ms / plan.total;
@@ -1439,6 +1439,11 @@ window.Viz = (function () {
     for (let e = 0; e <= maxX + 1e-9; e += xstep) g += `<text x="${sx(e).toFixed(1)}" y="${H - 6}" text-anchor="middle">${e}</text>`;
     g += `<line class="axis" x1="${ml}" x2="${W - mr}" y1="${mt + ph}" y2="${mt + ph}"/>`;
     if (isAcc) g += `<line class="chance" x1="${ml}" x2="${W - mr}" y1="${sy(0.5)}" y2="${sy(0.5)}"/>`;
+    // the honest ceiling (training accuracy above it means memorised mislabels), labelled under the line at the right, and
+    // the epoch of the lowest test loss, labelled on the free side of its line: the top of the loss chart, the bottom of
+    // the accuracy chart, where the curves are not
+    if (isAcc && opt.ceiling != null) g += `<line class="ceiling" x1="${ml}" x2="${W - mr}" y1="${sy(opt.ceiling).toFixed(1)}" y2="${sy(opt.ceiling).toFixed(1)}"/><text class="marker ceiling" x="${W - mr}" y="${(sy(opt.ceiling) + 11).toFixed(1)}" text-anchor="end">honest ceiling ${Math.round(opt.ceiling * 100)}%</text>`;
+    if (opt.stopAt != null && opt.showTest) { const x = sx(opt.stopAt), left = x > ml + pw / 2; g += `<line class="stop" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${mt}" y2="${mt + ph}"/><text class="marker stop" x="${(x + (left ? -4 : 4)).toFixed(1)}" y="${isAcc ? mt + ph - 5 : mt + 10}" text-anchor="${left ? 'end' : 'start'}">lowest test loss · epoch ${opt.stopAt}</text>`; }
     const path = key => hist.map((h, i) => `${i ? 'L' : 'M'}${sx(h.epoch).toFixed(1)} ${sy(clamp(h[key], 0, maxY)).toFixed(1)}`).join(' ');
     if (hist.length) {
       if (opt.showTest) g += `<path class="test" d="${path(testKey)}"/>`;

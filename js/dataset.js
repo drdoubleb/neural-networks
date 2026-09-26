@@ -114,23 +114,33 @@
   //   exclude:   set of feature keys the network is not allowed to see (features mode)
   //   normalize: 'off', or stain-normalise the pixels first, 'lab' (each lab's typical levels matched to our lab's) or
   //              'image' (each scan by its own levels)
-  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off' } = {}) {
+  //   labelNoise: the fraction of training cases given the wrong label (a second pathologist's disagreements), chosen
+  //              once per fraction so a lecture is reproducible whatever the network's seed; the test labels stay true
+  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off', labelNoise = 0 } = {}) {
+    const flipped = new Set();
+    if (labelNoise > 0) {
+      const rng = NN.mulberry32(48151 + Math.round(labelNoise * 1000));
+      const order = ds.train.map(s => [rng(), s.id]).sort((a, b) => a[0] - b[0]);
+      for (let i = 0; i < Math.round(labelNoise * ds.train.length); i++) flipped.add(order[i][1]);
+    }
+    const labelOf = s => (flipped.has(s.id) ? 1 - s.label : s.label);
     const columns = mode === 'features' ? ds.featureDefs.map((f, i) => i).filter(i => !exclude || !exclude.has(ds.featureDefs[i].key)) : null;
     const variant = (s, lab) => (s.variants && (s.variants[lab] || s.variants.A)) || s;
     const inkFor = (s, lab) => { const v = variant(s, lab); if (normalize === 'off' || !ds.labStats || !v.levels) return v.ink; return normalizeInk(v.ink, normalize === 'lab' ? ds.labStats[lab] || ds.labStats.A : v.levels, ds.labStats.A); };
     const rawFor = (s, lab) => (mode === 'pixels' ? inkFor(s, lab) : columns.map(i => { const f = variant(s, lab).features; return ds.featureDefs[i].log ? Math.log(Math.max(f[i], 1e-3)) : f[i]; }));
     const rawOf = s => rawFor(s, s.lab || 'A');
-    let trainRows = ds.train.map(rawOf), trainLabels = ds.train.map(s => s.label), trainOwner = ds.train.map(s => s.id);
+    let trainRows = ds.train.map(rawOf), trainLabels = ds.train.map(labelOf), trainOwner = ds.train.map(s => s.id);
     if (mode === 'pixels' && augment) {
       const rows = [], labels = [], owner = [];
-      ds.train.forEach(s => { const raw = rawOf(s); for (let t = 0; t < 8; t++) { rows.push(t === 0 ? raw : dihedral(raw, ds.size, t)); labels.push(s.label); owner.push(s.id); } });
+      ds.train.forEach(s => { const raw = rawOf(s), y = labelOf(s); for (let t = 0; t < 8; t++) { rows.push(t === 0 ? raw : dihedral(raw, ds.size, t)); labels.push(y); owner.push(s.id); } });
       trainRows = rows; trainLabels = labels; trainOwner = owner;
     }
     const std = NN.fitStandardizer(trainRows, { perDimScale: mode !== 'pixels' });
     const byId = new Map();
     for (const s of ds.specimens) byId.set(s.id, std.apply(rawOf(s)));
     return {
-      mode, std, columns, normalize,
+      mode, std, columns, normalize, labelNoise, flipped,
+      labelOf,                                          // the label the network is given for a training case
       inputSize: trainRows[0].length,
       trainX: trainRows.map(r => std.apply(r)), trainY: trainLabels, trainOwner,
       xOf: s => byId.get(s.id),
