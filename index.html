@@ -65,7 +65,7 @@
       <div class="card">
         <div class="card-head">
           <h2>Training set · <span id="train-count-2"></span></h2>
-          <div class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span><span>frame = ground truth</span></div>
+          <div class="legend"><span class="chip neg" data-cls="0"></span><span class="chip pos" data-cls="1"></span><span id="train-frame-word">frame = ground truth</span><label class="toggle" id="show-flipped-wrap" hidden><input type="checkbox" id="show-flipped"> Mark the mislabelled cases</label></div>
         </div>
         <div class="tray named" id="data-train-tray"></div>
       </div>
@@ -118,7 +118,7 @@
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
         <details class="advanced" id="advanced">
-          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, source lab, stain normalisation, inputs</span></summary>
+          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, label noise, source lab, stain normalisation, inputs</span></summary>
           <div class="controls">
             <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
             <div class="ctl"><label for="activation">Activation</label>
@@ -133,6 +133,7 @@
             <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
             <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" class="plainlabel">Augment pixels with flips &amp; rotations (×8)</label></div>
             <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" class="plainlabel">Peek at the test set while training</label></div>
+            <div class="ctl"><label for="noise">Label noise <span class="val" id="noise-val">off</span></label><input type="range" id="noise" min="0" max="30" step="5" value="0" title="this share of the training cases carries the wrong label, as a second pathologist might have called them; the test labels stay true"></div>
             <div class="ctl" id="source-train-wrap"><label for="source-train-2">Training cases from</label><select id="source-train-2"></select></div>
             <div class="ctl" id="normalize-wrap"><label for="normalize">Stain normalisation</label>
               <select id="normalize"><option value="off">off: the pixels as scanned</option><option value="lab">per lab: each lab’s levels matched to ours</option><option value="image">per image: each scan by its own levels</option></select></div>
@@ -184,13 +185,15 @@
       <div class="card">
         <div class="card-head">
           <h2>Training set · what the network currently calls</h2>
+          <label class="toggle" id="show-flipped-wrap-2" hidden><input type="checkbox" id="show-flipped-2"> Mark the mislabelled cases</label>
           <div class="seg small" id="tray-color-seg"><button type="button" data-color="call" class="is-active">frame = call</button><button type="button" data-color="unit">frame = most active unit</button></div>
         </div>
         <div class="legend" id="tray-legend-call" style="margin-bottom:10px">
           <span><span class="swatch ring"></span><span data-cls-called="0"></span></span>
           <span><span class="swatch ring pos"></span><span data-cls-called="1"></span></span>
-          <span><span class="swatch badge">✗</span>disagrees with truth</span>
+          <span><span class="swatch badge">✗</span><span id="tray-disagree-word">disagrees with truth</span></span>
           <span><span class="swatch batch"></span>in the last batch</span>
+          <span id="tray-legend-flip" hidden><span class="swatch flip">✎</span>mislabelled: the label the network was given is wrong</span>
         </div>
         <div class="legend" id="tray-legend-unit" style="margin-bottom:10px" hidden></div>
         <div class="tray" id="train-tray"></div>
@@ -203,6 +206,8 @@
             <span><span class="line"></span>training set</span>
             <span id="curves-legend-test" hidden><span class="line test"></span>test set (peeking)</span>
             <span><span class="line chance"></span>chance</span>
+            <span id="curves-legend-ceiling" hidden><span class="line ceiling"></span>honest ceiling: the share of labels that are right</span>
+            <span id="curves-legend-stop" hidden><span class="line stop"></span>lowest test loss so far (where early stopping would stop)</span>
           </div>
         </div>
         <div class="curves">

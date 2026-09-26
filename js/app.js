@@ -12,6 +12,7 @@
     tasks: null, taskId: 'leukaemia', task: null, ds: null, kind: 'tabular', size: 0, featureDefs: [],
     mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
+    labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -24,8 +25,8 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Enlargement · pixels · single layer', '⑤ Irregularity · pixels · single layer', '⑥ Irregularity · pixels · 4 ReLU + augmentation', '⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑨ Irregularity · convolution · the shortcut: irregular nuclei scanned at another lab'];
-  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off' }; // every recipe starts from our lab's scans, unnormalised
+  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Enlargement · pixels · single layer', '⑤ Irregularity · pixels · single layer', '⑥ Irregularity · pixels · 4 ReLU + augmentation', '⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑨ Irregularity · convolution · the shortcut: irregular nuclei scanned at another lab', '⑩ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting'];
+  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0 }; // every recipe starts from our lab's scans, unnormalised, with the labels as they are
   const RECIPES = {
     1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -36,6 +37,7 @@
     7: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 4, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
     8: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
     9: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4, trainLab: 'byClass', testLab: 'byClass' },
+    10: { task: 'atypia',      mode: 'features', h1: 8, h2: 8, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 300, augment: false, l2: 0,    peek: true,  speed: 10, labelNoise: 0.25 },
   };
   // the source modes, in the order of the selects; the class-split one names the positive class
   const SOURCE_LABELS = () => ({ ours: 'our lab', other: 'the other lab (weaker stain)', mixed: 'both labs, mixed at random', byClass: `split by class: ${posName()} from the other lab` });
@@ -103,10 +105,14 @@
   }
   function inputsFor(mode, augment, excluded) {
     const normalize = mode === 'pixels' ? S.normalize : 'off';
-    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '') + `|${S.ds.sources.train}/${S.ds.sources.test}|${normalize}`;
-    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment, exclude: excluded, normalize }));
+    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '') + `|${S.ds.sources.train}/${S.ds.sources.test}|${normalize}|noise${S.labelNoise}`;
+    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment, exclude: excluded, normalize, labelNoise: S.labelNoise }));
     return S.inputCache.get(key);
   }
+  // the label a training case carries (wrong for the mislabelled ones when label noise is on), and whether it is wrong
+  const trainLabel = s => (s.split === 'train' && S.inputs && S.inputs.labelOf ? S.inputs.labelOf(s) : s.label);
+  const isFlipped = s => !!(S.inputs && S.inputs.flipped && S.inputs.flipped.has(s.id));
+  const labelWord = s => (S.labelNoise > 0 && s.split === 'train' ? 'label' : 'truth');
   // ---- the two labs: which scans each set uses, and the pixels' stain normalisation
   function applySources() { DS.assignLabs(S.ds, S.trainLab, S.testLab); repaintThumbs(); }
   function renderSourceOptions() {
@@ -137,6 +143,13 @@
     for (const id of ['source-test', 'source-test-2']) $(id).value = S.ds.sources.test;
     $('normalize').value = S.normalize; $('show-lab').checked = S.showLab;
     $('sources-text').textContent = sourceText();
+  }
+  function renderNoiseControls() {
+    const on = S.labelNoise > 0;
+    $('noise').value = Math.round(S.labelNoise * 100); $('noise-val').textContent = on ? `${Math.round(S.labelNoise * 100)}% of the labels wrong` : 'off';
+    for (const id of ['show-flipped-wrap', 'show-flipped-wrap-2']) $(id).hidden = !on;
+    for (const id of ['show-flipped', 'show-flipped-2']) $(id).checked = S.showFlipped;
+    $('train-frame-word').textContent = on ? 'frame = the label the network is given' : 'frame = ground truth';
   }
   function setTrainSource(v) {
     S.trainLab = v; applySources(); syncControls();
@@ -172,7 +185,7 @@
   }
   function evaluateAll() {
     const tr = S.ds.train, te = S.ds.test;
-    S.trainEval = S.net.evaluate(tr.map(s => S.inputs.xOf(s)), tr.map(s => s.label), 0.5, true);
+    S.trainEval = S.net.evaluate(tr.map(s => S.inputs.xOf(s)), tr.map(trainLabel), 0.5, true); // against the labels the network was given
     S.testEval = S.net.evaluate(te.map(s => S.inputs.xOf(s)), te.map(s => s.label));
   }
   function recordEpoch() {
@@ -322,7 +335,7 @@
     if (!s || s.split !== 'train' || !S.net) return;
     stopTraining();
     if (S.selected !== s) selectSpecimen(s);
-    const x = S.inputs.xOf(s), y = s.label;
+    const x = S.inputs.xOf(s), y = trainLabel(s); // the network learns the label it is given, right or wrong
     const res = S.net.lesson(x, y);
     const hops = S.net.conv ? Viz.convPlan(S.net, true).hops : Viz.sweepPlan(S.net, S.mode).hops;
     S.lastLesson = null;
@@ -389,7 +402,7 @@
       else anim = { phase: 'lesson', hops, reveal: hops, wipes: les.phase === 'loss' ? plan.hopKeys : null };
     } else if (sweeping) reveal = Viz.sweepState(Viz.sweepPlan(S.net, S.mode, { prep: les.phase !== 'check' }), les.frac).reveal;
     return { phase: les.phase, frac: les.frac, hops, reveal, anim, error: les.res.error, loss: les.res.loss, y: les.y, truthName: className(les.y), pBefore: les.pBefore, pAfter: les.pAfter,
-      delta: g.delta, gW: g.gW, gWo: g.gWo, gWc: g.gWc, dPooled: g.dPooled, dConv: g.dConv, lr: S.lr, fwBefore: les.res.fw };
+      truthWord: labelWord(les.s), delta: g.delta, gW: g.gW, gWo: g.gWo, gWc: g.gWc, dPooled: g.dPooled, dConv: g.dConv, lr: S.lr, fwBefore: les.res.fw };
   }
   // what the forward sweep shows, for the strip
   function forwardText() {
@@ -415,7 +428,7 @@
       const p = les.pBefore.toFixed(2), e = Viz.fmtSigned(les.res.error, 2), call = les.pBefore >= 0.5 ? posName() : negName();
       const sure = Math.abs(les.res.error) < 0.02, allSilent = hidden > 0 && les.res.g.delta.every(d => d.every(v => v === 0));
       const pair = les.pAfter == null ? `${p} → …` : fmtPair(les.pBefore, les.pAfter);
-      const verdict = `The network calls <b>${p}</b> (${esc(call)}); the truth is <b>${esc(className(les.y))}</b>.`;
+      const verdict = `The network calls <b>${p}</b> (${esc(call)}); the ${isFlipped(les.s) ? `label says <b>${esc(className(les.y))}</b>, though the truth is ${esc(className(les.s.label))}: this case is mislabelled, and the network learns the label it is given` : `${labelWord(les.s)} is <b>${esc(className(les.y))}</b>`}.`;
       // a convolutional network's forward pass and check are narrated stage by stage, as in the test walk-through
       const sub = conv && (les.phase === 'forward' || les.phase === 'check') ? (() => { const at = lessonConvAt(); return convPhaseInfo(les.s, at.seg[0], { key: at.seg[2] }, true); })() : null;
       const pool = conv ? S.net.conv.pool : 0;
@@ -445,7 +458,7 @@
       };
       html = `<span class="step">Step ${n} of ${total} · ${LESSON_TITLES[les.phase]}${sub ? ' · ' + sub.title : ''}</span> <span>${texts[les.phase]}</span> <span class="muted small">N or a click on the diagram skips ahead · space pauses · ← → step</span>`;
     } else {
-      html = `<span class="step">✓ ${esc(last.s.name)}</span> <span>(truth ${esc(className(last.s.label))}) ${fmtPair(last.pBefore, last.pAfter)}. Next up: <b>${esc(nextLessonCase().name)}</b>.</span>`;
+      html = `<span class="step">✓ ${esc(last.s.name)}</span> <span>(${labelWord(last.s)} ${esc(className(trainLabel(last.s)))}) ${fmtPair(last.pBefore, last.pAfter)}. Next up: <b>${esc(nextLessonCase().name)}</b>.</span>`;
     }
     $('lesson-text').innerHTML = html;
     renderPlayerControls('lesson', les ? les.player : null);
@@ -502,6 +515,7 @@
     b.appendChild(cv);
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
     const lab = document.createElement('span'); lab.className = 'lab'; lab.textContent = 'B'; lab.title = 'scanned at the other lab'; b.appendChild(lab);
+    const flip = document.createElement('span'); flip.className = 'flip'; flip.textContent = '✎'; flip.title = 'mislabelled'; b.appendChild(flip);
     if (named) { const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = s.name; b.appendChild(nm); }
     b.addEventListener('click', () => selectSpecimen(s));
     paintThumb(cv, s);
@@ -518,8 +532,8 @@
   function repaintThumbs() {
     for (const map of Object.values(thumbs)) for (const [id, el] of map) paintThumb(el.querySelector('canvas'), S.ds.specimens[id]);
   }
-  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit, lab }) {
-    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '') + (lab === 'B' ? ' lab-b' : '') + (S.showLab ? ' show-lab' : '');
+  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit, lab, flipped }) {
+    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '') + (lab === 'B' ? ' lab-b' : '') + (S.showLab ? ' show-lab' : '') + (flipped ? ' flipped' : '') + (S.showFlipped ? ' show-flip' : '');
     el.style.borderColor = unit != null ? Viz.unitColor(unit) : '';
     const badge = el.querySelector('.badge');
     badge.className = 'badge' + (q ? ' q' : '');
@@ -530,8 +544,8 @@
     for (const s of S.ds.specimens) {
       const el = thumbs.data.get(s.id); if (!el) continue;
       const known = truthKnown(s);
-      setThumbState(el, { truth: known ? s.label : null, unknown: !known, selected: S.selected && S.selected.id === s.id, lab: s.lab,
-        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ' · ' + className(s.label) : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
+      setThumbState(el, { truth: known ? trainLabel(s) : null, unknown: !known, selected: S.selected && S.selected.id === s.id, lab: s.lab, flipped: isFlipped(s),
+        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ` · ${labelWord(s)} ${className(trainLabel(s))}` : ''}${known && isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     }
   }
   function topUnit(acts) { let j = 0; for (let i = 1; i < acts.length; i++) if (acts[i] > acts[j]) j = i; return acts[j] > 0 ? j : null; }
@@ -542,11 +556,14 @@
       const el = thumbs.train.get(s.id);
       const p = probs[k], call = p >= 0.5 ? 1 : 0;
       const u = byUnit ? topUnit(acts[k]) : null;
-      setThumbState(el, { call, wrong: call !== s.label, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u, lab: s.lab,
-        title: `${s.name} · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
+      const y = trainLabel(s);
+      setThumbState(el, { call, wrong: call !== y, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u, lab: s.lab, flipped: isFlipped(s),
+        title: `${s.name} · ${labelWord(s)} ${className(y)}${isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     });
     $('tray-legend-call').hidden = !!byUnit;
     $('tray-legend-unit').hidden = !byUnit;
+    $('tray-legend-flip').hidden = !(S.labelNoise > 0 && S.showFlipped);
+    $('tray-disagree-word').textContent = S.labelNoise > 0 ? 'disagrees with the label it was given' : 'disagrees with truth';
     if (byUnit) $('tray-legend-unit').innerHTML = S.net.hidden[0] ? Array.from({ length: S.net.hidden[0] }, (_, j) => `<span><span class="udot" style="background:${Viz.unitColor(j)}"></span>unit ${j + 1}</span>`).join('') + '<span class="muted">grey = no unit active</span>' : '';
   }
   function renderTestTray() {
@@ -572,7 +589,7 @@
     $('status').innerHTML =
       `<span>architecture <b>${inputDesc} → ${S.net.describe()} → output</b></span>` +
       `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
-      `<span>training cases <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode === 'pixels' ? ' · stain normalised' : ''}</span>` +
+      `<span>training cases <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode === 'pixels' ? ' · stain normalised' : ''}${S.labelNoise > 0 ? ` · <b>${S.inputs.flipped.size}</b> mislabelled` : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
       `<span>loss <b>${S.trainEval.loss.toFixed(3)}</b></span>` +
@@ -712,8 +729,12 @@
     P.schedule();
   }
   function renderCharts() {
-    Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs });
-    Viz.drawCurves($('chart-acc'), { history: S.history, key: 'acc', showTest: S.peek, maxEpoch: S.epochs });
+    let stopAt = null; // the epoch of the lowest test loss so far: where early stopping on a held-out set would have stopped
+    if (S.peek && S.history.length > 3) { let best = S.history[0]; for (const h of S.history) if (h.testLoss < best.testLoss) best = h; if (best.epoch > 0 && best.epoch < S.history[S.history.length - 1].epoch) stopAt = best.epoch; }
+    const ceiling = S.labelNoise > 0 ? 1 - S.labelNoise : null;
+    Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs, stopAt });
+    Viz.drawCurves($('chart-acc'), { history: S.history, key: 'acc', showTest: S.peek, maxEpoch: S.epochs, stopAt, ceiling });
+    $('curves-legend-ceiling').hidden = ceiling == null; $('curves-legend-stop').hidden = stopAt == null;
     $('loss-now').textContent = S.trainEval.loss.toFixed(3);
     $('acc-now').textContent = pct(S.trainEval.accuracy);
     $('curves-legend-test').hidden = !S.peek;
@@ -836,7 +857,8 @@
     const known = truthKnown(s);
     $('spec-chips').innerHTML =
       `<span class="chip plain">${s.split === 'train' ? 'Training set' : 'Test set · held out'}</span>` +
-      (known ? `<span class="chip ${classOf(s.label)}">truth: ${esc(className(s.label))}</span>` : `<span class="chip plain">truth hidden</span>`) +
+      (known ? `<span class="chip ${classOf(trainLabel(s))}">${labelWord(s)}: ${esc(className(trainLabel(s)))}</span>` : `<span class="chip plain">truth hidden</span>`) +
+      (known && isFlipped(s) && S.showFlipped ? `<span class="chip bad">mislabelled · truth: ${esc(className(s.label))}</span>` : '') +
       (known && s.subtype && tabular ? `<span class="chip plain">${esc(subtypeName(s.subtype))}</span>` : '') +
       (s.lab === 'B' ? '<span class="chip plain">scanned at the other lab</span>' : '');
     document.querySelector('.views').hidden = tabular;
@@ -875,7 +897,7 @@
       const call = fw.p >= thr ? 1 : 0;
       v.querySelector('.p').innerHTML = `<small class="lbl">P(${esc(posName())})</small><b>${fw.p.toFixed(3)}</b><small>score z = ${Viz.fmtSigned(fw.z, 2)}</small>`;
       let chips = `<span class="chip ${classOf(call)}">call: ${esc(className(call))}</span>`;
-      if (known) chips += call === s.label ? `<span class="chip good">✓ agrees with truth</span>` : `<span class="chip bad">✗ truth is ${esc(className(s.label))}</span>`;
+      if (known) chips += call === trainLabel(s) ? `<span class="chip good">✓ agrees with ${labelWord(s) === 'label' ? 'the label' : 'truth'}</span>` : `<span class="chip bad">✗ ${labelWord(s)} is ${esc(className(trainLabel(s)))}</span>`;
       $('verdict-call').innerHTML = chips;
       $('pbar-marker').style.left = (fw.p * 100).toFixed(1) + '%';
       $('pbar-thr').style.left = (thr * 100).toFixed(1) + '%';
@@ -943,7 +965,7 @@
     const tx = v => (fx.log ? Math.log10(Math.max(v, 1e-3)) : v), ty = v => (fy.log ? Math.log10(Math.max(v, 1e-3)) : v);
     const pts = S.ds.specimens.filter(s => s.split === 'train' || S.revealTest).map(s => ({
       id: s.id, name: s.name, x: tx(s.features[xi]), y: ty(s.features[yi]), split: s.split,
-      cls: truthKnown(s) ? classOf(s.label) : 'unknown', clsName: truthKnown(s) ? className(s.label) + (s.subtype ? ' · ' + subtypeName(s.subtype) : '') : '', selected: S.selected && S.selected.id === s.id,
+      cls: truthKnown(s) ? classOf(trainLabel(s)) : 'unknown', clsName: truthKnown(s) ? className(trainLabel(s)) + (isFlipped(s) && S.showFlipped ? ' · mislabelled' : '') + (s.subtype ? ' · ' + subtypeName(s.subtype) : '') : '', selected: S.selected && S.selected.id === s.id,
     }));
     Viz.drawScatter($('scatter'), { points: pts, xLabel: (fx.log ? 'log₁₀ ' : '') + fx.name, yLabel: (fy.log ? 'log₁₀ ' : '') + fy.name, onSelect: id => selectSpecimen(S.ds.specimens[id]) });
   }
@@ -987,6 +1009,7 @@
     $('augment-wrap').classList.toggle('muted', S.mode !== 'pixels');
     $('l2').value = S.l2; $('l2-val').textContent = S.l2 === 0 ? 'off' : S.l2.toFixed(2);
     $('peek').checked = S.peek;
+    renderNoiseControls();
     $('threshold').value = S.test.threshold;
     $('prev').value = sliderFromPrev(S.test.prevalence);
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.color === S.trayColor));
@@ -1026,6 +1049,13 @@
     for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
     $('normalize').addEventListener('change', () => { S.normalize = $('normalize').value; syncControls(); resetModel(S.normalize === 'off' ? 'Stain normalisation off — fresh random weights.' : `Stain normalisation ${S.normalize === 'lab' ? 'per lab' : 'per image'} — fresh random weights.`); });
     $('show-lab').addEventListener('change', () => { S.showLab = $('show-lab').checked; renderDataTrays(); if (S.stage === 'train') renderTrainTray(); if (S.stage === 'test') renderTestTray(); });
+    $('noise').addEventListener('input', () => { const v = +$('noise').value; $('noise-val').textContent = v ? `${v}% of the labels wrong` : 'off'; });
+    $('noise').addEventListener('change', () => {
+      S.labelNoise = +$('noise').value / 100; syncControls();
+      resetModel(S.labelNoise ? `${Math.round(S.labelNoise * 100)}% of the training labels flipped (${S.inputs.flipped.size} of ${S.ds.train.length}), as a second pathologist might have called them — fresh random weights.` : 'Every training label right again — fresh random weights.');
+      renderDataTrays(); renderScatter(); renderInspector();
+    });
+    for (const id of ['show-flipped', 'show-flipped-2']) $(id).addEventListener('change', ev => { S.showFlipped = ev.target.checked; syncControls(); renderDataTrays(); renderScatter(); renderInspector(); if (S.stage === 'train') renderTrainTray(); });
     $('btn-train').addEventListener('click', () => (S.running ? stopTraining('Paused.') : startTraining()));
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
@@ -1047,6 +1077,7 @@
       renderDataTrays(); renderScatter(); renderInspector();
       if (S.stage !== 'train') showStage('train');
       if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab.`);
+      if (k === '10') note(`Recipe ${RECIPE_LABELS[10]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
     });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
