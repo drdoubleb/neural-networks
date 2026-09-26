@@ -22,6 +22,10 @@
  *   - Task "atypia": bland nuclei are normal-sized, pale, smooth and finely textured. Atypical nuclei carry at
  *     least one of four traits, alone or combined: enlarged, hyperchromatic, irregular contour, coarse chromatin.
  *     Every other property is a decoy. Made for the measurement approach: each trait is caught by a different measurement.
+ *   - Every nucleus is rendered twice: as scanned at "our lab" (px) and at "the other lab" (pxB), whose staining is
+ *     weaker: the same shape and the same chromatin pattern, but a paler nucleus, less chromatin and membrane contrast,
+ *     a touch paler background. The page uses the second rendering for the lab-difference and shortcut-learning
+ *     teaching points (images/other-lab/, contact_sheet_other_lab.png).
  */
 'use strict';
 const fs = require('fs');
@@ -82,12 +86,13 @@ function mulberry32(seed) {
 let rand = mulberry32(1); // re-seeded per task below
 const uniform = (lo, hi) => lo + (hi - lo) * rand();
 const randint = (lo, hi) => lo + Math.floor(rand() * (hi - lo + 1)); // inclusive
-function gaussian() {
+function gaussianFrom(rng) {
   let u = 0, v = 0;
-  while (u === 0) u = rand();
-  while (v === 0) v = rand();
+  while (u === 0) u = rng();
+  while (v === 0) v = rng();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
+const gaussian = () => gaussianFrom(rand);
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
@@ -189,8 +194,17 @@ function sampleAppearance(label, task, traits) {
   };
 }
 
+// the other lab stains more weakly: the nucleus is paler by about 0.13, chromatin clumps and the membrane rim have
+// less contrast, the nucleolus is fainter, the background a touch paler; the optics are the same
+function otherLabLook(look, rng) {
+  const shift = 0.13 + (rng() - 0.5) * 0.04;
+  return { ...look, bg: Math.min(0.97, look.bg + 0.02), nucleus: look.nucleus + shift, textureAmp: look.textureAmp * 0.6, rim: look.rim * 0.6,
+    nucleolus: look.nucleolus ? { ...look.nucleolus, dark: look.nucleolus.dark * 0.7 } : null };
+}
+
 // ----------------------------------------------------------------------------- rasteriser
-function renderNucleus(shape, look) {
+// tex: the chromatin noise field (shared by both labs' renderings of a nucleus); gauss: the grain's random source
+function renderNucleus(shape, look, tex, gauss) {
   const W = SIZE * SS;
   const cov = new Float64Array(SIZE * SIZE);   // coverage (0..1) of the nucleus per pixel
   const rhoAcc = new Float64Array(SIZE * SIZE); // mean normalised radius per pixel (for rim shading)
@@ -214,7 +228,6 @@ function renderNucleus(shape, look) {
       rhoAcc[idx] += Math.min(r, 1.2) / (SS * SS);
     }
   }
-  const tex = makeValueNoise(look.textureCells || 7);
   const img = new Uint8Array(SIZE * SIZE);
   const nucCos = Math.cos(shape.phi), nucSin = Math.sin(shape.phi);
   let nx = 0, ny = 0;
@@ -229,7 +242,7 @@ function renderNucleus(shape, look) {
     for (let x = 0; x < SIZE; x++) {
       const i = y * SIZE + x;
       const c = cov[i];
-      const bgv = look.bg + gaussian() * look.bgNoise;
+      const bgv = look.bg + gauss() * look.bgNoise;
       let nv = look.nucleus + look.textureAmp * tex(x / SIZE, y / SIZE);
       const rr = rhoAcc[i];
       if (rr > 0.72) nv -= look.rim * Math.min(1, (rr - 0.72) / 0.28); // darker toward the membrane
@@ -237,7 +250,7 @@ function renderNucleus(shape, look) {
         const d = Math.hypot(x + 0.5 - nx, y + 0.5 - ny);
         if (d < look.nucleolus.r + 0.7) nv -= look.nucleolus.dark * Math.max(0, Math.min(1, look.nucleolus.r + 0.7 - d));
       }
-      let val = c * nv + (1 - c) * bgv + gaussian() * look.grain;
+      let val = c * nv + (1 - c) * bgv + gauss() * look.grain;
       val = Math.max(0, Math.min(1, val));
       img[i] = Math.round(val * 255);
     }
@@ -336,19 +349,24 @@ const test = shuffle([...negatives.slice(0, N_TEST_PER_CLASS), ...testPos]);
 const train = shuffle([...negatives.slice(N_TEST_PER_CLASS), ...trainPos]);
 const all = [...train.map(n => ({ ...n, split: 'train' })), ...test.map(n => ({ ...n, split: 'test' }))];
 
-fs.mkdirSync(path.join(OUT, 'images', 'train'), { recursive: true });
-fs.mkdirSync(path.join(OUT, 'images', 'test'), { recursive: true });
-for (const f of fs.readdirSync(path.join(OUT, 'images', 'train'))) fs.unlinkSync(path.join(OUT, 'images', 'train', f));
-for (const f of fs.readdirSync(path.join(OUT, 'images', 'test'))) fs.unlinkSync(path.join(OUT, 'images', 'test', f));
+for (const dir of ['train', 'test', 'other-lab/train', 'other-lab/test']) {
+  fs.mkdirSync(path.join(OUT, 'images', dir), { recursive: true });
+  for (const f of fs.readdirSync(path.join(OUT, 'images', dir))) if (f.endsWith('.png')) fs.unlinkSync(path.join(OUT, 'images', dir, f));
+}
 
 const records = [];
 let trainIdx = 0, testIdx = 0;
 for (let i = 0; i < all.length; i++) {
   const n = all[i];
-  const img = renderNucleus(n.shape, n.look);
+  const tex = makeValueNoise(n.look.textureCells || 7);
+  const img = renderNucleus(n.shape, n.look, tex, gaussian);
+  // the other lab's scan of the same nucleus: its own random source, so our lab's images are untouched by it
+  const rngB = mulberry32((task.seed + 7919 * (i + 1)) >>> 0), lookB = otherLabLook(n.look, rngB);
+  const imgB = renderNucleus(n.shape, lookB, tex, () => gaussianFrom(rngB));
   const k = n.split === 'train' ? ++trainIdx : ++testIdx;
   const file = `${n.split}_${String(k).padStart(2, '0')}_${task.classes[n.label].key}.png`;
   fs.writeFileSync(path.join(OUT, 'images', n.split, file), encodePNG(SIZE, SIZE, 1, img));
+  fs.writeFileSync(path.join(OUT, 'images', 'other-lab', n.split, file), encodePNG(SIZE, SIZE, 1, imgB));
   records.push({
     id: i,
     name: `${n.split === 'train' ? 'T' : 'X'}${String(k).padStart(2, '0')}`,
@@ -358,6 +376,7 @@ for (let i = 0; i < all.length; i++) {
     subtype: task.id === 'irregularity' ? n.shape.style : task.id === 'atypia' ? n.traits.subtype : `${n.label ? 'enlarged' : 'bland'}-${n.shape.contourClass ? 'irregular' : 'smooth'}`,
     file: `images/${n.split}/${file}`,
     px: Buffer.from(img).toString('base64'),
+    pxB: Buffer.from(imgB).toString('base64'),
     generator: {
       style: n.shape.style, contourIrregular: n.shape.contourClass === 1,
       semiMajor: +n.shape.a.toFixed(2), semiMinor: +n.shape.b.toFixed(2),
@@ -369,6 +388,7 @@ for (let i = 0; i < all.length; i++) {
       meanIntensity: +n.look.nucleus.toFixed(2),
       textureAmp: +n.look.textureAmp.toFixed(3),
       nucleolus: !!n.look.nucleolus,
+      otherLab: { meanIntensity: +lookB.nucleus.toFixed(2), textureAmp: +lookB.textureAmp.toFixed(3) },
       ...(n.traits ? { traits: TRAITS.filter(k => n.traits[k]) } : {}),
     },
   });
@@ -376,7 +396,7 @@ for (let i = 0; i < all.length; i++) {
 
 // contact sheet: 10 x 10, 4x scale, 2px frame in class colour (blue = regular, orange = irregular),
 // train first (rows 1-8) then test (rows 9-10)
-(function contactSheet() {
+function contactSheet(key, file) {
   const scale = 4, cell = SIZE * scale, gap = 6, cols = 10;
   const rows = Math.ceil(records.length / cols);
   const W = cols * cell + (cols + 1) * gap, H = rows * cell + (rows + 1) * gap;
@@ -386,7 +406,7 @@ for (let i = 0; i < all.length; i++) {
   records.forEach((r, idx) => {
     const c = idx % cols, rr = Math.floor(idx / cols);
     const x0 = gap + c * (cell + gap), y0 = gap + rr * (cell + gap);
-    const px = Buffer.from(r.px, 'base64');
+    const px = Buffer.from(r[key], 'base64');
     for (let y = -2; y < cell + 2; y++) for (let x = -2; x < cell + 2; x++) {
       const X = x0 + x, Y = y0 + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
       const o = (Y * W + X) * 3;
@@ -395,8 +415,10 @@ for (let i = 0; i < all.length; i++) {
       rgb[o] = v; rgb[o + 1] = v; rgb[o + 2] = v;
     }
   });
-  fs.writeFileSync(path.join(OUT, 'contact_sheet.png'), encodePNG(W, H, 3, rgb));
-})();
+  fs.writeFileSync(path.join(OUT, file), encodePNG(W, H, 3, rgb));
+}
+contactSheet('px', 'contact_sheet.png');
+contactSheet('pxB', 'contact_sheet_other_lab.png');
 
 const meta = {
   generated: new Date().toISOString().slice(0, 10),
@@ -406,9 +428,9 @@ const meta = {
   task: { id: task.id, order: task.order, kind: task.kind, title: task.title, short: task.short, classes: task.classes, blurb: task.blurb, decoys: task.decoys, signal: task.signal, subtypes: task.subtypes, specimenNoun: 'nucleus' },
   classes: task.classes.map(c => c.key),
 };
-fs.writeFileSync(path.join(OUT, 'nuclei.json'), JSON.stringify({ meta, nuclei: records.map(({ px, ...rest }) => rest) }, null, 1));
+fs.writeFileSync(path.join(OUT, 'nuclei.json'), JSON.stringify({ meta, nuclei: records.map(({ px, pxB, ...rest }) => rest) }, null, 1));
 const js = `// Generated by tools/generate_nuclei.js — do not edit by hand.\n` +
-  `// Task "${task.id}": ${meta.count} synthetic nuclei, ${SIZE}x${SIZE} 8-bit grayscale, base64 of the raw pixel rows (0 = black, 255 = white).\n` +
+  `// Task "${task.id}": ${meta.count} synthetic nuclei, ${SIZE}x${SIZE} 8-bit grayscale, base64 of the raw pixel rows (0 = black, 255 = white); px as scanned at our lab, pxB at the other lab (weaker stain).\n` +
   `window.LECTURE_TASKS = window.LECTURE_TASKS || {};\n` +
   `window.LECTURE_TASKS[${JSON.stringify(task.id)}] = ${JSON.stringify({ meta, nuclei: records.map(({ generator, ...rest }) => rest) })};\n`;
 fs.writeFileSync(path.join(OUT, 'nuclei_data.js'), js);

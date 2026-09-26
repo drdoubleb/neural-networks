@@ -11,19 +11,21 @@
   const S = {
     tasks: null, taskId: 'leukaemia', task: null, ds: null, kind: 'tabular', size: 0, featureDefs: [],
     mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
+    trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
     trainEval: null, testEval: null, profileAt: 0, prevW: null, applyingRecipe: false,
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
-    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01 },
+    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01, scores: {} },
     hover: { train: null, test: null },
     lesson: null, lastLesson: null, lessonCursor: 0,
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Enlargement · pixels · single layer', '⑤ Irregularity · pixels · single layer', '⑥ Irregularity · pixels · 4 ReLU + augmentation', '⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation'];
+  const RECIPE_LABELS = ['', '① Leukaemia · blood count · single layer', '② Leukaemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Enlargement · pixels · single layer', '⑤ Irregularity · pixels · single layer', '⑥ Irregularity · pixels · 4 ReLU + augmentation', '⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation', '⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑨ Irregularity · convolution · the shortcut: irregular nuclei scanned at another lab'];
+  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off' }; // every recipe starts from our lab's scans, unnormalised
   const RECIPES = {
     1: { task: 'leukaemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukaemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -33,7 +35,10 @@
     6: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
     7: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 4, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
     8: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
+    9: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4, trainLab: 'byClass', testLab: 'byClass' },
   };
+  // the source modes, in the order of the selects; the class-split one names the positive class
+  const SOURCE_LABELS = () => ({ ours: 'our lab', other: 'the other lab (weaker stain)', mixed: 'both labs, mixed at random', byClass: `split by class: ${posName()} from the other lab` });
 
   // ------------------------------------------------------------------ helpers
   const fmtP = p => p.toFixed(2);
@@ -59,6 +64,7 @@
     const raw = S.tasks[id];
     S.task = raw.meta.task;
     S.ds = DS.prepare(raw);
+    DS.assignLabs(S.ds, S.trainLab, S.testLab);
     S.kind = S.ds.kind; S.size = S.ds.size; S.featureDefs = S.ds.featureDefs;
     S.inputCache.clear();
     S.excluded = new Set();
@@ -92,12 +98,57 @@
     }[id] || '';
     $('mode-pixels').disabled = S.kind === 'tabular';
     $('mode-pixels').title = S.kind === 'tabular' ? 'Blood counts have no pixels' : '';
+    renderSourceOptions();
     renderInputPicker();
   }
   function inputsFor(mode, augment, excluded) {
-    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '');
-    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment, exclude: excluded }));
+    const normalize = mode === 'pixels' ? S.normalize : 'off';
+    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '') + `|${S.ds.sources.train}/${S.ds.sources.test}|${normalize}`;
+    if (!S.inputCache.has(key)) S.inputCache.set(key, DS.buildInputs(S.ds, mode, { augment, exclude: excluded, normalize }));
     return S.inputCache.get(key);
+  }
+  // ---- the two labs: which scans each set uses, and the pixels' stain normalisation
+  function applySources() { DS.assignLabs(S.ds, S.trainLab, S.testLab); repaintThumbs(); }
+  function renderSourceOptions() {
+    const L = SOURCE_LABELS();
+    for (const id of ['source-train', 'source-train-2', 'source-test', 'source-test-2']) $(id).innerHTML = DS.SOURCE_MODES.map(k => `<option value="${k}">${esc(L[k])}`).join('');
+  }
+  function sourceText() {
+    const tr = S.ds.sources.train, te = S.ds.sources.test, pos = posName().toLowerCase(), neg = negName().toLowerCase();
+    const train = {
+      ours: 'The training set is our lab’s scans.',
+      other: 'The training set is the other lab’s scans: the same nuclei, paler and with less contrast.',
+      mixed: 'The training set mixes the labs at random: half of each class from each lab, the proper way to collect cases from two sites, and the way to make a network indifferent to the stain.',
+      byClass: `Every ${pos} training nucleus comes from the other lab and every ${neg} one from ours: the stain is a perfect shortcut to the label, easier to learn than the contour. Would you have noticed?`,
+    }[tr];
+    const test = {
+      ours: 'The test set is our lab’s scans.',
+      other: 'The test set is the other lab’s scans of the same 20 held-out nuclei: what happens when the network meets a stain it never saw.',
+      mixed: 'The test set mixes the labs at random.',
+      byClass: `The test set is split by class the same way, so it carries the same shortcut: a network that reads the stain will look perfect on it.`,
+    }[te];
+    return `${train} ${test}${S.normalize !== 'off' && S.mode === 'pixels' ? ` Stain normalisation is on (${S.normalize === 'lab' ? 'each lab’s typical background and nucleus levels, measured from its scans without any label, are matched to ours' : 'each scan is rescaled by its own background and nucleus levels'}), so the network sees comparable images.` : ''}`;
+  }
+  function renderSources() {
+    const labs = !!S.ds.labs;
+    $('sources-card').hidden = !labs; $('source-train-wrap').hidden = !labs; $('normalize-wrap').hidden = !(labs && S.mode === 'pixels'); $('source-test-wrap').hidden = !labs;
+    if (!labs) return;
+    for (const id of ['source-train', 'source-train-2']) $(id).value = S.ds.sources.train;
+    for (const id of ['source-test', 'source-test-2']) $(id).value = S.ds.sources.test;
+    $('normalize').value = S.normalize; $('show-lab').checked = S.showLab;
+    $('sources-text').textContent = sourceText();
+  }
+  function setTrainSource(v) {
+    S.trainLab = v; applySources(); syncControls();
+    resetModel(`Training cases now from ${SOURCE_LABELS()[v]} — fresh random weights.`);
+    renderDataTrays(); renderScatter(); renderInspector();
+  }
+  function setTestSource(v) { // the weights stay: only the test nuclei's scans change, so the test results start over
+    S.testLab = v; applySources();
+    S.inputs = inputsFor(S.mode, S.augment, S.excluded);
+    clearTestResults(false, true); evaluateAll(); syncControls(); renderStatus();
+    $('test-note').textContent = { ours: 'The test nuclei are now our lab’s scans. Classify them again.', other: 'The test nuclei are now the other lab’s scans of the same 20 nuclei: paler, less contrast. Classify them again and compare.', mixed: 'The test nuclei now come from both labs, mixed at random. Classify them again.', byClass: `The test nuclei are now split by class: ${posName().toLowerCase()} from the other lab, ${negName().toLowerCase()} from ours. Classify them again.` }[v];
+    renderDataTrays(); renderScatter(); renderInspector(); if (S.stage === 'train') renderTraining(true); if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
   }
   function resetModel(reason) {
     stopTraining();
@@ -344,7 +395,7 @@
   function forwardText() {
     const hidden = S.net.hidden.length;
     if (S.mode === 'pixels' && !S.net.conv) {
-      const prep = `First the mean training ${noun(1)} is subtracted from this one: the network sees the difference (orange = more ink than average, blue = less), which is large at the membrane and near zero in the centre. `;
+      const prep = `${S.normalize !== 'off' ? 'After the stain normalisation, the' : 'First the'} mean training ${noun(1)} is subtracted from this one: the network sees the difference (orange = more ink than average, blue = less), which is large at the membrane and near zero in the centre. `;
       return prep + (hidden
         ? `That difference is laid over each weight map and multiplied cell by cell into a product map. A scan line sums the map, orange cells against blue, the bias is added, and ReLU keeps the positive part: that is the unit's value. The units' values × their weights then flow to the output.`
         : `That difference is laid over the weight map and multiplied cell by cell into the product map. A scan line sums the map, orange cells against blue, the bias is added to give the score z, and the sigmoid turns z into a probability.`);
@@ -404,8 +455,9 @@
   function stepEpoch() { stopTraining(); do { trainStep(); } while (S.ptr !== 0); renderTraining(true); note(`Epoch ${S.epoch} complete.`); }
 
   // ------------------------------------------------------------------ test phase
-  function clearTestResults(notify) {
+  function clearTestResults(notify, keepScores) {
     S.test.results.clear(); S.test.next = 0; S.test.revealed.clear(); S.test.animating = false; S.test.player = null;
+    if (!keepScores) S.test.scores = {};
     renderTestLine(null);
     if (notify) $('test-note').textContent = 'The model changed, so the test results were cleared. Classify again to score the new weights.';
     renderTestPanel();
@@ -449,6 +501,7 @@
     const cv = document.createElement('canvas'); cv.width = s.size || 48; cv.height = s.size || 48;
     b.appendChild(cv);
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
+    const lab = document.createElement('span'); lab.className = 'lab'; lab.textContent = 'B'; lab.title = 'scanned at the other lab'; b.appendChild(lab);
     if (named) { const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = s.name; b.appendChild(nm); }
     b.addEventListener('click', () => selectSpecimen(s));
     paintThumb(cv, s);
@@ -465,8 +518,8 @@
   function repaintThumbs() {
     for (const map of Object.values(thumbs)) for (const [id, el] of map) paintThumb(el.querySelector('canvas'), S.ds.specimens[id]);
   }
-  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit }) {
-    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '');
+  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit, lab }) {
+    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '') + (lab === 'B' ? ' lab-b' : '') + (S.showLab ? ' show-lab' : '');
     el.style.borderColor = unit != null ? Viz.unitColor(unit) : '';
     const badge = el.querySelector('.badge');
     badge.className = 'badge' + (q ? ' q' : '');
@@ -477,8 +530,8 @@
     for (const s of S.ds.specimens) {
       const el = thumbs.data.get(s.id); if (!el) continue;
       const known = truthKnown(s);
-      setThumbState(el, { truth: known ? s.label : null, unknown: !known, selected: S.selected && S.selected.id === s.id,
-        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ' · ' + className(s.label) : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}` });
+      setThumbState(el, { truth: known ? s.label : null, unknown: !known, selected: S.selected && S.selected.id === s.id, lab: s.lab,
+        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${known ? ' · ' + className(s.label) : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     }
   }
   function topUnit(acts) { let j = 0; for (let i = 1; i < acts.length; i++) if (acts[i] > acts[j]) j = i; return acts[j] > 0 ? j : null; }
@@ -489,8 +542,8 @@
       const el = thumbs.train.get(s.id);
       const p = probs[k], call = p >= 0.5 ? 1 : 0;
       const u = byUnit ? topUnit(acts[k]) : null;
-      setThumbState(el, { call, wrong: call !== s.label, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u,
-        title: `${s.name} · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}` });
+      setThumbState(el, { call, wrong: call !== s.label, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u, lab: s.lab,
+        title: `${s.name} · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     });
     $('tray-legend-call').hidden = !!byUnit;
     $('tray-legend-unit').hidden = !byUnit;
@@ -501,11 +554,11 @@
     for (const s of S.ds.test) {
       const el = thumbs.test.get(s.id);
       const r = S.test.results.get(s.id), shown = r && S.test.revealed.has(s.id);
-      if (!shown) setThumbState(el, { unknown: true, q: true, selected: S.selected && S.selected.id === s.id, title: `${s.name} · not classified yet` });
+      if (!shown) setThumbState(el, { unknown: true, q: true, selected: S.selected && S.selected.id === s.id, lab: s.lab, title: `${s.name} · not classified yet${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
       else {
         const call = r.p >= thr ? 1 : 0;
-        setThumbState(el, { call, wrong: call !== s.label, right: call === s.label, selected: S.selected && S.selected.id === s.id,
-          title: `${s.name} · call ${className(call)} (P ${fmtP(r.p)}) · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''}` });
+        setThumbState(el, { call, wrong: call !== s.label, right: call === s.label, selected: S.selected && S.selected.id === s.id, lab: s.lab,
+          title: `${s.name} · call ${className(call)} (P ${fmtP(r.p)}) · truth ${className(s.label)}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
       }
     }
   }
@@ -519,7 +572,7 @@
     $('status').innerHTML =
       `<span>architecture <b>${inputDesc} → ${S.net.describe()} → output</b></span>` +
       `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
-      `<span>training cases <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}</span>` +
+      `<span>training cases <b>${S.inputs.trainX.length}</b>${S.augment && S.mode === 'pixels' ? ' (80 × 8 orientations)' : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode === 'pixels' ? ' · stain normalised' : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
       `<span>loss <b>${S.trainEval.loss.toFixed(3)}</b></span>` +
@@ -537,6 +590,7 @@
     }
     return { net: S.net, mode: S.mode, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
       inputMean: S.mode === 'pixels' && S.inputs.std ? S.inputs.std.mean : null,
+      inputPx: s && S.mode === 'pixels' && S.inputs.normalize !== 'off' ? inkToPx(S.inputs.rawOf(s)) : null, // the scan after the stain normalisation
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
   }
   function renderTrainGraph() {
@@ -606,7 +660,7 @@
     const K = S.net.conv.K, pool = S.net.conv.pool, nL = S.net.hidden.length, F = S.net.featureCount;
     const hop = info && info.key, cols = K <= 4 ? 2 : 4, stack = `${Math.ceil(K / cols)}×${cols}`;
     const texts = {
-      prep: ['Preprocessing', `<b>${esc(s.name)}</b>: the mean training ${noun(1)} is subtracted from this one. The network sees the difference (orange = more ink than average, blue = less), large at the membrane and near zero in the centre.`],
+      prep: ['Preprocessing', `<b>${esc(s.name)}</b>: ${S.normalize !== 'off' ? 'after the stain normalisation, ' : ''}the mean training ${noun(1)} is subtracted from this one. The network sees the difference (orange = more ink than average, blue = less), large at the membrane and near zero in the centre.`],
       scan1: ['Convolution', 'Filter 1 slides over the difference image. At each position its 5×5 weights multiply the 5×5 values under them, the products are summed, and ReLU keeps the positive part: one cell of feature map 1. The arithmetic of the current position is shown under the image.'],
       scan: ['Convolution', `The other ${K - 1} filters sweep the ${noun(1)} the same way, each producing its own feature map.`],
       pool1: ['Max-pooling', `Each ${pool}×${pool} block of feature map 1 keeps only its largest value, so the map shrinks and the exact position inside a block no longer matters.`],
@@ -717,11 +771,22 @@
     updateTeachButton();
   }
 
+  function inkToPx(ink) { const px = new Uint8ClampedArray(ink.length); for (let i = 0; i < ink.length; i++) px[i] = Math.round(255 * (1 - ink[i])); return px; }
   // ------------------------------------------------------------------ rendering: test panel
+  function renderLabScores(st) {
+    const box = $('lab-scores'); if (!S.ds.labs) { box.hidden = true; return; }
+    if (st.n === S.ds.test.length) S.test.scores[S.ds.sources.test] = { acc: st.acc, sens: st.sens, spec: st.spec };
+    const keys = Object.keys(S.test.scores); box.hidden = !keys.length; if (!keys.length) return;
+    const L = SOURCE_LABELS(), f = v => (v == null ? '–' : pct(v));
+    box.innerHTML = '<span class="hd">test cases from</span><span class="hd n">accuracy</span><span class="hd n">sensitivity</span><span class="hd n">specificity</span>' +
+      DS.SOURCE_MODES.filter(k => S.test.scores[k]).map(k => { const r = S.test.scores[k], cur = k === S.ds.sources.test ? ' current' : ''; return `<span class="row${cur}">${esc(L[k])}</span><span class="row n${cur}">${f(r.acc)}</span><span class="row n${cur}">${f(r.sens)}</span><span class="row n${cur}">${f(r.spec)}</span>`; }).join('');
+  }
   function renderTestPanel() {
     renderTestTray();
     const st = testStats();
+    renderLabScores(st);
     $('stat-n').textContent = `${st.n} / ${S.ds.test.length}`;
+    $('stat-n-sub').textContent = `held-out ${noun(2)}${S.ds.labs && S.ds.sources.test !== 'ours' ? ` · ${SOURCE_LABELS()[S.ds.sources.test].split(':')[0]}` : ''}`;
     $('stat-acc').textContent = st.acc == null ? '–' : pct(st.acc);
     $('stat-sens').textContent = st.sens == null ? '–' : pct(st.sens);
     $('stat-spec').textContent = st.spec == null ? '–' : pct(st.spec);
@@ -772,7 +837,8 @@
     $('spec-chips').innerHTML =
       `<span class="chip plain">${s.split === 'train' ? 'Training set' : 'Test set · held out'}</span>` +
       (known ? `<span class="chip ${classOf(s.label)}">truth: ${esc(className(s.label))}</span>` : `<span class="chip plain">truth hidden</span>`) +
-      (known && s.subtype && tabular ? `<span class="chip plain">${esc(subtypeName(s.subtype))}</span>` : '');
+      (known && s.subtype && tabular ? `<span class="chip plain">${esc(subtypeName(s.subtype))}</span>` : '') +
+      (s.lab === 'B' ? '<span class="chip plain">scanned at the other lab</span>' : '');
     document.querySelector('.views').hidden = tabular;
     document.querySelectorAll('.views button').forEach(b => b.classList.toggle('is-active', b.dataset.view === S.view));
     const m = s.measurement;
@@ -795,6 +861,7 @@
       } else { Viz.renderMeasurement(cv, s.px, s.size, m, S.tint); caption = 'In measurement mode the evidence is per measurement — see the “push” column below.'; }
     }
     $('spec-caption').textContent = caption;
+    renderLabCard(s, fw);
 
     // verdict
     const v = $('verdict');
@@ -851,6 +918,24 @@
       : 'In pixel mode the network never sees these measurements — they are here for you, the human.';
   }
 
+  // the same nucleus as scanned at both labs, with the network's call for each scan once it may be shown
+  function renderLabCard(s, fw) {
+    const card = $('lab-card'); card.hidden = !(S.ds.labs && s.variants && s.variants.B); if (card.hidden) return;
+    const thr = s.split === 'test' ? S.test.threshold : 0.5;
+    for (const [lab, id] of [['A', 'lab-a'], ['B', 'lab-b']]) {
+      const el = $(id), v = s.variants[lab];
+      Viz.renderBigImage(el.querySelector('canvas'), v.px, s.size, S.tint);
+      el.classList.toggle('current', s.lab === lab);
+      const p = el.querySelector('.p');
+      if (!fw) { p.textContent = ''; p.className = 'p'; continue; }
+      const q = S.net.forward(S.inputs.xFor(s, lab)).p, call = q >= thr ? 1 : 0;
+      p.textContent = `P ${q.toFixed(2)} · ${className(call)}`; p.className = `p ${classOf(call)}`;
+    }
+    $('lab-note').textContent = fw
+      ? `Same shape, same chromatin, weaker stain${S.mode === 'features' ? '; the measurements are taken from each scan' : S.normalize !== 'off' ? '; both scans are stain-normalised before the network sees them' : ''}. The framed scan is the one in the ${s.split === 'train' ? 'training' : 'test'} set.`
+      : 'Same shape, same chromatin, weaker stain. The network’s call for each scan appears once it has classified this nucleus.';
+  }
+
   // ------------------------------------------------------------------ data panel
   function renderScatter() {
     const xi = +$('scatter-x').value, yi = +$('scatter-y').value;
@@ -884,6 +969,7 @@
     $('tint-wrap').hidden = tabular;
     $('prevalence-card').hidden = !tabular;
     $('legend-conv').hidden = !(pixels && S.convK > 0);
+    renderSources();
   }
   function syncControls() {
     applyVisibility();
@@ -936,6 +1022,10 @@
     $('augment').addEventListener('change', () => { S.augment = $('augment').checked; resetModel(S.augment ? 'Training set augmented with flips and rotations (80 × 8 = 640 views) — fresh random weights.' : 'Augmentation off — fresh random weights.'); });
     $('l2').addEventListener('input', () => { S.l2 = +$('l2').value; $('l2-val').textContent = S.l2 === 0 ? 'off' : S.l2.toFixed(2); });
     $('peek').addEventListener('change', () => { S.peek = $('peek').checked; renderStatus(); if (S.stage === 'train') renderCharts(); });
+    for (const id of ['source-train', 'source-train-2']) $(id).addEventListener('change', ev => setTrainSource(ev.target.value));
+    for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
+    $('normalize').addEventListener('change', () => { S.normalize = $('normalize').value; syncControls(); resetModel(S.normalize === 'off' ? 'Stain normalisation off — fresh random weights.' : `Stain normalisation ${S.normalize === 'lab' ? 'per lab' : 'per image'} — fresh random weights.`); });
+    $('show-lab').addEventListener('change', () => { S.showLab = $('show-lab').checked; renderDataTrays(); if (S.stage === 'train') renderTrainTray(); if (S.stage === 'test') renderTestTray(); });
     $('btn-train').addEventListener('click', () => (S.running ? stopTraining('Paused.') : startTraining()));
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
@@ -946,15 +1036,17 @@
       const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
-      Object.assign(S, settings);
+      Object.assign(S, LAB_SETTINGS, settings);
+      applySources();
       S.excluded = new Set();
       S.applyingRecipe = true;
       syncControls();
       resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
       S.applyingRecipe = false;
       $('recipe-select').value = k;
-      if (switchTask) { renderDataTrays(); renderScatter(); renderInspector(); }
+      renderDataTrays(); renderScatter(); renderInspector();
       if (S.stage !== 'train') showStage('train');
+      if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab.`);
     });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));

@@ -184,6 +184,23 @@ ul.prose li + li { margin-top: 4px; }
 .thumb .name { position: absolute; left: 0; right: 0; bottom: -3px; font-size: 9px; text-align: center; color: var(--ink-3); font-family: var(--font-mono); display: none; }
 .tray.named .thumb { margin-bottom: 10px; }
 .tray.named .thumb .name { display: block; bottom: -15px; }
+.thumb .lab { position: absolute; top: -7px; left: -7px; width: 15px; height: 15px; border-radius: 50%; font: 700 9px/15px var(--font-mono); text-align: center; color: #fff; background: var(--ink-3); box-shadow: 0 0 0 2px var(--surface); display: none; }
+.thumb.lab-b.show-lab .lab { display: block; }
+/* the inspector's pair of scans */
+.labs { display: flex; gap: 14px; justify-content: center; }
+.labs .lab { text-align: center; }
+.labs canvas { display: block; width: 96px; height: 96px; border-radius: 6px; border: 3px solid var(--surface-3); margin: 0 auto; }
+.labs .lab.current canvas { border-color: var(--ink); }
+.labs .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-top: 6px; }
+.labs .p { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); margin-top: 2px; min-height: 1.3em; }
+.labs .p.pos { color: var(--irregular); } .labs .p.neg { color: var(--regular); }
+/* scores by test set */
+.lab-scores { margin-top: 10px; display: grid; grid-template-columns: max-content repeat(3, max-content); gap: 3px 16px; font-size: 13px; align-items: baseline; }
+.lab-scores .hd { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.lab-scores .n { font-family: var(--font-mono); text-align: right; }
+.lab-scores .row.current { font-weight: 600; color: var(--ink); }
+.lab-scores .row { color: var(--ink-2); }
+.sources { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 
 /* ---------- controls ---------- */
 .controls { display: grid; gap: 12px 18px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; }

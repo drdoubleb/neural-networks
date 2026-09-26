@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-09-24",
+  "generated": "2026-09-26",
   "seed": 20260922,
   "size": 32,
   "count": 100,
@@ -83,7 +83,11 @@
     "bumps": [],
     "meanIntensity": 0.33,
     "textureAmp": 0.072,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.043
+    }
    }
   },
   {
@@ -126,7 +130,11 @@
     "bumps": [],
     "meanIntensity": 0.32,
     "textureAmp": 0.059,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.44,
+     "textureAmp": 0.035
+    }
    }
   },
   {
@@ -157,7 +165,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.071,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.44,
+     "textureAmp": 0.043
+    }
    }
   },
   {
@@ -188,7 +200,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.084,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.48,
+     "textureAmp": 0.051
+    }
    }
   },
   {
@@ -231,7 +247,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.056,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.034
+    }
    }
   },
   {
@@ -262,7 +282,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.077,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.046
+    }
    }
   },
   {
@@ -293,7 +317,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.057,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.034
+    }
    }
   },
   {
@@ -340,7 +368,11 @@
     "bumps": [],
     "meanIntensity": 0.41,
     "textureAmp": 0.088,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.053
+    }
    }
   },
   {
@@ -376,7 +408,11 @@
     ],
     "meanIntensity": 0.44,
     "textureAmp": 0.078,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.047
+    }
    }
   },
   {
@@ -407,7 +443,11 @@
     "bumps": [],
     "meanIntensity": 0.37,
     "textureAmp": 0.056,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.034
+    }
    }
   },
   {
@@ -438,7 +478,11 @@
     "bumps": [],
     "meanIntensity": 0.33,
     "textureAmp": 0.064,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.038
+    }
    }
   },
   {
@@ -469,7 +513,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.078,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.047
+    }
    }
   },
   {
@@ -500,7 +548,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.047,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -536,7 +588,11 @@
     ],
     "meanIntensity": 0.44,
     "textureAmp": 0.063,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.038
+    }
    }
   },
   {
@@ -572,7 +628,11 @@
     ],
     "meanIntensity": 0.4,
     "textureAmp": 0.046,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -608,7 +668,11 @@
     ],
     "meanIntensity": 0.32,
     "textureAmp": 0.086,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -639,7 +703,11 @@
     "bumps": [],
     "meanIntensity": 0.3,
     "textureAmp": 0.089,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.44,
+     "textureAmp": 0.054
+    }
    }
   },
   {
@@ -682,7 +750,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.09,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.054
+    }
    }
   },
   {
@@ -713,7 +785,11 @@
     "bumps": [],
     "meanIntensity": 0.45,
     "textureAmp": 0.074,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.044
+    }
    }
   },
   {
@@ -744,7 +820,11 @@
     "bumps": [],
     "meanIntensity": 0.45,
     "textureAmp": 0.053,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.032
+    }
    }
   },
   {
@@ -775,7 +855,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.072,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.5,
+     "textureAmp": 0.043
+    }
    }
   },
   {
@@ -818,7 +902,11 @@
     "bumps": [],
     "meanIntensity": 0.4,
     "textureAmp": 0.041,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.024
+    }
    }
   },
   {
@@ -861,7 +949,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.06,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.51,
+     "textureAmp": 0.036
+    }
    }
   },
   {
@@ -892,7 +984,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.054,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.032
+    }
    }
   },
   {
@@ -923,7 +1019,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.047,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.48,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -962,7 +1062,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.052,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.031
+    }
    }
   },
   {
@@ -993,7 +1097,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.071,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.43,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1033,7 +1141,11 @@
     ],
     "meanIntensity": 0.34,
     "textureAmp": 0.043,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.026
+    }
    }
   },
   {
@@ -1064,7 +1176,11 @@
     "bumps": [],
     "meanIntensity": 0.41,
     "textureAmp": 0.059,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.035
+    }
    }
   },
   {
@@ -1095,7 +1211,11 @@
     "bumps": [],
     "meanIntensity": 0.43,
     "textureAmp": 0.052,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.031
+    }
    }
   },
   {
@@ -1142,7 +1262,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.073,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.51,
+     "textureAmp": 0.044
+    }
    }
   },
   {
@@ -1185,7 +1309,11 @@
     "bumps": [],
     "meanIntensity": 0.46,
     "textureAmp": 0.05,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.03
+    }
    }
   },
   {
@@ -1225,7 +1353,11 @@
     ],
     "meanIntensity": 0.36,
     "textureAmp": 0.07,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1256,7 +1388,11 @@
     "bumps": [],
     "meanIntensity": 0.33,
     "textureAmp": 0.08,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.048
+    }
    }
   },
   {
@@ -1292,7 +1428,11 @@
     ],
     "meanIntensity": 0.43,
     "textureAmp": 0.047,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -1323,7 +1463,11 @@
     "bumps": [],
     "meanIntensity": 0.32,
     "textureAmp": 0.062,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.44,
+     "textureAmp": 0.037
+    }
    }
   },
   {
@@ -1362,7 +1506,11 @@
     "bumps": [],
     "meanIntensity": 0.36,
     "textureAmp": 0.071,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1405,7 +1553,11 @@
     "bumps": [],
     "meanIntensity": 0.39,
     "textureAmp": 0.079,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.048
+    }
    }
   },
   {
@@ -1436,7 +1588,11 @@
     "bumps": [],
     "meanIntensity": 0.45,
     "textureAmp": 0.046,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.027
+    }
    }
   },
   {
@@ -1467,7 +1623,11 @@
     "bumps": [],
     "meanIntensity": 0.36,
     "textureAmp": 0.07,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1498,7 +1658,11 @@
     "bumps": [],
     "meanIntensity": 0.41,
     "textureAmp": 0.087,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -1537,7 +1701,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.045,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.027
+    }
    }
   },
   {
@@ -1573,7 +1741,11 @@
     ],
     "meanIntensity": 0.41,
     "textureAmp": 0.069,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.041
+    }
    }
   },
   {
@@ -1604,7 +1776,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.07,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.48,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1651,7 +1827,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.077,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.046
+    }
    }
   },
   {
@@ -1682,7 +1862,11 @@
     "bumps": [],
     "meanIntensity": 0.45,
     "textureAmp": 0.068,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.041
+    }
    }
   },
   {
@@ -1721,7 +1905,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.086,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.051
+    }
    }
   },
   {
@@ -1768,7 +1956,11 @@
     "bumps": [],
     "meanIntensity": 0.41,
     "textureAmp": 0.065,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.039
+    }
    }
   },
   {
@@ -1808,7 +2000,11 @@
     ],
     "meanIntensity": 0.41,
     "textureAmp": 0.055,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.033
+    }
    }
   },
   {
@@ -1839,7 +2035,11 @@
     "bumps": [],
     "meanIntensity": 0.45,
     "textureAmp": 0.071,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.042
+    }
    }
   },
   {
@@ -1870,7 +2070,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.076,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.046
+    }
    }
   },
   {
@@ -1913,7 +2117,11 @@
     "bumps": [],
     "meanIntensity": 0.36,
     "textureAmp": 0.041,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.48,
+     "textureAmp": 0.025
+    }
    }
   },
   {
@@ -1952,7 +2160,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.079,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.047
+    }
    }
   },
   {
@@ -1991,7 +2203,11 @@
     "bumps": [],
     "meanIntensity": 0.39,
     "textureAmp": 0.073,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.044
+    }
    }
   },
   {
@@ -2038,7 +2254,11 @@
     "bumps": [],
     "meanIntensity": 0.4,
     "textureAmp": 0.052,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.031
+    }
    }
   },
   {
@@ -2078,7 +2298,11 @@
     ],
     "meanIntensity": 0.33,
     "textureAmp": 0.084,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.051
+    }
    }
   },
   {
@@ -2109,7 +2333,11 @@
     "bumps": [],
     "meanIntensity": 0.33,
     "textureAmp": 0.059,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.036
+    }
    }
   },
   {
@@ -2156,7 +2384,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.086,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.051
+    }
    }
   },
   {
@@ -2199,7 +2431,11 @@
     "bumps": [],
     "meanIntensity": 0.46,
     "textureAmp": 0.083,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.05
+    }
    }
   },
   {
@@ -2246,7 +2482,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.089,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.053
+    }
    }
   },
   {
@@ -2286,7 +2526,11 @@
     ],
     "meanIntensity": 0.37,
     "textureAmp": 0.08,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.048
+    }
    }
   },
   {
@@ -2325,7 +2569,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.086,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -2368,7 +2616,11 @@
     "bumps": [],
     "meanIntensity": 0.39,
     "textureAmp": 0.046,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -2407,7 +2659,11 @@
     "bumps": [],
     "meanIntensity": 0.33,
     "textureAmp": 0.08,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.048
+    }
    }
   },
   {
@@ -2438,7 +2694,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.077,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.046
+    }
    }
   },
   {
@@ -2469,7 +2729,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.054,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.42,
+     "textureAmp": 0.032
+    }
    }
   },
   {
@@ -2500,7 +2764,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.072,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.043
+    }
    }
   },
   {
@@ -2531,7 +2799,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.05,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.03
+    }
    }
   },
   {
@@ -2570,7 +2842,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.065,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.039
+    }
    }
   },
   {
@@ -2601,7 +2877,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.049,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.029
+    }
    }
   },
   {
@@ -2632,7 +2912,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.086,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.51,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -2668,7 +2952,11 @@
     ],
     "meanIntensity": 0.41,
     "textureAmp": 0.067,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.04
+    }
    }
   },
   {
@@ -2711,7 +2999,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.068,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.041
+    }
    }
   },
   {
@@ -2742,7 +3034,11 @@
     "bumps": [],
     "meanIntensity": 0.37,
     "textureAmp": 0.05,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.5,
+     "textureAmp": 0.03
+    }
    }
   },
   {
@@ -2785,7 +3081,11 @@
     "bumps": [],
     "meanIntensity": 0.46,
     "textureAmp": 0.046,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.028
+    }
    }
   },
   {
@@ -2816,7 +3116,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.084,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.5,
+     "textureAmp": 0.05
+    }
    }
   },
   {
@@ -2847,7 +3151,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.043,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.026
+    }
    }
   },
   {
@@ -2878,7 +3186,11 @@
     "bumps": [],
     "meanIntensity": 0.32,
     "textureAmp": 0.044,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.026
+    }
    }
   },
   {
@@ -2909,7 +3221,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.043,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.026
+    }
    }
   },
   {
@@ -2940,7 +3256,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.076,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.045
+    }
    }
   },
   {
@@ -2976,7 +3296,11 @@
     ],
     "meanIntensity": 0.38,
     "textureAmp": 0.045,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.5,
+     "textureAmp": 0.027
+    }
    }
   },
   {
@@ -3015,7 +3339,11 @@
     "bumps": [],
     "meanIntensity": 0.46,
     "textureAmp": 0.06,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.036
+    }
    }
   },
   {
@@ -3046,7 +3374,11 @@
     "bumps": [],
     "meanIntensity": 0.4,
     "textureAmp": 0.058,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.035
+    }
    }
   },
   {
@@ -3089,7 +3421,11 @@
     "bumps": [],
     "meanIntensity": 0.4,
     "textureAmp": 0.083,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.05
+    }
    }
   },
   {
@@ -3128,7 +3464,11 @@
     "bumps": [],
     "meanIntensity": 0.35,
     "textureAmp": 0.045,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.48,
+     "textureAmp": 0.027
+    }
    }
   },
   {
@@ -3159,7 +3499,11 @@
     "bumps": [],
     "meanIntensity": 0.39,
     "textureAmp": 0.068,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.52,
+     "textureAmp": 0.041
+    }
    }
   },
   {
@@ -3190,7 +3534,11 @@
     "bumps": [],
     "meanIntensity": 0.36,
     "textureAmp": 0.077,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.046
+    }
    }
   },
   {
@@ -3221,7 +3569,11 @@
     "bumps": [],
     "meanIntensity": 0.38,
     "textureAmp": 0.087,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.51,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -3252,7 +3604,11 @@
     "bumps": [],
     "meanIntensity": 0.34,
     "textureAmp": 0.073,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.044
+    }
    }
   },
   {
@@ -3291,7 +3647,11 @@
     "bumps": [],
     "meanIntensity": 0.4,
     "textureAmp": 0.078,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.047
+    }
    }
   },
   {
@@ -3322,7 +3682,11 @@
     "bumps": [],
     "meanIntensity": 0.37,
     "textureAmp": 0.068,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.041
+    }
    }
   },
   {
@@ -3353,7 +3717,11 @@
     "bumps": [],
     "meanIntensity": 0.41,
     "textureAmp": 0.045,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.55,
+     "textureAmp": 0.027
+    }
    }
   },
   {
@@ -3384,7 +3752,11 @@
     "bumps": [],
     "meanIntensity": 0.42,
     "textureAmp": 0.061,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.53,
+     "textureAmp": 0.037
+    }
    }
   },
   {
@@ -3423,7 +3795,11 @@
     "bumps": [],
     "meanIntensity": 0.36,
     "textureAmp": 0.087,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.47,
+     "textureAmp": 0.052
+    }
    }
   },
   {
@@ -3466,7 +3842,11 @@
     "bumps": [],
     "meanIntensity": 0.44,
     "textureAmp": 0.082,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.049
+    }
    }
   },
   {
@@ -3509,7 +3889,11 @@
     "bumps": [],
     "meanIntensity": 0.43,
     "textureAmp": 0.082,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.54,
+     "textureAmp": 0.049
+    }
    }
   },
   {
@@ -3552,7 +3936,11 @@
     "bumps": [],
     "meanIntensity": 0.3,
     "textureAmp": 0.042,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.43,
+     "textureAmp": 0.025
+    }
    }
   },
   {
@@ -3588,7 +3976,11 @@
     ],
     "meanIntensity": 0.36,
     "textureAmp": 0.081,
-    "nucleolus": true
+    "nucleolus": true,
+    "otherLab": {
+     "meanIntensity": 0.5,
+     "textureAmp": 0.049
+    }
    }
   },
   {
@@ -3619,7 +4011,11 @@
     "bumps": [],
     "meanIntensity": 0.37,
     "textureAmp": 0.06,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.49,
+     "textureAmp": 0.036
+    }
    }
   },
   {
@@ -3650,7 +4046,11 @@
     "bumps": [],
     "meanIntensity": 0.31,
     "textureAmp": 0.061,
-    "nucleolus": false
+    "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.037
+    }
    }
   }
  ]

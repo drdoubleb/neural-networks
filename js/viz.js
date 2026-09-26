@@ -735,7 +735,7 @@ window.Viz = (function () {
     const frame = x => { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, at.y - 0.5, size + 1, size + 1); };
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = fade(0, 0.12);
-    ctx.drawImage(imageToCanvas(m.specimen.px, S, m.tint), xs[0], at.y, size, size); frame(xs[0]); label('this nucleus', xs[0]);
+    ctx.drawImage(imageToCanvas(m.inputPx || m.specimen.px, S, m.tint), xs[0], at.y, size, size); frame(xs[0]); label(m.inputPx ? 'normalised' : 'this nucleus', xs[0]);
     ctx.globalAlpha = fade(0.2, 0.36);
     glyph('−', xs[0] + size + gap / 2);
     ctx.drawImage(imageToCanvas(pxMean, S, m.tint), xs[1], at.y, size, size); frame(xs[1]); label('mean nucleus', xs[1]);

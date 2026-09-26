@@ -44,7 +44,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
    Click a case to inspect it: for a blood count a mock report with reference ranges and H/L flags, for a nucleus the
    image, its six morphometric measurements and an overlay showing exactly where each comes from. A scatter plot shows
-   how separable any two parameters are.
+   how separable any two parameters are. For the nucleus questions, a *Where the cases come from* card says which lab's
+   scans each set uses (see *Another lab, and the shortcut* below).
 2. **Train.** Choose the input (the measurements or blood count, or all 1,024 raw pixels), tick which inputs the network
    may use (withhold blasts and watch it lean on cytopenias), an optional convolutional layer (4 or 8 filters of 5 × 5,
    ReLU, 4 × 4 max-pooling), zero to two dense hidden layers with a ReLU / sigmoid / tanh activation, and the learning
@@ -96,7 +97,9 @@ style). The network never sees it; the page uses it to show which hidden units r
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting.
 3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
    the frozen weights, each connection wiping with the product it carries while a strip names what is happening, then the call at the threshold,
-   then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. For a convolutional network, *Classify next* walks through the
+   then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. A *Test cases from* switch swaps the
+   held-out nuclei for the other lab's scans of the same nuclei (or a mix of both labs), and a table keeps the scores of
+   every test set run since the weights last changed. For a convolutional network, *Classify next* walks through the
    convolution in about 45 seconds: the mean training nucleus is subtracted first (the three tiles stay up), filter 1
    alone scans the difference image slowly with the arithmetic of each position shown, the remaining filters sweep
    together at a quicker pace, then feature map 1 is pooled block by block (each 4 × 4 block shown with its largest value
@@ -113,9 +116,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 The **inspector** on the right follows the selected nucleus through all three stages. Its *Evidence* view shows what the
 network is weighing: on pixels, a per-pixel overlay (orange pushes toward the positive class, blue away from it), computed
 by back-propagating the score to the input, so it works through hidden layers and the convolution too; on measurements, a
-*push* bar per measurement.
+*push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
+call for each scan.
 
-## The lecture arc: the eight recipe buttons
+## The lecture arc: the nine recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js`.
 
@@ -129,10 +133,57 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑥ Irregularity · pixels · 4 ReLU + augmentation | 4,105 | ~77% | Hidden units as learned feature detectors; flips and rotations turn 80 images into 640 views (roughly worth 8× more real data). |
 | ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
 | ⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
+| ⑨ Irregularity · convolution · the shortcut | 897 | 100% on a test set with the same flaw, ~58% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour, looks perfect on a test set split the same way, and fails on our lab's scans. See *Another lab, and the shortcut*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑥ (four: 79%), 87% on ⑦
 (four: 81%) and 94% on ⑧ (four: 93%).
+
+## Another lab, and the shortcut
+
+Every nucleus comes as two scans: ours, and the same nucleus as scanned at **another lab whose stain is weaker** (a paler
+nucleus, less chromatin and membrane contrast, a touch paler background; the same shape, the same chromatin pattern, the
+same optics). The *Where the cases come from* card in the Specimens stage says which scans each set uses: our lab, the
+other lab, both labs mixed at random (half of each class from each lab), or both labs split by class (the positives from
+the other lab, the negatives from ours). The Test stage repeats the test-set choice next to the threshold and keeps a
+table of the scores of every test set run since the weights last changed; the inspector shows the selected nucleus as
+scanned at both labs with the network's call for each; a checkbox marks the cases scanned at the other lab with a **B**.
+Two teaching points come out of this:
+
+- **Lab differences.** Train any image recipe at our lab, then switch the test cases to the other lab and classify
+  again. The dense pixel networks collapse to chance: they learned templates of absolute ink, and a paler nucleus turns
+  the difference image blue across its whole interior (the inspector's pair of scans shows the call flipping on the same
+  nucleus). The measurements recipe loses twenty points because darkness and texture are read off the raw scan. The
+  convolution barely drops, because its filters read edges. The remedy is **stain normalisation** (Advanced settings):
+  *per lab*, each lab's typical background and nucleus levels, measured from its scans without any label, are matched to
+  ours, the toy version of matching a slide's colour statistics to a reference slide; *per image*, each scan is rescaled
+  by its own levels, which also throws away hyperchromasia as a feature. Normalised, every pixel recipe scores as well at
+  the other lab as at home. The walk-throughs then show the normalised scan in the preprocessing row.
+- **Shortcut learning (recipe ⑨).** The convolutional network of ⑧, trained on a set where every irregular nucleus was
+  scanned at the other lab and every regular one at ours. Training accuracy hits 100% and so does the test set when it
+  carries the same split, because the stain is a perfect shortcut to the label and easier to learn than the contour: the
+  *Evidence* overlay shows the network weighing the interior of the nucleus rather than its outline. Switch the test cases
+  to our lab and the sensitivity collapses (the irregular nuclei are well stained, so they are called regular); switch
+  them to the other lab and the specificity collapses. This is the pen-mark and hospital-watermark story of the medical
+  AI literature. Two things defuse it: stain normalisation per lab, and collecting both classes from both labs (training
+  cases from *both labs, mixed at random*).
+
+Test accuracy, mean of three seeds (`node tools/check_training.js`):
+
+| Recipe, trained at our lab | at our lab | at the other lab | normalised per lab: our lab / the other lab |
+|---|---|---|---|
+| ③ Atypia · measurements · single layer | 95% | 75% | the measurements are read off the raw scan |
+| ④ Enlargement · pixels · single layer | 100% | 92% | 100% / 100% |
+| ⑤ Irregularity · pixels · single layer | 60% | 55% | 60% / 57% |
+| ⑥ Irregularity · pixels · 4 ReLU + augmentation | 77% | 50% | 77% / 80% |
+| ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 82% | 52% | 82% / 82% |
+| ⑧ Irregularity · pixels · convolution + 4 ReLU + augmentation | 88% | 85% | 88% / 92% |
+
+| ⑨ The convolution of ⑧, trained on… | test split by class | test at our lab | test at the other lab | test mixed |
+|---|---|---|---|---|
+| irregular from the other lab, regular from ours | 100% | 58% | 57% | 57% |
+| the same, stain normalised per lab | 93% | 90% | 92% | 88% |
+| both labs, mixed at random | 90% | 92% | 90% | 92% |
 
 ## The data
 
@@ -147,14 +198,18 @@ anaemia (microcytosis, reactive thrombocytosis). Counts are log-transformed befo
 `data/atypia/`, `data/enlargement/` and `data/irregularity/`:
 
 - `images/train/*.png`, `images/test/*.png` — 32 × 32 8-bit grayscale PNGs (80 + 20, class in the file name)
-- `nuclei_data.js` — the same pixels, base64-encoded, loaded by the page
+- `images/other-lab/train/*.png`, `images/other-lab/test/*.png` — the same nuclei as scanned at the other lab (weaker stain)
+- `nuclei_data.js` — both scans of every nucleus, base64-encoded, loaded by the page
 - `nuclei.json` — labels, split and the generator parameters of every nucleus
-- `contact_sheet.png` — all 100 at 4×, for slides
+- `contact_sheet.png`, `contact_sheet_other_lab.png` — all 100 at 4×, at each lab, for slides
 
 Each nucleus is a dark ellipse on a pale, noisy background whose radius is modulated by low-order harmonics (lobulation),
 localised clefts or blebs, or higher harmonics (jagged outlines). Chromatin texture, an optional nucleolus, a slightly
 darker membrane and position jitter are added to every nucleus. In the atypia set, 24 of the 50 atypical nuclei carry
-exactly one trait (six enlarged, six hyperchromatic, six irregular, six coarse) and 26 carry two to four.
+exactly one trait (six enlarged, six hyperchromatic, six irregular, six coarse) and 26 carry two to four. The other lab's
+scan of a nucleus keeps its shape and its chromatin pattern and renders it with a weaker stain: the nucleus about 0.13
+paler, chromatin clumps and the membrane rim at 60% contrast, the nucleolus fainter, the background a touch paler, with
+its own pixel grain; our lab's images are unchanged by it.
 
 The six measurements are computed from the pixels in the browser (`js/features.js`): Otsu threshold → largest component
 → sub-pixel contour by marching squares. *Area*, *elongation* (second moments), *darkness* and *texture* (mean and spread
@@ -168,11 +223,11 @@ index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons (browser + Node)
-js/dataset.js              decoding, blood-count fingerprints, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
+js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts
 js/app.js                  state, task switch, training loop, the three stages, the inspector, unit heatmap, prevalence
 tools/generate_cbc.js      make the blood-count dataset
-tools/generate_nuclei.js   make both nucleus datasets
+tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs
 tools/check_training.js    gradient check + the eight recipes in Node
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```

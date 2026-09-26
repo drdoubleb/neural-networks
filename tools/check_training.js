@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /*
- * check_training.js — trains the demo's eight lecture recipes in Node and prints their accuracies,
- * so you can verify the datasets are learnable without a browser.  node tools/check_training.js [--seeds 5]
+ * check_training.js — trains the demo's nine lecture recipes in Node and prints their accuracies, then measures what
+ * the other lab's scans (weaker stain) do to each image recipe, with and without stain normalisation, and what the
+ * shortcut trap (positives from the other lab) does. Run:  node tools/check_training.js [--seeds 5]
  */
 'use strict';
 const fs = require('fs');
@@ -40,10 +41,15 @@ const RECIPES = [
   { n: '⑥', label: 'Irregularity · pixels · 4 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
   { n: '⑦', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
   { n: '⑧', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
+  { n: '⑨', label: 'Irregularity · conv · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' },
 ];
-function run(r, seed) {
-  const ds = tasks[r.task].ds;
-  const inp = DS.buildInputs(ds, r.mode, { augment: r.augment });
+// trains a recipe (its training cases from opts.trainLab, stain normalisation opts.normalize) and scores the test set
+// as scanned under each of opts.testLabs, refitting nothing: the standardizer only ever sees the training rows
+function run(r, seed, opts = {}) {
+  const ds = tasks[r.task].ds, trainLab = opts.trainLab || r.trainLab || 'ours', normalize = opts.normalize || 'off';
+  const testLabs = opts.testLabs || [r.testLab || 'ours'];
+  DS.assignLabs(ds, trainLab, trainLab);
+  const inp = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize });
   const net = new Net({ inputSize: inp.inputSize, imageSize: ds.size, conv: r.conv, hidden: r.hidden, activation: 'relu', seed });
   const rnd = mulberry32(seed); const idx = inp.trainX.map((_, i) => i); const batch = 8;
   const t0 = Date.now();
@@ -51,15 +57,37 @@ function run(r, seed) {
     for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     for (let s = 0; s < idx.length; s += batch) { const b = idx.slice(s, s + batch); net.trainBatch(b.map(i => inp.trainX[i]), b.map(i => inp.trainY[i]), r.lr, r.l2); }
   }
-  return {
-    train: net.evaluate(ds.train.map(s => inp.xOf(s)), ds.train.map(s => s.label)).accuracy,
-    test: net.evaluate(ds.test.map(s => inp.xOf(s)), ds.test.map(s => s.label)).accuracy,
-    params: net.parameterCount(), ms: (Date.now() - t0) / r.epochs,
-  };
+  const ms = (Date.now() - t0) / r.epochs;
+  const train = net.evaluate(ds.train.map(s => inp.xOf(s)), ds.train.map(s => s.label)).accuracy;
+  const tests = {};
+  for (const mode of testLabs) { DS.assignLabs(ds, trainLab, mode); const ti = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize }); tests[mode] = net.evaluate(ds.test.map(s => ti.xOf(s)), ds.test.map(s => s.label)).accuracy; }
+  DS.assignLabs(ds, 'ours', 'ours');
+  return { train, test: tests[testLabs[0]], tests, params: net.parameterCount(), ms };
 }
+const pc = v => String(Math.round(v * 100)).padStart(3) + '%';
+const mean = (rs, f) => rs.reduce((a, x) => a + f(x), 0) / rs.length;
 console.log(`\nLecture recipes (batch 8, ReLU, mean of ${nSeeds} seeds):`);
 for (const r of RECIPES) {
   const rs = Array.from({ length: nSeeds }, (_, i) => run(r, i + 1));
-  const m = k => Math.round(rs.reduce((a, x) => a + x[k], 0) / rs.length * 100);
-  console.log(`  ${r.n} ${r.label.padEnd(62)} params ${String(rs[0].params).padStart(6)}   train ${String(m('train')).padStart(3)}%   test ${String(m('test')).padStart(3)}% (${rs.map(x => Math.round(x.test * 100)).join('/')})   ${rs[0].ms.toFixed(0)} ms/epoch`);
+  console.log(`  ${r.n} ${r.label.padEnd(66)} params ${String(rs[0].params).padStart(6)}   train ${pc(mean(rs, x => x.train))}   test ${pc(mean(rs, x => x.test))} (${rs.map(x => Math.round(x.test * 100)).join('/')})   ${rs[0].ms.toFixed(0)} ms/epoch`);
 }
+
+// the other lab: every image recipe trained at our lab, scored on the test nuclei as scanned at our lab and at the
+// other lab; then retrained with the pixels stain-normalised (per lab: each lab's typical levels matched to ours;
+// per image: each scan by its own levels), which only applies to pixel inputs
+console.log(`\nThe other lab (weaker stain): test accuracy at our lab · at the other lab, mean of ${nSeeds} seeds`);
+for (const r of RECIPES.filter(x => x.task !== 'leukaemia' && !x.trainLab)) {
+  const cell = normalize => { const rs = Array.from({ length: nSeeds }, (_, i) => run(r, i + 1, { normalize, testLabs: ['ours', 'other'] })); return `${pc(mean(rs, x => x.tests.ours))} · ${pc(mean(rs, x => x.tests.other))}`; };
+  const parts = [`as is ${cell('off')}`];
+  if (r.mode === 'pixels') parts.push(`normalised per lab ${cell('lab')}`, `per image ${cell('image')}`);
+  else parts.push('(the measurements are taken from the raw scan: no normalisation)');
+  console.log(`  ${r.n} ${r.label.padEnd(66)} ${parts.join('   ')}`);
+}
+
+// the shortcut: recipe ⑨'s network trained with the irregular nuclei from the other lab and the regular ones from ours
+const trap = RECIPES.find(x => x.n === '⑨');
+console.log(`\nThe shortcut (${trap.label}), mean of ${nSeeds} seeds: test accuracy by where the test nuclei come from`);
+const labsRow = (opts, tag) => { const rs = Array.from({ length: nSeeds }, (_, i) => run(trap, i + 1, opts)); console.log(`  ${tag.padEnd(52)} ${opts.testLabs.map(t => `${t.padEnd(7)} ${pc(mean(rs, x => x.tests[t]))}`).join('   ')}`); };
+labsRow({ trainLab: 'byClass', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class');
+labsRow({ trainLab: 'byClass', normalize: 'lab', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class, normalised per lab');
+labsRow({ trainLab: 'mixed', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained on both labs mixed at random');
