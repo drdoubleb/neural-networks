@@ -1,6 +1,6 @@
 {
  "meta": {
-  "generated": "2026-09-24",
+  "generated": "2026-09-26",
   "seed": 20260924,
   "size": 32,
   "count": 100,
@@ -94,6 +94,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.052,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.031
+    },
     "traits": []
    }
   },
@@ -126,6 +130,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.064,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.039
+    },
     "traits": []
    }
   },
@@ -158,6 +166,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.046,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.028
+    },
     "traits": []
    }
   },
@@ -190,6 +202,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.064,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.038
+    },
     "traits": []
    }
   },
@@ -222,6 +238,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.055,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.033
+    },
     "traits": []
    }
   },
@@ -254,6 +274,10 @@
     "meanIntensity": 0.44,
     "textureAmp": 0.043,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.026
+    },
     "traits": []
    }
   },
@@ -286,6 +310,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.025
+    },
     "traits": [
      "enlarged"
     ]
@@ -320,6 +348,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.048,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.029
+    },
     "traits": []
    }
   },
@@ -352,6 +384,10 @@
     "meanIntensity": 0.44,
     "textureAmp": 0.054,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.032
+    },
     "traits": []
    }
   },
@@ -396,6 +432,10 @@
     "meanIntensity": 0.28,
     "textureAmp": 0.062,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.41,
+     "textureAmp": 0.037
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -432,6 +472,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.225,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.135
+    },
     "traits": [
      "coarse"
     ]
@@ -466,6 +510,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.063,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.038
+    },
     "traits": []
    }
   },
@@ -498,6 +546,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.025
+    },
     "traits": []
    }
   },
@@ -530,6 +582,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.061,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.037
+    },
     "traits": []
    }
   },
@@ -562,6 +618,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.064,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.039
+    },
     "traits": []
    }
   },
@@ -594,6 +654,10 @@
     "meanIntensity": 0.31,
     "textureAmp": 0.051,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.44,
+     "textureAmp": 0.031
+    },
     "traits": [
      "enlarged",
      "dark"
@@ -629,6 +693,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.054,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.032
+    },
     "traits": []
    }
   },
@@ -669,6 +737,10 @@
     "meanIntensity": 0.31,
     "textureAmp": 0.064,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.038
+    },
     "traits": [
      "dark",
      "irregular"
@@ -713,6 +785,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.06,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.036
+    },
     "traits": [
      "irregular"
     ]
@@ -747,6 +823,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.061,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.037
+    },
     "traits": [
      "enlarged"
     ]
@@ -781,6 +861,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.062,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.037
+    },
     "traits": []
    }
   },
@@ -813,6 +897,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.059,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.035
+    },
     "traits": [
      "enlarged"
     ]
@@ -847,6 +935,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.061,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.037
+    },
     "traits": [
      "enlarged"
     ]
@@ -893,6 +985,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.065,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.039
+    },
     "traits": [
      "irregular"
     ]
@@ -927,6 +1023,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.024
+    },
     "traits": []
    }
   },
@@ -968,6 +1068,10 @@
     "meanIntensity": 0.23,
     "textureAmp": 0.236,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.35,
+     "textureAmp": 0.141
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -1005,6 +1109,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.208,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.125
+    },
     "traits": [
      "enlarged",
      "coarse"
@@ -1040,6 +1148,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.051,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.03
+    },
     "traits": []
    }
   },
@@ -1072,6 +1184,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.051,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.031
+    },
     "traits": []
    }
   },
@@ -1104,6 +1220,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.055,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.033
+    },
     "traits": []
    }
   },
@@ -1136,6 +1256,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.056,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.034
+    },
     "traits": [
      "enlarged"
     ]
@@ -1170,6 +1294,10 @@
     "meanIntensity": 0.26,
     "textureAmp": 0.055,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.39,
+     "textureAmp": 0.033
+    },
     "traits": [
      "dark"
     ]
@@ -1204,6 +1332,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.189,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.65,
+     "textureAmp": 0.113
+    },
     "traits": [
      "coarse"
     ]
@@ -1238,6 +1370,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.046,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.028
+    },
     "traits": []
    }
   },
@@ -1278,6 +1414,10 @@
     "meanIntensity": 0.3,
     "textureAmp": 0.183,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.42,
+     "textureAmp": 0.11
+    },
     "traits": [
      "dark",
      "irregular",
@@ -1314,6 +1454,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.055,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.64,
+     "textureAmp": 0.033
+    },
     "traits": []
    }
   },
@@ -1358,6 +1502,10 @@
     "meanIntensity": 0.31,
     "textureAmp": 0.047,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.46,
+     "textureAmp": 0.028
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -1394,6 +1542,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.049,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.029
+    },
     "traits": []
    }
   },
@@ -1438,6 +1590,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.049,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.029
+    },
     "traits": [
      "enlarged",
      "irregular"
@@ -1485,6 +1641,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.049,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.029
+    },
     "traits": [
      "enlarged",
      "irregular"
@@ -1520,6 +1680,10 @@
     "meanIntensity": 0.29,
     "textureAmp": 0.053,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.43,
+     "textureAmp": 0.032
+    },
     "traits": [
      "dark"
     ]
@@ -1554,6 +1718,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.199,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.12
+    },
     "traits": [
      "coarse"
     ]
@@ -1600,6 +1768,10 @@
     "meanIntensity": 0.27,
     "textureAmp": 0.21,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.41,
+     "textureAmp": 0.126
+    },
     "traits": [
      "dark",
      "irregular",
@@ -1636,6 +1808,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.04,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.024
+    },
     "traits": []
    }
   },
@@ -1668,6 +1844,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.056,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.034
+    },
     "traits": []
    }
   },
@@ -1700,6 +1880,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.049,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.029
+    },
     "traits": []
    }
   },
@@ -1737,6 +1921,10 @@
     "meanIntensity": 0.27,
     "textureAmp": 0.207,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.39,
+     "textureAmp": 0.124
+    },
     "traits": [
      "dark",
      "irregular",
@@ -1782,6 +1970,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.057,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.034
+    },
     "traits": [
      "irregular"
     ]
@@ -1825,6 +2017,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.239,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.144
+    },
     "traits": [
      "irregular",
      "coarse"
@@ -1860,6 +2056,10 @@
     "meanIntensity": 0.28,
     "textureAmp": 0.217,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.41,
+     "textureAmp": 0.13
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -1905,6 +2105,10 @@
     "meanIntensity": 0.25,
     "textureAmp": 0.215,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.37,
+     "textureAmp": 0.129
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -1942,6 +2146,10 @@
     "meanIntensity": 0.3,
     "textureAmp": 0.046,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.43,
+     "textureAmp": 0.027
+    },
     "traits": [
      "enlarged",
      "dark"
@@ -1977,6 +2185,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.204,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.123
+    },
     "traits": [
      "enlarged",
      "coarse"
@@ -2012,6 +2224,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.062,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.037
+    },
     "traits": []
    }
   },
@@ -2044,6 +2260,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.224,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.134
+    },
     "traits": [
      "coarse"
     ]
@@ -2078,6 +2298,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.047,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.028
+    },
     "traits": []
    }
   },
@@ -2119,6 +2343,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.063,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.038
+    },
     "traits": [
      "irregular"
     ]
@@ -2153,6 +2381,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.059,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.036
+    },
     "traits": []
    }
   },
@@ -2185,6 +2417,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.055,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.033
+    },
     "traits": []
    }
   },
@@ -2217,6 +2453,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.025
+    },
     "traits": []
    }
   },
@@ -2249,6 +2489,10 @@
     "meanIntensity": 0.24,
     "textureAmp": 0.047,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.36,
+     "textureAmp": 0.028
+    },
     "traits": [
      "dark"
     ]
@@ -2283,6 +2527,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.181,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.109
+    },
     "traits": [
      "coarse"
     ]
@@ -2329,6 +2577,10 @@
     "meanIntensity": 0.32,
     "textureAmp": 0.181,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.45,
+     "textureAmp": 0.108
+    },
     "traits": [
      "dark",
      "irregular",
@@ -2365,6 +2617,10 @@
     "meanIntensity": 0.28,
     "textureAmp": 0.054,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.39,
+     "textureAmp": 0.032
+    },
     "traits": [
      "dark"
     ]
@@ -2399,6 +2655,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.044,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.64,
+     "textureAmp": 0.027
+    },
     "traits": []
    }
   },
@@ -2431,6 +2691,10 @@
     "meanIntensity": 0.44,
     "textureAmp": 0.212,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.56,
+     "textureAmp": 0.127
+    },
     "traits": [
      "enlarged",
      "coarse"
@@ -2466,6 +2730,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.056,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.034
+    },
     "traits": []
    }
   },
@@ -2498,6 +2766,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.065,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.039
+    },
     "traits": []
    }
   },
@@ -2530,6 +2802,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.046,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.028
+    },
     "traits": []
    }
   },
@@ -2574,6 +2850,10 @@
     "meanIntensity": 0.27,
     "textureAmp": 0.056,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.42,
+     "textureAmp": 0.033
+    },
     "traits": [
      "dark",
      "irregular"
@@ -2609,6 +2889,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.049,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.64,
+     "textureAmp": 0.03
+    },
     "traits": []
    }
   },
@@ -2641,6 +2925,10 @@
     "meanIntensity": 0.3,
     "textureAmp": 0.059,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.43,
+     "textureAmp": 0.036
+    },
     "traits": [
      "dark"
     ]
@@ -2675,6 +2963,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.024
+    },
     "traits": []
    }
   },
@@ -2707,6 +2999,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.052,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.031
+    },
     "traits": []
    }
   },
@@ -2739,6 +3035,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.056,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.033
+    },
     "traits": []
    }
   },
@@ -2783,6 +3083,10 @@
     "meanIntensity": 0.5,
     "textureAmp": 0.048,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.029
+    },
     "traits": [
      "irregular"
     ]
@@ -2817,6 +3121,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.04,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.024
+    },
     "traits": []
    }
   },
@@ -2854,6 +3162,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.233,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.14
+    },
     "traits": [
      "enlarged",
      "irregular",
@@ -2890,6 +3202,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.058,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.035
+    },
     "traits": []
    }
   },
@@ -2922,6 +3238,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.063,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.038
+    },
     "traits": []
    }
   },
@@ -2963,6 +3283,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.239,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.143
+    },
     "traits": [
      "enlarged",
      "irregular",
@@ -2999,6 +3323,10 @@
     "meanIntensity": 0.44,
     "textureAmp": 0.052,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.58,
+     "textureAmp": 0.031
+    },
     "traits": []
    }
   },
@@ -3031,6 +3359,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.043,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.026
+    },
     "traits": []
    }
   },
@@ -3063,6 +3395,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.045,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.64,
+     "textureAmp": 0.027
+    },
     "traits": []
    }
   },
@@ -3095,6 +3431,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.051,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.61,
+     "textureAmp": 0.03
+    },
     "traits": []
    }
   },
@@ -3127,6 +3467,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.058,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.57,
+     "textureAmp": 0.035
+    },
     "traits": []
    }
   },
@@ -3159,6 +3503,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.047,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.028
+    },
     "traits": []
    }
   },
@@ -3203,6 +3551,10 @@
     "meanIntensity": 0.27,
     "textureAmp": 0.041,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.41,
+     "textureAmp": 0.024
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -3248,6 +3600,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.236,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.142
+    },
     "traits": [
      "enlarged",
      "irregular",
@@ -3284,6 +3640,10 @@
     "meanIntensity": 0.45,
     "textureAmp": 0.044,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.026
+    },
     "traits": []
    }
   },
@@ -3316,6 +3676,10 @@
     "meanIntensity": 0.47,
     "textureAmp": 0.045,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.59,
+     "textureAmp": 0.027
+    },
     "traits": []
    }
   },
@@ -3348,6 +3712,10 @@
     "meanIntensity": 0.22,
     "textureAmp": 0.211,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.37,
+     "textureAmp": 0.126
+    },
     "traits": [
      "enlarged",
      "dark",
@@ -3384,6 +3752,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.042,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.025
+    },
     "traits": [
      "enlarged"
     ]
@@ -3418,6 +3790,10 @@
     "meanIntensity": 0.46,
     "textureAmp": 0.183,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.11
+    },
     "traits": [
      "coarse"
     ]
@@ -3464,6 +3840,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.043,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.6,
+     "textureAmp": 0.026
+    },
     "traits": [
      "irregular"
     ]
@@ -3498,6 +3878,10 @@
     "meanIntensity": 0.22,
     "textureAmp": 0.224,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.36,
+     "textureAmp": 0.135
+    },
     "traits": [
      "dark",
      "coarse"
@@ -3533,6 +3917,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.063,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.038
+    },
     "traits": []
    }
   },
@@ -3570,6 +3958,10 @@
     "meanIntensity": 0.49,
     "textureAmp": 0.05,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.62,
+     "textureAmp": 0.03
+    },
     "traits": [
      "enlarged",
      "irregular"
@@ -3605,6 +3997,10 @@
     "meanIntensity": 0.48,
     "textureAmp": 0.053,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.63,
+     "textureAmp": 0.032
+    },
     "traits": []
    }
   },
@@ -3637,6 +4033,10 @@
     "meanIntensity": 0.24,
     "textureAmp": 0.062,
     "nucleolus": false,
+    "otherLab": {
+     "meanIntensity": 0.38,
+     "textureAmp": 0.037
+    },
     "traits": [
      "dark"
     ]

@@ -49,6 +49,19 @@
         </details>
       </div>
 
+      <div class="card" id="sources-card">
+        <div class="card-head">
+          <h2>Where the cases come from</h2>
+          <span class="small muted">every nucleus was scanned at two labs · the other lab’s stain is weaker: paler nuclei, less contrast</span>
+        </div>
+        <div class="controls sources">
+          <div class="ctl"><label for="source-train">Training cases from</label><select id="source-train"></select></div>
+          <div class="ctl"><label for="source-test">Test cases from</label><select id="source-test"></select></div>
+          <div class="ctl check"><input type="checkbox" id="show-lab"><label for="show-lab" class="plainlabel">Mark the cases scanned at the other lab (B)</label></div>
+        </div>
+        <p class="prose small" id="sources-text" style="margin-top:10px"></p>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Training set · <span id="train-count-2"></span></h2>
@@ -105,7 +118,7 @@
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
         <details class="advanced" id="advanced">
-          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, inputs</span></summary>
+          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, source lab, stain normalisation, inputs</span></summary>
           <div class="controls">
             <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
             <div class="ctl"><label for="activation">Activation</label>
@@ -120,6 +133,9 @@
             <div class="ctl"><label for="l2">Weight decay <span class="val" id="l2-val">off</span></label><input type="range" id="l2" min="0" max="0.2" step="0.01" value="0"></div>
             <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" class="plainlabel">Augment pixels with flips &amp; rotations (×8)</label></div>
             <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" class="plainlabel">Peek at the test set while training</label></div>
+            <div class="ctl" id="source-train-wrap"><label for="source-train-2">Training cases from</label><select id="source-train-2"></select></div>
+            <div class="ctl" id="normalize-wrap"><label for="normalize">Stain normalisation</label>
+              <select id="normalize"><option value="off">off: the pixels as scanned</option><option value="lab">per lab: each lab’s levels matched to ours</option><option value="image">per image: each scan by its own levels</option></select></div>
             <div class="ctl check" id="tint-wrap"><input type="checkbox" id="tint" checked><label for="tint" class="plainlabel">H&amp;E tint on the images</label></div>
             <div class="ctl wide" id="picker-wrap"><span class="lbl">Inputs the network may use</span><div class="picker" id="input-picker"></div></div>
           </div>
@@ -206,6 +222,7 @@
             <button type="button" class="btn" id="btn-test-reset">Clear</button>
           </div>
           <div class="ctl slim"><label for="threshold">Call <span data-cls="1"></span> when P ≥ <span class="val" id="threshold-val">0.50</span></label><input type="range" id="threshold" min="0.05" max="0.95" step="0.05" value="0.5"></div>
+          <div class="ctl" id="source-test-wrap"><label for="source-test-2">Test cases from</label><select id="source-test-2"></select></div>
           <div class="metrics">
             <div class="metric"><span class="lbl">classified</span><b id="stat-n">0 / 20</b><small id="stat-n-sub">held out</small></div>
             <div class="metric"><span class="lbl">accuracy</span><b id="stat-acc">–</b><small id="stat-acc-sub"></small></div>
@@ -216,6 +233,7 @@
         </div>
         <p class="note" id="test-warning" hidden>The network has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
         <div class="note" id="test-note"></div>
+        <div class="lab-scores" id="lab-scores" hidden></div>
       </div>
 
       <div class="card">
@@ -280,6 +298,14 @@
         <div class="evidence-sum" id="evidence-sum"></div>
       </div>
     </div>
+    <div class="card" id="lab-card" hidden>
+      <h3>The same nucleus at both labs</h3>
+      <div class="labs">
+        <div class="lab" id="lab-a"><canvas width="96" height="96" aria-label="This nucleus as scanned at our lab"></canvas><div class="lbl">our lab</div><div class="p"></div></div>
+        <div class="lab" id="lab-b"><canvas width="96" height="96" aria-label="This nucleus as scanned at the other lab"></canvas><div class="lbl">other lab · weaker stain</div><div class="p"></div></div>
+      </div>
+      <p class="small muted" id="lab-note" style="margin-top:8px"></p>
+    </div>
     <div class="card">
       <h3 id="feat-card-title">Measurements</h3>
       <table class="feat">
@@ -292,7 +318,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukaemia/patients_data.js"></script>
