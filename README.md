@@ -2,7 +2,7 @@
 
 An interactive, single-page teaching tool for an *AI for pathologists* lecture. Residents build a small neural network,
 watch it train with every node and weight on screen, then run it on cases it has never seen. The page starts with a
-clinical-pathology question (a blood count: leukaemia or not?) where the whole network fits on one screen, moves to
+clinical-pathology question (a blood count: leukemia or not?) where the whole network fits on one screen, moves to
 nuclei (first as six hand-made measurements, then as raw pixels), and takes the network from a single layer on raw
 pixels to a convolutional network, with the reasons for each step visible along the way. No installation, no server: open `index.html` in a browser.
 
@@ -30,7 +30,7 @@ The **question** dropdown switches between four datasets, each with its own synt
 
 | Question | Cases | Positive class | What separates the classes | Decoys |
 |---|---|---|---|---|
-| **Leukaemia?** | 200 blood counts (160 / 40) | Leukaemia (acute, CML, CLL) vs No leukaemia (normal, bacterial infection, viral lymphocytosis, iron deficiency) | the pattern across ten CBC parameters | a raised white count on its own, cytopenias on their own |
+| **Leukemia?** | 200 blood counts (160 / 40) | Leukemia (acute, CML, CLL) vs No leukemia (normal, bacterial infection, viral lymphocytosis, iron deficiency) | the pattern across ten CBC parameters | a raised white count on its own, cytopenias on their own |
 | **Atypical nucleus?** | 100 nuclei (80 / 20) | Atypical (enlarged, hyperchromatic, irregular contour or coarse chromatin, alone or combined; six nuclei carry each trait on its own) vs Bland | size, darkness, contour and texture, in any combination | elongation, rotation, nucleolus, position |
 | **Enlarged and hyperchromatic?** | 100 nuclei (80 / 20) | Enlarged (large, dark) vs Bland (small, pale) | size and darkness | contour shape (half of each class is irregular), elongation, rotation, texture, nucleolus, position |
 | **Irregular contour?** | 100 nuclei (80 / 20) | Irregular (lobulated, notched, jagged) vs Regular (smooth ellipse) | the contour only | size, elongation, rotation, darkness, texture, nucleolus, position |
@@ -123,27 +123,26 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the eleven recipe buttons
+## The lecture arc: the ten recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js`.
 
 | Recipe | Parameters | Test accuracy | What it shows |
 |---|---|---|---|
-| ① Leukaemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and haemoglobin, positive on basophils, immature granulocytes, WBC and blasts. |
-| ② Leukaemia · blood count · 3 ReLU units | 37 | ~95% | Hidden units organise themselves: one becomes an acute-leukaemia detector, one a CML detector, one a "looks healthy" detector with a negative weight; CLL is folded into a neighbour. Nobody told the network these types exist. |
+| ① Leukemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and hemoglobin, positive on basophils, immature granulocytes, WBC and blasts. |
+| ② Leukemia · blood count · 3 ReLU units | 37 | ~95% | Hidden units organise themselves: one becomes an acute-leukemia detector, one a CML detector, one a "looks healthy" detector with a negative weight; CLL is folded into a neighbour. Nobody told the network these types exist. |
 | ③ Atypia · measurements · single layer | 7 | ~95% | One approach to images: measure what a pathologist would name (area, darkness, chromatin texture, solidity, contour roughness) and let a single layer weigh the numbers. The checklist reads like a grading scheme: every trait measurement earns a weight, because each trait appears on its own in some nuclei, and elongation, the decoy, stays near zero. |
-| ④ Enlargement · pixels · single layer | 1,025 | 100% | The other approach: raw pixels. A basic network works on pixels when the answer is a whole-image template: the weight map becomes a nucleus-shaped stencil. |
-| ⑤ Irregularity · pixels · single layer | 1,025 | ~60% | Same network, new question: training accuracy hits 100% while the test curve stays at chance. Memorisation. No single template can capture "a bump somewhere on the outline". Switching the input to measurements rescues it (~95%, the weights land on solidity and contour roughness), but someone had to invent those measurements. |
-| ⑥ Irregularity · pixels · 4 ReLU + augmentation | 4,105 | ~77% | Hidden units as learned feature detectors; flips and rotations turn 80 images into 640 views (roughly worth 8× more real data). |
-| ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
-| ⑧ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑦ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
-| ⑨ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
-| ⑩ Irregularity · convolution · the shortcut | 897 | 100% on a test set with the same flaw, ~58% at our lab | The shortcut again with the convolution of ⑨: the state of the art falls for it just the same. |
-| ⑪ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong | 137 | ~97% early, ~83% after 300 epochs | Overfitting in its textbook shape. With 20 of the 80 training labels flipped, the network first learns the rule (the test curve peaks early), then memorises the mislabelled cases: training accuracy climbs past the honest ceiling of 75% while the test curve falls. See *Label noise and overfitting*. |
+| ④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong | 137 | ~97% early, ~83% after 300 epochs | Overfitting in its textbook shape. With 20 of the 80 training labels flipped, the network first learns the rule (the test curve peaks early), then memorises the mislabelled cases: training accuracy climbs past the honest ceiling of 75% while the test curve falls. See *Label noise and overfitting*. |
+| ⑤ Enlargement · pixels · single layer | 1,025 | 100% | The other approach: raw pixels. A basic network works on pixels when the answer is a whole-image template: the weight map becomes a nucleus-shaped stencil. |
+| ⑥ Irregularity · pixels · single layer | 1,025 | ~60% | Same network, new question: training accuracy hits 100% while the test curve stays at chance. Memorisation. No single template can capture "a bump somewhere on the outline". Switching the input to measurements rescues it (~95%, the weights land on solidity and contour roughness), but someone had to invent those measurements. |
+| ⑦ Irregularity · pixels · 4 ReLU + augmentation | 4,105 | ~77% | Hidden units as learned feature detectors; flips and rotations turn 80 images into 640 views (roughly worth 8× more real data). |
+| ⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. |
+| ⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
+| ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
-a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑥ (four: 79%), 87% on ⑦
-(four: 81%) and 94% on ⑨ (four: 93%).
+a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
+(four: 81%) and 94% on ⑩ (four: 93%).
 
 ## Another lab, and the shortcut
 
@@ -165,12 +164,12 @@ Two teaching points come out of this:
   ours, the toy version of matching a slide's colour statistics to a reference slide; *per image*, each scan is rescaled
   by its own levels, which also throws away hyperchromasia as a feature. Normalised, every pixel recipe scores as well at
   the other lab as at home. The walk-throughs then show the normalised scan in the preprocessing row.
-- **Shortcut learning (recipes ⑧ and ⑩).** The 4 + 4 network of ⑦ (recipe ⑧), and the convolution of ⑨ (recipe ⑩),
-  trained on a set where every irregular nucleus was scanned at the other lab and every regular one at ours. Training
-  accuracy hits 100% and so does the test set when it carries the same split, because the stain is a perfect shortcut to
-  the label and easier to learn than the contour: in ⑧ the first-layer weight maps turn into plain interior templates
-  instead of contour detectors, and the *Evidence* overlay shows either network weighing the interior of the nucleus
-  rather than its outline. Switch the test cases
+- **Shortcut learning (recipe ⑨).** The 4 + 4 network of ⑧, trained on a set where every irregular nucleus was scanned
+  at the other lab and every regular one at ours. Training accuracy hits 100% and so does the test set when it carries
+  the same split, because the stain is a perfect shortcut to the label and easier to learn than the contour: the
+  first-layer weight maps turn into plain interior templates instead of contour detectors, and the *Evidence* overlay
+  shows the network weighing the interior of the nucleus rather than its outline (the convolution of ⑩ falls for it just
+  the same; its numbers are in the second table below). Switch the test cases
   to our lab and the sensitivity collapses (the irregular nuclei are well stained, so they are called regular); switch
   them to the other lab and the specificity collapses. This is the pen-mark and hospital-watermark story of the medical
   AI literature. Two things defuse it: stain normalisation per lab, and collecting both classes from both labs (training
@@ -181,19 +180,19 @@ Test accuracy, mean of three seeds (`node tools/check_training.js`):
 | Recipe, trained at our lab | at our lab | at the other lab | normalised per lab: our lab / the other lab |
 |---|---|---|---|
 | ③ Atypia · measurements · single layer | 95% | 75% | the measurements are read off the raw scan |
-| ④ Enlargement · pixels · single layer | 100% | 92% | 100% / 100% |
-| ⑤ Irregularity · pixels · single layer | 60% | 55% | 60% / 57% |
-| ⑥ Irregularity · pixels · 4 ReLU + augmentation | 77% | 50% | 77% / 80% |
-| ⑦ Irregularity · pixels · 4 + 4 ReLU + augmentation | 82% | 52% | 82% / 82% |
-| ⑨ Irregularity · pixels · convolution + 4 ReLU + augmentation | 88% | 85% | 88% / 92% |
+| ⑤ Enlargement · pixels · single layer | 100% | 92% | 100% / 100% |
+| ⑥ Irregularity · pixels · single layer | 60% | 55% | 60% / 57% |
+| ⑦ Irregularity · pixels · 4 ReLU + augmentation | 77% | 50% | 77% / 80% |
+| ⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation | 82% | 52% | 82% / 82% |
+| ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 88% | 85% | 88% / 92% |
 
-| ⑧ The 4 + 4 network of ⑦, trained on… | test split by class | test at our lab | test at the other lab | test mixed |
+| ⑨ The 4 + 4 network of ⑧, trained on… | test split by class | test at our lab | test at the other lab | test mixed |
 |---|---|---|---|---|
 | irregular from the other lab, regular from ours | 97% | 55% | 52% | 52% |
 | the same, stain normalised per lab | 78% | 77% | 82% | 82% |
 | both labs, mixed at random | 68% | 75% | 58% | 73% |
 
-| ⑩ The convolution of ⑨, trained on… | test split by class | test at our lab | test at the other lab | test mixed |
+| The convolution of ⑩, trained the same way (no longer a recipe) | test split by class | test at our lab | test at the other lab | test mixed |
 |---|---|---|---|---|
 | irregular from the other lab, regular from ours | 100% | 58% | 57% | 57% |
 | the same, stain normalised per lab | 93% | 90% | 92% | 88% |
@@ -204,11 +203,11 @@ Test accuracy, mean of three seeds (`node tools/check_training.js`):
 None of the clean recipes overfits in the textbook way: the pixel networks that memorise never generalised in the first
 place, so their test curve never had a peak to fall from, and the measurement and blood-count networks are too small,
 with too clean a signal, to overfit at all. The test *loss* does rise once a pixel network without weight decay trains
-on, from 0.49 at its minimum around epoch 10 to 0.9 by epoch 300 on recipe ⑥, while the test accuracy stays flat: the
+on, from 0.49 at its minimum around epoch 10 to 0.9 by epoch 300 on recipe ⑦, while the test accuracy stays flat: the
 network makes no more errors, it only grows more confident in the errors it makes.
 
 Label noise brings the classic curve out, and it is a pathology-native reason for it: labels are a consensus with
-disagreement in them. Recipe ⑪ trains the atypia measurements with 8 + 8 units and a quarter of the training labels
+disagreement in them. Recipe ④ trains the atypia measurements with 8 + 8 units and a quarter of the training labels
 flipped (a fixed set of 20, so the lecture is reproducible whatever the seed). The network first learns the rule from
 the majority of right labels, so the test accuracy, scored against the true labels, peaks early; then it memorises the
 mislabelled cases one by one, training accuracy climbs past the **honest ceiling** of 75%, and the test curve falls while
@@ -222,12 +221,12 @@ above the 75% ceiling.
 
 ## The data
 
-`tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukaemia/`
+`tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
 (`patients_data.js` for the page, `patients.json` and `patients.csv` for you). Each patient comes from one of seven
-subtypes with plausible teaching distributions, not population data: acute leukaemia (40% of them aleukaemic, with a low
+subtypes with plausible teaching distributions, not population data: acute leukemia (40% of them aleukemic, with a low
 count and few blasts), CML (very high count, basophilia, marked left shift), CLL (lymphocytosis), normal, bacterial
 infection (neutrophilia, left shift, a quarter septic with low platelets), viral lymphocytosis and iron-deficiency
-anaemia (microcytosis, reactive thrombocytosis). Counts are log-transformed before standardization.
+anemia (microcytosis, reactive thrombocytosis). Counts are log-transformed before standardization.
 
 `tools/generate_nuclei.js` (no dependencies) draws the three nucleus datasets from fixed seeds and writes, per task, into
 `data/atypia/`, `data/enlargement/` and `data/irregularity/`:

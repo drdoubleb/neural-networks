@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * check_training.js — trains the demo's eleven lecture recipes in Node and prints their accuracies, then measures what
+ * check_training.js — trains the demo's ten lecture recipes in Node and prints their accuracies, then measures what
  * the other lab's scans (weaker stain) do to each image recipe, with and without stain normalisation, and what the
  * shortcut trap (positives from the other lab) does. Run:  node tools/check_training.js [--seeds 5]
  */
@@ -13,7 +13,7 @@ const DS = require('../js/dataset.js');
 
 const nSeeds = process.argv.includes('--seeds') ? +process.argv[process.argv.indexOf('--seeds') + 1] : 3;
 const window = {};
-for (const f of ['leukaemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
+for (const f of ['leukemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const tasks = {};
 for (const [id, raw] of Object.entries(window.LECTURE_TASKS)) tasks[id] = { raw, ds: DS.prepare(raw) };
 
@@ -33,18 +33,19 @@ for (const [id, t] of Object.entries(tasks)) {
 }
 
 const RECIPES = [
-  { n: '①', label: 'Leukaemia · blood count · single layer',                       task: 'leukaemia',    mode: 'features', hidden: [],     conv: null,               lr: 0.05, epochs: 60,  augment: false, l2: 0 },
-  { n: '②', label: 'Leukaemia · blood count · 3 ReLU units',                       task: 'leukaemia',    mode: 'features', hidden: [3],    conv: null,               lr: 0.05, epochs: 150, augment: false, l2: 0 },
+  { n: '①', label: 'Leukemia · blood count · single layer',                       task: 'leukemia',    mode: 'features', hidden: [],     conv: null,               lr: 0.05, epochs: 60,  augment: false, l2: 0 },
+  { n: '②', label: 'Leukemia · blood count · 3 ReLU units',                       task: 'leukemia',    mode: 'features', hidden: [3],    conv: null,               lr: 0.05, epochs: 150, augment: false, l2: 0 },
   { n: '③', label: 'Atypia · measurements · single layer',                       task: 'atypia',       mode: 'features', hidden: [],     conv: null,               lr: 0.1,  epochs: 60, augment: false, l2: 0 },
-  { n: '④', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
-  { n: '⑤', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
-  { n: '⑥', label: 'Irregularity · pixels · 4 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
-  { n: '⑦', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
-  { n: '⑧', label: 'Irregularity · 4 + 4 ReLU · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4, 4], conv: null, lr: 0.02, epochs: 60, augment: true, l2: 0.01, trainLab: 'byClass', testLab: 'byClass' },
-  { n: '⑨', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
-  { n: '⑩', label: 'Irregularity · conv · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' },
-  { n: '⑪', label: 'Atypia · measurements · 8 + 8 ReLU · 25% of the training labels wrong', task: 'atypia', mode: 'features', hidden: [8, 8], conv: null, lr: 0.1, epochs: 300, augment: false, l2: 0, labelNoise: 0.25 },
+  { n: '④', label: 'Atypia · measurements · 8 + 8 ReLU · 25% of the training labels wrong', task: 'atypia', mode: 'features', hidden: [8, 8], conv: null, lr: 0.1, epochs: 300, augment: false, l2: 0, labelNoise: 0.25 },
+  { n: '⑤', label: 'Enlargement · pixels · single layer',                        task: 'enlargement',  mode: 'pixels',   hidden: [],     conv: null,               lr: 0.02, epochs: 30, augment: false, l2: 0 },
+  { n: '⑥', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
+  { n: '⑦', label: 'Irregularity · pixels · 4 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
+  { n: '⑧', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
+  { n: '⑨', label: 'Irregularity · 4 + 4 ReLU · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4, 4], conv: null, lr: 0.02, epochs: 60, augment: true, l2: 0.01, trainLab: 'byClass', testLab: 'byClass' },
+  { n: '⑩', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
 ];
+// the convolution trained on the shortcut, measured for the README but no longer a recipe
+const CONV_TRAP = { n: '·', label: 'the convolution of ⑩ trained on the shortcut', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' };
 // trains a recipe (its training cases from opts.trainLab, stain normalisation opts.normalize) and scores the test set
 // as scanned under each of opts.testLabs, refitting nothing: the standardizer only ever sees the training rows
 function run(r, seed, opts = {}) {
@@ -79,7 +80,7 @@ for (const r of RECIPES) {
 // other lab; then retrained with the pixels stain-normalised (per lab: each lab's typical levels matched to ours;
 // per image: each scan by its own levels), which only applies to pixel inputs
 console.log(`\nThe other lab (weaker stain): test accuracy at our lab · at the other lab, mean of ${nSeeds} seeds`);
-for (const r of RECIPES.filter(x => x.task !== 'leukaemia' && !x.trainLab && !x.labelNoise)) {
+for (const r of RECIPES.filter(x => x.task !== 'leukemia' && !x.trainLab && !x.labelNoise)) {
   const cell = normalize => { const rs = Array.from({ length: nSeeds }, (_, i) => run(r, i + 1, { normalize, testLabs: ['ours', 'other'] })); return `${pc(mean(rs, x => x.tests.ours))} · ${pc(mean(rs, x => x.tests.other))}`; };
   const parts = [`as is ${cell('off')}`];
   if (r.mode === 'pixels') parts.push(`normalised per lab ${cell('lab')}`, `per image ${cell('image')}`);
@@ -87,8 +88,8 @@ for (const r of RECIPES.filter(x => x.task !== 'leukaemia' && !x.trainLab && !x.
   console.log(`  ${r.n} ${r.label.padEnd(66)} ${parts.join('   ')}`);
 }
 
-// the shortcut: recipes ⑧ and ⑩, a network trained with the irregular nuclei from the other lab and the regular ones from ours
-for (const trap of RECIPES.filter(x => x.trainLab === 'byClass')) {
+// the shortcut: recipe ⑨ (and the convolution), a network trained with the irregular nuclei from the other lab and the regular ones from ours
+for (const trap of [...RECIPES.filter(x => x.trainLab === 'byClass'), CONV_TRAP]) {
   console.log(`\nThe shortcut (${trap.n} ${trap.label}), mean of ${nSeeds} seeds: test accuracy by where the test nuclei come from`);
   const labsRow = (opts, tag) => { const rs = Array.from({ length: nSeeds }, (_, i) => run(trap, i + 1, opts)); console.log(`  ${tag.padEnd(52)} ${opts.testLabs.map(t => `${t.padEnd(7)} ${pc(mean(rs, x => x.tests[t]))}`).join('   ')}`); };
   labsRow({ trainLab: 'byClass', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class');
@@ -96,8 +97,8 @@ for (const trap of RECIPES.filter(x => x.trainLab === 'byClass')) {
   labsRow({ trainLab: 'mixed', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained on both labs mixed at random');
 }
 
-// label noise: recipe ⑪'s test curve, which rises and then falls as the network memorises the mislabelled cases
-const noisy = RECIPES.find(x => x.n === '⑪');
+// label noise: recipe ④'s test curve, which rises and then falls as the network memorises the mislabelled cases
+const noisy = RECIPES.find(x => x.n === '④');
 console.log(`\nLabel noise (${noisy.label}), ${nSeeds} seeds: the test accuracy over training (against the true labels)`);
 {
   const rs = Array.from({ length: nSeeds }, (_, i) => run(noisy, i + 1, { curve: true }));

@@ -1,28 +1,28 @@
 {
  "meta": {
-  "generated": "2026-09-23",
+  "generated": "2026-09-27",
   "seed": 20260923,
   "size": 0,
   "count": 200,
   "train": 160,
   "test": 40,
   "task": {
-   "id": "leukaemia",
+   "id": "leukemia",
    "order": 0,
    "kind": "tabular",
-   "title": "Leukaemia?",
-   "short": "Leukaemia",
+   "title": "Leukemia?",
+   "short": "Leukemia",
    "classes": [
     {
      "key": "no",
-     "name": "No leukaemia"
+     "name": "No leukemia"
     },
     {
-     "key": "leukaemia",
-     "name": "Leukaemia"
+     "key": "leukemia",
+     "name": "Leukemia"
     }
    ],
-   "blurb": "Two hundred synthetic complete blood counts. Half are leukaemias: acute leukaemia (a third of them presenting with a low count), CML and CLL. The other half are the blood counts that fool a simple rule: normal, bacterial infection with neutrophilia and a left shift, viral lymphocytosis, and iron-deficiency anaemia with a reactive thrombocytosis. The network is told only leukaemia yes or no; the subtype is kept so we can see which hidden units respond to which kind of blood.",
+   "blurb": "Two hundred synthetic complete blood counts. Half are leukemias: acute leukemia (a third of them presenting with a low count), CML and CLL. The other half are the blood counts that fool a simple rule: normal, bacterial infection with neutrophilia and a left shift, viral lymphocytosis, and iron-deficiency anemia with a reactive thrombocytosis. The network is told only leukemia yes or no; the subtype is kept so we can see which hidden units respond to which kind of blood.",
    "decoys": "a raised white count on its own, cytopenias on their own",
    "signal": "the pattern across the count and the differential",
    "features": [
@@ -34,7 +34,7 @@
      "high": 11,
      "log": true,
      "decimals": 1,
-     "desc": "White cell count. Raised in infection and in leukaemias with circulating cells; can be low in acute leukaemia."
+     "desc": "White cell count. Raised in infection and in leukemias with circulating cells; can be low in acute leukemia."
     },
     {
      "key": "hb",
@@ -44,7 +44,7 @@
      "high": 16,
      "log": false,
      "decimals": 1,
-     "desc": "Haemoglobin. Falls when the marrow is replaced or iron is short."
+     "desc": "Hemoglobin. Falls when the marrow is replaced or iron is short."
     },
     {
      "key": "plt",
@@ -64,7 +64,7 @@
      "high": 100,
      "log": false,
      "decimals": 0,
-     "desc": "Mean red-cell volume. Low in iron deficiency, mildly high in some acute leukaemias."
+     "desc": "Mean red-cell volume. Low in iron deficiency, mildly high in some acute leukemias."
     },
     {
      "key": "neut",
@@ -124,7 +124,7 @@
      "high": 0,
      "log": false,
      "decimals": 0,
-     "desc": "Blasts on the smear. Any blast is abnormal; high in acute leukaemia with a raised count, few or none when aleukaemic."
+     "desc": "Blasts on the smear. Any blast is abnormal; high in acute leukemia with a raised count, few or none when aleukemic."
     }
    ],
    "subtypes": [
@@ -145,12 +145,12 @@
     },
     {
      "key": "ida",
-     "name": "Iron-deficiency anaemia",
+     "name": "Iron-deficiency anemia",
      "positive": 0
     },
     {
      "key": "acute",
-     "name": "Acute leukaemia",
+     "name": "Acute leukemia",
      "positive": 1
     },
     {
@@ -168,7 +168,7 @@
   },
   "classes": [
    "no",
-   "leukaemia"
+   "leukemia"
   ]
  },
  "patients": [
@@ -177,7 +177,7 @@
    "name": "T001",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     135.53,
@@ -277,7 +277,7 @@
    "name": "T006",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     93.18,
@@ -297,7 +297,7 @@
    "name": "T007",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     389.49,
@@ -337,7 +337,7 @@
    "name": "T009",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.94,
@@ -437,7 +437,7 @@
    "name": "T014",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     60.44,
@@ -517,7 +517,7 @@
    "name": "T018",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     54.42,
@@ -537,7 +537,7 @@
    "name": "T019",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     35.76,
@@ -557,7 +557,7 @@
    "name": "T020",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     36.92,
@@ -577,7 +577,7 @@
    "name": "T021",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     1.85,
@@ -617,7 +617,7 @@
    "name": "T023",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     16.83,
@@ -657,7 +657,7 @@
    "name": "T025",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     20.36,
@@ -757,7 +757,7 @@
    "name": "T030",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     38.93,
@@ -777,7 +777,7 @@
    "name": "T031",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.36,
@@ -837,7 +837,7 @@
    "name": "T034",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     113.9,
@@ -997,7 +997,7 @@
    "name": "T042",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     108.01,
@@ -1077,7 +1077,7 @@
    "name": "T046",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     12.32,
@@ -1097,7 +1097,7 @@
    "name": "T047",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     89.1,
@@ -1197,7 +1197,7 @@
    "name": "T052",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     1.47,
@@ -1217,7 +1217,7 @@
    "name": "T053",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     55.61,
@@ -1237,7 +1237,7 @@
    "name": "T054",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     16.38,
@@ -1257,7 +1257,7 @@
    "name": "T055",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     22.07,
@@ -1277,7 +1277,7 @@
    "name": "T056",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     60.49,
@@ -1297,7 +1297,7 @@
    "name": "T057",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     18.52,
@@ -1317,7 +1317,7 @@
    "name": "T058",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     56.24,
@@ -1477,7 +1477,7 @@
    "name": "T066",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     45.42,
@@ -1497,7 +1497,7 @@
    "name": "T067",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     157.74,
@@ -1557,7 +1557,7 @@
    "name": "T070",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     66.85,
@@ -1577,7 +1577,7 @@
    "name": "T071",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     146.36,
@@ -1617,7 +1617,7 @@
    "name": "T073",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     41.11,
@@ -1657,7 +1657,7 @@
    "name": "T075",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     105.32,
@@ -1677,7 +1677,7 @@
    "name": "T076",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     53.89,
@@ -1697,7 +1697,7 @@
    "name": "T077",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     53.38,
@@ -1737,7 +1737,7 @@
    "name": "T079",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     19.09,
@@ -1837,7 +1837,7 @@
    "name": "T084",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     26.99,
@@ -1937,7 +1937,7 @@
    "name": "T089",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     93.71,
@@ -1997,7 +1997,7 @@
    "name": "T092",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     13.45,
@@ -2037,7 +2037,7 @@
    "name": "T094",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     40.67,
@@ -2097,7 +2097,7 @@
    "name": "T097",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.47,
@@ -2137,7 +2137,7 @@
    "name": "T099",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     173.49,
@@ -2177,7 +2177,7 @@
    "name": "T101",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     4.09,
@@ -2197,7 +2197,7 @@
    "name": "T102",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     18.81,
@@ -2237,7 +2237,7 @@
    "name": "T104",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     42.04,
@@ -2277,7 +2277,7 @@
    "name": "T106",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     69.55,
@@ -2297,7 +2297,7 @@
    "name": "T107",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     11.94,
@@ -2357,7 +2357,7 @@
    "name": "T110",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     33.28,
@@ -2437,7 +2437,7 @@
    "name": "T114",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     53.45,
@@ -2457,7 +2457,7 @@
    "name": "T115",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     81.83,
@@ -2477,7 +2477,7 @@
    "name": "T116",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     96.18,
@@ -2517,7 +2517,7 @@
    "name": "T118",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     14.91,
@@ -2597,7 +2597,7 @@
    "name": "T122",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     123.15,
@@ -2617,7 +2617,7 @@
    "name": "T123",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     24.87,
@@ -2637,7 +2637,7 @@
    "name": "T124",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     27.14,
@@ -2677,7 +2677,7 @@
    "name": "T126",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     29.77,
@@ -2717,7 +2717,7 @@
    "name": "T128",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     32.09,
@@ -2737,7 +2737,7 @@
    "name": "T129",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     15.53,
@@ -2777,7 +2777,7 @@
    "name": "T131",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     6.49,
@@ -2797,7 +2797,7 @@
    "name": "T132",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     3.35,
@@ -2837,7 +2837,7 @@
    "name": "T134",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     1.7,
@@ -2877,7 +2877,7 @@
    "name": "T136",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     118.86,
@@ -2897,7 +2897,7 @@
    "name": "T137",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     14.04,
@@ -2937,7 +2937,7 @@
    "name": "T139",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     84,
@@ -3017,7 +3017,7 @@
    "name": "T143",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     1.31,
@@ -3037,7 +3037,7 @@
    "name": "T144",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     37.97,
@@ -3117,7 +3117,7 @@
    "name": "T148",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     114.48,
@@ -3137,7 +3137,7 @@
    "name": "T149",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     23.11,
@@ -3237,7 +3237,7 @@
    "name": "T154",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     39.21,
@@ -3257,7 +3257,7 @@
    "name": "T155",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     27.43,
@@ -3277,7 +3277,7 @@
    "name": "T156",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     111.27,
@@ -3297,7 +3297,7 @@
    "name": "T157",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     13.8,
@@ -3317,7 +3317,7 @@
    "name": "T158",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.5,
@@ -3337,7 +3337,7 @@
    "name": "T159",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     25.22,
@@ -3357,7 +3357,7 @@
    "name": "T160",
    "split": "train",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     180.15,
@@ -3417,7 +3417,7 @@
    "name": "X03",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     3.3,
@@ -3437,7 +3437,7 @@
    "name": "X04",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     53.13,
@@ -3457,7 +3457,7 @@
    "name": "X05",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     75.8,
@@ -3497,7 +3497,7 @@
    "name": "X07",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     11.82,
@@ -3557,7 +3557,7 @@
    "name": "X10",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     141.17,
@@ -3597,7 +3597,7 @@
    "name": "X12",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     329.86,
@@ -3677,7 +3677,7 @@
    "name": "X16",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     20.13,
@@ -3717,7 +3717,7 @@
    "name": "X18",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     36.51,
@@ -3737,7 +3737,7 @@
    "name": "X19",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     80,
@@ -3777,7 +3777,7 @@
    "name": "X21",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     115.73,
@@ -3797,7 +3797,7 @@
    "name": "X22",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     21.47,
@@ -3837,7 +3837,7 @@
    "name": "X24",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     72.42,
@@ -3857,7 +3857,7 @@
    "name": "X25",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     57.09,
@@ -3897,7 +3897,7 @@
    "name": "X27",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     39.26,
@@ -3917,7 +3917,7 @@
    "name": "X28",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.54,
@@ -3937,7 +3937,7 @@
    "name": "X29",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cml",
    "values": [
     78.49,
@@ -3957,7 +3957,7 @@
    "name": "X30",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     2.61,
@@ -3997,7 +3997,7 @@
    "name": "X32",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     24.3,
@@ -4017,7 +4017,7 @@
    "name": "X33",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     51.2,
@@ -4037,7 +4037,7 @@
    "name": "X34",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     16.97,
@@ -4097,7 +4097,7 @@
    "name": "X37",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "acute",
    "values": [
     1.26,
@@ -4157,7 +4157,7 @@
    "name": "X40",
    "split": "test",
    "label": 1,
-   "className": "leukaemia",
+   "className": "leukemia",
    "subtype": "cll",
    "values": [
     26.66,
