@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * check_training.js — trains the demo's nine lecture recipes in Node and prints their accuracies, then measures what
+ * check_training.js — trains the demo's eleven lecture recipes in Node and prints their accuracies, then measures what
  * the other lab's scans (weaker stain) do to each image recipe, with and without stain normalisation, and what the
  * shortcut trap (positives from the other lab) does. Run:  node tools/check_training.js [--seeds 5]
  */
@@ -40,9 +40,10 @@ const RECIPES = [
   { n: '⑤', label: 'Irregularity · pixels · single layer',                       task: 'irregularity', mode: 'pixels',   hidden: [],     conv: null,               lr: 0.01, epochs: 60, augment: false, l2: 0 },
   { n: '⑥', label: 'Irregularity · pixels · 4 ReLU + augmentation',              task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
   { n: '⑦', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
-  { n: '⑧', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
-  { n: '⑨', label: 'Irregularity · conv · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' },
-  { n: '⑩', label: 'Atypia · measurements · 8 + 8 ReLU · 25% of the training labels wrong', task: 'atypia', mode: 'features', hidden: [8, 8], conv: null, lr: 0.1, epochs: 300, augment: false, l2: 0, labelNoise: 0.25 },
+  { n: '⑧', label: 'Irregularity · 4 + 4 ReLU · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4, 4], conv: null, lr: 0.02, epochs: 60, augment: true, l2: 0.01, trainLab: 'byClass', testLab: 'byClass' },
+  { n: '⑨', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
+  { n: '⑩', label: 'Irregularity · conv · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' },
+  { n: '⑪', label: 'Atypia · measurements · 8 + 8 ReLU · 25% of the training labels wrong', task: 'atypia', mode: 'features', hidden: [8, 8], conv: null, lr: 0.1, epochs: 300, augment: false, l2: 0, labelNoise: 0.25 },
 ];
 // trains a recipe (its training cases from opts.trainLab, stain normalisation opts.normalize) and scores the test set
 // as scanned under each of opts.testLabs, refitting nothing: the standardizer only ever sees the training rows
@@ -86,16 +87,17 @@ for (const r of RECIPES.filter(x => x.task !== 'leukaemia' && !x.trainLab && !x.
   console.log(`  ${r.n} ${r.label.padEnd(66)} ${parts.join('   ')}`);
 }
 
-// the shortcut: recipe ⑨'s network trained with the irregular nuclei from the other lab and the regular ones from ours
-const trap = RECIPES.find(x => x.n === '⑨');
-console.log(`\nThe shortcut (${trap.label}), mean of ${nSeeds} seeds: test accuracy by where the test nuclei come from`);
-const labsRow = (opts, tag) => { const rs = Array.from({ length: nSeeds }, (_, i) => run(trap, i + 1, opts)); console.log(`  ${tag.padEnd(52)} ${opts.testLabs.map(t => `${t.padEnd(7)} ${pc(mean(rs, x => x.tests[t]))}`).join('   ')}`); };
-labsRow({ trainLab: 'byClass', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class');
-labsRow({ trainLab: 'byClass', normalize: 'lab', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class, normalised per lab');
-labsRow({ trainLab: 'mixed', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained on both labs mixed at random');
+// the shortcut: recipes ⑧ and ⑩, a network trained with the irregular nuclei from the other lab and the regular ones from ours
+for (const trap of RECIPES.filter(x => x.trainLab === 'byClass')) {
+  console.log(`\nThe shortcut (${trap.n} ${trap.label}), mean of ${nSeeds} seeds: test accuracy by where the test nuclei come from`);
+  const labsRow = (opts, tag) => { const rs = Array.from({ length: nSeeds }, (_, i) => run(trap, i + 1, opts)); console.log(`  ${tag.padEnd(52)} ${opts.testLabs.map(t => `${t.padEnd(7)} ${pc(mean(rs, x => x.tests[t]))}`).join('   ')}`); };
+  labsRow({ trainLab: 'byClass', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class');
+  labsRow({ trainLab: 'byClass', normalize: 'lab', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained split by class, normalised per lab');
+  labsRow({ trainLab: 'mixed', testLabs: ['byClass', 'ours', 'other', 'mixed'] }, 'trained on both labs mixed at random');
+}
 
-// label noise: recipe ⑩'s test curve, which rises and then falls as the network memorises the mislabelled cases
-const noisy = RECIPES.find(x => x.n === '⑩');
+// label noise: recipe ⑪'s test curve, which rises and then falls as the network memorises the mislabelled cases
+const noisy = RECIPES.find(x => x.n === '⑪');
 console.log(`\nLabel noise (${noisy.label}), ${nSeeds} seeds: the test accuracy over training (against the true labels)`);
 {
   const rs = Array.from({ length: nSeeds }, (_, i) => run(noisy, i + 1, { curve: true }));
