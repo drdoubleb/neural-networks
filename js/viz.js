@@ -373,6 +373,13 @@ window.Viz = (function () {
     }
     L.captions.push({ x: output.x, text: 'OUTPUT' });
     L.output = output; L.unitColumns = unitColumns;
+    if (m.contrast) { // the foundation model's encoder: no output, the code units feed the pair panel on the right
+      L.nodes = L.nodes.filter(n => n.kind !== 'output'); L.edges = L.edges.filter(e => e.layer !== 'out'); L.output = null;
+      L.captions = L.captions.filter(cap => cap.text !== 'OUTPUT');
+      for (const cap of L.captions) if (cap.text.startsWith('HIDDEN')) { cap.text = `CODE · ${net.hidden[0]} NUMBERS`; cap.x += 22; }
+      L.captions.push({ x: 695, text: 'THE PAIR' });
+      L.pair = { x: 604, w: 186 };
+    }
     return L;
   }
 
@@ -611,9 +618,103 @@ window.Viz = (function () {
       if (anim && anim.phase === 'reveal') drawTruthLabel(ctx, c, L.output, anim.y, anim.truthName, anim.correct ? '✓' : '✗');
       if (anim && anim.banner) drawBanner(ctx, c, L, anim.banner, anim.dir || 0);
     }
+    if (m.contrast && L.pair) drawPairPanel(ctx, L, c, m);
     return L;
   }
-  function ACT_SIGNED(name) { return name === 'tanh'; }
+  function ACT_SIGNED(name) { return name === 'tanh' || name === 'linear'; }
+
+  // ---- the foundation model's pretraining
+  // The pair panel beside the encoder: the code of the nucleus in the diagram (view 1), the other view of the same
+  // nucleus with its code, their cosine similarity (to be pulled up), a few other nuclei of the batch with theirs (to be
+  // pushed down), and the loss this view contributes. m.contrast = { view2Px, code1, code2, cos12, others: [{ px, cos }],
+  // loss, share, view2Label }
+  function codeStrip(ctx, c, x, y, w, h, code) {
+    const n = code.length, bw = w / n, mid = y + h / 2;
+    let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v));
+    ctx.fillStyle = c.surface2; ctx.fillRect(x, y, w, h);
+    for (let j = 0; j < n; j++) { const v = code[j] / mx, bh = Math.abs(v) * (h / 2 - 2); ctx.fillStyle = diverging(v); ctx.fillRect(x + j * bw + 1, v >= 0 ? mid - bh : mid, bw - 2, bh); }
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, mid + 0.5); ctx.lineTo(x + w, mid + 0.5); ctx.stroke();
+    ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+  }
+  function drawPairPanel(ctx, L, c, m) {
+    const p = m.contrast, x0 = L.pair.x, w = L.pair.w, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono11 = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.imageSmoothingEnabled = false;
+    ctx.font = mono9; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    // view 1: the nucleus in the diagram; its code is the badges, drawn again as a strip
+    ctx.fillStyle = c.ink3; ctx.fillText('view 1 · in the diagram', x0, 36);
+    ctx.fillStyle = c.ink2; ctx.fillText(p.view1Label, x0, 47);
+    codeStrip(ctx, c, x0, 60, w, 28, p.code1);
+    // view 2: the same nucleus seen differently, through the same encoder
+    ctx.fillStyle = c.ink3; ctx.fillText('view 2 · the same nucleus, again', x0, 98);
+    ctx.fillStyle = c.ink2; ctx.fillText(p.view2Label, x0, 109);
+    ctx.drawImage(imageToCanvas(p.view2Px, m.size, m.tint), x0, 122, 44, 44);
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x0 - 0.5, 121.5, 45, 45);
+    codeStrip(ctx, c, x0 + 54, 130, w - 54, 28, p.code2);
+    // their similarity: what the loss pulls up
+    ctx.font = mono11; ctx.fillStyle = c.ink; ctx.fillText(`cosine ${p.cos12.toFixed(2)}`, x0, 176);
+    ctx.font = mono9; ctx.fillStyle = c.irregular; ctx.fillText('the same nucleus: pull together ↑', x0, 190);
+    // others in the batch: what the loss pushes down (the three whose codes sit nearest)
+    ctx.fillStyle = c.ink3; ctx.fillText('others in the batch: push apart ↓', x0, 212);
+    let impostor = false;
+    p.others.forEach((o, k) => {
+      const ox = x0 + k * 62;
+      ctx.drawImage(imageToCanvas(o.px, m.size, m.tint), ox, 224, 44, 44);
+      ctx.strokeStyle = c.lineStrong; ctx.strokeRect(ox - 0.5, 223.5, 45, 45);
+      const nearer = o.cos > p.cos12; impostor = impostor || nearer;
+      ctx.fillStyle = nearer ? c.bad : c.ink2; ctx.textAlign = 'center'; ctx.fillText(o.cos.toFixed(2), ox + 22, 272);
+    });
+    ctx.textAlign = 'left';
+    if (impostor) { ctx.fillStyle = c.bad; ctx.fillText('red: nearer than the pair itself', x0, 285); }
+    // the loss for view 1: the pair's share of the softmax over every other view of the batch
+    ctx.fillStyle = c.ink3; ctx.fillText('softmax over the batch, at τ:', x0, 304);
+    ctx.fillStyle = c.ink2; ctx.fillText(`the pair gets ${Math.round(p.share * 100)}% of it`, x0, 317);
+    ctx.font = mono11; ctx.fillStyle = c.ink; ctx.fillText(`loss = −log(share) = ${p.loss.toFixed(2)}`, x0, 332);
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.fillText('no label anywhere in this', x0, 350);
+  }
+  // The similarity matrix of a batch: every view against every other, thumbnails along the edges, the pairs ringed.
+  // opt = { thumbs: [px…], sim: N×N cosines, size, tint }; view 2k and 2k+1 are the same nucleus.
+  function drawSimilarityMatrix(canvas, opt) {
+    const N = opt.thumbs.length, cell = 20, m0 = 26, W = m0 + N * cell + 2, H = W;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < N; i++) {
+      const img = imageToCanvas(opt.thumbs[i], opt.size, opt.tint);
+      ctx.drawImage(img, m0 + i * cell + 1, 2, cell - 2, cell - 2); ctx.drawImage(img, 2, m0 + i * cell + 1, cell - 2, cell - 2);
+      if (i % 2 === 0) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1; ctx.strokeRect(m0 + i * cell + 0.5, 0.5, 2 * cell - 1, cell + 1); ctx.strokeRect(0.5, m0 + i * cell + 0.5, cell + 1, 2 * cell - 1); }
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x = m0 + j * cell, y = m0 + i * cell;
+      if (i === j) { ctx.fillStyle = c.surface2; ctx.fillRect(x, y, cell - 1, cell - 1); continue; }
+      ctx.fillStyle = diverging(Math.max(-1, Math.min(1, opt.sim[i][j]))); ctx.fillRect(x, y, cell - 1, cell - 1);
+      if ((i ^ 1) === j) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x + 1, y + 1, cell - 3, cell - 3); }
+    }
+  }
+  // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct }
+  function drawSeries(svg, opt) {
+    const W = 400, H = 170, ml = 40, mr = 16, mt = 10, mb = 22, pw = W - ml - mr, ph = H - mt - mb;
+    const hist = opt.hist || [], maxX = Math.max(10, opt.maxEpoch || 0, hist.length ? hist[hist.length - 1].epoch : 0);
+    let maxY = opt.pct ? 1 : 1e-9;
+    if (!opt.pct) { for (const h of hist) for (const k of opt.keys) if (h[k.key] != null) maxY = Math.max(maxY, h[k.key]); maxY = Math.ceil(maxY * 2) / 2 || 1; }
+    const sx = e => ml + e / maxX * pw, sy = v => mt + (1 - v / maxY) * ph;
+    let g = '<g class="grid">';
+    const ystep = opt.pct ? 0.25 : niceStep(maxY, 4);
+    for (let v = 0; v <= maxY + 1e-9; v += ystep) g += `<line x1="${ml}" x2="${W - mr}" y1="${sy(v).toFixed(1)}" y2="${sy(v).toFixed(1)}"/><text x="${ml - 5}" y="${(sy(v) + 3.5).toFixed(1)}" text-anchor="end">${opt.pct ? Math.round(v * 100) + '%' : v.toFixed(ystep < 1 ? 1 : 0)}</text>`;
+    g += '</g>';
+    const xstep = niceStep(maxX, 5);
+    for (let e = 0; e <= maxX + 1e-9; e += xstep) g += `<text x="${sx(e).toFixed(1)}" y="${H - 6}" text-anchor="middle">${e}</text>`;
+    g += `<line class="axis" x1="${ml}" x2="${W - mr}" y1="${mt + ph}" y2="${mt + ph}"/>`;
+    if (opt.pct) g += `<line class="chance" x1="${ml}" x2="${W - mr}" y1="${sy(0.5)}" y2="${sy(0.5)}"/>`;
+    for (const k of opt.keys) {
+      const pts = hist.filter(h => h[k.key] != null);
+      if (!pts.length) continue;
+      g += `<path style="fill:none;stroke:${k.color};stroke-width:2;stroke-linejoin:round;stroke-linecap:round${k.dash ? ';stroke-dasharray:5 4' : ''}" d="${pts.map((h, i) => `${i ? 'L' : 'M'}${sx(h.epoch).toFixed(1)} ${sy(clamp(h[k.key], 0, maxY)).toFixed(1)}`).join(' ')}"/>`;
+      const last = pts[pts.length - 1];
+      g += `<circle style="fill:${k.color}" r="3" cx="${sx(last.epoch).toFixed(1)}" cy="${sy(clamp(last[k.key], 0, maxY)).toFixed(1)}"/>`;
+    }
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.innerHTML = g;
+  }
 
   // ---- shared by the lesson and the test walk-through
   // a banner along the bottom of the diagram naming the step, with an arrow for the passes (dir +1 forward, −1 back)
@@ -1345,15 +1446,15 @@ window.Viz = (function () {
         const W = firstWeights(m, n.j); let mm = 0; for (let i = 0; i < W.D; i++) mm = Math.max(mm, Math.abs(W.arr[W.off + i]));
         const { i, j, k } = cellAt(n, W, x, y), w = W.arr[W.off + k];
         const lessonTxt = m.lesson && (m.lesson.phase === 'gradient' || m.lesson.phase === 'update' || m.lesson.phase === 'check') ? ` · this lesson adds ${fmtSigned(-m.lesson.lr * m.lesson.delta[0][n.j], 3)} × image to this map` : '';
-        return { kind: 'node', ref: n, text: `hidden unit ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · ${cellName(m, i, j)} weight ${fmtSigned(w, 3)}${lessonTxt}` };
+        return { kind: 'node', ref: n, text: `${m.contrast ? 'code number' : 'hidden unit'} ${n.j + 1} weights: max |w| ${mm.toFixed(3)} · ${cellName(m, i, j)} weight ${fmtSigned(w, 3)}${lessonTxt}` };
       }
       if (n.kind === 'uprod' && (inBox(n, 2) || Math.hypot(x - n.x - n.size / 2 - 16, y - n.y) <= 13)) {
         const W = firstWeights(m, n.j), inp = firstInput(m), what = net.conv ? 'pooled' : 'pixel';
         let sum = 0; if (inp) for (let i = 0; i < W.D; i++) sum += W.arr[W.off + i] * inp.vec[i];
         const a = fw ? fw.a[1][n.j] : null;
-        const out = net.hidden.length === 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
+        const out = net.hidden.length === 1 && !m.contrast ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
         const pix = inBox(n, 0) && inp ? (() => { const { i, j, k } = cellAt(n, W, x, y); return ` · ${cellName(m, i, j)}: ${fmtSigned(W.arr[W.off + k], 3)} × ${fmtSigned(inp.vec[k], 2)} = ${fmtSigned(W.arr[W.off + k] * inp.vec[k], 3)}`; })() : '';
-        return { kind: 'node', ref: n, text: `unit ${n.j + 1}: Σ weight × ${what} ${inp ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}${blameNote(m, 0, n.j)}` };
+        return { kind: 'node', ref: n, text: `${m.contrast ? 'code number' : 'unit'} ${n.j + 1}: Σ weight × ${what} ${inp ? fmtSigned(sum, 2) : '?'} + bias ${fmtSigned(net.b[0][n.j], 2)}${a != null ? ` → ${m.activationLabel} → ${fmtNum(a, 2)}` : ''}${out}${pix}${blameNote(m, 0, n.j)}` };
       }
       if (n.kind === 'map' && inBox(n, 0)) {
         const W = firstWeights(m, null), inp = firstInput(m), { i, j, k } = cellAt(n, W, x, y), w = W.arr[W.off + k];
@@ -1505,10 +1606,11 @@ window.Viz = (function () {
     g += '</g>';
     g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     g += `<text class="axlabel" transform="translate(11 ${mt + ph / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel)}</text>`;
+    if (opt.segments) for (const s of opt.segments) g += `<line class="seg" x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
-      const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}`;
-      g += `<circle class="${cls}" data-id="${p.id}" r="${p.selected ? 6 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.clsName ? ' · ' + p.clsName : ''}</title></circle>`;
+      const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}${p.small ? ' small' : ''}`;
+      g += `<circle class="${cls}"${p.color ? ` style="fill:${p.color}"` : ''} data-id="${p.id}" r="${p.selected ? 6 : p.small ? 3 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.clsName ? ' · ' + p.clsName : ''}</title></circle>`;
     }
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.innerHTML = g;
@@ -1521,5 +1623,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
