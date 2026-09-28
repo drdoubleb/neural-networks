@@ -25,6 +25,7 @@
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
     <button type="button" class="stage" data-stage="train">2 · Train</button>
     <button type="button" class="stage" data-stage="test">3 · Test</button>
+    <button type="button" class="stage" data-stage="foundation">4 · Foundation</button>
   </nav>
   <div class="masthead-tools">
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
@@ -279,6 +280,97 @@
         <p class="prev-text" id="prev-text"></p>
       </div>
     </section>
+
+    <!-- ============================ 4 · FOUNDATION ============================ -->
+    <section class="stage-panel" id="panel-foundation" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>A foundation model, in miniature</h2>
+          <span class="small muted">pretrained on 100 nuclei without a single label · reused later for every question</span>
+        </div>
+        <p class="prose small">So far every question trained its own network from scratch on labelled cases. A foundation model is pretrained once, on many unlabelled images, to produce a short <strong>code</strong> for any image; the questions then come later, each with a few labelled cases. The miniature here is a convolutional encoder trained by a simple rule with no labels in it: <strong>two views of the same nucleus</strong> (a flip or rotation, or the other lab’s scan of it) must land on nearly the same code, and <strong>different nuclei</strong> must land far apart. The 100 nuclei come from all three questions; the network is never told which.</p>
+        <div class="bar-row">
+          <div class="ctl check"><input type="checkbox" id="fm-labs" checked><label for="fm-labs" class="plainlabel">The other lab’s scans count as views</label></div>
+          <div class="ctl slim"><label for="fm-epochs">Epochs <span class="val" id="fm-epochs-val">100</span></label><input type="range" id="fm-epochs" min="10" max="300" step="10" value="100"></div>
+          <div class="ctl slim"><label for="fm-speed">Speed <span class="val" id="fm-speed-val"></span></label><input type="range" id="fm-speed" min="0" max="100" step="1" value="52"></div>
+          <div class="ctl slim"><label for="fm-seed">Random seed</label><input type="number" id="fm-seed" min="1" max="9999" value="1"></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="fm-step-batch" title="one gradient step on the next batch of 16 nuclei, two views each">Step batch</button>
+            <button type="button" class="btn" id="fm-step-epoch" title="one pass through the 100 nuclei">Step epoch</button>
+            <button type="button" class="btn primary big" id="fm-train" title="run the remaining epochs">▶ Pretrain</button>
+            <button type="button" class="btn" id="fm-reset" title="re-initialise the encoder from the seed">↺ Reset</button>
+          </div>
+        </div>
+        <div class="status" id="fm-status"></div>
+        <div class="note" id="fm-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The encoder, live · one pair of views</h2>
+          <span class="small muted">the nucleus of the last batch (or the one you click below) goes through the encoder · hover any filter, map or connection</span>
+        </div>
+        <div class="net-wrap">
+          <canvas id="fm-canvas" width="800" height="440" aria-label="The encoder and the pair of views"></canvas>
+          <div class="tip" id="fm-tip" hidden></div>
+        </div>
+        <div class="legend net-legend">
+          <span>the code is the 8 badge values; the strips show them scaled to the largest</span>
+          <span>cosine = how alike two codes are, −1 to 1</span>
+          <span>the three others shown are the batch’s nearest by code</span>
+          <span>the loss looks at the whole batch: the pair’s share of a softmax over every other view</span>
+        </div>
+      </div>
+
+      <div class="fm-two">
+        <div class="card">
+          <div class="card-head">
+            <h2>This batch: 8 nuclei, two views each</h2>
+            <span class="small muted">every view against every other · ringed cells are the pairs</span>
+          </div>
+          <canvas id="fm-batch" width="348" height="348" aria-label="Similarity matrix of the batch"></canvas>
+          <p class="small muted" style="margin-top:8px">Orange = alike, blue = unlike. Pretraining pulls the ringed cells towards orange and everything else towards blue: each nucleus becomes recognisable across its views and distinct from the rest. Views are flips, rotations and (when ticked) the other lab’s scans.</p>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h2>The 100 unlabelled nuclei</h2>
+            <label class="toggle"><span>colour by</span>
+              <select id="fm-color"><option value="none">nothing (the model sees no labels)</option><option value="label">the answer to their own question</option><option value="question">which question they come from</option></select></label>
+          </div>
+          <div class="tray" id="fm-tray"></div>
+          <div class="fm-selected" id="fm-selected"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Pretraining curves</h2>
+          <div class="legend">
+            <span><span class="line"></span>loss on the batches</span>
+            <span><span class="line test"></span>loss on 60 held-out nuclei</span>
+            <span id="fm-worth-legend"></span>
+          </div>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Contrastive loss per epoch</span><span class="now" id="fm-loss-now"></span></div><svg id="fm-loss" role="img" aria-label="Contrastive loss per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>What the code is worth: a single layer on it, 20 labelled cases per question</span><span class="now" id="fm-worth-now"></span></div><svg id="fm-worth" role="img" aria-label="Test accuracy of a single layer on the code, per question"></svg></div>
+        </div>
+        <p class="small muted" style="margin-top:8px">The right-hand chart is measured on the side, never fed back: after each epoch a single layer is trained on the frozen code with 20 labelled training cases of each question and scored on 40 nuclei it never saw (the question’s 20 test nuclei and the 20 held-out ones). Pretraining itself never sees a label, yet the code becomes worth more for every question. Size is readable even from a random code; contour irregularity is not, and that is what the pretraining earns.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The embedding map</h2>
+          <div class="scatter-controls">
+            <label>x <select id="fm-x"></select></label>
+            <label>y <select id="fm-y"></select></label>
+            <label class="toggle"><input type="checkbox" id="fm-pairs" checked> show both views of each nucleus</label>
+          </div>
+        </div>
+        <div class="chart scatter"><svg id="fm-map" role="img" aria-label="The 100 nuclei placed by two of their code numbers"></svg></div>
+        <p class="small muted" style="margin-top:8px" id="fm-map-hint">Two of the eight code numbers, for every nucleus and its second view (joined by a line). As pretraining runs, the two views of a nucleus pull together and nuclei arrange themselves by what makes them recognisable. Colour by the answers above to see how far the classes separate without any label having been used.</p>
+      </div>
+    </section>
   </div>
 
   <!-- ============================ INSPECTOR ============================ -->
@@ -323,7 +415,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage pretrains a miniature foundation model on 100 of them without labels. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukemia/patients_data.js"></script>

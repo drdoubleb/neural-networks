@@ -4,7 +4,10 @@
  *   input  ->  [optional convolution: K filters f×f, ReLU, max-pool p×p]  ->  [0, 1 or 2 dense hidden layers]  ->  sigmoid output
  *
  * The output is P(positive class). Trained with mini-batch gradient descent on binary cross-entropy,
- * with optional weight decay. Works in the browser (window.TinyNet) and in Node (module.exports).
+ * with optional weight decay. Two miniature foundation models reuse the same pieces, an encoder being a Net without
+ * its output (the convolution, then a dense layer to a short code), both trained without labels: Contrastive makes two
+ * views of the same nucleus land on the same code, AutoEncoder rebuilds the pixels from the code.
+ * Works in the browser (window.TinyNet) and in Node (module.exports).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -27,6 +30,7 @@
     sigmoid: { label: 'Sigmoid', f: z => 1 / (1 + Math.exp(-z)), df: (z, a) => a * (1 - a), signed: false },
     tanh:    { label: 'Tanh',    f: z => Math.tanh(z),           df: (z, a) => 1 - a * a,   signed: true },
     relu:    { label: 'ReLU',    f: z => (z > 0 ? z : 0),        df: (z, a) => (z > 0 ? 1 : 0), signed: false },
+    linear:  { label: 'Linear',  f: z => z,                      df: () => 1,                signed: true }, // for an autoencoder's code
   };
   const sigmoid = z => 1 / (1 + Math.exp(-z));
   const EPS = 1e-7;
@@ -112,13 +116,20 @@
     }
     predict(x) { return this.forward(x).p; }
 
-    // backpropagate d(loss)/dz = dz through the dense layers; returns d(loss)/d(a0) (a0 = pooled conv features or the raw input)
+    // backpropagate d(loss)/dz = dz through the output weights and the dense layers; returns d(loss)/d(a0)
+    // (a0 = pooled conv features or the raw input)
     backDense(fw, dz, g) {
-      const act = ACTIVATIONS[this.activation];
       const top = fw.a[fw.a.length - 1];
-      let d = new Float64Array(top.length);
+      const d = new Float64Array(top.length);
       if (g) g.gbo += dz;
       for (let i = 0; i < top.length; i++) { if (g) g.gWo[i] += dz * top[i]; d[i] = dz * this.Wo[i]; }
+      return this.backHidden(fw, d, g);
+    }
+    // backpropagate d(loss)/d(top) through the dense hidden layers, top being the last hidden layer's activations (or
+    // a0 itself when there is none); fills g.gW, g.gb and g.delta when g is given; returns d(loss)/d(a0)
+    backHidden(fw, dTop, g) {
+      const act = ACTIVATIONS[this.activation];
+      let d = dTop;
       for (let l = this.hidden.length - 1; l >= 0; l--) {
         const fanIn = this.sizes[l], fanOut = this.sizes[l + 1], inp = fw.a[l], W = this.W[l];
         const dn = new Float64Array(fanIn);
@@ -149,22 +160,24 @@
       if (this.conv) { g.gWc = new Float64Array(this.Wc.length); g.gbc = new Float64Array(this.bc.length); }
       return g;
     }
+    // the convolution's gradients from d(loss)/d(pooled values), added into g.gWc and g.gbc
+    convAccumulate(x, fw, d0, g) {
+      const { K, f } = this.conv, size = this.size, co = this.co;
+      const dconv = this.backPool(fw, d0);
+      for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
+        const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
+        g.gbc[kk] += gg;
+        const gWc = g.gWc;
+        if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
+        else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
+      }
+    }
     // forward + backward for one case, adding its gradient into g; returns the case's loss
     accumulate(x, y, g, fw) {
       fw = fw || this.forward(x);
       const loss = bce(fw.p, y);
       const d0 = this.backDense(fw, fw.p - y, g);
-      if (this.conv) {
-        const { K, f } = this.conv, size = this.size, co = this.co;
-        const dconv = this.backPool(fw, d0);
-        for (let kk = 0; kk < K; kk++) for (let oy = 0; oy < co; oy++) for (let ox = 0; ox < co; ox++) {
-          const gg = dconv[(kk * co + oy) * co + ox]; if (gg === 0) continue;
-          g.gbc[kk] += gg;
-          const gWc = g.gWc;
-          if (f === 5) for (let dy = 0; dy < 5; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * 5 + dy) * 5; gWc[wrow] += gg * x[row]; gWc[wrow + 1] += gg * x[row + 1]; gWc[wrow + 2] += gg * x[row + 2]; gWc[wrow + 3] += gg * x[row + 3]; gWc[wrow + 4] += gg * x[row + 4]; }
-          else for (let dy = 0; dy < f; dy++) { const row = (oy + dy) * size + ox, wrow = (kk * f + dy) * f; for (let dx = 0; dx < f; dx++) gWc[wrow + dx] += gg * x[row + dx]; }
-        }
-      }
+      if (this.conv) this.convAccumulate(x, fw, d0, g);
       return loss;
     }
     // gradient-descent update from an accumulated gradient over n cases (l2 = weight decay)
@@ -237,6 +250,114 @@
     }
   }
 
+  // A convolutional autoencoder, the miniature foundation model. The encoder is a Net without its output: the
+  // convolution, then a dense layer to a short code (tanh, so every code value lies in −1..1). The decoder rebuilds the
+  // pixels from the code as Σ code_j × basis image_j + a bias image. Trained on the squared error of the rebuild, so no
+  // label is ever involved; the code is the embedding the downstream tasks can use.
+  class AutoEncoder {
+    constructor({ imageSize, conv = { K: 4, f: 5, pool: 4 }, code = 8, seed = 1 }) {
+      this.size = imageSize; this.D = imageSize * imageSize; this.code = code; this.seed = seed;
+      this.enc = new Net({ inputSize: this.D, imageSize, conv, hidden: [code], activation: 'tanh', seed });
+      const rnd = mulberry32(seed * 104729 + 3), u = s => (rnd() * 2 - 1) * s;
+      this.Wd = new Float64Array(this.D * code); for (let i = 0; i < this.Wd.length; i++) this.Wd[i] = u(0.05);
+      this.bd = new Float64Array(this.D);
+      this.steps = 0;
+    }
+    get conv() { return this.enc.conv; }
+    encode(x) { return this.enc.forward(x).a[1]; }
+    // basis image j: the decoder's weights from code unit j, as an image
+    basis(j) { const b = new Float64Array(this.D); for (let i = 0; i < this.D; i++) b[i] = this.Wd[i * this.code + j]; return b; }
+    forward(x) {
+      const fw = this.enc.forward(x), code = fw.a[1], recon = new Float64Array(this.D), C = this.code;
+      let loss = 0;
+      for (let i = 0; i < this.D; i++) { let s = this.bd[i]; const off = i * C; for (let j = 0; j < C; j++) s += this.Wd[off + j] * code[j]; recon[i] = s; const e = s - x[i]; loss += e * e; }
+      return { enc: fw, code, recon, loss: loss / this.D };
+    }
+    newGradient() { const g = this.enc.newGradient(); g.delta = [new Float64Array(this.code)]; g.gWd = new Float64Array(this.Wd.length); g.gbd = new Float64Array(this.D); return g; }
+    // forward + backward for one nucleus, adding its gradient into g; returns the squared error of the rebuild
+    accumulate(x, g, fw) {
+      fw = fw || this.forward(x);
+      const { code, recon } = fw, D = this.D, C = this.code, dCode = new Float64Array(C);
+      for (let i = 0; i < D; i++) {
+        const d = 2 * (recon[i] - x[i]) / D, off = i * C;
+        g.gbd[i] += d;
+        for (let j = 0; j < C; j++) { g.gWd[off + j] += d * code[j]; dCode[j] += d * this.Wd[off + j]; }
+      }
+      const d0 = this.enc.backHidden(fw.enc, dCode, g);
+      if (this.enc.conv) this.enc.convAccumulate(x, fw.enc, d0, g);
+      return fw.loss;
+    }
+    applyGradient(g, n, lr, l2 = 0) {
+      this.enc.applyGradient(g, n, lr, l2); // the encoder's unused output weights receive a zero gradient
+      const s = lr / n, decay = 1 - lr * l2;
+      for (let i = 0; i < this.Wd.length; i++) this.Wd[i] = this.Wd[i] * decay - s * g.gWd[i];
+      for (let i = 0; i < this.D; i++) this.bd[i] -= s * g.gbd[i];
+      this.steps++;
+    }
+    trainBatch(xs, lr, l2 = 0) {
+      const g = this.newGradient(); let loss = 0;
+      for (const x of xs) loss += this.accumulate(x, g);
+      this.applyGradient(g, xs.length, lr, l2);
+      return loss / xs.length;
+    }
+    // mean squared error of the rebuild over a set, and every nucleus's code
+    evaluate(xs) { let loss = 0; const codes = new Array(xs.length); for (let k = 0; k < xs.length; k++) { const fw = this.forward(xs[k]); loss += fw.loss; codes[k] = fw.code; } return { loss: loss / xs.length, codes }; }
+    parameterCount() { return this.enc.parameterCount() - this.enc.Wo.length - 1 + this.Wd.length + this.bd.length; }
+    describe() { const c = this.enc.conv; return `${c.K} filters ${c.f}×${c.f} + pool ${c.pool}×${c.pool} → code of ${this.code} (tanh) → ${this.D.toLocaleString()} pixels rebuilt`; }
+  }
+
+  // Contrastive pretraining, the miniature foundation model of the page. The encoder is a Net without its output: the
+  // convolution, then a dense linear layer to a short code. It is trained so that two views of the same nucleus (a flip
+  // or rotation, or the other lab's scan of it) land close together in the code, on the unit sphere, while every other
+  // nucleus in the batch lands far away: instance discrimination with the normalised-temperature cross-entropy loss.
+  // No label is ever involved; the code is the embedding the downstream tasks can use.
+  class Contrastive {
+    constructor({ imageSize, conv = { K: 4, f: 5, pool: 4 }, code = 8, tau = 0.2, seed = 1 }) {
+      this.size = imageSize; this.D = imageSize * imageSize; this.code = code; this.tau = tau; this.seed = seed;
+      this.enc = new Net({ inputSize: this.D, imageSize, conv, hidden: [code], activation: 'linear', seed });
+      this.steps = 0;
+    }
+    get conv() { return this.enc.conv; }
+    encode(x) { return this.enc.forward(x).a[1]; }
+    static unit(z) { let n = 0; for (const q of z) n += q * q; n = Math.sqrt(n) + 1e-8; const u = new Float64Array(z.length); for (let d = 0; d < z.length; d++) u[d] = z[d] / n; return { u, n }; }
+    // cosine similarity of two codes
+    static cosine(a, b) { const ua = Contrastive.unit(a).u, ub = Contrastive.unit(b).u; let s = 0; for (let d = 0; d < ua.length; d++) s += ua[d] * ub[d]; return s; }
+    // A batch of pairs [[x1, x2], …] (view 2k and 2k+1 belong to nucleus k). Returns the loss, how often each view's
+    // nearest other view is its own pair, the cosine similarity matrix and the codes; when lr is given, takes one
+    // gradient step. Loss = mean over views of −log( e^(s_pair/τ) / Σ_(other views) e^(s/τ) ).
+    step(pairs, lr, l2 = 0) {
+      const N = pairs.length * 2, C = this.code, tau = this.tau, xs = [], fws = [], u = [], norm = [];
+      for (const [x1, x2] of pairs) for (const x of [x1, x2]) { const fw = this.enc.forward(x); const { u: uu, n } = Contrastive.unit(fw.a[1]); xs.push(x); fws.push(fw); u.push(uu); norm.push(n); }
+      const sim = Array.from({ length: N }, () => new Float64Array(N));
+      for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { let s = 0; for (let d = 0; d < C; d++) s += u[i][d] * u[j][d]; sim[i][j] = sim[j][i] = s; }
+      const g = lr != null ? this.enc.newGradient() : null;
+      const du = g ? Array.from({ length: N }, () => new Float64Array(C)) : null;
+      let loss = 0, hits = 0;
+      for (let i = 0; i < N; i++) {
+        const pos = i ^ 1; let mx = -Infinity, best = -1, bestS = -Infinity;
+        for (let j = 0; j < N; j++) if (j !== i) { mx = Math.max(mx, sim[i][j] / tau); if (sim[i][j] > bestS) { bestS = sim[i][j]; best = j; } }
+        if (best === pos) hits++;
+        let Z = 0; const p = new Float64Array(N);
+        for (let j = 0; j < N; j++) if (j !== i) { p[j] = Math.exp(sim[i][j] / tau - mx); Z += p[j]; }
+        loss += -Math.log(p[pos] / Z) / N;
+        if (g) for (let j = 0; j < N; j++) if (j !== i) { const coef = (p[j] / Z - (j === pos ? 1 : 0)) / tau / N; for (let d = 0; d < C; d++) { du[i][d] += coef * u[j][d]; du[j][d] += coef * u[i][d]; } }
+      }
+      if (g) {
+        for (let i = 0; i < N; i++) { // through the normalisation: dz = (du − u (u·du)) / |z|
+          let dot = 0; for (let d = 0; d < C; d++) dot += u[i][d] * du[i][d];
+          const dz = new Float64Array(C); for (let d = 0; d < C; d++) dz[d] = (du[i][d] - u[i][d] * dot) / norm[i];
+          const d0 = this.enc.backHidden(fws[i], dz, g);
+          if (this.enc.conv) this.enc.convAccumulate(xs[i], fws[i], d0, g);
+        }
+        this.enc.applyGradient(g, 1, lr, l2); this.steps++;
+      }
+      return { loss, pairAcc: hits / N, sim, codes: fws.map(fw => fw.a[1]), units: u };
+    }
+    evaluate(pairs) { return this.step(pairs, null); }
+    parameterCount() { return this.enc.parameterCount() - this.enc.Wo.length - 1; }
+    describe() { const c = this.enc.conv; return `${c.K} filters ${c.f}×${c.f} + pool ${c.pool}×${c.pool} → code of ${this.code}`; }
+  }
+
   // z-scoring helpers. Fit on the training set only, apply to everything.
   function fitStandardizer(rows, { perDimScale = true } = {}) {
     const D = rows[0].length, n = rows.length;
@@ -278,5 +399,46 @@
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck };
+  // the same check for the autoencoder's gradients, on a tiny instance
+  function gradientCheckAE() {
+    const ae = new AutoEncoder({ imageSize: 8, conv: { K: 2, f: 3, pool: 2 }, code: 3, seed: 5 });
+    const rnd = mulberry32(13), eps = 1e-6;
+    const x = new Float64Array(ae.D); for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1;
+    const lossAt = () => ae.forward(x).loss;
+    const params = [ae.enc.Wc, ae.enc.bc, ae.enc.W[0], ae.enc.b[0], ae.Wd, ae.bd];
+    const before = params.map(p => Float64Array.from(p));
+    ae.trainBatch([x], 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j]));
+    params.forEach((p, i) => p.set(before[i]));
+    let worst = 0, checked = 0;
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
+      const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
+      const num = (lp - lm) / (2 * eps);
+      if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+    } });
+    return { worst, checked };
+  }
+
+  // and for the contrastive loss, on a tiny instance with three pairs
+  function gradientCheckCL() {
+    const cl = new Contrastive({ imageSize: 8, conv: { K: 2, f: 3, pool: 2 }, code: 3, tau: 0.3, seed: 9 });
+    const rnd = mulberry32(17), eps = 1e-6;
+    const mk = () => { const x = new Float64Array(cl.D); for (let i = 0; i < x.length; i++) x[i] = rnd() * 2 - 1; return x; };
+    const pairs = [[mk(), mk()], [mk(), mk()], [mk(), mk()]];
+    const lossAt = () => cl.evaluate(pairs).loss;
+    const params = [cl.enc.Wc, cl.enc.bc, cl.enc.W[0], cl.enc.b[0]];
+    const before = params.map(p => Float64Array.from(p));
+    cl.step(pairs, 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j]));
+    params.forEach((p, i) => p.set(before[i]));
+    let worst = 0, checked = 0;
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
+      const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
+      const num = (lp - lm) / (2 * eps);
+      if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+    } });
+    return { worst, checked };
+  }
+
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL };
 });
