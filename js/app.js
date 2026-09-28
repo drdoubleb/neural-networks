@@ -1138,7 +1138,7 @@
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && S.stage === 'train') teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test'); else if (ev.key === '4') showStage('foundation');
     });
-    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderGraph(); fmRenderBatch(); } });
+    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } });
     // playback controls in both strips: previous step, pause/play, next step, speed
     for (const key of ['lesson', 'test']) {
       const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
@@ -1179,12 +1179,12 @@
 
   // ------------------------------------------------------------------ 4 · Foundation: a miniature foundation model, pretrained live
   // 100 nuclei from the three image questions' training sets (34 / 33 / 33) and no labels. The encoder (4 filters 5×5,
-  // pool 4×4, a linear layer to a code of 8) is pretrained by instance discrimination: a batch takes 16 nuclei and two
+  // pool 4×4, a linear layer to a code of 8) is pretrained by instance discrimination: a batch takes 20 nuclei and two
   // random views of each (a flip or rotation, and the other lab's scan when allowed); the loss pulls the two views of a
   // nucleus together and pushes every other view of the batch away. After every epoch the code is measured on the side:
   // the contrastive loss on 60 held-out nuclei, and what a single layer trained on the frozen code with 20 labelled cases
   // per question scores on 40 nuclei it never saw.
-  const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 15, batch: 16, lr: 0.05, K: 4, code: 8, tau: 0.2,
+  const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 20, batch: 20, lr: 0.05, K: 4, code: 8, tau: 0.2,
     probePerClass: 10, probeEpochs: 150, probeLr: 0.1, colors: { atypia: '#7c3aed', enlargement: '#0e9f6e', irregularity: '#d97706' } };
   const ORIENT = ['as scanned', '90°', '180°', '270°', 'mirrored', 'mirror+90°', 'mirror+180°', 'mirror+270°'];
   const ORIENT_LONG = ['as scanned', 'rotated 90°', 'rotated 180°', 'rotated 270°', 'mirrored', 'mirrored, rotated 90°', 'mirrored, rotated 180°', 'mirrored, rotated 270°'];
@@ -1217,7 +1217,7 @@
     fmBuildHeld();
     fmSyncControls();
   }
-  // the held-out nuclei get two views each, drawn once from a fixed seed, in batches of 15 pairs so that their loss reads
+  // the held-out nuclei get two views each, drawn once from a fixed seed, in batches of 20 pairs so that their loss reads
   // on the same scale as the training batches' (at chance, −log of one over the other views in the batch)
   function fmBuildHeld() {
     const F = S.fm, rng = NN.mulberry32(99), pairs = F.held.map(e => [fmRandomView(e, rng).x, fmRandomView(e, rng).x]);
@@ -1255,6 +1255,7 @@
     const F = S.fm; fmStop();
     if (!F.set) fmBuild();
     F.cl = new NN.Contrastive({ imageSize: F.size, conv: { K: FM.K, f: 5, pool: 4 }, code: FM.code, tau: FM.tau, seed: F.seed });
+    F.cl0 = new NN.Contrastive({ imageSize: F.size, conv: { K: FM.K, f: 5, pool: 4 }, code: FM.code, tau: FM.tau, seed: F.seed }); // the same encoder as it started, kept for comparison
     F.rng = NN.mulberry32(F.seed * 31 + 7); F.order = F.set.map((_, i) => i);
     F.epoch = 0; F.ptr = 0; F.debt = 0; F.hist = []; F.lastBatch = null; F.epochLoss = 0; F.epochBatches = 0; F.codes = null; F.batchCache = null; F.selected = null;
     for (const e of F.set) { e.fixed = fmFixedViews(e); e.views = e.fixed; }
@@ -1268,7 +1269,7 @@
     const F = S.fm, held = fmHeldEval(), probes = fmProbes();
     F.hist.push(Object.assign({ epoch: F.epoch, loss, heldLoss: held.loss, pairAcc: held.pairAcc }, probes));
   }
-  // one gradient step: the next 16 nuclei of the epoch's order, two fresh random views each
+  // one gradient step: the next 20 nuclei of the epoch's order, two fresh random views each
   function fmStep() {
     const F = S.fm, n = F.set.length;
     if (F.ptr === 0) fmShuffle();
@@ -1291,7 +1292,7 @@
   function fmStop(msg) { const F = S.fm; F.running = false; fmSyncButtons(); if (msg) fmNote(msg); }
   function fmFinish() {
     const F = S.fm, last = F.hist[F.hist.length - 1];
-    fmStop(`Finished ${F.epochs} epochs without a label. Held-out loss ${last.heldLoss.toFixed(2)}, pair-hit ${pct(last.pairAcc)}. A single layer on the frozen code, with 20 labelled cases per question, now scores ${FM.tasks.map(id => `${pct(last[id])} on “${F.dsets[id].task.title}”`).join(', ')}.`);
+    fmStop(`Finished ${F.epochs} epochs without a label. Held-out loss ${last.heldLoss.toFixed(2)}, partner found first for ${pct(last.pairAcc)} of the held-out views. A single layer on the frozen code, with 20 labelled cases per question, now scores ${FM.tasks.map(id => `${pct(last[id])} on “${F.dsets[id].task.title}”`).join(', ')}.`);
   }
   function fmTick(now) {
     const F = S.fm; if (!F.running) return;
@@ -1316,7 +1317,7 @@
     fmBuildHeld(); F.codes = null; F.batchCache = null;
     if (F.cl) { fmRender(true); fmNote(F.labs ? 'The other lab’s scans now count as views of the same nucleus: from the next batch on, the encoder is asked to see past the stain too. The held-out pairs follow.' : 'Only flips and rotations count as views now: the encoder is no longer asked to see past the stain. The held-out pairs follow.'); }
   }
-  function fmSelect(i) { const F = S.fm; F.selected = i == null || i === F.selected ? null : i; fmRenderGraph(); fmRenderTray(); fmRenderMap(); fmRenderSelected(); }
+  function fmSelect(i) { const F = S.fm; F.selected = i == null || i === F.selected ? null : i; fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderTray(); fmRenderMap(); fmRenderSelected(); }
   function fmFocus() { const F = S.fm; return F.selected != null ? F.set[F.selected] : F.lastBatch ? F.lastBatch.views[0].e : F.set[0]; } // the nucleus in the diagram
   function fmSyncButtons() { const F = S.fm; $('fm-train').textContent = F.running ? '⏸ Pause' : F.epoch > 0 ? '▶ Continue' : '▶ Pretrain'; }
   function fmSyncControls() {
@@ -1329,7 +1330,7 @@
     fmSyncButtons();
   }
   // ---- rendering
-  // the reference batch through the current encoder: the last batch, or the first 16 nuclei before any step
+  // the reference batch through the current encoder: the last batch, or the first 20 nuclei before any step
   function fmBatchView() {
     const F = S.fm, views = F.lastBatch ? F.lastBatch.views : F.defaultBatch;
     if (F.batchCache && F.batchCache.steps === F.cl.steps && F.batchCache.views === views) return F.batchCache;
@@ -1347,18 +1348,50 @@
     F.codes = { steps: F.cl.steps, canon: F.set.map(e => F.cl.encode(e.fixed[0].x)), alt: F.set.map(e => F.cl.encode(e.fixed[1].x)) };
     return F.codes;
   }
-  function fmGraphModel() {
+  // the game for one view: every other view of the batch is a candidate for "the same nucleus", and the encoder's vote
+  // is a softmax over the cosines of the codes at τ (the partner included), best first
+  function fmLineup() {
     const F = S.fm, B = fmBatchView(), e = fmFocus(), k = B.views.findIndex(v => v.e === e), [v1, v2] = e.views;
     const fw = F.cl.enc.forward(v1.x);
     const code1 = k >= 0 ? B.codes[2 * k] : fw.a[1], code2 = k >= 0 ? B.codes[2 * k + 1] : F.cl.encode(v2.x);
     const u1 = NN.Contrastive.unit(code1).u, u2 = NN.Contrastive.unit(code2).u, tau = F.cl.tau, cos12 = dot(u1, u2);
-    let Z = 0; const others = [];
-    B.views.forEach((v, j) => { if (v.e === e) return; const c1 = dot(u1, B.units[2 * j]), c2 = dot(u1, B.units[2 * j + 1]); Z += Math.exp(c1 / tau) + Math.exp(c2 / tau); others.push({ px: v.v1.px, cos: c1 }); });
-    others.sort((a, b) => b.cos - a.cos); // the hardest negatives: the other nuclei whose codes sit nearest
-    const share = Math.exp(cos12 / tau) / (Math.exp(cos12 / tau) + Z);
-    return { net: F.cl.enc, mode: 'pixels', x: v1.x, fw, specimen: { px: v1.px }, size: F.size, tint: S.tint, stage: 2, inputMean: F.std.mean, hover: F.hover,
+    const cands = [{ px: v2.px, cos: cos12, partner: true, e }];
+    const field = k >= 0 ? B.views : B.views.slice(0, -1); // a nucleus picked from outside the batch takes the last one's seat, so the line-up stays the same size
+    field.forEach((v, j) => { if (v.e === e) return; cands.push({ px: v.v1.px, cos: dot(u1, B.units[2 * j]), partner: false, e: v.e }, { px: v.v2.px, cos: dot(u1, B.units[2 * j + 1]), partner: false, e: v.e }); });
+    let Z = 0; for (const d of cands) { d.w = Math.exp(d.cos / tau); Z += d.w; }
+    for (const d of cands) d.p = d.w / Z;
+    cands.sort((x, y) => y.p - x.p);
+    const share = cands.find(d => d.partner).p;
+    return { e, v1, v2, fw, code1, code2, cos12, cands, share, loss: -Math.log(share), inBatch: k >= 0 };
+  }
+  function fmGraphModel() {
+    const F = S.fm, L = fmLineup(), seen = new Set(), others = [];
+    for (const d of L.cands) { if (d.partner || seen.has(d.e)) continue; seen.add(d.e); others.push({ px: d.px, cos: d.cos }); if (others.length === 3) break; } // the hardest negatives: the nearest other nuclei by code
+    return { net: F.cl.enc, mode: 'pixels', x: L.v1.x, fw: L.fw, specimen: { px: L.v1.px }, size: F.size, tint: S.tint, stage: 2, inputMean: F.std.mean, hover: F.hover,
       activation: 'linear', activationLabel: NN.ACTIVATIONS.linear.label, featureNames: [], positiveName: '', negativeName: '',
-      contrast: { view1Label: fmViewLabel(v1), view2Label: fmViewLabel(v2), view2Px: v2.px, code1, code2, cos12, others: others.slice(0, 3), loss: -Math.log(share), share, inBatch: k >= 0 } };
+      contrast: { view1Label: fmViewLabel(L.v1), view2Label: fmViewLabel(L.v2), view2Px: L.v2.px, code1: L.code1, code2: L.code2, cos12: L.cos12, others, loss: L.loss, share: L.share, inBatch: L.inBatch } };
+  }
+  function fmRenderLineup() {
+    const F = S.fm, L = fmLineup();
+    Viz.drawLineup($('fm-lineup'), { query: L.v1.px, queryLabel: fmViewLabel(L.v1), cands: L.cands.map(d => ({ px: d.px, p: d.p, partner: d.partner })), share: L.share, loss: L.loss, size: F.size, tint: S.tint });
+  }
+  // the same nucleus in every orientation from both labs: its codes at the start and now, and another nucleus (the
+  // batch's nearest by code) for contrast
+  function fmRenderViews() {
+    const F = S.fm, L = fmLineup(), e = L.e, near = L.cands.find(d => !d.partner), other = near ? near.e : F.set.find(o => o !== e);
+    const views = o => { const out = []; for (const lab of ['A', 'B']) for (let t = 0; t < 8; t++) out.push(fmMakeView(o, lab, t)); return out; };
+    const row = (o, cl, label, ref) => {
+      const vs = views(o), codes = vs.map(v => cl.encode(v.x)), units = codes.map(cd => NN.Contrastive.unit(cd).u);
+      let sum = 0, n = 0;
+      if (ref) { for (const p of units) for (const q of ref) { sum += dot(p, q); n++; } }
+      else for (let i = 0; i < units.length; i++) for (let j = i + 1; j < units.length; j++) { sum += dot(units[i], units[j]); n++; }
+      return { label, units, mean: sum / n, views: vs.map((v, i) => ({ px: v.px, code: codes[i] })) };
+    };
+    const r0 = row(e, F.cl0, 'at the start'), r1 = row(e, F.cl, 'now'), r2 = row(other, F.cl, 'another nucleus, now', r1.units);
+    r0.note = `mean cosine ${r0.mean.toFixed(2)}`; r0.note2 = 'among its 16 codes';
+    r1.note = `mean cosine ${r1.mean.toFixed(2)}`; r1.note2 = 'among its 16 codes';
+    r2.note = `mean cosine ${r2.mean.toFixed(2)}`; r2.note2 = 'to the codes above';
+    Viz.drawViews($('fm-views'), { rows: [r0, r1, r2], size: F.size, tint: S.tint });
   }
   function fmRenderGraph() { const cv = $('fm-canvas'), m = fmGraphModel(); cv._model = m; Viz.drawNetwork(cv, m); }
   function fmRenderBatch() {
@@ -1374,15 +1407,15 @@
       `<span>nuclei <b>${F.set.length}</b>, no labels · views: flips &amp; rotations${F.labs ? ' + the other lab’s scans' : ''}</span>` +
       `<span>epoch <b>${F.epoch}</b> / ${F.epochs}</span>` +
       `<span>batch <b>${F.lastBatch ? F.lastBatch.index : '–'}</b> / ${bpe}</span>` +
-      (F.lastBatch ? `<span>last batch loss <b>${F.lastBatch.res.loss.toFixed(2)}</b> · pair-hit <b>${pct(F.lastBatch.res.pairAcc)}</b></span>` : '') +
-      (last ? `<span>held-out loss <b>${last.heldLoss.toFixed(2)}</b> · pair-hit <b>${pct(last.pairAcc)}</b></span>` : '');
+      (F.lastBatch ? `<span>last batch loss <b>${F.lastBatch.res.loss.toFixed(2)}</b> · partner found <b>${pct(F.lastBatch.res.pairAcc)}</b></span>` : '') +
+      (last ? `<span>held-out loss <b>${last.heldLoss.toFixed(2)}</b> · partner found <b>${pct(last.pairAcc)}</b></span>` : '');
   }
   function fmRenderCurves() {
     const F = S.fm, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim();
     Viz.drawSeries($('fm-loss'), { hist: F.hist, keys: [{ key: 'loss', color: c.accent }, { key: 'heldLoss', color: testCol, dash: true }], maxEpoch: F.epochs });
     Viz.drawSeries($('fm-worth'), { hist: F.hist, keys: FM.tasks.map(id => ({ key: id, color: FM.colors[id] })), maxEpoch: F.epochs, pct: true });
     const last = F.hist[F.hist.length - 1];
-    $('fm-loss-now').textContent = last ? `${last.loss != null ? `batches ${last.loss.toFixed(2)} · ` : ''}held-out ${last.heldLoss.toFixed(2)} · pair-hit ${pct(last.pairAcc)}` : '';
+    $('fm-loss-now').textContent = last ? `${last.loss != null ? `batches ${last.loss.toFixed(2)} · ` : ''}held-out ${last.heldLoss.toFixed(2)} · partner found ${pct(last.pairAcc)}` : '';
     $('fm-worth-now').textContent = last ? FM.tasks.map(id => pct(last[id])).join(' / ') : '';
   }
   function fmRenderMap() {
@@ -1424,14 +1457,14 @@
   }
   function fmRender(full) {
     const F = S.fm; if (!F.cl) return;
-    fmRenderStatus(); fmRenderGraph(); fmRenderBatch();
-    if (full) { fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); }
+    fmRenderStatus(); fmRenderLineup(); fmRenderGraph(); fmRenderBatch();
+    if (full) { fmRenderViews(); fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); }
     fmSyncButtons();
   }
   function fmEnter() {
     const F = S.fm;
     if (!F.set) fmBuild();
-    if (!F.cl) fmReset('A fresh random encoder. Step a batch to watch one gradient step on 16 nuclei, or press Pretrain and watch the code become worth something.');
+    if (!F.cl) fmReset('A fresh random encoder. Step a batch to watch one gradient step on 20 nuclei, or press Pretrain and watch the code become worth something.');
     else fmRender(true);
   }
   function bindFoundation() {

@@ -628,9 +628,9 @@ window.Viz = (function () {
   // nucleus with its code, their cosine similarity (to be pulled up), a few other nuclei of the batch with theirs (to be
   // pushed down), and the loss this view contributes. m.contrast = { view2Px, code1, code2, cos12, others: [{ px, cos }],
   // loss, share, view2Label }
-  function codeStrip(ctx, c, x, y, w, h, code) {
+  function codeStrip(ctx, c, x, y, w, h, code, scale) {
     const n = code.length, bw = w / n, mid = y + h / 2;
-    let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v));
+    let mx = scale || 1e-9; if (!scale) for (const v of code) mx = Math.max(mx, Math.abs(v));
     ctx.fillStyle = c.surface2; ctx.fillRect(x, y, w, h);
     for (let j = 0; j < n; j++) { const v = code[j] / mx, bh = Math.abs(v) * (h / 2 - 2); ctx.fillStyle = diverging(v); ctx.fillRect(x + j * bw + 1, v >= 0 ? mid - bh : mid, bw - 2, bh); }
     ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, mid + 0.5); ctx.lineTo(x + w, mid + 0.5); ctx.stroke();
@@ -689,6 +689,79 @@ window.Viz = (function () {
       ctx.fillStyle = diverging(Math.max(-1, Math.min(1, opt.sim[i][j]))); ctx.fillRect(x, y, cell - 1, cell - 1);
       if ((i ^ 1) === j) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x + 1, y + 1, cell - 3, cell - 3); }
     }
+  }
+  // ---- the game the encoder plays: spot the same nucleus
+  // One view (the query) against every other view of the batch as a candidate for "the same nucleus", ranked by the
+  // encoder's vote: a softmax over the cosines of the codes. opt = { query: px, queryLabel, cands: [{ px, p, partner }]
+  // best first, share, loss, size, tint }
+  function drawLineup(canvas, opt) {
+    const W = 800, per = 20, slot = 35, thumb = 28, barH = 34, rowH = thumb + 4 + barH + 16, rows = Math.ceil(opt.cands.length / per), H = 30 + rows * rowH + 34;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono11 = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = mono9; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    // the query, at the left
+    const qx = 10, qy = 30;
+    ctx.drawImage(imageToCanvas(opt.query, opt.size, opt.tint), qx, qy, 60, 60);
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(qx - 0.5, qy - 0.5, 61, 61);
+    ctx.fillStyle = c.ink; ctx.fillText('this view:', qx, qy + 66);
+    const lab = opt.queryLabel.split(' · '); let ty = qy + 77;
+    ctx.fillStyle = c.ink3; for (const t of lab) { ctx.fillText(t, qx, ty); ty += 11; }
+    ty += 8; ctx.fillStyle = c.ink2; ['which of the', `${opt.cands.length} candidates`, 'is the same', 'nucleus?'].forEach(t => { ctx.fillText(t, qx, ty); ty += 11; });
+    ctx.fillStyle = c.irregular; ctx.fillText('answer: orange', qx, ty + 6);
+    // the candidates: the encoder's vote, best first
+    const x0 = 92;
+    ctx.fillStyle = c.ink3; ctx.fillText('the encoder’s vote, best first · each bar is the candidate’s share of 100%', x0, 10);
+    let mx = 1e-9; for (const d of opt.cands) mx = Math.max(mx, d.p);
+    opt.cands.forEach((d, i) => {
+      const r = Math.floor(i / per), k = i % per, x = x0 + k * slot, y = 30 + r * rowH;
+      ctx.drawImage(imageToCanvas(d.px, opt.size, opt.tint), x, y, thumb, thumb);
+      ctx.strokeStyle = d.partner ? c.irregular : c.lineStrong; ctx.lineWidth = d.partner ? 2.5 : 1; ctx.strokeRect(x - 0.5, y - 0.5, thumb + 1, thumb + 1);
+      const bh = Math.max(1, Math.round(d.p / mx * barH)), wrongPick = i === 0 && !d.partner;
+      ctx.fillStyle = d.partner ? c.irregular : wrongPick ? c.bad : rgbStr(c.rgb.ink3, 0.45);
+      ctx.fillRect(x + 5, y + thumb + 4 + barH - bh, thumb - 10, bh);
+      ctx.font = mono9; ctx.fillStyle = d.partner ? c.irregular : wrongPick ? c.bad : c.ink3; ctx.textAlign = 'center';
+      ctx.fillText(d.p >= 0.0995 ? `${Math.round(d.p * 100)}%` : `${(d.p * 100).toFixed(1)}%`, x + thumb / 2, y + thumb + 4 + barH + 3);
+      ctx.textAlign = 'left';
+    });
+    // its first pick, right or wrong
+    const first = opt.cands[0];
+    ctx.font = mono11; ctx.fillStyle = first.partner ? c.good : c.bad; ctx.textAlign = 'right';
+    ctx.fillText(first.partner ? '✓ first pick: the partner' : '✗ first pick: another nucleus', W - 8, 8);
+    ctx.textAlign = 'left';
+    // the loss for this view
+    const yb = 30 + rows * rowH + 2, pc = v => (v >= 0.0995 ? `${Math.round(v * 100)}%` : `${(v * 100).toFixed(1)}%`);
+    ctx.font = mono11; ctx.fillStyle = c.ink;
+    ctx.fillText(`the answer gets ${pc(opt.share)} of the vote → loss = −log(share) = ${opt.loss.toFixed(2)}`, x0, yb);
+    ctx.font = mono9; ctx.fillStyle = c.ink3;
+    ctx.fillText(`at chance every candidate gets ${(100 / opt.cands.length).toFixed(1)}% (loss ${Math.log(opt.cands.length).toFixed(2)}) · a sure answer gets 100% (loss 0) · every view plays once per batch`, x0, yb + 16);
+  }
+  // What the code keeps and what it ignores: one nucleus in its 8 orientations from both labs, each view's code as a
+  // strip (one scale per row), for the encoder at the start and now, and another nucleus for contrast.
+  // opt = { rows: [{ label, note, note2, views: [{ px, code }] }], size, tint }
+  function drawViews(canvas, opt) {
+    const W = 800, x0 = 150, slot = 40, thumb = 30, strip = 14, rowH = thumb + 3 + strip + 10, H = 26 + opt.rows.length * rowH + 2;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono11 = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = mono9; ctx.textBaseline = 'top'; ctx.fillStyle = c.ink3; ctx.textAlign = 'center';
+    ctx.fillText('our lab’s scan · 8 orientations', x0 + 4 * slot - 5, 2); ctx.fillText('the other lab’s scan · 8 orientations', x0 + 12 * slot - 5, 2);
+    const ori = ['0°', '90°', '180°', '270°', 'mirror', 'm+90°', 'm+180°', 'm+270°'];
+    for (let k = 0; k < 16; k++) ctx.fillText(ori[k % 8], x0 + k * slot + thumb / 2, 13);
+    opt.rows.forEach((row, r) => {
+      const y = 26 + r * rowH;
+      ctx.textAlign = 'left'; ctx.font = mono11; ctx.fillStyle = c.ink; ctx.fillText(row.label, 8, y + 4);
+      ctx.font = mono9; ctx.fillStyle = c.ink3; if (row.note) ctx.fillText(row.note, 8, y + 21); if (row.note2) ctx.fillText(row.note2, 8, y + 32);
+      let mx = 1e-9; for (const v of row.views) for (const q of v.code) mx = Math.max(mx, Math.abs(q));
+      row.views.forEach((v, k) => {
+        const x = x0 + k * slot;
+        ctx.drawImage(imageToCanvas(v.px, opt.size, opt.tint), x, y, thumb, thumb);
+        ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, y - 0.5, thumb + 1, thumb + 1);
+        codeStrip(ctx, c, x, y + thumb + 3, thumb, strip, v.code, mx);
+      });
+    });
   }
   // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct }
   function drawSeries(svg, opt) {
@@ -1623,5 +1696,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();

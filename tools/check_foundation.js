@@ -2,8 +2,9 @@
  * check_foundation.js — measures the miniature foundation model of the 4 · Foundation stage, exactly as the page
  * pretrains it: 100 unlabelled nuclei (34 / 33 / 33 from the three image questions' training sets), a convolutional
  * encoder (4 filters 5×5, pool 4×4, a linear layer to a code of 8) trained by instance discrimination on batches of
- * 16 nuclei with two random views each (flips, rotations, and the other lab's scan). After every epoch it reports the
- * contrastive loss on the batches and on 60 held-out nuclei, and what the frozen code is worth: a single layer trained
+ * 20 nuclei with two random views each (flips, rotations, and the other lab's scan). After every epoch it reports the
+ * contrastive loss on the batches and on 60 held-out nuclei (with the share of held-out views whose nearest other view
+ * is their partner), and what the frozen code is worth: a single layer trained
  * on it with 20 labelled cases per question, scored on 40 nuclei it never saw (the question's 20 test nuclei and its
  * 20 held-out training nuclei).
  *   node tools/check_foundation.js [--seeds 3] [--epochs 100] [--no-labs]
@@ -24,7 +25,7 @@ const gc = gradientCheckCL();
 console.log(`Contrastive gradient check: worst relative error ${gc.worst.toExponential(2)} over ${gc.checked} weights ${gc.worst < 1e-4 ? '(ok)' : '(FAILED)'}`);
 
 // the same constants as app.js
-const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 15, batch: 16, lr: 0.05, K: 4, code: 8, tau: 0.2, probePerClass: 10, probeEpochs: 150, probeLr: 0.1 };
+const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 20, batch: 20, lr: 0.05, K: 4, code: 8, tau: 0.2, probePerClass: 10, probeEpochs: 150, probeLr: 0.1 };
 const set = [], held = [];
 FM.tasks.forEach((id, k) => { const tr = tasks[id].train; tr.slice(0, FM.counts[k]).forEach(s => set.push({ s, task: id })); tr.slice(FM.counts[k], FM.counts[k] + FM.heldPer).forEach(s => held.push({ s, task: id })); });
 const size = tasks.atypia.size;
@@ -65,7 +66,7 @@ for (let seed = 1; seed <= nSeeds; seed++) {
   const atB = FM.tasks.map(id => probe(cl, id, 'B'));
   runs.push({ hist, atB });
   console.log(`\nseed ${seed} · ${ms.toFixed(0)} ms per epoch including the measurements${labs ? '' : ' · views without the other lab'}`);
-  console.log('  epoch  batches  held-out  pair-hit   ' + FM.tasks.map(id => id.padStart(12)).join(''));
+  console.log('  epoch  batches  held-out   partner   ' + FM.tasks.map(id => id.padStart(12)).join(''));
   for (const h of hist) if (h.epoch === 0 || h.epoch % 10 === 0 || h.epoch === epochs) console.log(`  ${String(h.epoch).padStart(5)}  ${h.loss == null ? '      –' : h.loss.toFixed(2).padStart(7)}  ${h.heldLoss.toFixed(2).padStart(8)}  ${pc(h.pairAcc).padStart(8)}   ` + FM.tasks.map(id => pc(h[id]).padStart(12)).join(''));
   console.log(`  the same single layer scored on the other lab's scans of the test nuclei: ${FM.tasks.map((id, k) => `${id} ${pc(atB[k]).trim()}`).join(' · ')}`);
 }
@@ -74,6 +75,6 @@ const at = e => runs.map(r => r.hist.find(h => h.epoch === e));
 console.log(`\nMean of ${nSeeds} seeds:`);
 for (const e of [0, 10, 25, 50, epochs].filter((v, i, a) => v <= epochs && a.indexOf(v) === i)) {
   const hs = at(e);
-  console.log(`  epoch ${String(e).padStart(3)}: held-out loss ${(hs.reduce((a, h) => a + h.heldLoss, 0) / hs.length).toFixed(2)} · pair-hit ${pc(hs.reduce((a, h) => a + h.pairAcc, 0) / hs.length)} · a single layer on the code: ` + FM.tasks.map(id => `${id} ${pc(hs.reduce((a, h) => a + h[id], 0) / hs.length).trim()}`).join(' · '));
+  console.log(`  epoch ${String(e).padStart(3)}: held-out loss ${(hs.reduce((a, h) => a + h.heldLoss, 0) / hs.length).toFixed(2)} · partner found ${pc(hs.reduce((a, h) => a + h.pairAcc, 0) / hs.length)} · a single layer on the code: ` + FM.tasks.map(id => `${id} ${pc(hs.reduce((a, h) => a + h[id], 0) / hs.length).trim()}`).join(' · '));
 }
 console.log(`  at the other lab after ${epochs} epochs: ` + FM.tasks.map((id, k) => `${id} ${pc(mean(r => r.atB[k])).trim()}`).join(' · '));
