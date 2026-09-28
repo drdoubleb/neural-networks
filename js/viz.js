@@ -252,7 +252,7 @@ window.Viz = (function () {
       const wide = D > 8 ? 40 : 0; // room for long parameter names
       const xs = hidden.length === 0 ? [150 + wide] : hidden.length === 1 ? [150 + wide, 440 + wide / 2] : [140 + wide, 400 + wide / 2, 585];
       const inputs = spread(D, yc, Math.min(58, (NET_H - 90) / Math.max(1, D - 1))).map((y, i) => add({ kind: 'input', i, x: xs[0], y, r: D > 8 ? 13 : 16 }));
-      L.captions.push({ x: xs[0], text: `INPUT · ${D} MEASUREMENTS` });
+      L.captions.push({ x: xs[0], text: m.inputCaption || `INPUT · ${D} MEASUREMENTS` });
       let prevCol = inputs;
       hidden.forEach((h, l) => {
         const col = spread(h, yc, Math.min(46, (NET_H - 110) / Math.max(1, h - 1))).map((y, j) => add({ kind: 'unit', l, j, x: xs[l + 1], y, r: 17 }));

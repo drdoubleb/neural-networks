@@ -3,6 +3,7 @@
  * the input representations the demo can feed the network:
  *   'features' : the task's measurements (six nuclear morphometrics, or the ten CBC parameters)
  *   'pixels'   : all 1,024 ink values (mean image subtracted) — image tasks only
+ *   'code'     : the foundation encoder's code of the image (8 or 16 numbers) — image tasks only
  * Every nucleus was scanned at two labs (px: our lab; pxB: the other lab, whose stain is weaker). A source mode says
  * which lab each set's cases come from (assignLabs), and the pixels can be stain-normalised before the network sees them.
  * Works in the browser (window.NucleusDataset) and in Node (module.exports).
@@ -116,7 +117,12 @@
   //              'image' (each scan by its own levels)
   //   labelNoise: the fraction of training cases given the wrong label (a second pathologist's disagreements), chosen
   //              once per fraction so a lecture is reproducible whatever the network's seed; the test labels stay true
-  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off', labelNoise = 0 } = {}) {
+  //   encoder:   for mode 'code', { encode: ink => code }: the foundation encoder, fed the scan (after any stain
+  //              normalisation) and returning its code
+  //   labelled:  how many training cases carry a label (0 = all): the first labelled/2 of each class in the training
+  //              order; the rest stay in the tray, the network never trains on them and the training scores skip them
+  //              (their images still serve to standardise the inputs)
+  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off', labelNoise = 0, encoder = null, labelled = 0 } = {}) {
     const flipped = new Set();
     if (labelNoise > 0) {
       const rng = NN.mulberry32(48151 + Math.round(labelNoise * 1000));
@@ -127,26 +133,37 @@
     const columns = mode === 'features' ? ds.featureDefs.map((f, i) => i).filter(i => !exclude || !exclude.has(ds.featureDefs[i].key)) : null;
     const variant = (s, lab) => (s.variants && (s.variants[lab] || s.variants.A)) || s;
     const inkFor = (s, lab) => { const v = variant(s, lab); if (normalize === 'off' || !ds.labStats || !v.levels) return v.ink; return normalizeInk(v.ink, normalize === 'lab' ? ds.labStats[lab] || ds.labStats.A : v.levels, ds.labStats.A); };
-    const rawFor = (s, lab) => (mode === 'pixels' ? inkFor(s, lab) : columns.map(i => { const f = variant(s, lab).features; return ds.featureDefs[i].log ? Math.log(Math.max(f[i], 1e-3)) : f[i]; }));
+    const rawFor = (s, lab) => (mode === 'pixels' ? inkFor(s, lab) : mode === 'code' ? encoder.encode(inkFor(s, lab)) : columns.map(i => { const f = variant(s, lab).features; return ds.featureDefs[i].log ? Math.log(Math.max(f[i], 1e-3)) : f[i]; }));
     const rawOf = s => rawFor(s, s.lab || 'A');
-    let trainRows = ds.train.map(rawOf), trainLabels = ds.train.map(labelOf), trainOwner = ds.train.map(s => s.id);
+    // the labelled training cases: all of them, or the first labelled/2 of each class
+    let trainSet = ds.train;
+    if (labelled > 0 && labelled < ds.train.length) {
+      const per = Math.ceil(labelled / 2), pos = new Set(ds.train.filter(s => s.label).slice(0, per).map(s => s.id)), neg = new Set(ds.train.filter(s => !s.label).slice(0, labelled - per).map(s => s.id));
+      trainSet = ds.train.filter(s => pos.has(s.id) || neg.has(s.id));
+    }
+    const labelledIds = new Set(trainSet.map(s => s.id));
+    let trainRows = trainSet.map(rawOf), trainLabels = trainSet.map(labelOf), trainOwner = trainSet.map(s => s.id);
     if (mode === 'pixels' && augment) {
       const rows = [], labels = [], owner = [];
-      ds.train.forEach(s => { const raw = rawOf(s), y = labelOf(s); for (let t = 0; t < 8; t++) { rows.push(t === 0 ? raw : dihedral(raw, ds.size, t)); labels.push(y); owner.push(s.id); } });
+      trainSet.forEach(s => { const raw = rawOf(s), y = labelOf(s); for (let t = 0; t < 8; t++) { rows.push(t === 0 ? raw : dihedral(raw, ds.size, t)); labels.push(y); owner.push(s.id); } });
       trainRows = rows; trainLabels = labels; trainOwner = owner;
     }
-    const std = NN.fitStandardizer(trainRows, { perDimScale: mode !== 'pixels' });
+    // the standardiser sees every training image, labels or not, as one would use an unlabelled archive; with every
+    // case labelled that is the training rows themselves (augmented views included)
+    const std = NN.fitStandardizer(trainSet === ds.train ? trainRows : ds.train.map(rawOf), { perDimScale: mode !== 'pixels' });
     const byId = new Map();
     for (const s of ds.specimens) byId.set(s.id, std.apply(rawOf(s)));
     return {
       mode, std, columns, normalize, labelNoise, flipped,
       labelOf,                                          // the label the network is given for a training case
+      labelled: labelledIds, trainSet,                  // the training cases the network sees
+      inkOf: s => (mode === 'features' ? null : inkFor(s, s.lab || 'A')), // the scan as the network (or the encoder) sees it
       inputSize: trainRows[0].length,
       trainX: trainRows.map(r => std.apply(r)), trainY: trainLabels, trainOwner,
       xOf: s => byId.get(s.id),
       rawOf,                                            // what the network is given before standardisation (the normalised ink, on pixels)
       xFor: (s, lab) => std.apply(rawFor(s, lab)),      // the same case as scanned at a given lab
-      featureNames: mode === 'features' ? columns.map(i => ds.featureDefs[i].name) : null,
+      featureNames: mode === 'features' ? columns.map(i => ds.featureDefs[i].name) : mode === 'code' ? Array.from(trainRows[0], (_, i) => `code ${i + 1}`) : null,
     };
   }
 

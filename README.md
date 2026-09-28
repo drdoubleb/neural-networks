@@ -15,6 +15,9 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
 - **One file to email or drop on a USB stick:** `dist/nucleus-net.html` has the stylesheet, scripts and all the cases
   inlined. Rebuild it with `node tools/build_single_file.js`.
 - **GitHub Pages:** repository settings → Pages → *Deploy from a branch* → the default branch, root folder.
+- **The numbers in this file:** `node tools/check_training.js` (the recipes, the other lab, the shortcut, label noise,
+  the labelled-cases table), `node tools/check_foundation.js` (the foundation model's pretraining) and
+  `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) reproduce them.
 
 Keys during a lecture: `1` `2` `3` `4` switch stages, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
@@ -47,7 +50,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    image, its six morphometric measurements and an overlay showing exactly where each comes from. A scatter plot shows
    how separable any two parameters are. For the nucleus questions, a *Where the cases come from* card says which lab's
    scans each set uses (see *Another lab, and the shortcut* below).
-2. **Train.** Choose the input (the measurements or blood count, or all 1,024 raw pixels), tick which inputs the network
+2. **Train.** Choose the input (the measurements or blood count, all 1,024 raw pixels, or the **code** from a foundation
+   encoder: the one pretrained in stage 4 or the one shipped with the page), tick which inputs the network
    may use (withhold blasts and watch it lean on cytopenias), an optional convolutional layer (4 or 8 filters of 5 × 5,
    ReLU, 4 × 4 max-pooling), zero to two dense hidden layers with a ReLU / sigmoid / tanh activation, and the learning
    rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Teach one case, step one batch or one
@@ -99,7 +103,12 @@ style). The network never sees it; the page uses it to show which hidden units r
    dotted line marks the epoch of the lowest test loss so far (where early stopping on a held-out set would have
    stopped), and with label noise on, a dashed line marks the honest ceiling of training accuracy. *Label noise* in the
    advanced settings flips a share of the training labels, as a second pathologist might have called them; the trays and
-   the inspector then show the label each case was given, and a checkbox marks the mislabelled ones.
+   the inspector then show the label each case was given, and a checkbox marks the mislabelled ones. A *Labelled
+   cases* control (4, 10, 20, 40 or all) withholds the labels of the rest of the training set: those cases stay in the
+   tray, dimmed and dashed, the network never sees them and the training scores skip them, which is how the value of a
+   pretrained code is shown (see *The code as an input*). With the code as input the inspector adds a card with the
+   code's numbers and each one's push on the score, and its *Evidence* view carries that push back through the frozen
+   encoder to the pixels.
 3. **Test.** The weights are frozen. *Classify next* runs one held-out case as a walk-through: a forward pass through
    the frozen weights, each connection wiping with the product it carries while a strip names what is happening, then the call at the threshold,
    then the truth with a ✓ or ✗ on the diagram; *Classify all* scores the rest at once. A *Test cases from* switch swaps the
@@ -132,7 +141,7 @@ style). The network never sees it; the page uses it to show which hidden units r
    saw); an embedding map plots any two code numbers for every nucleus and its second view. Two curves run
    per epoch: the contrastive loss on the batches and on 60 held-out nuclei, and *what the code is worth*: a single
    layer trained on the frozen code with 20 labelled cases per question, scored on 40 nuclei it never saw. See *A
-   foundation model, in miniature*.
+   foundation model, in miniature*. The encoder then serves as the *code* input of stage 2 (see *The code as an input*).
 
 The **inspector** on the right follows the selected nucleus through the first three stages. Its *Evidence* view shows what the
 network is weighing: on pixels, a per-pixel overlay (orange pushes toward the positive class, blue away from it), computed
@@ -140,7 +149,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the eleven recipe buttons
+## The lecture arc: the twelve recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js`.
 
@@ -157,6 +166,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
 | ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
 | ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
+| ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases (pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑪ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -278,6 +288,61 @@ same nuclei, the single layer keeps 83% / 89% / 79%: the code was made to see pa
 scans count as views* and it no longer is. The measurements cost about as much as the pretraining itself (some 80 ms
 per epoch for both in Node); at the default speed of 4 epochs per second the 100 epochs take about half a minute.
 
+## The code as an input, and how many labelled cases it needs
+
+Recipe ⑫ and the *Labelled cases* control close the loop on why anyone pretrains. In stage 2 the third input, **the
+code**, feeds the network the encoder's 8 (or 16) numbers for each nucleus instead of its pixels or measurements; the
+*Code from* control picks the encoder: the one pretrained in stage 4, or one of two shipped with the page
+(`data/foundation/backbones.js`, written by `tools/pretrain_backbone.js`): a saved copy of exactly what stage 4
+makes with seed 1 (100 nuclei, 4 filters, a code of 8, 100 epochs), so the recipe works before anyone has run ⑪, and a
+bigger encoder (the page's 240 training nuclei, 8 filters, a code of 16, 200 epochs). Everything else works as for the
+measurements: the diagram shows the code numbers as inputs, the checklist lists their weights, the inspector adds a
+card with each number's value and push, and its *Evidence* view carries the push back through the frozen encoder to
+the pixels. The *Labelled cases* control (4, 10, 20, 40 or all) keeps the first n/2 of each class in the training order
+as labelled and withholds the labels of the rest: they stay in the tray, dimmed and dashed, the network never trains
+on them and the training scores skip them, though their images still serve to standardise the inputs, as an
+unlabelled archive would.
+
+Irregular contour, test accuracy at our lab, mean of five seeds (`node tools/check_training.js --only labelled --seeds 5`),
+a single layer for 60 epochs except the augmented column (4 ReLU units, the recipe ⑦ network):
+
+| Labelled cases | Measurements | Pixels | Pixels · 4 ReLU + augmentation | The code · 100 nuclei, 4 filters | The code · 240 nuclei, 8 filters |
+|---|---|---|---|---|---|
+| 4 | 93% | 53% | 49% | 78% | 56% |
+| 10 | 84% | 60% | 64% | 82% | 58% |
+| 20 | 91% | 69% | 74% | 71% | 73% |
+| 40 | 95% | 66% | 59% | 80% | 85% |
+| 80 (all) | 95% | 60% | 80% | 80% | 90% |
+
+Three things to read off it. Pixels stay at chance however many labels there are, and the best pixel network of the
+lecture needs all 80 cases and their augmented views to reach 80%. The code of the stage-4 encoder gets there with 4
+to 10 labelled cases: pretraining on 100 unlabelled nuclei bought what 70 labels could not. And the hand-made
+measurements win at every count, because solidity and contour roughness were designed for exactly this question; the
+code is a general-purpose set of numbers that nobody had to design, and most questions in pathology come without such
+measurements. With 20 test nuclei and one fixed draw of labelled cases the numbers are noisy: another draw of 10
+labelled cases moves the code's score by ten points either way (over random draws it averages 73 to 75%), which is
+why the recipe keeps its draw fixed.
+
+**Does a bigger encoder help?** `node tools/pretrain_backbone.js --measure` pretrains five encoders and probes each
+one the same way (a single layer on the frozen code, n labelled cases per question as random draws, scored on the 20
+test nuclei); mean over the three questions and two pretraining seeds:
+
+| Pretraining set · encoder | 4 | 10 | 20 | 40 | 80 | Other lab, 20 |
+|---|---|---|---|---|---|---|
+| The page's 100 nuclei · 4 filters, code of 8 · 100 epochs (stage 4; shipped) | 69% | 80% | 86% | 88% | 88% | 84% |
+| The page's 240 training nuclei · 4 filters, code of 8 · 200 epochs | 63% | 75% | 83% | 86% | 86% | 83% |
+| The page's 240 training nuclei · 8 filters, code of 16 · 200 epochs (shipped) | 66% | 75% | 89% | 91% | 93% | 87% |
+| 2,100 generated nuclei · 4 filters, code of 8 · 60 epochs | 62% | 74% | 87% | 87% | 86% | 86% |
+| 2,100 generated nuclei · 8 filters, code of 16 · 60 epochs | 64% | 74% | 86% | 88% | 92% | 85% |
+
+Not much, and not at all where it would matter most. With 4 to 20 labelled cases every encoder lands within a few
+points of the stage's own 100-nucleus one, which is the best of them at 4 and 10. Only with 40 to 80 labelled cases do
+the 8-filter encoders pull ahead (91 to 93% against 88%), and the one pretrained on the page's 240 nuclei is the best
+of those, which is why it ships as the second option. Twenty-one times more generated nuclei bought nothing: a hundred
+nuclei already span everything this generator can draw, and longer pretraining makes the code better at telling
+individuals apart rather than at the traits the questions ask about. In this miniature the scaling story of the real
+foundation models does not reproduce, and the page says so rather than pretending otherwise.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -315,12 +380,14 @@ perimeter of the smooth ellipse with the same area and elongation). Standardizat
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder and an autoencoder for the foundation model (browser + Node)
-js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model (browser + Node)
+js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix
-js/app.js                  state, task switch, training loop, the four stages (with the foundation model's pretraining loop and probes), the inspector, unit heatmap, prevalence
+js/app.js                  state, task switch, training loop, the four stages (with the foundation model's pretraining loop and probes), the code input and its encoders, the inspector, unit heatmap, prevalence
+data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 tools/generate_cbc.js      make the blood-count dataset
-tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs
+tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
+tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
 tools/check_training.js    gradient check + the ten recipes, the other lab, the shortcut and the label-noise curve in Node
 tools/check_foundation.js  the foundation model's pretraining and what its code is worth, in Node
 tools/build_single_file.js bundle everything into dist/nucleus-net.html

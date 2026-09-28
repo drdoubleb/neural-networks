@@ -3,6 +3,7 @@
  * generate_nuclei.js — builds the synthetic nucleus datasets used by the demo, one per lecture question.
  *
  * Zero dependencies (Node >= 16). Run:  node tools/generate_nuclei.js
+ * Required as a module (tools/pretrain_backbone.js), it runs nothing and exports the generator's parts instead.
  *
  * For each task (data/atypia, data/enlargement, data/irregularity) it writes:
  *   nuclei_data.js        all 100 images (base64 grayscale) + labels + split, loaded by index.html
@@ -329,7 +330,7 @@ function makeOne(label, task, i) {
   throw new Error('could not sample a nucleus');
 }
 
-for (const task of TASKS) buildTask(task);
+if (require.main === module) for (const task of TASKS) buildTask(task);
 
 function buildTask(task) {
 const OUT = path.join(DATA_ROOT, task.id);
@@ -441,3 +442,5 @@ console.log(`[${task.id}] wrote ${records.length} nuclei (${meta.train} train / 
 console.log('  contour styles:', styles);
 console.log('  subtypes:', subtypes);
 }
+
+module.exports = { SIZE, TASKS, mulberry32, setSeed: seed => { rand = mulberry32(seed); }, makeOne, makeValueNoise, renderNucleus, otherLabLook, gaussian, gaussianFrom, encodePNG, shuffle };
