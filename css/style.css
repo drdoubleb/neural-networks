@@ -132,6 +132,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .thumb:focus-vi
 .fm-two { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) { .fm-two { grid-template-columns: 380px minmax(0, 1fr); } }
 #fm-batch { display: block; width: 348px; max-width: 100%; height: auto; border-radius: 8px; }
+#fm-lineup, #fm-views { display: block; width: 100%; height: auto; border-radius: 8px; }
 .fm-selected { margin-top: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; font-size: 13px; color: var(--ink-2); }
 .fm-selected .who { flex-basis: 100%; }
 .fm-selected .txt { flex: 1 1 220px; display: grid; gap: 6px; align-content: start; }

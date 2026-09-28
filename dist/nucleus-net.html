@@ -143,6 +143,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .thumb:focus-vi
 .fm-two { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) { .fm-two { grid-template-columns: 380px minmax(0, 1fr); } }
 #fm-batch { display: block; width: 348px; max-width: 100%; height: auto; border-radius: 8px; }
+#fm-lineup, #fm-views { display: block; width: 100%; height: auto; border-radius: 8px; }
 .fm-selected { margin-top: 12px; display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; font-size: 13px; color: var(--ink-2); }
 .fm-selected .who { flex-basis: 100%; }
 .fm-selected .txt { flex: 1 1 220px; display: grid; gap: 6px; align-content: start; }
@@ -740,14 +741,14 @@ details.fold > ul { margin-top: 8px; }
           <h2>A foundation model, in miniature</h2>
           <span class="small muted">pretrained on 100 nuclei without a single label · reused later for every question</span>
         </div>
-        <p class="prose small">So far every question trained its own network from scratch on labelled cases. A foundation model is pretrained once, on many unlabelled images, to produce a short <strong>code</strong> for any image; the questions then come later, each with a few labelled cases. The miniature here is a convolutional encoder trained by a simple rule with no labels in it: <strong>two views of the same nucleus</strong> (a flip or rotation, or the other lab’s scan of it) must land on nearly the same code, and <strong>different nuclei</strong> must land far apart. The 100 nuclei come from all three questions; the network is never told which.</p>
+        <p class="prose small">So far every question trained its own network from scratch on labelled cases. A foundation model is pretrained once, on many unlabelled images, to turn any image into a short <strong>code</strong>; the questions come later, each with a few labelled cases on top of the code. Nothing here rebuilds the nucleus. The miniature encoder plays a game with no labels in it, <strong>spot the same nucleus</strong>: ① take a nucleus and make two <em>views</em> of it (a flip or rotation, or the other lab’s scan); ② the encoder turns each view into 8 numbers; ③ among all the other views in the batch, it must find the partner by comparing the numbers; ④ the weights are nudged so the partner scores higher next time. To win, the code has to keep what makes a nucleus itself (its outline, size, texture) and ignore what a view changes (orientation, stain), and that is exactly what the questions later need. The 100 nuclei come from all three questions; the network is never told which.</p>
         <div class="bar-row">
           <div class="ctl check"><input type="checkbox" id="fm-labs" checked><label for="fm-labs" class="plainlabel">The other lab’s scans count as views</label></div>
           <div class="ctl slim"><label for="fm-epochs">Epochs <span class="val" id="fm-epochs-val">100</span></label><input type="range" id="fm-epochs" min="10" max="300" step="10" value="100"></div>
           <div class="ctl slim"><label for="fm-speed">Speed <span class="val" id="fm-speed-val"></span></label><input type="range" id="fm-speed" min="0" max="100" step="1" value="52"></div>
           <div class="ctl slim"><label for="fm-seed">Random seed</label><input type="number" id="fm-seed" min="1" max="9999" value="1"></div>
           <div class="actions-inline">
-            <button type="button" class="btn" id="fm-step-batch" title="one gradient step on the next batch of 16 nuclei, two views each">Step batch</button>
+            <button type="button" class="btn" id="fm-step-batch" title="one gradient step on the next batch of 20 nuclei, two views each">Step batch</button>
             <button type="button" class="btn" id="fm-step-epoch" title="one pass through the 100 nuclei">Step epoch</button>
             <button type="button" class="btn primary big" id="fm-train" title="run the remaining epochs">▶ Pretrain</button>
             <button type="button" class="btn" id="fm-reset" title="re-initialise the encoder from the seed">↺ Reset</button>
@@ -755,6 +756,15 @@ details.fold > ul { margin-top: 8px; }
         </div>
         <div class="status" id="fm-status"></div>
         <div class="note" id="fm-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The game: spot the same nucleus</h2>
+          <span class="small muted">one view of the last batch (or of the nucleus you pick below) against every other view of the batch · no label anywhere</span>
+        </div>
+        <canvas id="fm-lineup" width="800" height="240" aria-label="The line-up: which candidate is the same nucleus"></canvas>
+        <p class="small muted" style="margin-top:8px">The encoder turns every view into 8 numbers and compares them by cosine; the vote is a softmax over the cosines at temperature 0.2. The answer is the nucleus’s other view, framed in orange. At the start the vote is spread thin over every candidate; pretraining is nothing but making the partner win this game, for every view of every batch. Watch the orange bar grow as it runs.</p>
       </div>
 
       <div class="card">
@@ -774,10 +784,19 @@ details.fold > ul { margin-top: 8px; }
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-head">
+          <h2>What the code learns to keep, and to ignore</h2>
+          <span class="small muted">the same nucleus in all 8 orientations from both labs, and the code of each view · at the start and now · then another nucleus</span>
+        </div>
+        <canvas id="fm-views" width="800" height="200" aria-label="One nucleus in sixteen views with its codes, before and after pretraining, and another nucleus"></canvas>
+        <p class="small muted" style="margin-top:8px">Each strip is one view’s code, the 8 numbers as bars on one scale per row. At the start a nucleus’s 16 codes are no closer to each other than to another nucleus’s: a random encoder gives every view much the same code, so nothing is told apart. Pretraining makes a nucleus’s own codes agree (orientation and stain are ignored) while a different nucleus’s codes move away (its identity is kept). Untick the other lab’s scans above, reset, and the right-hand half no longer lines up.</p>
+      </div>
+
       <div class="fm-two">
         <div class="card">
           <div class="card-head">
-            <h2>This batch: 8 nuclei, two views each</h2>
+            <h2>This batch: 8 of its 20 nuclei, two views each</h2>
             <span class="small muted">every view against every other · ringed cells are the pairs</span>
           </div>
           <canvas id="fm-batch" width="348" height="348" aria-label="Similarity matrix of the batch"></canvas>
@@ -2368,9 +2387,9 @@ window.Viz = (function () {
   // nucleus with its code, their cosine similarity (to be pulled up), a few other nuclei of the batch with theirs (to be
   // pushed down), and the loss this view contributes. m.contrast = { view2Px, code1, code2, cos12, others: [{ px, cos }],
   // loss, share, view2Label }
-  function codeStrip(ctx, c, x, y, w, h, code) {
+  function codeStrip(ctx, c, x, y, w, h, code, scale) {
     const n = code.length, bw = w / n, mid = y + h / 2;
-    let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v));
+    let mx = scale || 1e-9; if (!scale) for (const v of code) mx = Math.max(mx, Math.abs(v));
     ctx.fillStyle = c.surface2; ctx.fillRect(x, y, w, h);
     for (let j = 0; j < n; j++) { const v = code[j] / mx, bh = Math.abs(v) * (h / 2 - 2); ctx.fillStyle = diverging(v); ctx.fillRect(x + j * bw + 1, v >= 0 ? mid - bh : mid, bw - 2, bh); }
     ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, mid + 0.5); ctx.lineTo(x + w, mid + 0.5); ctx.stroke();
@@ -2429,6 +2448,79 @@ window.Viz = (function () {
       ctx.fillStyle = diverging(Math.max(-1, Math.min(1, opt.sim[i][j]))); ctx.fillRect(x, y, cell - 1, cell - 1);
       if ((i ^ 1) === j) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x + 1, y + 1, cell - 3, cell - 3); }
     }
+  }
+  // ---- the game the encoder plays: spot the same nucleus
+  // One view (the query) against every other view of the batch as a candidate for "the same nucleus", ranked by the
+  // encoder's vote: a softmax over the cosines of the codes. opt = { query: px, queryLabel, cands: [{ px, p, partner }]
+  // best first, share, loss, size, tint }
+  function drawLineup(canvas, opt) {
+    const W = 800, per = 20, slot = 35, thumb = 28, barH = 34, rowH = thumb + 4 + barH + 16, rows = Math.ceil(opt.cands.length / per), H = 30 + rows * rowH + 34;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono11 = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = mono9; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    // the query, at the left
+    const qx = 10, qy = 30;
+    ctx.drawImage(imageToCanvas(opt.query, opt.size, opt.tint), qx, qy, 60, 60);
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(qx - 0.5, qy - 0.5, 61, 61);
+    ctx.fillStyle = c.ink; ctx.fillText('this view:', qx, qy + 66);
+    const lab = opt.queryLabel.split(' · '); let ty = qy + 77;
+    ctx.fillStyle = c.ink3; for (const t of lab) { ctx.fillText(t, qx, ty); ty += 11; }
+    ty += 8; ctx.fillStyle = c.ink2; ['which of the', `${opt.cands.length} candidates`, 'is the same', 'nucleus?'].forEach(t => { ctx.fillText(t, qx, ty); ty += 11; });
+    ctx.fillStyle = c.irregular; ctx.fillText('answer: orange', qx, ty + 6);
+    // the candidates: the encoder's vote, best first
+    const x0 = 92;
+    ctx.fillStyle = c.ink3; ctx.fillText('the encoder’s vote, best first · each bar is the candidate’s share of 100%', x0, 10);
+    let mx = 1e-9; for (const d of opt.cands) mx = Math.max(mx, d.p);
+    opt.cands.forEach((d, i) => {
+      const r = Math.floor(i / per), k = i % per, x = x0 + k * slot, y = 30 + r * rowH;
+      ctx.drawImage(imageToCanvas(d.px, opt.size, opt.tint), x, y, thumb, thumb);
+      ctx.strokeStyle = d.partner ? c.irregular : c.lineStrong; ctx.lineWidth = d.partner ? 2.5 : 1; ctx.strokeRect(x - 0.5, y - 0.5, thumb + 1, thumb + 1);
+      const bh = Math.max(1, Math.round(d.p / mx * barH)), wrongPick = i === 0 && !d.partner;
+      ctx.fillStyle = d.partner ? c.irregular : wrongPick ? c.bad : rgbStr(c.rgb.ink3, 0.45);
+      ctx.fillRect(x + 5, y + thumb + 4 + barH - bh, thumb - 10, bh);
+      ctx.font = mono9; ctx.fillStyle = d.partner ? c.irregular : wrongPick ? c.bad : c.ink3; ctx.textAlign = 'center';
+      ctx.fillText(d.p >= 0.0995 ? `${Math.round(d.p * 100)}%` : `${(d.p * 100).toFixed(1)}%`, x + thumb / 2, y + thumb + 4 + barH + 3);
+      ctx.textAlign = 'left';
+    });
+    // its first pick, right or wrong
+    const first = opt.cands[0];
+    ctx.font = mono11; ctx.fillStyle = first.partner ? c.good : c.bad; ctx.textAlign = 'right';
+    ctx.fillText(first.partner ? '✓ first pick: the partner' : '✗ first pick: another nucleus', W - 8, 8);
+    ctx.textAlign = 'left';
+    // the loss for this view
+    const yb = 30 + rows * rowH + 2, pc = v => (v >= 0.0995 ? `${Math.round(v * 100)}%` : `${(v * 100).toFixed(1)}%`);
+    ctx.font = mono11; ctx.fillStyle = c.ink;
+    ctx.fillText(`the answer gets ${pc(opt.share)} of the vote → loss = −log(share) = ${opt.loss.toFixed(2)}`, x0, yb);
+    ctx.font = mono9; ctx.fillStyle = c.ink3;
+    ctx.fillText(`at chance every candidate gets ${(100 / opt.cands.length).toFixed(1)}% (loss ${Math.log(opt.cands.length).toFixed(2)}) · a sure answer gets 100% (loss 0) · every view plays once per batch`, x0, yb + 16);
+  }
+  // What the code keeps and what it ignores: one nucleus in its 8 orientations from both labs, each view's code as a
+  // strip (one scale per row), for the encoder at the start and now, and another nucleus for contrast.
+  // opt = { rows: [{ label, note, note2, views: [{ px, code }] }], size, tint }
+  function drawViews(canvas, opt) {
+    const W = 800, x0 = 150, slot = 40, thumb = 30, strip = 14, rowH = thumb + 3 + strip + 10, H = 26 + opt.rows.length * rowH + 2;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono11 = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = mono9; ctx.textBaseline = 'top'; ctx.fillStyle = c.ink3; ctx.textAlign = 'center';
+    ctx.fillText('our lab’s scan · 8 orientations', x0 + 4 * slot - 5, 2); ctx.fillText('the other lab’s scan · 8 orientations', x0 + 12 * slot - 5, 2);
+    const ori = ['0°', '90°', '180°', '270°', 'mirror', 'm+90°', 'm+180°', 'm+270°'];
+    for (let k = 0; k < 16; k++) ctx.fillText(ori[k % 8], x0 + k * slot + thumb / 2, 13);
+    opt.rows.forEach((row, r) => {
+      const y = 26 + r * rowH;
+      ctx.textAlign = 'left'; ctx.font = mono11; ctx.fillStyle = c.ink; ctx.fillText(row.label, 8, y + 4);
+      ctx.font = mono9; ctx.fillStyle = c.ink3; if (row.note) ctx.fillText(row.note, 8, y + 21); if (row.note2) ctx.fillText(row.note2, 8, y + 32);
+      let mx = 1e-9; for (const v of row.views) for (const q of v.code) mx = Math.max(mx, Math.abs(q));
+      row.views.forEach((v, k) => {
+        const x = x0 + k * slot;
+        ctx.drawImage(imageToCanvas(v.px, opt.size, opt.tint), x, y, thumb, thumb);
+        ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, y - 0.5, thumb + 1, thumb + 1);
+        codeStrip(ctx, c, x, y + thumb + 3, thumb, strip, v.code, mx);
+      });
+    });
   }
   // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct }
   function drawSeries(svg, opt) {
@@ -3363,7 +3455,7 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
 
 </script>
@@ -4508,7 +4600,7 @@ window.Viz = (function () {
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && S.stage === 'train') teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test'); else if (ev.key === '4') showStage('foundation');
     });
-    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderGraph(); fmRenderBatch(); } });
+    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } });
     // playback controls in both strips: previous step, pause/play, next step, speed
     for (const key of ['lesson', 'test']) {
       const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
@@ -4549,12 +4641,12 @@ window.Viz = (function () {
 
   // ------------------------------------------------------------------ 4 · Foundation: a miniature foundation model, pretrained live
   // 100 nuclei from the three image questions' training sets (34 / 33 / 33) and no labels. The encoder (4 filters 5×5,
-  // pool 4×4, a linear layer to a code of 8) is pretrained by instance discrimination: a batch takes 16 nuclei and two
+  // pool 4×4, a linear layer to a code of 8) is pretrained by instance discrimination: a batch takes 20 nuclei and two
   // random views of each (a flip or rotation, and the other lab's scan when allowed); the loss pulls the two views of a
   // nucleus together and pushes every other view of the batch away. After every epoch the code is measured on the side:
   // the contrastive loss on 60 held-out nuclei, and what a single layer trained on the frozen code with 20 labelled cases
   // per question scores on 40 nuclei it never saw.
-  const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 15, batch: 16, lr: 0.05, K: 4, code: 8, tau: 0.2,
+  const FM = { tasks: ['atypia', 'enlargement', 'irregularity'], counts: [34, 33, 33], heldPer: 20, heldBatch: 20, batch: 20, lr: 0.05, K: 4, code: 8, tau: 0.2,
     probePerClass: 10, probeEpochs: 150, probeLr: 0.1, colors: { atypia: '#7c3aed', enlargement: '#0e9f6e', irregularity: '#d97706' } };
   const ORIENT = ['as scanned', '90°', '180°', '270°', 'mirrored', 'mirror+90°', 'mirror+180°', 'mirror+270°'];
   const ORIENT_LONG = ['as scanned', 'rotated 90°', 'rotated 180°', 'rotated 270°', 'mirrored', 'mirrored, rotated 90°', 'mirrored, rotated 180°', 'mirrored, rotated 270°'];
@@ -4587,7 +4679,7 @@ window.Viz = (function () {
     fmBuildHeld();
     fmSyncControls();
   }
-  // the held-out nuclei get two views each, drawn once from a fixed seed, in batches of 15 pairs so that their loss reads
+  // the held-out nuclei get two views each, drawn once from a fixed seed, in batches of 20 pairs so that their loss reads
   // on the same scale as the training batches' (at chance, −log of one over the other views in the batch)
   function fmBuildHeld() {
     const F = S.fm, rng = NN.mulberry32(99), pairs = F.held.map(e => [fmRandomView(e, rng).x, fmRandomView(e, rng).x]);
@@ -4625,6 +4717,7 @@ window.Viz = (function () {
     const F = S.fm; fmStop();
     if (!F.set) fmBuild();
     F.cl = new NN.Contrastive({ imageSize: F.size, conv: { K: FM.K, f: 5, pool: 4 }, code: FM.code, tau: FM.tau, seed: F.seed });
+    F.cl0 = new NN.Contrastive({ imageSize: F.size, conv: { K: FM.K, f: 5, pool: 4 }, code: FM.code, tau: FM.tau, seed: F.seed }); // the same encoder as it started, kept for comparison
     F.rng = NN.mulberry32(F.seed * 31 + 7); F.order = F.set.map((_, i) => i);
     F.epoch = 0; F.ptr = 0; F.debt = 0; F.hist = []; F.lastBatch = null; F.epochLoss = 0; F.epochBatches = 0; F.codes = null; F.batchCache = null; F.selected = null;
     for (const e of F.set) { e.fixed = fmFixedViews(e); e.views = e.fixed; }
@@ -4638,7 +4731,7 @@ window.Viz = (function () {
     const F = S.fm, held = fmHeldEval(), probes = fmProbes();
     F.hist.push(Object.assign({ epoch: F.epoch, loss, heldLoss: held.loss, pairAcc: held.pairAcc }, probes));
   }
-  // one gradient step: the next 16 nuclei of the epoch's order, two fresh random views each
+  // one gradient step: the next 20 nuclei of the epoch's order, two fresh random views each
   function fmStep() {
     const F = S.fm, n = F.set.length;
     if (F.ptr === 0) fmShuffle();
@@ -4661,7 +4754,7 @@ window.Viz = (function () {
   function fmStop(msg) { const F = S.fm; F.running = false; fmSyncButtons(); if (msg) fmNote(msg); }
   function fmFinish() {
     const F = S.fm, last = F.hist[F.hist.length - 1];
-    fmStop(`Finished ${F.epochs} epochs without a label. Held-out loss ${last.heldLoss.toFixed(2)}, pair-hit ${pct(last.pairAcc)}. A single layer on the frozen code, with 20 labelled cases per question, now scores ${FM.tasks.map(id => `${pct(last[id])} on “${F.dsets[id].task.title}”`).join(', ')}.`);
+    fmStop(`Finished ${F.epochs} epochs without a label. Held-out loss ${last.heldLoss.toFixed(2)}, partner found first for ${pct(last.pairAcc)} of the held-out views. A single layer on the frozen code, with 20 labelled cases per question, now scores ${FM.tasks.map(id => `${pct(last[id])} on “${F.dsets[id].task.title}”`).join(', ')}.`);
   }
   function fmTick(now) {
     const F = S.fm; if (!F.running) return;
@@ -4686,7 +4779,7 @@ window.Viz = (function () {
     fmBuildHeld(); F.codes = null; F.batchCache = null;
     if (F.cl) { fmRender(true); fmNote(F.labs ? 'The other lab’s scans now count as views of the same nucleus: from the next batch on, the encoder is asked to see past the stain too. The held-out pairs follow.' : 'Only flips and rotations count as views now: the encoder is no longer asked to see past the stain. The held-out pairs follow.'); }
   }
-  function fmSelect(i) { const F = S.fm; F.selected = i == null || i === F.selected ? null : i; fmRenderGraph(); fmRenderTray(); fmRenderMap(); fmRenderSelected(); }
+  function fmSelect(i) { const F = S.fm; F.selected = i == null || i === F.selected ? null : i; fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderTray(); fmRenderMap(); fmRenderSelected(); }
   function fmFocus() { const F = S.fm; return F.selected != null ? F.set[F.selected] : F.lastBatch ? F.lastBatch.views[0].e : F.set[0]; } // the nucleus in the diagram
   function fmSyncButtons() { const F = S.fm; $('fm-train').textContent = F.running ? '⏸ Pause' : F.epoch > 0 ? '▶ Continue' : '▶ Pretrain'; }
   function fmSyncControls() {
@@ -4699,7 +4792,7 @@ window.Viz = (function () {
     fmSyncButtons();
   }
   // ---- rendering
-  // the reference batch through the current encoder: the last batch, or the first 16 nuclei before any step
+  // the reference batch through the current encoder: the last batch, or the first 20 nuclei before any step
   function fmBatchView() {
     const F = S.fm, views = F.lastBatch ? F.lastBatch.views : F.defaultBatch;
     if (F.batchCache && F.batchCache.steps === F.cl.steps && F.batchCache.views === views) return F.batchCache;
@@ -4717,18 +4810,50 @@ window.Viz = (function () {
     F.codes = { steps: F.cl.steps, canon: F.set.map(e => F.cl.encode(e.fixed[0].x)), alt: F.set.map(e => F.cl.encode(e.fixed[1].x)) };
     return F.codes;
   }
-  function fmGraphModel() {
+  // the game for one view: every other view of the batch is a candidate for "the same nucleus", and the encoder's vote
+  // is a softmax over the cosines of the codes at τ (the partner included), best first
+  function fmLineup() {
     const F = S.fm, B = fmBatchView(), e = fmFocus(), k = B.views.findIndex(v => v.e === e), [v1, v2] = e.views;
     const fw = F.cl.enc.forward(v1.x);
     const code1 = k >= 0 ? B.codes[2 * k] : fw.a[1], code2 = k >= 0 ? B.codes[2 * k + 1] : F.cl.encode(v2.x);
     const u1 = NN.Contrastive.unit(code1).u, u2 = NN.Contrastive.unit(code2).u, tau = F.cl.tau, cos12 = dot(u1, u2);
-    let Z = 0; const others = [];
-    B.views.forEach((v, j) => { if (v.e === e) return; const c1 = dot(u1, B.units[2 * j]), c2 = dot(u1, B.units[2 * j + 1]); Z += Math.exp(c1 / tau) + Math.exp(c2 / tau); others.push({ px: v.v1.px, cos: c1 }); });
-    others.sort((a, b) => b.cos - a.cos); // the hardest negatives: the other nuclei whose codes sit nearest
-    const share = Math.exp(cos12 / tau) / (Math.exp(cos12 / tau) + Z);
-    return { net: F.cl.enc, mode: 'pixels', x: v1.x, fw, specimen: { px: v1.px }, size: F.size, tint: S.tint, stage: 2, inputMean: F.std.mean, hover: F.hover,
+    const cands = [{ px: v2.px, cos: cos12, partner: true, e }];
+    const field = k >= 0 ? B.views : B.views.slice(0, -1); // a nucleus picked from outside the batch takes the last one's seat, so the line-up stays the same size
+    field.forEach((v, j) => { if (v.e === e) return; cands.push({ px: v.v1.px, cos: dot(u1, B.units[2 * j]), partner: false, e: v.e }, { px: v.v2.px, cos: dot(u1, B.units[2 * j + 1]), partner: false, e: v.e }); });
+    let Z = 0; for (const d of cands) { d.w = Math.exp(d.cos / tau); Z += d.w; }
+    for (const d of cands) d.p = d.w / Z;
+    cands.sort((x, y) => y.p - x.p);
+    const share = cands.find(d => d.partner).p;
+    return { e, v1, v2, fw, code1, code2, cos12, cands, share, loss: -Math.log(share), inBatch: k >= 0 };
+  }
+  function fmGraphModel() {
+    const F = S.fm, L = fmLineup(), seen = new Set(), others = [];
+    for (const d of L.cands) { if (d.partner || seen.has(d.e)) continue; seen.add(d.e); others.push({ px: d.px, cos: d.cos }); if (others.length === 3) break; } // the hardest negatives: the nearest other nuclei by code
+    return { net: F.cl.enc, mode: 'pixels', x: L.v1.x, fw: L.fw, specimen: { px: L.v1.px }, size: F.size, tint: S.tint, stage: 2, inputMean: F.std.mean, hover: F.hover,
       activation: 'linear', activationLabel: NN.ACTIVATIONS.linear.label, featureNames: [], positiveName: '', negativeName: '',
-      contrast: { view1Label: fmViewLabel(v1), view2Label: fmViewLabel(v2), view2Px: v2.px, code1, code2, cos12, others: others.slice(0, 3), loss: -Math.log(share), share, inBatch: k >= 0 } };
+      contrast: { view1Label: fmViewLabel(L.v1), view2Label: fmViewLabel(L.v2), view2Px: L.v2.px, code1: L.code1, code2: L.code2, cos12: L.cos12, others, loss: L.loss, share: L.share, inBatch: L.inBatch } };
+  }
+  function fmRenderLineup() {
+    const F = S.fm, L = fmLineup();
+    Viz.drawLineup($('fm-lineup'), { query: L.v1.px, queryLabel: fmViewLabel(L.v1), cands: L.cands.map(d => ({ px: d.px, p: d.p, partner: d.partner })), share: L.share, loss: L.loss, size: F.size, tint: S.tint });
+  }
+  // the same nucleus in every orientation from both labs: its codes at the start and now, and another nucleus (the
+  // batch's nearest by code) for contrast
+  function fmRenderViews() {
+    const F = S.fm, L = fmLineup(), e = L.e, near = L.cands.find(d => !d.partner), other = near ? near.e : F.set.find(o => o !== e);
+    const views = o => { const out = []; for (const lab of ['A', 'B']) for (let t = 0; t < 8; t++) out.push(fmMakeView(o, lab, t)); return out; };
+    const row = (o, cl, label, ref) => {
+      const vs = views(o), codes = vs.map(v => cl.encode(v.x)), units = codes.map(cd => NN.Contrastive.unit(cd).u);
+      let sum = 0, n = 0;
+      if (ref) { for (const p of units) for (const q of ref) { sum += dot(p, q); n++; } }
+      else for (let i = 0; i < units.length; i++) for (let j = i + 1; j < units.length; j++) { sum += dot(units[i], units[j]); n++; }
+      return { label, units, mean: sum / n, views: vs.map((v, i) => ({ px: v.px, code: codes[i] })) };
+    };
+    const r0 = row(e, F.cl0, 'at the start'), r1 = row(e, F.cl, 'now'), r2 = row(other, F.cl, 'another nucleus, now', r1.units);
+    r0.note = `mean cosine ${r0.mean.toFixed(2)}`; r0.note2 = 'among its 16 codes';
+    r1.note = `mean cosine ${r1.mean.toFixed(2)}`; r1.note2 = 'among its 16 codes';
+    r2.note = `mean cosine ${r2.mean.toFixed(2)}`; r2.note2 = 'to the codes above';
+    Viz.drawViews($('fm-views'), { rows: [r0, r1, r2], size: F.size, tint: S.tint });
   }
   function fmRenderGraph() { const cv = $('fm-canvas'), m = fmGraphModel(); cv._model = m; Viz.drawNetwork(cv, m); }
   function fmRenderBatch() {
@@ -4744,15 +4869,15 @@ window.Viz = (function () {
       `<span>nuclei <b>${F.set.length}</b>, no labels · views: flips &amp; rotations${F.labs ? ' + the other lab’s scans' : ''}</span>` +
       `<span>epoch <b>${F.epoch}</b> / ${F.epochs}</span>` +
       `<span>batch <b>${F.lastBatch ? F.lastBatch.index : '–'}</b> / ${bpe}</span>` +
-      (F.lastBatch ? `<span>last batch loss <b>${F.lastBatch.res.loss.toFixed(2)}</b> · pair-hit <b>${pct(F.lastBatch.res.pairAcc)}</b></span>` : '') +
-      (last ? `<span>held-out loss <b>${last.heldLoss.toFixed(2)}</b> · pair-hit <b>${pct(last.pairAcc)}</b></span>` : '');
+      (F.lastBatch ? `<span>last batch loss <b>${F.lastBatch.res.loss.toFixed(2)}</b> · partner found <b>${pct(F.lastBatch.res.pairAcc)}</b></span>` : '') +
+      (last ? `<span>held-out loss <b>${last.heldLoss.toFixed(2)}</b> · partner found <b>${pct(last.pairAcc)}</b></span>` : '');
   }
   function fmRenderCurves() {
     const F = S.fm, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim();
     Viz.drawSeries($('fm-loss'), { hist: F.hist, keys: [{ key: 'loss', color: c.accent }, { key: 'heldLoss', color: testCol, dash: true }], maxEpoch: F.epochs });
     Viz.drawSeries($('fm-worth'), { hist: F.hist, keys: FM.tasks.map(id => ({ key: id, color: FM.colors[id] })), maxEpoch: F.epochs, pct: true });
     const last = F.hist[F.hist.length - 1];
-    $('fm-loss-now').textContent = last ? `${last.loss != null ? `batches ${last.loss.toFixed(2)} · ` : ''}held-out ${last.heldLoss.toFixed(2)} · pair-hit ${pct(last.pairAcc)}` : '';
+    $('fm-loss-now').textContent = last ? `${last.loss != null ? `batches ${last.loss.toFixed(2)} · ` : ''}held-out ${last.heldLoss.toFixed(2)} · partner found ${pct(last.pairAcc)}` : '';
     $('fm-worth-now').textContent = last ? FM.tasks.map(id => pct(last[id])).join(' / ') : '';
   }
   function fmRenderMap() {
@@ -4794,14 +4919,14 @@ window.Viz = (function () {
   }
   function fmRender(full) {
     const F = S.fm; if (!F.cl) return;
-    fmRenderStatus(); fmRenderGraph(); fmRenderBatch();
-    if (full) { fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); }
+    fmRenderStatus(); fmRenderLineup(); fmRenderGraph(); fmRenderBatch();
+    if (full) { fmRenderViews(); fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); }
     fmSyncButtons();
   }
   function fmEnter() {
     const F = S.fm;
     if (!F.set) fmBuild();
-    if (!F.cl) fmReset('A fresh random encoder. Step a batch to watch one gradient step on 16 nuclei, or press Pretrain and watch the code become worth something.');
+    if (!F.cl) fmReset('A fresh random encoder. Step a batch to watch one gradient step on 20 nuclei, or press Pretrain and watch the code become worth something.');
     else fmRender(true);
   }
   function bindFoundation() {

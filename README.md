@@ -119,13 +119,17 @@ style). The network never sees it; the page uses it to show which hidden units r
    them into positive and negative predictive values for a realistic population.
 4. **Foundation.** A miniature foundation model, pretrained live on 100 nuclei from all three image questions (34 / 33 /
    33 of their training sets) without a single label: a convolutional encoder (4 filters of 5 × 5, pool 4 × 4, a linear
-   layer to a **code** of 8 numbers) trained by instance discrimination. Every batch takes 16 nuclei and two random
+   layer to a **code** of 8 numbers) trained by instance discrimination. Every batch takes 20 nuclei and two random
    *views* of each (a flip or rotation, and the other lab's scan of it when the checkbox allows); the loss pulls the two
-   views of a nucleus together and pushes every other view of the batch away. The encoder diagram shows one pair live
-   (the codes of both views as strips, their cosine, the three nearest other nuclei of the batch and the pair's share of
-   the softmax that makes the loss); a similarity matrix shows the batch, every view against every other, with the
-   pairs ringed; the tray of 100 can be coloured by question or by the answer to each nucleus's own question (which the
-   model never saw); an embedding map plots any two code numbers for every nucleus and its second view. Two curves run
+   views of a nucleus together and pushes every other view of the batch away. The stage shows the rule as the game it
+   is, *spot the same nucleus*: a line-up puts one view against every other view of the batch as a candidate, best
+   first, with the encoder's vote for each (a softmax over the cosines of the codes) and the answer framed in orange;
+   the encoder diagram shows the same pair live (the codes of both views as strips, their cosine, the three nearest
+   other nuclei of the batch and the pair's share of the vote, which is the loss); a strip shows what the code keeps
+   and ignores (one nucleus in all 8 orientations from both labs with the code of each view, at the start and now,
+   then another nucleus); a similarity matrix shows the batch, every view against every other, with the pairs ringed;
+   the tray of 100 can be coloured by question or by the answer to each nucleus's own question (which the model never
+   saw); an embedding map plots any two code numbers for every nucleus and its second view. Two curves run
    per epoch: the contrastive loss on the batches and on 60 held-out nuclei, and *what the code is worth*: a single
    layer trained on the frozen code with 20 labelled cases per question, scored on 40 nuclei it never saw. See *A
    foundation model, in miniature*.
@@ -152,7 +156,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. The recipe to show the other lab on: switch the test cases to the other lab and it falls to chance, and stain normalisation repairs it (see *Another lab, and the shortcut*). |
 | ⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
 | ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
-| ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~85% atypia, ~97% enlargement, ~82% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
+| ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -239,10 +243,12 @@ Recipe ⑪ and the fourth stage. The idea of a foundation model is that the expe
 made of, is done once, on many unlabelled images, and every later question is a small model on top of the resulting
 **code**. The miniature keeps every part visible: 100 nuclei from the three image questions' training sets (34 / 33 /
 33, our lab's scans, never a label), an encoder of 1,680 weights (4 filters of 5 × 5, pool 4 × 4, a linear layer to a
-code of 8), and a pretraining rule with no labels in it, instance discrimination: two views of the same nucleus (a flip
-or rotation, or the other lab's scan of it) must land on nearly the same code, and different nuclei must land apart. A
-batch takes 16 nuclei with two random views each; for each view the loss is minus the log of its pair's share of a
-softmax over every other view of the batch at temperature 0.2 (so it starts near −log(1/31) ≈ 3.4), and the gradient
+code of 8), and a pretraining rule with no labels in it, instance discrimination, which the page presents as the game
+it is, **spot the same nucleus**: take a nucleus and make two views of it (a flip or rotation, or the other lab's scan);
+the encoder turns each view into 8 numbers; among all the other views in the batch it must find the partner by
+comparing the numbers; the weights are nudged so the partner scores higher next time. Nothing rebuilds the image. A
+batch takes 20 nuclei with two random views each; for each view the loss is minus the log of its partner's share of a
+softmax over every other view of the batch at temperature 0.2 (so it starts near −log(1/39) ≈ 3.7), and the gradient
 runs back through the normalisation, the code layer and the convolution exactly as in the classifiers (learning rate
 0.05, no weight decay, 100 epochs by default).
 
@@ -256,20 +262,20 @@ What the code is worth is measured on the side after every epoch and never fed b
 frozen code with 20 labelled training cases of a question (10 per class) and scored on 40 nuclei it never saw (the
 question's 20 test nuclei and its 20 held-out training nuclei). Mean of three seeds (`node tools/check_foundation.js`):
 
-| Epoch | Held-out loss | Pair-hit | Atypia | Enlargement | Irregularity |
+| Epoch | Held-out loss | Partner found | Atypia | Enlargement | Irregularity |
 |---|---|---|---|---|---|
-| 0 (random encoder) | 3.18 | 18% | 74% | 80% | 60% |
-| 10 | 2.39 | 44% | 80% | 99% | 61% |
-| 25 | 1.70 | 66% | 83% | 98% | 75% |
-| 50 | 1.44 | 74% | 86% | 98% | 75% |
-| 100 | 1.28 | 83% | 85% | 97% | 82% |
+| 0 (random encoder) | 3.44 | 15% | 74% | 80% | 60% |
+| 10 | 2.31 | 39% | 84% | 98% | 61% |
+| 25 | 1.87 | 63% | 82% | 98% | 79% |
+| 50 | 1.62 | 70% | 85% | 98% | 80% |
+| 100 | 1.40 | 81% | 81% | 97% | 83% |
 
-*Pair-hit* is the share of held-out views whose nearest other view, by cosine, is their own pair. Enlargement is
+*Partner found* is the share of held-out views whose nearest other view, by cosine, is their own partner. Enlargement is
 readable even from a random code (size is total ink, which any filter passes on), atypia is mostly size and darkness
 too, and contour irregularity is what the pretraining earns: from chance to about 80% with 20 labelled cases, where
 recipe ⑦ needed all 80 labelled cases and their 640 augmented views to reach 77%. Scored on the other lab's scans of the
-same nuclei, the single layer keeps 83% / 91% / 81%: the code was made to see past the stain. Untick *The other lab's
-scans count as views* and it no longer is. The measurements cost about as much as the pretraining itself (some 75 ms
+same nuclei, the single layer keeps 83% / 89% / 79%: the code was made to see past the stain. Untick *The other lab's
+scans count as views* and it no longer is. The measurements cost about as much as the pretraining itself (some 80 ms
 per epoch for both in Node); at the default speed of 4 epochs per second the 100 epochs take about half a minute.
 
 ## The data

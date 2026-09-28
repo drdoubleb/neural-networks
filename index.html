@@ -288,14 +288,14 @@
           <h2>A foundation model, in miniature</h2>
           <span class="small muted">pretrained on 100 nuclei without a single label · reused later for every question</span>
         </div>
-        <p class="prose small">So far every question trained its own network from scratch on labelled cases. A foundation model is pretrained once, on many unlabelled images, to produce a short <strong>code</strong> for any image; the questions then come later, each with a few labelled cases. The miniature here is a convolutional encoder trained by a simple rule with no labels in it: <strong>two views of the same nucleus</strong> (a flip or rotation, or the other lab’s scan of it) must land on nearly the same code, and <strong>different nuclei</strong> must land far apart. The 100 nuclei come from all three questions; the network is never told which.</p>
+        <p class="prose small">So far every question trained its own network from scratch on labelled cases. A foundation model is pretrained once, on many unlabelled images, to turn any image into a short <strong>code</strong>; the questions come later, each with a few labelled cases on top of the code. Nothing here rebuilds the nucleus. The miniature encoder plays a game with no labels in it, <strong>spot the same nucleus</strong>: ① take a nucleus and make two <em>views</em> of it (a flip or rotation, or the other lab’s scan); ② the encoder turns each view into 8 numbers; ③ among all the other views in the batch, it must find the partner by comparing the numbers; ④ the weights are nudged so the partner scores higher next time. To win, the code has to keep what makes a nucleus itself (its outline, size, texture) and ignore what a view changes (orientation, stain), and that is exactly what the questions later need. The 100 nuclei come from all three questions; the network is never told which.</p>
         <div class="bar-row">
           <div class="ctl check"><input type="checkbox" id="fm-labs" checked><label for="fm-labs" class="plainlabel">The other lab’s scans count as views</label></div>
           <div class="ctl slim"><label for="fm-epochs">Epochs <span class="val" id="fm-epochs-val">100</span></label><input type="range" id="fm-epochs" min="10" max="300" step="10" value="100"></div>
           <div class="ctl slim"><label for="fm-speed">Speed <span class="val" id="fm-speed-val"></span></label><input type="range" id="fm-speed" min="0" max="100" step="1" value="52"></div>
           <div class="ctl slim"><label for="fm-seed">Random seed</label><input type="number" id="fm-seed" min="1" max="9999" value="1"></div>
           <div class="actions-inline">
-            <button type="button" class="btn" id="fm-step-batch" title="one gradient step on the next batch of 16 nuclei, two views each">Step batch</button>
+            <button type="button" class="btn" id="fm-step-batch" title="one gradient step on the next batch of 20 nuclei, two views each">Step batch</button>
             <button type="button" class="btn" id="fm-step-epoch" title="one pass through the 100 nuclei">Step epoch</button>
             <button type="button" class="btn primary big" id="fm-train" title="run the remaining epochs">▶ Pretrain</button>
             <button type="button" class="btn" id="fm-reset" title="re-initialise the encoder from the seed">↺ Reset</button>
@@ -303,6 +303,15 @@
         </div>
         <div class="status" id="fm-status"></div>
         <div class="note" id="fm-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The game: spot the same nucleus</h2>
+          <span class="small muted">one view of the last batch (or of the nucleus you pick below) against every other view of the batch · no label anywhere</span>
+        </div>
+        <canvas id="fm-lineup" width="800" height="240" aria-label="The line-up: which candidate is the same nucleus"></canvas>
+        <p class="small muted" style="margin-top:8px">The encoder turns every view into 8 numbers and compares them by cosine; the vote is a softmax over the cosines at temperature 0.2. The answer is the nucleus’s other view, framed in orange. At the start the vote is spread thin over every candidate; pretraining is nothing but making the partner win this game, for every view of every batch. Watch the orange bar grow as it runs.</p>
       </div>
 
       <div class="card">
@@ -322,10 +331,19 @@
         </div>
       </div>
 
+      <div class="card">
+        <div class="card-head">
+          <h2>What the code learns to keep, and to ignore</h2>
+          <span class="small muted">the same nucleus in all 8 orientations from both labs, and the code of each view · at the start and now · then another nucleus</span>
+        </div>
+        <canvas id="fm-views" width="800" height="200" aria-label="One nucleus in sixteen views with its codes, before and after pretraining, and another nucleus"></canvas>
+        <p class="small muted" style="margin-top:8px">Each strip is one view’s code, the 8 numbers as bars on one scale per row. At the start a nucleus’s 16 codes are no closer to each other than to another nucleus’s: a random encoder gives every view much the same code, so nothing is told apart. Pretraining makes a nucleus’s own codes agree (orientation and stain are ignored) while a different nucleus’s codes move away (its identity is kept). Untick the other lab’s scans above, reset, and the right-hand half no longer lines up.</p>
+      </div>
+
       <div class="fm-two">
         <div class="card">
           <div class="card-head">
-            <h2>This batch: 8 nuclei, two views each</h2>
+            <h2>This batch: 8 of its 20 nuclei, two views each</h2>
             <span class="small muted">every view against every other · ringed cells are the pairs</span>
           </div>
           <canvas id="fm-batch" width="348" height="348" aria-label="Similarity matrix of the batch"></canvas>
