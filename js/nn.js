@@ -210,7 +210,11 @@
     // d(score z)/d(input): how much each input nudges the score toward the positive class
     inputGradient(x, fw) {
       fw = fw || this.forward(x);
-      const d0 = this.backDense(fw, 1, null);
+      return this.inputGradientFrom(fw, this.backDense(fw, 1, null));
+    }
+    // the same from d(anything)/d(a0), a0 being the pooled convolution features or the raw input: back through the
+    // pooling and the filters to the pixels
+    inputGradientFrom(fw, d0) {
       if (!this.conv) return d0;
       const { K, f } = this.conv, size = this.size, co = this.co;
       const dconv = this.backPool(fw, d0);
@@ -356,6 +360,19 @@
     evaluate(pairs) { return this.step(pairs, null); }
     parameterCount() { return this.enc.parameterCount() - this.enc.Wo.length - 1; }
     describe() { const c = this.enc.conv; return `${c.K} filters ${c.f}×${c.f} + pool ${c.pool}×${c.pool} → code of ${this.code}`; }
+    // d(anything)/d(pixels) given d(anything)/d(code): the evidence of a classifier on the code, carried through the encoder
+    inputGradient(x, dCode) { const fw = this.enc.forward(x); return this.enc.inputGradientFrom(fw, this.enc.backHidden(fw, dCode, null)); }
+    // the encoder's weights and its input standardiser as plain arrays, so a pretrained backbone can ship with the page
+    toJSON(std, meta) {
+      const r = v => Array.from(v, q => +q.toPrecision(5));
+      return Object.assign({}, meta || {}, { size: this.size, conv: this.enc.conv, code: this.code, tau: this.tau, steps: this.steps, std: { mean: r(std.mean), scale: +std.scale[0].toPrecision(6) }, Wc: r(this.enc.Wc), bc: r(this.enc.bc), W: r(this.enc.W[0]), b: r(this.enc.b[0]) });
+    }
+    static fromJSON(o) {
+      const cl = new Contrastive({ imageSize: o.size, conv: o.conv, code: o.code, tau: o.tau, seed: 1 });
+      cl.enc.Wc.set(o.Wc); cl.enc.bc.set(o.bc); cl.enc.W[0].set(o.W); cl.enc.b[0].set(o.b); cl.steps = o.steps || 0;
+      cl.std = standardizerFrom(o.std.mean, o.std.scale); cl.meta = o;
+      return cl;
+    }
   }
 
   // z-scoring helpers. Fit on the training set only, apply to everything.
@@ -375,6 +392,12 @@
       mean, scale,
       apply(r) { const out = new Float64Array(D); for (let i = 0; i < D; i++) out[i] = (r[i] - mean[i]) / scale[i]; return out; },
     };
+  }
+
+  // a standardiser from stored statistics (one scale for every dimension, or one per dimension)
+  function standardizerFrom(mean, scale) {
+    const D = mean.length, m = Float64Array.from(mean), sc = typeof scale === 'number' ? new Float64Array(D).fill(scale) : Float64Array.from(scale);
+    return { mean: m, scale: sc, apply(r) { const out = new Float64Array(D); for (let i = 0; i < D; i++) out[i] = (r[i] - m[i]) / sc[i]; return out; } };
   }
 
   // finite-difference check of the analytic gradients on a tiny random instance; returns the worst relative error
@@ -440,5 +463,5 @@
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, ACTIVATIONS, mulberry32, fitStandardizer, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL };
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL };
 });

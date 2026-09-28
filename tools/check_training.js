@@ -7,13 +7,14 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { Net, mulberry32, gradientCheck } = require('../js/nn.js');
+const { Net, Contrastive, mulberry32, gradientCheck } = require('../js/nn.js');
 const NF = require('../js/features.js');
 const DS = require('../js/dataset.js');
 
 const nSeeds = process.argv.includes('--seeds') ? +process.argv[process.argv.indexOf('--seeds') + 1] : 3;
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null; // 'labelled': just the labelled-cases table
 const window = {};
-for (const f of ['leukemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
+for (const f of ['leukemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js', 'foundation/backbones.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const tasks = {};
 for (const [id, raw] of Object.entries(window.LECTURE_TASKS)) tasks[id] = { raw, ds: DS.prepare(raw) };
 
@@ -43,7 +44,12 @@ const RECIPES = [
   { n: '⑧', label: 'Irregularity · pixels · 4 + 4 ReLU + augmentation',          task: 'irregularity', mode: 'pixels',   hidden: [4, 4], conv: null,               lr: 0.02, epochs: 60, augment: true,  l2: 0.01 },
   { n: '⑨', label: 'Irregularity · 4 + 4 ReLU · the shortcut (irregular from the other lab)', task: 'irregularity', mode: 'pixels', hidden: [4, 4], conv: null, lr: 0.02, epochs: 60, augment: true, l2: 0.01, trainLab: 'byClass', testLab: 'byClass' },
   { n: '⑩', label: 'Irregularity · pixels · conv 4@5×5 + 4 ReLU + augmentation', task: 'irregularity', mode: 'pixels',   hidden: [4],    conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0 },
+  { n: '⑫', label: 'Irregularity · the foundation code (shipped) · single layer · 10 labelled', task: 'irregularity', mode: 'code', hidden: [], conv: null, lr: 0.1, epochs: 60, augment: false, l2: 0, labelled: 10, encoder: () => shippedEncoder() },
 ];
+// the foundation encoders behind the code input: the shipped ones (the first is the encoder 4 · Foundation pretrains
+// with seed 1, saved; the second a bigger one on the page's 240 training nuclei)
+const shipped = {};
+function shippedEncoder(k = 0) { if (!shipped[k]) { const cl = Contrastive.fromJSON(window.FOUNDATION_BACKBONES[k]); shipped[k] = { encode: ink => cl.encode(cl.std.apply(ink)), cl }; } return shipped[k]; }
 // the convolution trained on the shortcut, measured for the README but no longer a recipe
 const CONV_TRAP = { n: '·', label: 'the convolution of ⑩ trained on the shortcut', task: 'irregularity', mode: 'pixels', hidden: [4], conv: { K: 4, f: 5, pool: 4 }, lr: 0.02, epochs: 30, augment: true, l2: 0, trainLab: 'byClass', testLab: 'byClass' };
 // trains a recipe (its training cases from opts.trainLab, stain normalisation opts.normalize) and scores the test set
@@ -52,7 +58,8 @@ function run(r, seed, opts = {}) {
   const ds = tasks[r.task].ds, trainLab = opts.trainLab || r.trainLab || 'ours', normalize = opts.normalize || 'off';
   const testLabs = opts.testLabs || [r.testLab || 'ours'];
   DS.assignLabs(ds, trainLab, trainLab);
-  const inp = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize, labelNoise: r.labelNoise || 0 });
+  const encoder = r.mode === 'code' ? r.encoder() : null, labelled = opts.labelled != null ? opts.labelled : (r.labelled || 0);
+  const inp = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize, labelNoise: r.labelNoise || 0, encoder, labelled });
   const net = new Net({ inputSize: inp.inputSize, imageSize: ds.size, conv: r.conv, hidden: r.hidden, activation: 'relu', seed });
   const rnd = mulberry32(seed); const idx = inp.trainX.map((_, i) => i); const batch = 8;
   const t0 = Date.now(); const curve = [];
@@ -62,14 +69,15 @@ function run(r, seed, opts = {}) {
     if (opts.curve) { const te = net.evaluate(ds.test.map(s => inp.xOf(s)), ds.test.map(s => s.label)); curve.push({ e, teLoss: te.loss, teAcc: te.accuracy, trAcc: net.evaluate(ds.train.map(s => inp.xOf(s)), ds.train.map(inp.labelOf)).accuracy }); }
   }
   const ms = (Date.now() - t0) / r.epochs;
-  const train = net.evaluate(ds.train.map(s => inp.xOf(s)), ds.train.map(inp.labelOf)).accuracy; // against the labels the network was given
+  const train = net.evaluate(inp.trainSet.map(s => inp.xOf(s)), inp.trainSet.map(inp.labelOf)).accuracy; // against the labels the network was given, on the labelled cases
   const tests = {};
-  for (const mode of testLabs) { DS.assignLabs(ds, trainLab, mode); const ti = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize }); tests[mode] = net.evaluate(ds.test.map(s => ti.xOf(s)), ds.test.map(s => s.label)).accuracy; }
+  for (const mode of testLabs) { DS.assignLabs(ds, trainLab, mode); const ti = DS.buildInputs(ds, r.mode, { augment: r.augment, normalize, encoder, labelled }); tests[mode] = net.evaluate(ds.test.map(s => ti.xOf(s)), ds.test.map(s => s.label)).accuracy; }
   DS.assignLabs(ds, 'ours', 'ours');
   return { train, test: tests[testLabs[0]], tests, params: net.parameterCount(), ms, curve };
 }
 const pc = v => String(Math.round(v * 100)).padStart(3) + '%';
 const mean = (rs, f) => rs.reduce((a, x) => a + f(x), 0) / rs.length;
+function everything() {
 console.log(`\nLecture recipes (batch 8, ReLU, mean of ${nSeeds} seeds):`);
 for (const r of RECIPES) {
   const rs = Array.from({ length: nSeeds }, (_, i) => run(r, i + 1));
@@ -84,6 +92,7 @@ for (const r of RECIPES.filter(x => x.task !== 'leukemia' && !x.trainLab && !x.l
   const cell = normalize => { const rs = Array.from({ length: nSeeds }, (_, i) => run(r, i + 1, { normalize, testLabs: ['ours', 'other'] })); return `${pc(mean(rs, x => x.tests.ours))} · ${pc(mean(rs, x => x.tests.other))}`; };
   const parts = [`as is ${cell('off')}`];
   if (r.mode === 'pixels') parts.push(`normalised per lab ${cell('lab')}`, `per image ${cell('image')}`);
+  else if (r.mode === 'code') parts.push(`normalised per lab ${cell('lab')}`, `per image ${cell('image')}`);
   else parts.push('(the measurements are taken from the raw scan: no normalisation)');
   console.log(`  ${r.n} ${r.label.padEnd(66)} ${parts.join('   ')}`);
 }
@@ -108,3 +117,26 @@ console.log(`\nLabel noise (${noisy.label}), ${nSeeds} seeds: the test accuracy 
   console.log(`  test loss     at epoch 10 ${lossAt(10).toFixed(2)} · 25 ${lossAt(25).toFixed(2)} · 50 ${lossAt(50).toFixed(2)} · 100 ${lossAt(100).toFixed(2)} · 200 ${lossAt(200).toFixed(2)} · 300 ${lossAt(300).toFixed(2)}`);
   console.log(`  train accuracy (against the given labels; 75% is the honest ceiling) at epoch 10 ${pc(trAt(10))} · 50 ${pc(trAt(50))} · 100 ${pc(trAt(100))} · 300 ${pc(trAt(300))}`);
 }
+
+}
+// how many labelled cases? Irregularity with a growing number of labelled training cases (the first n/2 of each class),
+// by input: the measurements, the pixels, and the foundation code from the two shipped encoders
+function labelledTable() {
+console.log(`\nHow many labelled cases? Irregularity, test accuracy at our lab, mean of ${nSeeds} seeds, 60 epochs`);
+{
+  const base = { task: 'irregularity', hidden: [], conv: null, epochs: 60, augment: false, l2: 0 };
+  const COLS = [
+    { short: 'measurements', r: { ...base, mode: 'features', lr: 0.1 } },
+    { short: 'pixels', r: { ...base, mode: 'pixels', lr: 0.01 } },
+    { short: 'pixels 4 ReLU + aug', r: { ...base, mode: 'pixels', hidden: [4], lr: 0.02, augment: true, l2: 0.01 } },
+    { short: 'code · 100 nuclei, 4 filters', r: { ...base, mode: 'code', lr: 0.1, encoder: () => shippedEncoder(0) } },
+    { short: 'code · 240 nuclei, 8 filters', r: { ...base, mode: 'code', lr: 0.1, encoder: () => shippedEncoder(1) } },
+  ];
+  console.log('  labelled   ' + COLS.map(c => c.short.padStart(28)).join(''));
+  for (const n of [4, 10, 20, 40, 80]) {
+    const cells = COLS.map(c => { const rs = Array.from({ length: nSeeds }, (_, i) => run(c.r, i + 1, { labelled: n })); return pc(mean(rs, x => x.test)); });
+    console.log(`  ${String(n).padStart(8)}   ` + cells.map(v => v.padStart(28)).join(''));
+  }
+}
+}
+if (only === 'labelled') labelledTable(); else { everything(); labelledTable(); }
