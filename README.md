@@ -166,7 +166,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
 | ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
 | ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
-| ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases (pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑪ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
+| ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑪ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -322,6 +322,15 @@ code is a general-purpose set of numbers that nobody had to design, and most que
 measurements. With 20 test nuclei and one fixed draw of labelled cases the numbers are noisy: another draw of 10
 labelled cases moves the code's score by ten points either way (over random draws it averages 73 to 75%), which is
 why the recipe keeps its draw fixed.
+
+One more thing the small numbers make visible: **an untrained network on the code is not at chance.** Every code number
+carries information on its own (their correlations with the irregularity label run up to 0.71), so any random
+weighting of them is already a classifier, pointing the right way or the wrong way by the luck of the seed. Before a
+single step of training, seed 1 scores 80% on the 10 labelled cases and 70% on the test set, seed 9 scores 20% and
+25%, seed 11 70% and 90%; over many seeds it averages 50%, but no one seed sits there. A random weighting of 1,024
+pixels averages out to about 50% every time. Recipe ⑫ therefore starts from seed 8, whose untrained network sits near
+chance (50% train, 45% test) so that the curve visibly climbs, and every other recipe starts from seed 1; roll the
+dice on ⑫ and watch where it starts.
 
 **Does a bigger encoder help?** `node tools/pretrain_backbone.js --measure` pretrains five encoders and probes each
 one the same way (a single layer on the frozen code, n labelled cases per question as random draws, scored on the 20
