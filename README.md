@@ -484,12 +484,62 @@ why a first version of this question, with a focus of three, could not be learne
 as atypical next to a scattered one faked a focus. The bigger shipped encoder reads a nucleus right 98% of the time and
 is the *code from* option to try.
 
-### Next: invasion
+### Invasion: the field model
 
-The third slide question is being built in steps: the tissue fields first (drawn, see *The data*), then a two-layer
-transformer over the nuclei of a field with a Node measurement of which mimic fools which ablation, then the page. Its
-data is the conjunction of cytology, location and architecture with a bladder mimic for every incomplete combination,
-so that a model lacking one cue is caught by a real entity rather than a contrived one.
+The third slide question is built in steps: the tissue fields first (drawn, see *The data*), then the model and its
+measurement in Node (this section), then the page. Its data is the conjunction of cytology, location and architecture
+with a bladder mimic for every incomplete combination, so that a model lacking one cue is caught by a real entity
+rather than a contrived one.
+
+**The model.** Every nucleus of a field is a token: the code of the frozen encoder for its crop, masked to the nucleus
+by the field's segmentation (cytology and nothing else), plus its position in the field when the model is given one.
+Two layers of self-attention let the nuclei look at each other (`ContextLayer`, now with any number of heads, each with
+its own query, key and value maps and its own learned distance cost, and `AttentionMIL` with a stack of them). Then two
+attention heads over the same tokens answer the two questions a report asks of the field, *carcinoma in situ?* and
+*invasion?*, each with its own scorer (4 tanh units), softmax over the field, weighted average and single layer
+(`outputs: 2`; the two losses are summed). Only the field's two labels train it: 150 epochs, learning rate 0.02, weight
+decay 0.001, one field per step, every training field seen in a mirror half the time with its positions jittered by
+about a pixel. A one-head, one-layer, one-output model is byte-identical to the slides' model, and
+`gradientCheckField` checks two layers of two heads and two outputs, 405 weights, against finite differences.
+
+**The ablations.** `tools/check_invasion.js` trains four models on the same fields so that the mimic table shows which
+cue each one lacks: the *bag of codes* (no positions, no context: cytology only); the codes *with positions* but no
+context (cytology and location); the *context* stack without positions, where distances live inside the attention
+(cytology and arrangement); and the *full* model. Mean of three seeds on the 50 test fields (10 per pattern), small
+encoder, crops masked to the nucleus:
+
+| Model | Parameters | CIS right | Invasion right | Invasive fields called invasive | CIS-into-nests fields called invasive | CIS fields called invasive | Invasion head's attention on the atypical nuclei below the membrane |
+|---|---|---|---|---|---|---|---|
+| Bag of codes | 100 | 100% | 87% | 50% | 7% | 10% | 25% |
+| With positions, no context | 120 | 100% | 94% | 90% | 20% | 0% | 88% |
+| Context, no positions | 966 | 100% | 88% | 73% | 27% | 7% | 18% |
+| **Full: positions and context** | 1,186 | 100% | 94% | 93% | 20% | 3% | 78% |
+| Full, two heads per layer | 1,876 | 100% | 95% | 93% | 17% | 3% | 76% |
+| Full, big encoder (code of 16) | 2,066 | 100% | 95% | 93% | 17% | 0% | 90% |
+
+No model ever calls a von Brunn nest or an inverted papilloma field invasive, and every model gets CIS right on every
+test field: cytology is read from the codes alone, as it should be. The CIS head's attention lands on the atypical
+nuclei (95 to 99%). Three things to say in front of the table:
+
+- **Cytology alone is not invasion.** The bag of codes calls half the invasive fields invasive and cannot say more,
+  because its invasion head can only weigh how atypical the field is: the other half look, as a bag, like CIS.
+- **Location does most of the work here, and its failure is the textbook one.** Positions lift the invasive fields
+  found to 90%, and the fields that fool the model are exactly the CIS-into-von-Brunn-nests fields: atypical cells
+  below the membrane, in the one arrangement that is not invasion. The full model's learned distance costs (1.1 to 1.8 per
+  nucleus diameter in the first layer, 2.0 to 2.5 in the second) say that it reads immediate neighbours; with
+  distances but no positions it finds 73% of the invasive fields, so arrangement alone carries part of the answer.
+- **The remaining confusion is the hardest mimic for people too.** With nuclear positions and codes alone, a round
+  nest and an angulated one differ only in how their nuclei sit, and 17 to 20% of the CIS-into-nests test fields are
+  still called invasive by the full models. Give the encoder the field around each nucleus (`--crop surroundings`) and
+  the outline of the nest reaches the code: the full model then finds 87% of the invasive fields and calls no mimic
+  invasive at all, but the bag of codes also sees more than cytology (50% of invasive fields found, with 58% of its
+  attention already below the membrane), which is the leak the masked crops exist to remove.
+
+**What the data taught.** With 40 training fields per pattern the full model fitted them to 100% and found 53% of the
+invasive test fields; stronger weight decay (55%) and augmentation on that set (50%) did not help, doubling the fields
+did (80%), and doubling with augmentation did more (90%). The shipped set is 80 per pattern, and the page will train
+with the same mirrored, jittered fields; on it the full model's test accuracy holds between 93 and 97% from epoch 20
+on, with the test loss flat, where on the small set it climbed from epoch 40.
 
 ## The data
 
@@ -530,7 +580,7 @@ slides come from the same pool under the same held-out rule; every slide holds f
 12 possible 2 × 2 blocks or as one of the 454 ways to scatter four cells with no two adjacent.
 
 `tools/generate_fields.js` (no dependencies) draws the tissue fields of the invasion question, the next question in
-preparation: 250 strips of bladder of 176 × 128 pixels, 200 for training and 50 held out, written to
+preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50 held out, written to
 `data/fields/fields_data.js`, with two contact sheets in H&E colour (`contact_sheet_fields.png`, and
 `contact_sheet_fields_truth.png` with the membrane, the nest outlines and every nucleus's truth drawn over it). Each
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
@@ -547,24 +597,31 @@ membrane, which nest. Invasion is the conjunction of three cues, and every patte
 | CIS extending into von Brunn nests | atypical | below | round smooth nests | not invasive |
 | Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
-Fifty fields of each pattern. A field ships as a PNG without its pixel grain, in steps of four grey levels that the
-grain hides, and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser alike, and cuts
-every nucleus's 32 × 32 crop; the file is 2.4 MB.
+Ninety fields of each pattern, 80 for training and 10 held out (the test fields are drawn first, so they stay the same
+when the training count changes; 40 per pattern was not enough, see the model below). A field ships as a PNG without
+its pixel grain, in steps of four grey levels that the grain hides, with its nuclear segmentation as a second PNG (1 +
+the index of the nucleus covering each pixel, what a segmentation step gives), and `js/fields.js` adds the grain back
+from the field's seed, in Node and in the browser alike, and cuts every nucleus's 32 × 32 crop, either with the field
+around it or masked to the nucleus alone; the file is 5.5 MB.
 
 `tools/check_fields.js` asks what the frozen encoders make of those crops before any model is built on them: a single
-layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds):
+layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds), for
+crops with the field around the nucleus and for crops masked to the nucleus (`--masked`):
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, the nuclei of the test fields (spindle cells aside) | 72% | 87% |
-| The same probe trained on the slides' pool of lone nuclei instead | 87% on the pool's held-out nuclei, 49% on the fields' | 99% on the pool, 46% on the fields' |
-| Below vs above the membrane, from the code alone (majority: 73%) | 78% | 87% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 71% | 86% |
+| Atypical vs bland, crops masked to the nucleus | 90% | 92% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 48% · 81% | 46% · 84% |
+| Below vs above the membrane, from the code alone (majority: 69%): with surroundings · masked | 75% · 70% | 88% · 70% |
 
-Two things follow. A crop from a field holds the edges of neighbours, the membrane or stroma, which the encoder never
-saw: the atypia signal survives, weaker with the small encoder, and a probe trained on lone nuclei does not transfer at
-all, so the codes of crops with neighbours live elsewhere than the codes of lone nuclei. And the surroundings leak
-location, so a model given only the bag of codes is not blind to where a nucleus sits. Both are measured before the
-model exists; pretraining the encoder on crops from fields as well is the fix to try if the slide model needs it.
+A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
+nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
+and the surroundings leak location, so a model given only the bag of such codes is not blind to where a nucleus sits
+or what shape its nest has (the ablations below measure how much). Masked to its nucleus, a crop is what a
+segment-then-encode pipeline produces, the atypia signal comes back, a lone-nucleus probe transfers, and location falls
+to the majority rate: the code carries cytology and nothing else, which is what makes the cues separable by
+construction. The field model uses masked crops; the surroundings stay available as a switch, to show the leak.
 
 ## Code map
 
@@ -579,7 +636,7 @@ js/viz.js                  canvas + SVG drawing: images, fingerprints, weight ma
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
-data/fields/fields_data.js the tissue fields of the invasion question: 250 strips of bladder as grainless PNGs with their membrane, nuclei and nests, written by tools/generate_fields.js
+data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)

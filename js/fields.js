@@ -24,6 +24,15 @@
     for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) { const X = cx + i, Y = cy + j; out[j * size + i] = X < 0 || Y < 0 || X >= w || Y >= h ? f : px[Y * w + X]; }
     return out;
   }
+  // the crop of one nucleus with the field around it masked away, as a nuclear segmentation would leave it: pixels the
+  // segmentation gives to another nucleus, or to no nucleus, become the pale background of a lone-nucleus crop, with
+  // the same grain, so that the encoder sees the nucleus alone (index: the nucleus's index in its field, 0-based)
+  const MASK_FILL = 232;
+  function cropMasked(px, seg, w, h, x, y, size, index, seed) {
+    const out = crop(px, w, h, x, y, size, MASK_FILL), lab = crop(seg, w, h, x, y, size, 0), rng = mulberry32((seed + 7919 * (index + 1)) >>> 0), want = index + 1;
+    for (let i = 0; i < out.length; i++) if (lab[i] !== want) out[i] = Math.max(0, Math.min(255, Math.round(MASK_FILL + gaussianFrom(rng) * GRAIN * 255)));
+    return out;
+  }
   // the membrane's height at x from its samples every 8 px
   function membraneAt(field, x) { const s = field.membrane, k = Math.max(0, Math.min(s.length - 2, Math.floor(x / 8))), t = Math.max(0, Math.min(1, x / 8 - k)); return s[k] + (s[k + 1] - s[k]) * t; }
   // a field's PNG as grey levels, in Node: inflate, then undo the row filters
@@ -37,6 +46,17 @@
       for (let x = 0; x < w; x++) { const a = x ? px[y * w + x - 1] : 0, b = y ? px[(y - 1) * w + x] : 0, c = x && y ? px[(y - 1) * w + x - 1] : 0; px[y * w + x] = (raw[o + x] + (type === 0 ? 0 : type === 1 ? a : type === 2 ? b : type === 3 ? (a + b) >> 1 : paeth(a, b, c))) & 255; }
     }
     return { w, h, px };
+  }
+  // every nucleus of the given fields as the model will see it, in Node: its crop as ink (1 dark … 0 pale), with the
+  // field around it or masked to the nucleus alone, its position, and its truth (kind, atypical, below the membrane,
+  // which nest); F is window.LECTURE_FIELDS
+  function nucleiOf(F, fields, { masked = false } = {}) {
+    const K = F.meta.nucleus.reduce((o, k, i) => Object.assign(o, { [k]: i }), {}), out = [];
+    for (const f of fields) {
+      const d = decodePNGNode(f.png), px = withGrain(d.px, f.grainSeed, F.meta.grain), seg = masked ? decodePNGNode(f.seg).px : null;
+      f.nuclei.forEach((n, index) => { const c = masked ? cropMasked(px, seg, d.w, d.h, n[K.x], n[K.y], F.meta.size, index, f.grainSeed) : crop(px, d.w, d.h, n[K.x], n[K.y], F.meta.size), ink = new Float32Array(c.length); for (let i = 0; i < c.length; i++) ink[i] = 1 - c[i] / 255; out.push({ field: f, index, x: n[K.x], y: n[K.y], ink, kind: F.meta.kinds[n[K.kind]], atypical: n[K.atypical], below: n[K.below], nest: n[K.nest], pattern: f.pattern }); });
+    }
+    return out;
   }
   // a greyscale PNG, in Node, with the row filter chosen per row (None, Sub, Up, Average or Paeth, whichever leaves
     // the smallest residuals): the fields are smooth, so the residuals compress far better than raw rows
@@ -72,5 +92,5 @@
       img.src = 'data:image/png;base64,' + b64;
     });
   }
-  return { GRAIN, mulberry32, gaussianFrom, withGrain, crop, membraneAt, encodePNGNode, decodePNGNode, decodePNGBrowser };
+  return { GRAIN, MASK_FILL, mulberry32, gaussianFrom, withGrain, crop, cropMasked, membraneAt, nucleiOf, encodePNGNode, decodePNGNode, decodePNGBrowser };
 });

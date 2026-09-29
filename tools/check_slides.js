@@ -77,7 +77,7 @@ for (const q of questions) {
       const at = runs.map(r => r.curve[e]);
       console.log(`  ${String(e).padStart(5)}   ${pc(mean(at, c => c.tr.accuracy)).padStart(9)}   ${pc(mean(at, c => c.te.accuracy)).padStart(8)}   ${mean(at, c => c.te.loss).toFixed(2).padStart(9)}   ${pc(mean(at, c => c.tr.culpritMass))} · ${pc(mean(at, c => c.te.culpritMass))}`);
     }
-    const dc = runs.map(r => r.mil.context && r.mil.context.distanceBias ? Math.log1p(Math.exp(r.mil.context.beta)).toFixed(2) : null).filter(Boolean);
+    const dc = runs.map(r => r.mil.context && r.mil.context.distanceBias ? Math.log1p(Math.exp(r.mil.context.beta[0])).toFixed(2) : null).filter(Boolean);
     console.log(`  per seed at the end: test ${runs.map(r => Math.round(r.curve[epochs].te.accuracy * 100)).join('/')}% · attention on the atypical nuclei ${runs.map(r => Math.round(r.curve[epochs].te.culpritMass * 100)).join('/')}%${dc.length ? ` · learned distance cost ${dc.join('/')} per cell` : ''}\n`);
   }
 }
