@@ -25,8 +25,6 @@
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
     <button type="button" class="stage" data-stage="train">2 · Train</button>
     <button type="button" class="stage" data-stage="test">3 · Test</button>
-    <button type="button" class="stage" data-stage="foundation" hidden>4 · Foundation</button>
-    <button type="button" class="stage" data-stage="slides" hidden>5 · Slides</button>
   </nav>
   <div class="masthead-tools">
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
@@ -104,7 +102,7 @@
             <div class="seg" id="mode-seg">
               <button type="button" data-mode="features" class="is-active">measurements</button>
               <button type="button" data-mode="pixels" id="mode-pixels">1,024 pixels</button>
-              <button type="button" data-mode="code" id="mode-code" title="the foundation model’s code: a few numbers from a pretrained encoder (4 · Foundation)" hidden>the code</button>
+              <button type="button" data-mode="code" id="mode-code" title="the foundation model’s code: a few numbers from a pretrained encoder (the Foundation question)" hidden>the code</button>
             </div>
           </div>
           <div class="ctl" id="code-wrap" hidden><label for="backbone">Code from</label><select id="backbone"></select></div>
@@ -345,8 +343,7 @@
         <p class="small muted" style="margin-top:8px">Each strip is one view’s code, the 8 numbers as bars on one scale per row. At the start a nucleus’s 16 codes are no closer to each other than to another nucleus’s: a random encoder gives every view much the same code, so nothing is told apart. Pretraining makes a nucleus’s own codes agree (orientation and stain are ignored) while a different nucleus’s codes move away (its identity is kept). Untick the other lab’s scans above, reset, and the right-hand half no longer lines up.</p>
       </div>
 
-      <div class="fm-two">
-        <div class="card">
+      <div class="card">
           <div class="card-head">
             <h2>This batch: 8 of its 20 nuclei, two views each</h2>
             <span class="small muted">every view against every other · ringed cells are the pairs</span>
@@ -354,31 +351,18 @@
           <canvas id="fm-batch" width="348" height="348" aria-label="Similarity matrix of the batch"></canvas>
           <p class="small muted" style="margin-top:8px">Orange = alike, blue = unlike. Pretraining pulls the ringed cells towards orange and everything else towards blue: each nucleus becomes recognisable across its views and distinct from the rest. Views are flips, rotations and (when ticked) the other lab’s scans.</p>
         </div>
-        <div class="card">
-          <div class="card-head">
-            <h2>The 100 unlabelled nuclei</h2>
-            <label class="toggle"><span>colour by</span>
-              <select id="fm-color"><option value="none">nothing (the model sees no labels)</option><option value="label">the answer to their own question</option><option value="question">which question they come from</option></select></label>
-          </div>
-          <div class="tray" id="fm-tray"></div>
-          <div class="fm-selected" id="fm-selected"></div>
-        </div>
-      </div>
 
       <div class="card">
         <div class="card-head">
-          <h2>Pretraining curves</h2>
+          <h2>Pretraining curve</h2>
           <div class="legend">
             <span><span class="line"></span>loss on the batches</span>
             <span><span class="line test"></span>loss on 60 held-out nuclei</span>
-            <span id="fm-worth-legend"></span>
           </div>
         </div>
-        <div class="curves">
+        <div class="curves single">
           <div class="chart"><div class="title"><span>Contrastive loss per epoch</span><span class="now" id="fm-loss-now"></span></div><svg id="fm-loss" role="img" aria-label="Contrastive loss per epoch"></svg></div>
-          <div class="chart"><div class="title"><span>What the code is worth: a single layer on it, 20 labelled cases per question</span><span class="now" id="fm-worth-now"></span></div><svg id="fm-worth" role="img" aria-label="Test accuracy of a single layer on the code, per question"></svg></div>
         </div>
-        <p class="small muted" style="margin-top:8px">The right-hand chart is measured on the side, never fed back: after each epoch a single layer is trained on the frozen code with 20 labelled training cases of each question and scored on 40 nuclei it never saw (the question’s 20 test nuclei and the 20 held-out ones). Pretraining itself never sees a label, yet the code becomes worth more for every question. Size is readable even from a random code; contour irregularity is not, and that is what the pretraining earns.</p>
       </div>
 
       <div class="card">
@@ -395,7 +379,43 @@
       </div>
     </section>
 
-    <!-- ============================ 5 · SLIDES ============================ -->
+
+    <!-- ============================ THE FOUNDATION QUESTION · SPECIMENS AND TEST ============================ -->
+    <section class="stage-panel" id="panel-fm-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Foundation: a code from 100 unlabelled nuclei</h2>
+          <span class="small muted">the specimens of the foundation question · no labels anywhere</span>
+        </div>
+        <p class="prose small">100 nuclei from the three image questions’ training sets (34 from atypia, 33 from enlargement, 33 from irregularity), our lab’s scans, and never a label. The foundation model will learn to turn each of them into a <strong>code</strong> of eight numbers without being told what any question asks; afterwards a single layer on that code, trained with a handful of labelled cases, answers each question. Colour the tray by each nucleus’s own answer to see what the code will have to capture on its own, then go to <strong>2 · Train</strong> to pretrain it and to <strong>3 · Test</strong> to see what the code is worth.</p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The 100 unlabelled nuclei</h2>
+          <label class="toggle"><span>colour by</span>
+            <select id="fm-color"><option value="none">nothing (the model sees no labels)</option><option value="label">the answer to their own question</option><option value="question">which question they come from</option></select></label>
+        </div>
+        <div class="tray" id="fm-tray"></div>
+        <div class="fm-selected" id="fm-selected"></div>
+      </div>
+    </section>
+
+    <section class="stage-panel" id="panel-fm-test" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>What the code is worth</h2>
+          <div class="legend"><span id="fm-worth-legend"></span></div>
+        </div>
+        <p class="prose small">This chart is measured on the side, never fed back: after each epoch a single layer is trained on the frozen code with 20 labelled training cases of each question and scored on 40 nuclei it never saw (the question’s 20 test nuclei and the 20 held-out ones). Pretraining itself never sees a label, yet the code becomes worth more for every question. Size is readable even from a random code; contour irregularity is not, and that is what the pretraining earns.</p>
+        <div class="curves single">
+          <div class="chart"><div class="title"><span>A single layer on the code, 20 labelled cases per question · test accuracy per epoch of pretraining</span><span class="now" id="fm-worth-now"></span></div><svg id="fm-worth" role="img" aria-label="Test accuracy of a single layer on the code, per question"></svg></div>
+        </div>
+        <div id="fm-worth-table" style="margin-top:12px"></div>
+        <p class="small muted" style="margin-top:8px" id="fm-worth-note"></p>
+      </div>
+    </section>
+
+    <!-- ============================ THE SLIDES QUESTIONS ============================ -->
     <section class="stage-panel" id="panel-slides" hidden>
       <div class="card bar">
         <div class="card-head">
@@ -404,7 +424,6 @@
         </div>
         <p class="prose small" id="sl-blurb"></p>
         <div class="bar-row">
-          <div class="ctl"><span class="lbl">Question</span><div class="seg" id="sl-question-seg"><button type="button" data-q="atypia" class="is-active">atypical cells?</button><button type="button" data-q="focus">a focus?</button></div></div>
           <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sl-context-seg"><button type="button" data-ctx="0" class="is-active">none</button><button type="button" data-ctx="1" title="one layer of self-attention before the pooling">nuclei look at each other</button></div></div>
           <div class="ctl"><span class="lbl">Pooling</span><div class="seg" id="sl-pool-seg"><button type="button" data-att="1" class="is-active">attention</button><button type="button" data-att="0">plain average</button></div></div>
           <div class="ctl"><label for="sl-units">Attention units</label><select id="sl-units"><option value="2">2 tanh</option><option value="4" selected>4 tanh</option><option value="8">8 tanh</option></select></div>
@@ -509,6 +528,78 @@
         <div class="tray slides" id="sl-test-tray"></div>
       </div>
     </section>
+
+    <section class="stage-panel" id="panel-sl-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sl-data-title">Slides</h2>
+          <span class="small muted" id="sl-data-sub"></span>
+        </div>
+        <p class="prose small" id="sl-data-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl check"><input type="checkbox" id="sl-data-reveal"><label for="sl-data-reveal" class="plainlabel">Reveal which nuclei are atypical (the model never sees this)</label></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sl-data-slide-title">The slide</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="sl-data-prev" title="the previous slide">◀ previous</button><button type="button" class="btn" id="sl-data-next" title="the next slide">next ▶</button></div>
+        </div>
+        <div class="sl-two">
+          <div><canvas id="sl-data-canvas" width="372" height="354" aria-label="The slide: twenty nuclei"></canvas></div>
+          <div><p class="small muted" id="sl-data-note"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The slides</h2>
+          <div class="legend"><span><span class="swatch ring"></span>label: <span data-slcls="0"></span></span><span><span class="swatch ring pos"></span>label: <span data-slcls="1"></span></span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px" id="sl-data-train-label">Training slides</p>
+        <div class="tray slides" id="sl-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="sl-data-test-label">Test slides · held out</p>
+        <div class="tray slides" id="sl-data-test-tray"></div>
+      </div>
+    </section>
+
+    <section class="stage-panel" id="panel-sl-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="sl-classify-next">Classify next slide</button>
+            <button type="button" class="btn" id="sl-classify-all">Classify all</button>
+            <button type="button" class="btn" id="sl-test-clear">Clear</button>
+          </div>
+          <div class="ctl check"><input type="checkbox" id="sl-test-reveal"><label for="sl-test-reveal" class="plainlabel">Reveal which nuclei are atypical</label></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">classified</span><b id="sl-stat-n">0 / 20</b><small>held-out slides</small></div>
+            <div class="metric"><span class="lbl">accuracy</span><b id="sl-stat-acc">–</b><small id="sl-stat-acc-sub"></small></div>
+            <div class="metric"><span class="lbl">sensitivity</span><b id="sl-stat-sens">–</b><small id="sl-stat-sens-sub"></small></div>
+            <div class="metric"><span class="lbl">specificity</span><b id="sl-stat-spec">–</b><small id="sl-stat-spec-sub"></small></div>
+            <div class="confusion small" id="sl-confusion"></div>
+          </div>
+        </div>
+        <p class="note" id="sl-test-warning" hidden>The model has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
+        <div class="note" id="sl-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sl-test-slide-title">The slide under test</h2>
+          <span class="small muted">held-out slides go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
+        </div>
+        <div class="sl-two">
+          <div><canvas id="sl-test-canvas" width="372" height="354" aria-label="The slide under test with its attention weights"></canvas><p class="small" id="sl-test-call" style="margin-top:8px"></p></div>
+          <div><div class="sl-rank-wrap"><canvas id="sl-test-rank" width="800" height="116" aria-label="The nuclei of the slide under test ranked by attention"></canvas></div><p class="small muted" style="margin-top:8px" id="sl-test-rank-note"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Test slides · <span id="sl-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch ring"></span><span data-slcalled="0"></span></span><span><span class="swatch ring pos"></span><span data-slcalled="1"></span></span><span><span class="swatch badge" style="background:var(--good)">✓</span>correct</span><span><span class="swatch badge">✗</span>wrong</span></div>
+        </div>
+        <div class="tray slides" id="sl-test-results"></div>
+      </div>
+    </section>
   </div>
 
   <!-- ============================ INSPECTOR ============================ -->
@@ -561,7 +652,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage, which appears with recipe ⑪, pretrains a miniature foundation model on 100 of them without labels, and the fifth, with recipe ⑬, trains attention over slides of twenty nuclei with one label each. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch steps, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; every question has the same three steps, specimens, train and test; the foundation question pretrains a miniature foundation model on 100 nuclei without labels, and the slides questions train attention over slides of twenty nuclei with one label each, with one layer of self-attention on the way. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukemia/patients_data.js"></script>
