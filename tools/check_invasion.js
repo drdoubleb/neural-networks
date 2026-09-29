@@ -15,7 +15,7 @@
  * table: how often the test fields of each pattern are called CIS and called invasive.
  *   node tools/check_invasion.js [--models bag,pos,ctx,full] [--layers 2] [--heads 1] [--seeds 3] [--epochs 150]
  *                                [--lr 0.02] [--decay 0.001] [--units 4] [--dk 8] [--ffn 8] [--cost 1.5] [--big] [--curve]
- *                                [--crop nucleus|surroundings]
+ *                                [--crop nucleus|surroundings] [--augment] [--data path/to/fields_data.js]
  * --crop nucleus (the default) masks every crop to its nucleus with the field's segmentation, so the code carries
  * cytology alone and location and arrangement have to come from the positions and the context; surroundings leaves
  * the field around the nucleus in the crop, which leaks both.
@@ -29,9 +29,10 @@ const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.inde
 const num = (k, d) => +arg(k, d);
 const models = arg('--models', 'bag,pos,ctx,full').split(','), layers = num('--layers', 2), heads = num('--heads', 1), nSeeds = num('--seeds', 3), epochs = num('--epochs', 150);
 const lr = num('--lr', 0.02), decay = num('--decay', 0.001), units = num('--units', 4), dk = num('--dk', 8), ffn = num('--ffn', 8), costInit = num('--cost', 1.5), big = process.argv.includes('--big'), curve = process.argv.includes('--curve'), cropMode = arg('--crop', 'nucleus');
+const augment = process.argv.includes('--augment'), dataFile = arg('--data', path.join(__dirname, '..', 'data', 'fields', 'fields_data.js')); // --augment: mirrored fields and jittered positions while training; --data: another fields file
 const UNIT = 16; // distances in nucleus diameters, so a cost per unit compares with the slides' cost per cell
 const window = {};
-for (const f of ['fields/fields_data.js', 'foundation/backbones.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
+for (const f of [dataFile, path.join(__dirname, '..', 'data', 'foundation', 'backbones.js')]) new Function('window', fs.readFileSync(f, 'utf8'))(window);
 const F = window.LECTURE_FIELDS, meta = F.meta, cl = Contrastive.fromJSON(window.FOUNDATION_BACKBONES[big ? 1 : 0]), enc = ink => cl.encode(cl.std.apply(ink));
 const pc = v => String(Math.round(v * 100)).padStart(3) + '%', mean = (arr, f) => arr.reduce((a, x) => a + (f ? f(x) : x), 0) / arr.length;
 { const gc = gradientCheckField(); console.log(`Field model gradient check (2 layers × 2 heads, 2 outputs): worst relative error ${gc.worst.toExponential(2)} over ${gc.checked} weights ${gc.worst < 1e-4 ? '(ok)' : '(FAILED)'}`); }
@@ -47,7 +48,7 @@ function prepare(withPos) {
     H: ns.map(n => { const c = std.apply(n.code); return withPos ? Float64Array.from([...c, n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]) : c; }),
     dist: ns.map(a => Float64Array.from(ns, b => Math.hypot(a.x - b.x, a.y - b.y) / UNIT)),
     y: [cisOf(f), f.label], pos: [ns.map(n => !!n.atypical), ns.map(n => !!(n.atypical && n.below))], pattern: f.pattern, name: f.name });
-  return { train: [...trainMap].map(([f, ns]) => mk(f, ns)), test: [...testMap].map(([f, ns]) => mk(f, ns)), D: cl.code + (withPos ? 2 : 0) };
+  return { train: [...trainMap].map(([f, ns]) => mk(f, ns)), test: [...testMap].map(([f, ns]) => mk(f, ns)), D: cl.code + (withPos ? 2 : 0), withPos };
 }
 const MODELS = {
   bag: { name: 'bag of codes: no positions, no context', pos: false, ctx: false },
@@ -55,6 +56,12 @@ const MODELS = {
   ctx: { name: 'context without positions (distances inside the attention)', pos: false, ctx: true },
   full: { name: 'positions and context', pos: true, ctx: true },
 };
+// a training field seen in a mirror half the time, its positions jittered by about a pixel: the same nuclei, the same
+// distances, another field for the position inputs (nothing changes for a model without positions)
+function augmented(sl, D, rng) {
+  const flip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  return Object.assign({}, sl, { H: sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = h[D - 1] + 0.015 * g(); return o; }) });
+}
 function run(P, M, seed) {
   const mil = new AttentionMIL({ inputSize: P.D, attentionUnits: units, outputs: 2, context: M.ctx ? { dk, ffn, heads, layers, distanceBias: true, excludeSelf: true, costInit } : null, seed });
   const rng = mulberry32(seed * 31 + 7), order = P.train.map((_, i) => i), hist = [];
@@ -62,7 +69,7 @@ function run(P, M, seed) {
   rec(0);
   for (let e = 1; e <= epochs; e++) {
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-    for (const i of order) mil.trainBatch([P.train[i]], lr, decay);
+    for (const i of order) mil.trainBatch([augment && P.withPos ? augmented(P.train[i], P.D, rng) : P.train[i]], lr, decay);
     if (curve ? (e % 10 === 0 || e === epochs) : e === epochs) rec(e);
   }
   return { mil, hist };
@@ -73,7 +80,7 @@ for (const key of models) {
   const M = MODELS[key]; if (!M) { console.log(`unknown model ${key}`); continue; }
   const P = prepared[M.pos] || (prepared[M.pos] = prepare(M.pos)), t0 = Date.now();
   const runs = Array.from({ length: nSeeds }, (_, i) => run(P, M, i + 1)), last = runs.map(r => r.hist[r.hist.length - 1]), mil = runs[0].mil;
-  console.log(`=== ${key}: ${M.name}\n    ${mil.describe()} · ${mil.parameterCount()} parameters · each nucleus: its code${M.pos ? ' + its position' : ''} (${P.D} numbers) · lr ${lr}, decay ${decay}, ${epochs} epochs, mean of ${nSeeds} seeds, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  console.log(`=== ${key}: ${M.name}\n    ${mil.describe()} · ${mil.parameterCount()} parameters · each nucleus: its code${M.pos ? ' + its position' : ''} (${P.D} numbers) · lr ${lr}, decay ${decay}, ${epochs} epochs${augment && M.pos ? ', mirrored and jittered while training' : ''}, mean of ${nSeeds} seeds, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   if (curve) { console.log('    epoch   train CIS · invasion   test CIS · invasion   test loss'); for (const h of runs[0].hist) { const at = runs.map(r => r.hist.find(x => x.e === h.e)); console.log(`    ${String(h.e).padStart(5)}   ${pc(mean(at, x => x.tr.outputs[0].accuracy))} · ${pc(mean(at, x => x.tr.outputs[1].accuracy))}       ${pc(mean(at, x => x.te.outputs[0].accuracy))} · ${pc(mean(at, x => x.te.outputs[1].accuracy))}      ${mean(at, x => x.te.outputs[0].loss + x.te.outputs[1].loss).toFixed(2)}`); } }
   FLAGS.forEach((flag, k) => console.log(`    ${flag.padEnd(9)} test accuracy ${pc(mean(last, x => x.te.outputs[k].accuracy))} (${last.map(x => Math.round(x.te.outputs[k].accuracy * 100)).join('/')}) · training ${pc(mean(last, x => x.tr.outputs[k].accuracy))} · its head's attention on the ${k ? 'atypical nuclei below the membrane' : 'atypical nuclei'} of a positive test field ${pc(mean(last, x => x.te.outputs[k].culpritMass))}`));
   if (M.ctx) console.log(`    learned distance cost per nucleus diameter: ${runs.map(r => r.mil.layers.map((c, l) => `layer ${l + 1} ${Array.from(c.beta, b => Math.log1p(Math.exp(b)).toFixed(2)).join('/')}`).join(', ')).join(' · ')}`);

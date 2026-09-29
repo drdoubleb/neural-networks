@@ -27,8 +27,8 @@ const zlib = require('zlib');
 const gen = require('./generate_nuclei.js');
 const FL = require('../js/fields.js');
 
-const SEED = 20260930, W = 176, H = 128, SIZE = gen.SIZE, PER_PATTERN_TRAIN = 40, PER_PATTERN_TEST = 10, SHEET_PER_PATTERN = 4;
-const OUT = path.join(__dirname, '..', 'data', 'fields');
+const SEED = 20260930, W = 176, H = 128, SIZE = gen.SIZE, PER_PATTERN_TRAIN = +(process.env.FIELDS_TRAIN || 40), PER_PATTERN_TEST = +(process.env.FIELDS_TEST || 10), SHEET_PER_PATTERN = 4; // FIELDS_TRAIN / FIELDS_TEST: other counts, for experiments
+const OUT = process.env.FIELDS_OUT || path.join(__dirname, '..', 'data', 'fields'); // FIELDS_OUT: another folder, for experiments
 const task = gen.TASKS.find(t => t.id === 'atypia');
 const PATTERNS = [
   { key: 'vbn', name: 'Normal urothelium with von Brunn nests', short: 'von Brunn nests', label: 0, atypical: false, below: 'round',
