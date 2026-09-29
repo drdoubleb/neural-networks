@@ -484,12 +484,61 @@ why a first version of this question, with a focus of three, could not be learne
 as atypical next to a scattered one faked a focus. The bigger shipped encoder reads a nucleus right 98% of the time and
 is the *code from* option to try.
 
-### Next: invasion
+### Invasion: the field model
 
-The third slide question is being built in steps: the tissue fields first (drawn, see *The data*), then a two-layer
-transformer over the nuclei of a field with a Node measurement of which mimic fools which ablation, then the page. Its
-data is the conjunction of cytology, location and architecture with a bladder mimic for every incomplete combination,
-so that a model lacking one cue is caught by a real entity rather than a contrived one.
+The third slide question is built in steps: the tissue fields first (drawn, see *The data*), then the model and its
+measurement in Node (this section), then the page. Its data is the conjunction of cytology, location and architecture
+with a bladder mimic for every incomplete combination, so that a model lacking one cue is caught by a real entity
+rather than a contrived one.
+
+**The model.** Every nucleus of a field is a token: the code of the frozen encoder for its crop, masked to the nucleus
+by the field's segmentation (cytology and nothing else), plus its position in the field when the model is given one.
+Two layers of self-attention let the nuclei look at each other (`ContextLayer`, now with any number of heads, each with
+its own query, key and value maps and its own learned distance cost, and `AttentionMIL` with a stack of them). Then two
+attention heads over the same tokens answer the two questions a report asks of the field, *carcinoma in situ?* and
+*invasion?*, each with its own scorer (4 tanh units), softmax over the field, weighted average and single layer
+(`outputs: 2`; the two losses are summed). Only the field's two labels train it: 150 epochs, learning rate 0.02, weight
+decay 0.001, one field per step, every training field seen in a mirror half the time with its positions jittered by
+about a pixel. A one-head, one-layer, one-output model is byte-identical to the slides' model, and
+`gradientCheckField` checks two layers of two heads and two outputs, 405 weights, against finite differences.
+
+**The ablations.** `tools/check_invasion.js` trains four models on the same fields so that the mimic table shows which
+cue each one lacks: the *bag of codes* (no positions, no context: cytology only); the codes *with positions* but no
+context (cytology and location); the *context* stack without positions, where distances live inside the attention
+(cytology and arrangement); and the *full* model. Mean of three seeds on the 50 test fields (10 per pattern), small
+encoder, crops masked to the nucleus:
+
+| Model | Parameters | CIS right | Invasion right | Invasive fields called invasive | CIS-into-nests fields called invasive | CIS fields called invasive | Invasion head's attention on the atypical nuclei below the membrane |
+|---|---|---|---|---|---|---|---|
+| Bag of codes | 100 | 100% | 87% | 50% | 7% | 10% | 25% |
+| With positions, no context | 120 | 100% | 94% | 90% | 20% | 0% | 88% |
+| Context, no positions | 966 | 100% | 88% | 73% | 27% | 7% | 18% |
+| Full, two heads per layer | 1,876 | 100% | 95% | 93% | 17% | 3% | 76% |
+| Full, big encoder (code of 16) | 2,066 | 100% | 95% | 93% | 17% | 0% | 90% |
+
+No model ever calls a von Brunn nest or an inverted papilloma field invasive, and every model gets CIS right on every
+test field: cytology is read from the codes alone, as it should be. The CIS head's attention lands on the atypical
+nuclei (95 to 99%). Three things to say in front of the table:
+
+- **Cytology alone is not invasion.** The bag of codes calls half the invasive fields invasive and cannot say more,
+  because its invasion head can only weigh how atypical the field is: the other half look, as a bag, like CIS.
+- **Location does most of the work here, and its failure is the textbook one.** Positions lift the invasive fields
+  found to 90%, and the fields that fool the model are exactly the CIS-into-von-Brunn-nests fields: atypical cells
+  below the membrane, in the one arrangement that is not invasion. The learned distance costs of the context stack
+  (1.6 to 2.4 per nucleus diameter in the first layer, 3.7 to 4.4 in the second) say that it reads immediate
+  neighbours; with distances but no positions it finds 73% of the invasive fields, so arrangement alone carries part
+  of the answer.
+- **The remaining confusion is the hardest mimic for people too.** With nuclear positions and codes alone, a round
+  nest and an angulated one differ only in how their nuclei sit, and 17 to 20% of the CIS-into-nests test fields are
+  still called invasive by the full models. Give the encoder the field around each nucleus (`--crop surroundings`) and
+  the outline of the nest reaches the code: the full model then finds 87% of the invasive fields and calls no mimic
+  invasive at all, but the bag of codes also sees more than cytology (50% of invasive fields found, with 58% of its
+  attention already below the membrane), which is the leak the masked crops exist to remove.
+
+**What the data taught.** With 40 training fields per pattern the full model fitted them to 100% and found 53% of the
+invasive test fields; stronger weight decay (55%) and augmentation on that set (50%) did not help, doubling the fields
+did (80%), and doubling with augmentation did more (90%). The shipped set is 80 per pattern, and the page will train
+with the same mirrored, jittered fields.
 
 ## The data
 
