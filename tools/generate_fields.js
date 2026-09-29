@@ -112,7 +112,7 @@ function makeField(P, id) {
       f.nuclei.push(Object.assign(sampleNucleus(P.atypical ? 1 : 0), { x, y, kind: 'epi', below: false, group: null }));
     }
   }
-  const taken = () => f.nuclei.map(n => [n.x, n.y]);
+  const radiusOf = nn => (nn.a + nn.b) / 2, taken = () => f.nuclei.map(n => [n.x, n.y]);
   const clear = (p, min) => taken().every(q => dist(p, q) >= min);
   const belowMembrane = (x, margin) => ym(x) + margin;
   // nests below the membrane, placed where they do not overlap
@@ -120,27 +120,32 @@ function makeField(P, id) {
   // a round nest hangs from the underside of the membrane three times in four, as the invasive nests do, so that depth
   // alone does not tell the two apart; otherwise it lies free in the stroma
   function placeNest(R, attached) { for (let t = 0; t < 40; t++) { const cx = U(R + 4, W - R - 4), cy = attached ? belowMembrane(cx, 0) + R + U(0.5, 3) : U(belowMembrane(cx, 12) + R, H - 3 - R); if (nestFits(cx, cy, R, attached ? 0 : 12)) return [cx, cy]; } return null; }
-  const roundNest = (atypical, gid) => {
-    const R = U(19, 25), attached = rand() < 0.75, at = placeNest(R, attached); if (!at) return false;
-    const nest = { kind: 'round', cx: at[0], cy: at[1], R, rx: R, ry: R * U(0.85, 1), rot: U(0, Math.PI), amp: U(0, 0.025), k: RI(2, 3), phase: U(0, TAU), group: gid, connected: attached };
+  const roundNest = (atypical, gid) => { // a ring of nuclei touching one another (never overlapping, like the chains), one in the middle when there is room; a ring that does not fit tries again with one nucleus fewer
+    const attached = rand() < 0.75; let ring, steps, ringR, rMax, R, at = null;
+    for (let k = RI(5, 7); k >= 4 && !at; k--) {
+      ring = Array.from({ length: k }, () => sampleNucleus(atypical ? 1 : 0)); const gaps = ring.map(() => U(0.3, 1.5));
+      steps = ring.map((n, i) => radiusOf(n) + radiusOf(ring[(i + 1) % k]) + gaps[i]); ringR = steps.reduce((a, b) => a + b, 0) / TAU; rMax = Math.max(...ring.map(radiusOf));
+      R = ringR + rMax + 2.5; at = placeNest(R, attached);
+    }
+    if (!at) return false;
+    const nest = { kind: 'round', cx: at[0], cy: at[1], R, rx: R, ry: R * U(0.92, 1), rot: U(0, Math.PI), amp: U(0, 0.02), k: RI(2, 3), phase: U(0, TAU), group: gid, connected: attached };
     f.nests.push(nest);
-    const r = R - 8.5, k = Math.min(8, Math.floor(TAU * r / 13.5)), a0 = U(0, TAU); // nuclei on a ring, and one in the middle of a big nest
-    for (let i = 0; i < k; i++) { const ang = a0 + i * TAU / k + U(-0.12, 0.12), rr = r + U(-1, 1); f.nuclei.push(Object.assign(sampleNucleus(atypical ? 1 : 0), { x: nest.cx + rr * Math.cos(ang), y: nest.cy + rr * Math.sin(ang) * nest.ry / nest.rx, kind: 'nest', below: true, group: gid })); }
-    if (r >= 13) f.nuclei.push(Object.assign(sampleNucleus(atypical ? 1 : 0), { x: nest.cx + U(-1.5, 1.5), y: nest.cy + U(-1.5, 1.5), kind: 'nest', below: true, group: gid }));
+    let ang = U(0, TAU);
+    ring.forEach((n, i) => { f.nuclei.push(Object.assign(n, { x: nest.cx + ringR * Math.cos(ang), y: nest.cy + ringR * Math.sin(ang) * nest.ry / nest.rx, kind: 'nest', below: true, group: gid })); ang += steps[i] / ringR; });
+    const mid = sampleNucleus(atypical ? 1 : 0); if (ringR - rMax - radiusOf(mid) >= 0.5) f.nuclei.push(Object.assign(mid, { x: nest.cx + U(-1, 1), y: nest.cy + U(-1, 1), kind: 'nest', below: true, group: gid }));
     return true;
   };
   // invasive: a chain of atypical nuclei that grows down from the underside of the epithelium (or, less often, lies free
   // in the stroma), turning as it goes, with a side branch and stretches two cells wide; its outline is a ribbon hugging
   // the nuclei, kinked where the chain turns and pointed at the tip, so the angulation is the nuclei themselves
   // pressing on the border
-  const radiusOf = nn => (nn.a + nn.b) / 2;
   const freeAt = (q, own) => q[0] >= 10 && q[0] <= W - 10 && q[1] <= H - 8 && q[1] >= ym(q[0]) + 6 && clear(q, 11) && own.every(o => dist(q, [o.x, o.y]) >= 11) && f.nests.every(o => nestSigned(o, q) < -1e9 || nestSigned(o, q) >= 7);
   const growChain = (start, dir, count, own) => { // nuclei touching one another along a turning path; blocked, it tries other turns
     const nodes = [start];
     while (nodes.length < count) {
       const prev = nodes[nodes.length - 1], nn = sampleNucleus(1), r = radiusOf(nn); let placed = false;
       for (let t = 0; t < 6 && !placed; t++) {
-        const d = Math.max(-1.4, Math.min(1.4, dir + U(-0.6, 0.6))), step = prev.r + r - U(0.5, 2), q = [prev.x + step * Math.sin(d), prev.y + step * Math.cos(d)];
+        const d = Math.max(-1.4, Math.min(1.4, dir + U(-0.6, 0.6))), step = prev.r + r + U(0.3, 1.5), q = [prev.x + step * Math.sin(d), prev.y + step * Math.cos(d)];
         if (!freeAt(q, own.concat(nodes.slice(0, -1)))) continue;
         nodes.push(Object.assign(nn, { x: q[0], y: q[1], r })); dir = d; placed = true;
       }
@@ -172,7 +177,7 @@ function makeField(P, id) {
       const all = [].concat(...chains.map((c, i) => (i ? c.slice(1) : c))), twins = [];
       for (const c of chains) for (let i = 1; i < c.length - 1; i++) { // a second nucleus beside some links, two cells wide there
         const p = c[i]; if (p.branch || p.twin || rand() >= 0.45) continue;
-        const [tx, ty] = tangent(c, i), side = rand() < 0.5 ? -1 : 1, nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r - 1) * side, q = [p.x - ty * off, p.y + tx * off];
+        const [tx, ty] = tangent(c, i), side = rand() < 0.5 ? -1 : 1, nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r + U(0.3, 1.5)) * side, q = [p.x - ty * off, p.y + tx * off];
         if (!freeAt(q, all.filter(o => o !== p).concat(twins))) continue;
         twins.push(Object.assign(nn, { x: q[0], y: q[1], r })); p.twin = { side, r };
       }
