@@ -484,6 +484,13 @@ why a first version of this question, with a focus of three, could not be learne
 as atypical next to a scattered one faked a focus. The bigger shipped encoder reads a nucleus right 98% of the time and
 is the *code from* option to try.
 
+### Next: invasion
+
+The third slide question is being built in steps: the tissue fields first (drawn, see *The data*), then a two-layer
+transformer over the nuclei of a field with a Node measurement of which mimic fools which ablation, then the page. Its
+data is the conjunction of cytology, location and architecture with a bladder mimic for every incomplete combination,
+so that a model lacking one cue is caught by a real entity rather than a contrived one.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -522,6 +529,43 @@ the 20 test slides, so no test slide shares a nucleus with a training slide. The
 slides come from the same pool under the same held-out rule; every slide holds four atypical nuclei, placed as one of the
 12 possible 2 × 2 blocks or as one of the 454 ways to scatter four cells with no two adjacent.
 
+`tools/generate_fields.js` (no dependencies) draws the tissue fields of the invasion question, the next question in
+preparation: 250 strips of bladder of 176 × 128 pixels, 200 for training and 50 held out, written to
+`data/fields/fields_data.js`, with two contact sheets in H&E colour (`contact_sheet_fields.png`, and
+`contact_sheet_fields_truth.png` with the membrane, the nest outlines and every nucleus's truth drawn over it). Each
+field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
+stroma with pale spindle cells beneath, and, in four of the five patterns, cells below the membrane. The nuclei come
+from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a field, the spindle
+cells included, is a token for the model, with its truth kept for the page: atypical or bland, above or below the
+membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a real mimic:
+
+| Pattern | Cytology | Location | Architecture | Label |
+|---|---|---|---|---|
+| Normal urothelium with von Brunn nests | bland | below the membrane | round smooth nests | not invasive |
+| Inverted papilloma | bland | below | anastomosing cords | not invasive |
+| Carcinoma in situ | atypical | above only (normal von Brunn nests below on half the fields) | | not invasive |
+| CIS extending into von Brunn nests | atypical | below | round smooth nests | not invasive |
+| Invasive carcinoma | atypical | below | angulated jagged nests, single cells shed into the stroma on half the fields | **invasive** |
+
+Fifty fields of each pattern. A field ships as a PNG without its pixel grain, in steps of four grey levels that the
+grain hides, and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser alike, and cuts
+every nucleus's 32 × 32 crop; the file is 2.4 MB.
+
+`tools/check_fields.js` asks what the frozen encoders make of those crops before any model is built on them: a single
+layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds):
+
+| | Small encoder (code of 8) | Big encoder (code of 16) |
+|---|---|---|
+| Atypical vs bland, the nuclei of the test fields (spindle cells aside) | 71% | 87% |
+| The same probe trained on the slides' pool of lone nuclei instead | 87% on the pool's held-out nuclei, 50% on the fields' | 99% on the pool, 48% on the fields' |
+| Below vs above the membrane, from the code alone (majority: 72%) | 75% | 86% |
+
+Two things follow. A crop from a field holds the edges of neighbours, the membrane or stroma, which the encoder never
+saw: the atypia signal survives, weaker with the small encoder, and a probe trained on lone nuclei does not transfer at
+all, so the codes of crops with neighbours live elsewhere than the codes of lone nuclei. And the surroundings leak
+location, so a model given only the bag of codes is not blind to where a nucleus sits. Both are measured before the
+model exists; pretraining the encoder on crops from fields as well is the fix to try if the slide model needs it.
+
 ## Code map
 
 ```
@@ -529,11 +573,13 @@ index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context (browser + Node)
+js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
+data/fields/fields_data.js the tissue fields of the invasion question: 250 strips of bladder as grainless PNGs with their membrane, nuclei and nests, written by tools/generate_fields.js
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -541,5 +587,7 @@ tools/check_training.js    gradient check + the ten recipes, the other lab, the 
 tools/check_foundation.js  the foundation model's pretraining and what its code is worth, in Node
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
 tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
+tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
+tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
