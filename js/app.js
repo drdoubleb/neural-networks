@@ -17,7 +17,7 @@
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
     foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe ⑪/⑫ introduces them, and stay for the session
     // the Slides questions: attention over slides of nuclei with one label each
-    sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
+    sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -1643,7 +1643,7 @@
     }
     if (L.loaded !== q) {
       const set = L.sets[q]; L.meta = set.meta; L.train = set.train; L.test = set.test; L.all = set.all; L.byId = set.byId; L.share = set.share; L.loaded = q;
-      L.selected = null; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.encKey = null; L.trayFor = {}; L.dataSelected = null; L.testSelected = null; L.trial = { next: 0, results: new Map() };
+      L.selected = null; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.hoverDecide = null; L.pinned = null; L.encKey = null; L.trayFor = {}; L.dataSelected = null; L.testSelected = null; L.trial = { next: 0, results: new Map() };
       for (const [id, tray] of [['sl-train-tray', L.train], ['sl-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) el.appendChild(slThumb(s)); }
       document.querySelectorAll('[data-slcls="0"]').forEach(el => { el.textContent = L.meta.classes[0].name; });
       document.querySelectorAll('[data-slcls="1"]').forEach(el => { el.textContent = L.meta.classes[1].name; });
@@ -1680,7 +1680,7 @@
     slEncode();
     L.model = new NN.AttentionMIL({ inputSize: L.D, attentionUnits: L.units, attention: L.attention, context: L.context ? SLC.context : null, seed: L.seed });
     L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
-    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null;
+    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.hoverDecide = null;
     L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelQuestion = L.loaded; // a new model: the test step starts over
     slRecordEpoch();
     slSyncControls(); slRenderAll();
@@ -1707,7 +1707,7 @@
     L.running = true; L.lastTime = performance.now(); L.debt = 0; L.lastRender = 0; slSyncButtons();
     requestAnimationFrame(slTick);
   }
-  function slStop(msg) { const L = S.sl; L.running = false; if (L.walk) slWalkStop(); slSyncButtons(); if (msg) slNote(msg); }
+  function slStop(msg) { const L = S.sl; L.running = false; if (L.walk) slWalkStop(); if (L.dwalk) slDecideWalkStop(); slSyncButtons(); if (msg) slNote(msg); }
   function slFinish() {
     const L = S.sl, last = L.hist[L.hist.length - 1];
     slStop(`Finished ${L.epochs} epochs on the slides' labels alone. Slide accuracy ${pct(last.acc)} on the training slides, ${pct(last.testAcc)} on the test slides${L.attention ? `; ${pct(last.testMass)} of a positive test slide's attention now lands on its atypical nuclei (uniform: ${pct(L.share)}). Tick “Reveal” and look.` : '. A plain average cannot say where it looked.'}`);
@@ -1728,7 +1728,7 @@
   }
   function slStepSlide() { const L = S.sl; slStop(); const ended = slStep(); slRender(true); slNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on slide ${L.byId.get(L.lastSlide).name} (${L.meta.classes[L.byId.get(L.lastSlide).label].name}): step ${L.ptr} of ${L.train.length}.`); }
   function slStepEpoch() { const L = S.sl; slStop(); do { slStep(); } while (L.ptr !== 0); slRender(true); slNote(`Epoch ${L.epoch} complete.`); }
-  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderSummary(); slRenderTrays(); }
+  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slDecideWalkStop(); slRenderFocus(); slRenderSummary(); slRenderTrays(); }
   function slFocus() { const L = S.sl; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
   function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
@@ -1736,7 +1736,10 @@
     const L = S.sl;
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.att === '1') === L.attention));
     document.querySelectorAll('#sl-context-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.context));
-    $('sl-context-card').hidden = !L.context;
+    $('sl-context-card').hidden = !L.context; $('sl-decide-card').hidden = !L.context; $('sl-links-ctl').hidden = !L.context;
+    document.querySelectorAll('#sl-attview-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.attView));
+    document.querySelectorAll('#sl-links-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.links === '1') === L.linksAll));
+    $('sl-links-min').value = Math.round(L.linksMin * 100); $('sl-links-min-val').textContent = pct(L.linksMin); $('sl-links-min').disabled = !L.linksAll;
     $('sl-units').value = L.units; $('sl-units').disabled = !L.attention;
     $('sl-epochs').value = L.epochs; $('sl-epochs-val').textContent = L.epochs;
     $('sl-speed').value = sliderFromSpeed(L.speed); $('sl-speed-val').textContent = `${L.speed} epochs/s`;
@@ -1758,9 +1761,20 @@
     void cls;
   }
   function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H, s.dist) }; }
+  // the nucleus the cards follow: the hovered one, else the pinned one (a click on the slide or the map), else the one with the most attention
+  function slShown(fw) { const L = S.sl; if (L.hoverNucleus != null) return L.hoverNucleus; if (L.pinned != null && L.pinned < fw.a.length) return L.pinned; let j = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[j]) j = i; return j; }
+  function slShownWord() { const L = S.sl; return L.hoverNucleus != null ? '' : L.pinned != null ? ', pinned,' : ', the one with the most attention,'; }
+  // the context layer's attention as the map shows it: what the layer uses, or what the match alone or the distance alone would give
+  function slAttentionView(fw) { const L = S.sl, ex = L.model.context.explain(fw.ctx); return L.attView === 'match' ? ex.matchOnly : L.attView === 'distance' ? ex.distOnly : fw.ctx.A; }
   function slRenderSlide() {
-    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes;
-    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus, links: L.context && L.hoverNucleus != null && fw.ctx ? { from: L.hoverNucleus, weights: fw.ctx.A[L.hoverNucleus] } : null });
+    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, view = L.context && fw.ctx ? slAttentionView(fw) : null;
+    const from = L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned; // whose listening the lines show
+    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus, pinned: view ? L.pinned : null,
+      links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null });
+    if (view) $('sl-links-note').textContent = (L.linksAll
+      ? `Every link above ${pct(L.linksMin)}${L.linksMin > 0 ? ' at once' : ''}: a link is wide at the end that listens, its width that nucleus’s share for the other, and comes to a point at an end that does not listen back. Hover a nucleus to lift its links out; click it to keep it.`
+      : 'Lines from the hovered nucleus to the nuclei it listens to, thicker with the share. Click a nucleus to keep it as the one the cards follow; switch to every nucleus to see all the links at once.')
+      + (L.attView === 'both' ? '' : L.attView === 'match' ? ' Shown from the match alone, as if distance cost nothing.' : ' Shown from the distance alone, as if every nucleus looked the same.');
     const call = fw.p >= 0.5 ? 1 : 0, k = s.nuclei.filter(n => n.label).length;
     $('sl-slide-title').textContent = `Slide ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · label: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
     $('sl-call').innerHTML = `The model says <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b> → <span class="${call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[call].name)} ${call === s.label ? '✓' : '✗'}</span>${L.selected == null && L.lastSlide != null ? ' · the last slide trained on' : ''}. ${L.attention ? 'Frames and percentages are the attention weights.' : 'Plain average: every nucleus weighs the same.'}`;
@@ -1772,15 +1786,14 @@
   }
   function slScorerModel() { // the attention network for one nucleus: the hovered one, or the one with the most attention
     const L = S.sl, { s, fw } = slFocusForward();
-    let j = L.hoverNucleus; if (j == null) { j = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[j]) j = i; }
-    const n = s.nuclei[j], tok = fw.T[j], sf = fw.fws ? fw.fws[j] : L.model.scorer.forward(tok);
+    const j = slShown(fw), n = s.nuclei[j], tok = fw.T[j], sf = fw.fws ? fw.fws[j] : L.model.scorer.forward(tok);
     return { j, n, m: { net: L.model.scorer, mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S CODE${L.context ? ', AFTER CONTEXT' : ''} · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => `code ${i + 1}`), x: tok, fw: sf, stage: 2, hover: L.hoverScorer,
       activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the slide\n→ ${pct(fw.a[j])} of the attention`, specimen: null, size: L.size, tint: S.tint } };
   }
   function slRenderScorer() {
     const L = S.sl; if (!L.attention) return;
     const { j, n, m } = slScorerModel(), cv = $('sl-scorer'); cv._model = m; Viz.drawNetwork(cv, m);
-    $('sl-scorer-note').textContent = `${L.hoverNucleus == null ? 'The nucleus with the most attention on this slide' : `Nucleus ${j + 1} of this slide`}${L.reveal ? ` (${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'})` : ''}. Every nucleus of the slide goes through this same little network; the softmax then compares the 20 scores, so a score only means something relative to the others on the slide.`;
+    $('sl-scorer-note').textContent = `${L.hoverNucleus == null && L.pinned == null ? 'The nucleus with the most attention on this slide' : `Nucleus ${j + 1} of this slide${L.hoverNucleus == null ? ', pinned' : ''}`}${L.reveal ? ` (${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'})` : ''}. Every nucleus of the slide goes through this same little network; the softmax then compares the 20 scores, so a score only means something relative to the others on the slide.`;
   }
   function subtypeWord(key) { return { enlarged: 'enlarged', hyperchromatic: 'hyperchromatic', irregular: 'irregular contour', coarse: 'coarse chromatin', combined: 'two or more traits', bland: 'bland' }[key] || key; }
   function slRenderSummary() {
@@ -1796,9 +1809,8 @@
   // the whole model for the slide on screen, unrolled: every nucleus through the scorer, the softmax, the sum, the call
   function slRenderUnrolled() {
     const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, n = s.nuclei.length;
-    let top = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[top]) top = i;
     const m = { nuclei: s.nuclei.map((q, i) => ({ px: q.px, h: fw.T[i], s: fw.s[i], a: fw.a[i], pos: !!q.label })), D: L.D, tokenNote: L.context ? 'code, after context' : null, size: L.size, tint: S.tint, reveal: L.reveal,
-      scorer: L.attention ? L.model.scorer : null, head: L.model.head, fw, shown: L.hoverNucleus != null ? L.hoverNucleus : top, hover: L.hoverUnrolled, walk: L.walk, positiveName: cls[1].name, negativeName: cls[0].name };
+      scorer: L.attention ? L.model.scorer : null, head: L.model.head, fw, shown: slShown(fw), hover: L.hoverUnrolled, walk: L.walk, positiveName: cls[1].name, negativeName: cls[0].name };
     const cv = $('sl-unrolled'); cv._model = m; Viz.drawSlideNetwork(cv, m);
     $('sl-unrolled-note').textContent = L.attention
       ? `Left to right: the ${n} nuclei of this slide, each as its code of ${L.D} numbers; one scorer, the same weights for all of them, gives each a score; the softmax compares the ${n} scores and turns them into shares that add up to 100%; the codes are added up, each weighted by its share, into the ${L.D}-number summary; a single layer on the summary makes the call. Training sends the label’s error back along the same path, through the softmax into the scorer, which is how the scorer learns where to look without a single nucleus label. Hover a nucleus to follow it, or press Walk through.`
@@ -1807,7 +1819,7 @@
   // the walk-through: the slide on screen goes through the model step by step, one nucleus at a time
   const SL_WALK = { score: 110, softmax: 900, sum: 1000, head: 800, pause: 300 };
   function slWalkStart() {
-    const L = S.sl; if (!L.model) return; slStop();
+    const L = S.sl; if (!L.model) return; slStop(); slDecideWalkStop();
     L.walk = { stage: L.attention ? 'score' : 'softmax', k: 0, t: 0, t0: performance.now() }; L.hoverUnrolled = null;
     slSyncWalk(); requestAnimationFrame(slWalkTick);
   }
@@ -1834,16 +1846,64 @@
   // before and after context, and whom it listens to most
   function slRenderContext() {
     const L = S.sl; if (!L.context || !L.model || !L.model.context) return;
-    const { s, fw } = slFocusForward(), A = fw.ctx.A, n = s.nuclei.length, cost = fw.ctx.cost;
-    let j = L.hoverNucleus; if (j == null) { j = 0; for (let i = 1; i < n; i++) if (fw.a[i] > fw.a[j]) j = i; }
-    Viz.drawAttentionMap($('sl-attmap'), { A, thumbs: s.nuclei.map(q => q.px), size: L.size, tint: S.tint, hover: j, pair: L.hoverAtt, pos: s.pos, reveal: L.reveal });
-    $('sl-attmap-note').textContent = `Each row is one nucleus asking, each column one answering: how much of its listening goes to each of the other ${n - 1} (a row adds up to 100%; a nucleus does not listen to itself, its own code stays through the residual). The learned distance cost is ${cost.toFixed(2)} per cell: every extra cell of distance divides a nucleus’s weight by ${Math.exp(cost).toFixed(1)}, so ${cost > 2 ? 'the layer listens almost only to immediate neighbours' : cost > 0.8 ? 'near nuclei count more, but far ones still count' : 'distance hardly matters to it'}.`;
+    const { s, fw } = slFocusForward(), A = slAttentionView(fw), n = s.nuclei.length, cost = fw.ctx.cost, j = L.dwalk ? L.dwalk.i : slShown(fw);
+    const pair = L.hoverAtt || (L.hoverDecide && L.hoverDecide.j != null ? { i: j, j: L.hoverDecide.j } : null);
+    Viz.drawAttentionMap($('sl-attmap'), { A, thumbs: s.nuclei.map(q => q.px), size: L.size, tint: S.tint, hover: j, pair, pos: s.pos, reveal: L.reveal });
+    const costWord = cost > 2 ? 'the layer listens almost only to immediate neighbours' : cost > 0.8 ? 'near nuclei count more, but far ones still count' : 'distance hardly matters to it';
+    $('sl-attmap-note').textContent = L.attView === 'match'
+      ? `Match only: the shares the softmax would give from query · key alone, as if distance cost nothing. This is the part of the decision that reads what a nucleus looks like: the nuclei whose keys fit a query get the listening, wherever they sit on the slide. Switch back to see what the distance cost (${cost.toFixed(2)} per cell) does to it.`
+      : L.attView === 'distance'
+        ? `Distance only: the shares from the learned distance cost alone, as if every nucleus looked the same; each cell of distance divides a nucleus’s weight by ${Math.exp(cost).toFixed(1)}, so ${costWord}. This is the part of the decision that reads where a nucleus is. The layer uses both: match minus distance cost, then the softmax.`
+        : `Each row is one nucleus asking, each column one answering: how much of its listening goes to each of the other ${n - 1} (a row adds up to 100%; a nucleus does not listen to itself, its own code stays through the residual). The learned distance cost is ${cost.toFixed(2)} per cell: every extra cell of distance divides a nucleus’s weight by ${Math.exp(cost).toFixed(1)}, so ${costWord}. Match only and distance only show the two parts of the decision on their own.`;
     const row = Array.from(A[j], (w, k) => ({ k, w })).filter(e => e.k !== j).sort((a, b) => b.w - a.w), top = row.slice(0, 3);
     const bars = code => { let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v)); return `<span class="code" title="${Array.from(code).map(v => v.toFixed(2)).join(', ')}">${Array.from(code).map(v => `<i class="${v < 0 ? 'neg' : 'pos'}" style="height:${Math.max(2, Math.round(Math.abs(v) / mx * 100))}%"></i>`).join('')}</span>`; };
     const where = k => (s.dist[j][k] <= 1 ? 'a neighbour' : s.dist[j][k] < 1.5 ? 'diagonal' : `${s.dist[j][k].toFixed(1)} cells away`);
     $('sl-context-focus').innerHTML = `<div class="v"><div class="lbl">nucleus ${j + 1} · code</div>${bars(s.H[j])}<div class="n">before context</div></div><div class="v"><div class="lbl">after context</div>${bars(fw.T[j])}<div class="n">what the scorer sees</div></div>` +
-      `<div class="txt"><div>Nucleus ${j + 1}${L.hoverNucleus == null ? ', the one with the most attention,' : ''} listens most to ${top.map(e => `nucleus ${e.k + 1} (${pct(e.w)}, ${where(e.k)})`).join(', ')}.</div><div>What it hears is added to its own code, so the scorer can weigh “atypical, with atypical neighbours” rather than “atypical” alone.</div></div>`;
+      `<div class="txt"><div>Nucleus ${j + 1}${slShownWord()} listens most to ${top.map(e => `nucleus ${e.k + 1} (${pct(e.w)}, ${where(e.k)})`).join(', ')}${L.attView === 'both' ? '' : ` (from the ${L.attView} alone)`}.</div><div>What it hears is added to its own code, so the scorer can weigh “atypical, with atypical neighbours” rather than “atypical” alone.</div></div>`;
   }
+  // how the shown nucleus decides where to look: the context layer's attention for it, taken apart
+  function slRenderDecide() {
+    const L = S.sl; if (!L.context || !L.model || !L.model.context) return;
+    const { s, fw } = slFocusForward(), ctx = fw.ctx, cl = L.model.context, ex = cl.explain(ctx), n = s.nuclei.length, i = L.dwalk ? L.dwalk.i : slShown(fw), cost = ctx.cost;
+    const m = { asker: i, nuclei: s.nuclei.map(q => ({ px: q.px, pos: !!q.label })), X: ctx.X, Q: ctx.Q, K: ctx.K, V: ctx.V, cost, match: ex.match[i], costs: ex.cost[i], shares: ctx.A[i], C: ctx.C[i], heard: Float64Array.from(ctx.Xp[i], (v, d) => v - ctx.X[i][d]), after: ctx.Xp[i], final: ctx.Y[i],
+      D: L.D, dk: cl.dk, ffn: cl.F, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverDecide, walk: L.dwalk };
+    const cv = $('sl-decide'); cv._model = m; Viz.drawDecision(cv, m);
+    $('sl-decide-title').textContent = `How nucleus ${i + 1} decides where to look`;
+    const row = Array.from(ctx.A[i], (w, k) => ({ k, w })).filter(e => e.k !== i).sort((a, b) => b.w - a.w), best = row[0], bestMatch = row.slice().sort((a, b) => ex.match[i][b.k] - ex.match[i][a.k])[0];
+    $('sl-decide-note').textContent = `Nucleus ${i + 1}${slShownWord()} turns its code into a query; each of the other ${n - 1} turns its code into a key and a value, with the same three weight maps. Query × key, ${cl.dk} products added up, is the match: how well that nucleus fits what nucleus ${i + 1} is looking for (best match: nucleus ${bestMatch.k + 1}, ${Viz.fmtSigned(ex.match[i][bestMatch.k], 2)}). The learned distance cost, ${cost.toFixed(2)} per cell, comes off, and the softmax over the ${n - 1} scores gives shares that add up to 100% (most to nucleus ${best.k + 1}, ${pct(best.w)}, ${s.dist[i][best.k] <= 1 ? 'a neighbour' : s.dist[i][best.k] < 1.5 ? 'diagonal' : `${s.dist[i][best.k].toFixed(1)} cells away`}). The values, each weighted by its share, add up to the message, ${cl.dk} numbers; projected back to ${L.D}, it is added to nucleus ${i + 1}’s own code, and a small feed-forward is added after that. Nothing else changes: the scorer sees the same nucleus, plus what it heard. Hover a row to read its numbers; press Walk through to watch the decision happen.`;
+  }
+  function slDecideRowTip(m, j) { const L = S.sl, s = slFocus(), d = s.dist[m.asker][j], where = d <= 1 ? 'a neighbour' : d < 1.5 ? 'diagonal' : `${d.toFixed(1)} cells away`; return `nucleus ${j + 1} · ${where} · match ${Viz.fmtSigned(m.match[j], 2)} − ${m.costs[j].toFixed(2)} = ${Viz.fmtSigned(m.match[j] - m.costs[j], 2)} → ${pct(m.shares[j])} of what nucleus ${m.asker + 1} hears${L.reveal ? ` · ${s.nuclei[j].label ? 'atypical: ' + subtypeWord(s.nuclei[j].subtype) : 'bland'}` : ''}`; }
+  const DE_WALK = { query: 700, keys: 40, match: 110, distance: 900, softmax: 900, message: 1000, add: 1000, pause: 300 };
+  function slDecideWalkStart() {
+    const L = S.sl; if (!L.model || !L.context) return; slStop(); slWalkStop();
+    const { fw } = slFocusForward();
+    L.dwalk = { stage: 'query', k: 0, t: 0, t0: performance.now(), i: slShown(fw) }; L.hoverDecide = null; L.walkNucleus = L.dwalk.i;
+    slSyncDecideWalk(); slRenderSlide(); slRenderContext(); requestAnimationFrame(slDecideTick);
+  }
+  function slDecideWalkStop() { const L = S.sl; if (!L.dwalk) return; L.dwalk = null; L.walkNucleus = null; slSyncDecideWalk(); if (L.model) { slRenderSlide(); slRenderContext(); slRenderDecide(); } }
+  function slSyncDecideWalk() { $('sl-decide-walk').textContent = S.sl.dwalk ? '■ Stop' : '▶ Walk through'; }
+  function slDecideTick(now) {
+    const L = S.sl, w = L.dwalk; if (!w) return;
+    const el = now - w.t0, n = slFocus().nuclei.length, next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
+    const timed = (dur, after) => { w.t = Math.min(1, el / dur); if (el >= dur + DE_WALK.pause) next(after); };
+    if (w.stage === 'query') timed(DE_WALK.query, 'keys');
+    else if (w.stage === 'keys') { w.k = Math.min(n, Math.floor(el / DE_WALK.keys) + 1); if (el >= n * DE_WALK.keys + DE_WALK.pause) next('match'); }
+    else if (w.stage === 'match') { w.k = Math.min(n, Math.floor(el / DE_WALK.match) + 1); if (el >= n * DE_WALK.match + DE_WALK.pause) next('distance'); }
+    else if (w.stage === 'distance') timed(DE_WALK.distance, 'softmax');
+    else if (w.stage === 'softmax') timed(DE_WALK.softmax, 'message');
+    else if (w.stage === 'message') timed(DE_WALK.message, 'add');
+    else if (w.stage === 'add') {
+      w.t = Math.min(1, el / DE_WALK.add);
+      if (el >= DE_WALK.add + DE_WALK.pause) {
+        const i = w.i, { fw } = slFocusForward(), row = Array.from(fw.ctx.A[i], (v, k) => ({ k, v })).filter(e => e.k !== i).sort((a, b) => b.v - a.v).slice(0, 2);
+        slDecideWalkStop(); slNote(`Nucleus ${i + 1} through the context layer: query against every key, minus the distance cost, softmax; it listens most to ${row.map(e => `nucleus ${e.k + 1} (${pct(e.v)})`).join(' and ')}, and what it hears is added to its own code before the scorer sees it.`);
+        return;
+      }
+    }
+    slRenderDecide();
+    requestAnimationFrame(slDecideTick);
+  }
+  function slRenderFocus() { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderDecide(); }
   function slRenderCurves() {
     const L = S.sl, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
     Viz.drawCurves($('sl-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
@@ -1861,7 +1921,7 @@
   }
   function slRender(full) {
     const L = S.sl; if (!L.model) return;
-    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderContext(); slRenderSummary();
+    slRenderStatus(); slRenderFocus(); slRenderSummary();
     if (full) { slRenderCurves(); slRenderTrays(); }
     slSyncButtons();
   }
@@ -1959,11 +2019,16 @@
     cv.addEventListener('mousemove', ev => {
       const L = S.sl; if (!L.model) return;
       const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
-      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
+      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderFocus(); }
       if (i != null) { tip.hidden = false; tip.textContent = slNucleusTip(i); tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
       else tip.hidden = true;
     });
-    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } } });
+    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderFocus(); } } });
+    const pin = i => { const L = S.sl; if (i == null || !L.context) return; L.pinned = L.pinned === i ? null : i; slDecideWalkStop(); slRenderFocus(); slNote(L.pinned == null ? 'Unpinned: the cards follow the hovered nucleus, else the one with the most attention.' : `Nucleus ${i + 1} pinned: the cards follow it until you click it again.`); };
+    cv.addEventListener('click', ev => { const L = S.sl; if (!L.model) return; const r = cv.getBoundingClientRect(); pin(Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top)); });
+    document.querySelectorAll('#sl-attview-seg button').forEach(b => b.addEventListener('click', () => { S.sl.attView = b.dataset.view; slSyncControls(); if (S.sl.model) { slRenderSlide(); slRenderContext(); } }));
+    document.querySelectorAll('#sl-links-seg button').forEach(b => b.addEventListener('click', () => { S.sl.linksAll = b.dataset.links === '1'; slSyncControls(); if (S.sl.model) slRenderSlide(); }));
+    $('sl-links-min').addEventListener('input', () => { S.sl.linksMin = +$('sl-links-min').value / 100; $('sl-links-min-val').textContent = pct(S.sl.linksMin); if (S.sl.model) slRenderSlide(); });
     document.querySelectorAll('#sl-context-seg button').forEach(b => b.addEventListener('click', () => { const on = b.dataset.ctx === '1'; if (on === S.sl.context) return; S.sl.context = on; slReset(on ? 'Context on: one layer of self-attention lets every nucleus read the others before the pooling — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
     const ca = $('sl-attmap'), ta = $('sl-attmap-tip');
     ca.addEventListener('mousemove', ev => {
@@ -1971,16 +2036,29 @@
       const r = ca.getBoundingClientRect(), hit = Viz.hitAttentionMap(ca, ev.clientX - r.left, ev.clientY - r.top);
       const prevI = L.hoverNucleus, prevKey = L.hoverAtt ? `${L.hoverAtt.i}:${L.hoverAtt.j}` : '';
       L.hoverAtt = hit; if (hit) L.hoverNucleus = hit.i;
-      if (hit && hit.i !== prevI) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
+      if (hit && hit.i !== prevI) { slRenderFocus(); }
       else if ((hit ? `${hit.i}:${hit.j}` : '') !== prevKey) slRenderContext();
       if (hit) {
-        const { s, fw } = slFocusForward(), c = fw.ctx;
+        const { s, fw } = slFocusForward(), c = fw.ctx, ex = L.model.context.explain(c), view = slAttentionView(fw);
         ta.hidden = false;
-        ta.textContent = hit.i === hit.j ? `nucleus ${hit.i + 1} does not listen to itself` : `nucleus ${hit.i + 1} listens to nucleus ${hit.j + 1}: ${pct(c.A[hit.i][hit.j])} · match ${Viz.fmtSigned(c.S[hit.i][hit.j] + c.cost * s.dist[hit.i][hit.j], 2)} − distance ${s.dist[hit.i][hit.j].toFixed(1)} × ${c.cost.toFixed(2)}`;
+        ta.textContent = hit.i === hit.j ? `nucleus ${hit.i + 1} does not listen to itself` : `nucleus ${hit.i + 1} listens to nucleus ${hit.j + 1}: ${pct(view[hit.i][hit.j])}${L.attView === 'both' ? '' : ` from the ${L.attView} alone (${pct(c.A[hit.i][hit.j])} in fact)`} · match ${Viz.fmtSigned(ex.match[hit.i][hit.j], 2)} − distance ${s.dist[hit.i][hit.j].toFixed(1)} × ${c.cost.toFixed(2)} · click to pin the row`;
         const half = ta.offsetWidth / 2 + 4; ta.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; ta.style.top = (ev.clientY - r.top) + 'px';
       } else ta.hidden = true;
     });
-    ca.addEventListener('mouseleave', () => { const L = S.sl; ta.hidden = true; if (L.hoverAtt || L.hoverNucleus != null) { L.hoverAtt = null; L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } } });
+    ca.addEventListener('mouseleave', () => { const L = S.sl; ta.hidden = true; if (L.hoverAtt || L.hoverNucleus != null) { L.hoverAtt = null; L.hoverNucleus = null; if (L.model) { slRenderFocus(); } } });
+    ca.addEventListener('click', ev => { const L = S.sl; if (!L.model || !L.context) return; const r = ca.getBoundingClientRect(), hit = Viz.hitAttentionMap(ca, ev.clientX - r.left, ev.clientY - r.top); if (hit) pin(hit.i); });
+    // the decision card: hovering a row outlines the pair on the map; the numbers explain themselves
+    const cd = $('sl-decide'), td = $('sl-decide-tip'), rowOf = h => (h && h.j != null ? h.j : null), keyOf = h => (h ? `${h.kind}:${h.j == null ? '' : h.j}:${h.d == null ? '' : h.d}` : '');
+    cd.addEventListener('mousemove', ev => {
+      const L = S.sl, m = cd._model; if (!m || L.dwalk) return;
+      const r = cd.getBoundingClientRect(), hit = Viz.hitDecision(cd, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverDecide;
+      L.hoverDecide = hit;
+      if (keyOf(prev) !== keyOf(hit)) { slRenderDecide(); if (rowOf(prev) !== rowOf(hit)) slRenderContext(); }
+      if (hit) { td.hidden = false; td.textContent = hit.kind === 'asker' ? slNucleusTip(m.asker) : hit.kind === 'row' ? slDecideRowTip(m, hit.j) : hit.text; const half = td.offsetWidth / 2 + 4; td.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; td.style.top = (ev.clientY - r.top) + 'px'; }
+      else td.hidden = true;
+    });
+    cd.addEventListener('mouseleave', () => { const L = S.sl; td.hidden = true; if (L.hoverDecide) { L.hoverDecide = null; if (L.model) { slRenderDecide(); slRenderContext(); } } });
+    $('sl-decide-walk').addEventListener('click', () => (S.sl.dwalk ? slDecideWalkStop() : slDecideWalkStart()));
     // the unrolled diagram: hovering a nucleus row follows it everywhere; the other parts explain themselves
     const cu = $('sl-unrolled'), tu = $('sl-unrolled-tip'), hitKey = h => (h ? `${h.kind}:${h.i == null ? '' : h.i}:${h.d == null ? '' : h.d}` : '');
     cu.addEventListener('mousemove', ev => {
@@ -1988,11 +2066,11 @@
       const r = cu.getBoundingClientRect(), hit = Viz.hitSlideNetwork(cu, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverUnrolled;
       const ni = hit && hit.kind === 'nucleus' ? hit.i : null;
       L.hoverUnrolled = hit;
-      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
+      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; slRenderFocus(); }
       else if (hitKey(prev) !== hitKey(hit)) slRenderUnrolled();
       if (hit) { tu.hidden = false; tu.textContent = hit.kind === 'nucleus' ? slNucleusTip(hit.i) : hit.text; const half = tu.offsetWidth / 2 + 4; tu.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tu.style.top = (ev.clientY - r.top) + 'px'; } // kept inside the (scrollable) wrapper else tu.hidden = true;
     });
-    cu.addEventListener('mouseleave', () => { const L = S.sl; tu.hidden = true; const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } });
+    cu.addEventListener('mouseleave', () => { const L = S.sl; tu.hidden = true; const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) { slRenderFocus(); } });
     $('sl-walk').addEventListener('click', () => (S.sl.walk ? slWalkStop() : slWalkStart()));
     for (const [cvId, tipId, key, render] of [['sl-scorer', 'sl-scorer-tip', 'hoverScorer', slRenderScorer], ['sl-head', 'sl-head-tip', 'hoverHead', slRenderSummary]]) {
       const c2 = $(cvId), t2 = $(tipId);

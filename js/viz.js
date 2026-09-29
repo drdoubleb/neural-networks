@@ -774,7 +774,9 @@ window.Viz = (function () {
   // ---- a slide of nuclei and its attention
   // The slide as a grid, every nucleus framed by its attention weight (relative to the largest), the weight written
   // under it, a truth dot when revealed (orange atypical, blue bland), the hovered nucleus outlined.
-  // opt = { nuclei: [{ px, a, pos }], cols, size, tint, reveal, hover }
+  // opt = { nuclei: [{ px, a, pos }], cols, size, tint, reveal, hover, pinned, links: { from, weights } (the hovered
+  // nucleus's listening, a line to each), allLinks: { A, min, hover } (every pair at once: a link wide at the end that
+  // listens, its width that end's share, a point at an end that does not listen back above min) }
   function drawSlide(canvas, opt) {
     const cols = opt.cols || 5, n = opt.nuclei.length, rows = Math.ceil(n / cols), cell = 64, gap = 10, pad = 6, rowH = cell + 14 + gap;
     const W = pad * 2 + cols * cell + (cols - 1) * gap, H = pad * 2 + rows * rowH - gap;
@@ -788,12 +790,30 @@ window.Viz = (function () {
       if (opt.plain) { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1); } // no model yet: a plain border
       else { const lw = 1 + 5 * rel; ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(x + lw / 2, y + lw / 2, cell - lw, cell - lw); } // the attention frame: thicker and stronger with the weight
       if (opt.hover === i) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 2, cell + 4, cell + 4); }
-      ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      if (!opt.plain) ctx.fillText(`${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`, x + cell / 2, y + cell + 2);
+      if (opt.pinned === i) { ctx.setLineDash([4, 3]); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 4.5, y - 4.5, cell + 9, cell + 9); ctx.setLineDash([]); } // pinned: a dashed outline
       if (opt.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1.5; ctx.stroke(); }
     });
+    const centre = k => [pad + (k % cols) * (cell + gap) + cell / 2, pad + Math.floor(k / cols) * rowH + cell / 2];
+    if (opt.allLinks) { // every pair at once, the weakest first so the strong links end up on top
+      const { A, min, hover } = opt.allLinks, width = a => 1 + 22 * Math.min(0.6, a), pairs = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const ai = A[i][j] >= min ? A[i][j] : 0, aj = A[j][i] >= min ? A[j][i] : 0; if (ai || aj) pairs.push({ i, j, ai, aj, top: Math.max(ai, aj) }); }
+      pairs.sort((a, b) => a.top - b.top);
+      for (const q of pairs) {
+        const [xa, ya] = centre(q.i), [xb, yb] = centre(q.j), len = Math.hypot(xb - xa, yb - ya), nx = -(yb - ya) / len, ny = (xb - xa) / len, wa = (q.ai ? width(q.ai) : 0) / 2, wb = (q.aj ? width(q.aj) : 0) / 2;
+        const near = hover == null || q.i === hover || q.j === hover; // with a nucleus hovered, only its links stay strong
+        ctx.fillStyle = rgbStr(c.rgb.accent, (0.3 + 0.6 * Math.min(1, q.top / 0.5)) * (near ? 1 : 0.15));
+        ctx.beginPath(); ctx.moveTo(xa + nx * wa, ya + ny * wa); ctx.lineTo(xb + nx * wb, yb + ny * wb); ctx.lineTo(xb - nx * wb, yb - ny * wb); ctx.lineTo(xa - nx * wa, ya - ny * wa); ctx.closePath(); ctx.fill();
+      }
+      if (hover != null) { const [x0, y0] = centre(hover); ctx.fillStyle = c.accent; ctx.beginPath(); ctx.arc(x0, y0, 6, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 2; ctx.stroke(); }
+    }
+    if (!opt.plain) opt.nuclei.forEach((q, i) => { // the shares under the cells, last, on a backing where links could cross them
+      const x = pad + (i % cols) * (cell + gap), y = pad + Math.floor(i / cols) * rowH, rel = q.a / mx, text = `${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`;
+      ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      if (opt.allLinks) { const tw = ctx.measureText(text).width; ctx.fillStyle = c.surface; ctx.fillRect(x + cell / 2 - tw / 2 - 2, y + cell + 1, tw + 4, 12); }
+      ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.fillText(text, x + cell / 2, y + cell + 2);
+    });
     if (opt.links) { // who the hovered nucleus listens to: a line to each, thicker with the weight
-      const { from, weights } = opt.links, centre = k => [pad + (k % cols) * (cell + gap) + cell / 2, pad + Math.floor(k / cols) * rowH + cell / 2];
+      const { from, weights } = opt.links;
       let mw = 1e-9; weights.forEach((w, j) => { if (j !== from) mw = Math.max(mw, w); });
       const [x0, y0] = centre(from);
       weights.forEach((w, j) => { if (j === from || w < 0.04 * mw) return; const rel = w / mw, [x1, y1] = centre(j); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.3 + 0.7 * rel); ctx.lineWidth = 1 + 6 * rel; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
@@ -1034,6 +1054,166 @@ window.Viz = (function () {
     if (x >= L.box.x && x <= L.box.x + L.box.w && y >= L.box.y && y <= L.box.y + L.box.h) return { kind: 'scorer', text: m.scorer ? `the scorer: ${m.D} → ${m.scorer.hidden[0]} tanh → 1 score, the same weights for every nucleus · showing nucleus ${m.shown + 1}` : 'plain average: no scorer, every nucleus weighs the same' };
     if (x >= L.band.x - 4 && x <= L.band.x + L.band.w + 4 && y >= L.top - 6 && y <= L.bottom + 6) return { kind: 'softmax', text: m.scorer ? `softmax: share = e^score ÷ Σ e^score over the ${n} nuclei, so the shares add up to 100% and a score only counts relative to the others` : `every nucleus gets 1/${n}` };
     if ((x >= 6 && x <= L.xCode + L.codeW + 4) || (x >= L.xScore - L.rScore - 4 && x <= L.xRowEnd)) { const i = Math.floor((y - L.top) / L.pitch); if (y >= L.top && i >= 0 && i < n) return { kind: 'nucleus', i }; }
+    return null;
+  }
+  // ---- how one nucleus decides where to look: the context layer's attention for one asking nucleus, taken apart on one
+  // canvas. The asker's code becomes its query; every other nucleus's key meets it in dk products whose sum is the match;
+  // the distance cost comes off; the softmax over the others turns the scores into shares; the values, each weighted by
+  // its share, add up to the message, which is projected back and added to the asker's own code.
+  // m = { asker, nuclei: [{ px, pos }], X (the codes before context), Q, K, V, cost, match (the asker's row), costs (row),
+  //       shares (row), C (the message, dk numbers), heard, after, final (D numbers each), D, dk, ffn, size, tint, reveal,
+  //       hover ({ kind, j, d } or null), walk ({ stage, k, t } or null) }
+  const DE_W = 800, DE_STAGES = ['query', 'keys', 'match', 'distance', 'softmax', 'message', 'add'];
+  function layoutDecision(n, D) {
+    const pitch = 22, top = 100, bottom = top + n * pitch, mid = (top + bottom) / 2, foot = bottom + 14;
+    return { n, D, pitch, top, bottom, mid, rowY: i => top + pitch / 2 + i * pitch, H: foot + 96,
+      head: { thumb: 36, xThumb: 12, y: 26, h: 18, xCode: 64, codeW: 62, xQuery: 180, qW: 46, xText: 262 },
+      xIdx: 22, xThumb: 27, thumb: 18, xKey: 52, kW: 46, sH: 16, xProd: 106, pW: 46, xMatch: 208, matchHalf: 34, xMatchTxt: 248, xCost: 336, costMax: 44, xCostTxt: 342, xScoreTxt: 388,
+      band: { x: 438, w: 22 }, xBar: 470, barMax: 82, xPct: 592, xValue: 606, vW: 46, xLines: 656, sum: { x: 700, r: 13 }, xMsg: 726, mW: 46, xRowEnd: 654,
+      foot: { y: foot, sy: foot + 22, h: 18, mW: 46, xMsg: 12, w: 62, xHeard: 108, xOwn: 204, xAfter: 300, xFinal: 452, xText: 540 } };
+  }
+  function drawDecision(canvas, m) {
+    const n = m.nuclei.length, D = m.D, dk = m.dk, i = m.asker, L = layoutDecision(n, D), c = colors(), ctx = fitCanvas(canvas, DE_W, L.H);
+    canvas._decision = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    const w = m.walk, at = w ? DE_STAGES.indexOf(w.stage) : DE_STAGES.length, past = st => at > DE_STAGES.indexOf(st), during = st => !!w && w.stage === st;
+    const hov = m.hover, hovRow = hov && hov.j != null ? hov.j : null, cur = during('keys') || during('match') ? Math.min(n - 1, Math.max(0, w.k - 1)) : null, hl = hovRow != null ? hovRow : cur;
+    const uniform = 1 / Math.max(1, n - 1), sc = 1 / Math.sqrt(dk), prod = (j, d) => m.Q[i][d] * m.K[j][d] * sc;
+    ctx.clearRect(0, 0, DE_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, DE_W, L.H); ctx.imageSmoothingEnabled = false;
+    // one scale per kind of number, so that strips of the same kind compare
+    let mQ = 1e-9, mK = 1e-9, mV = 1e-9, mP = 1e-9, mM = 1e-9, mC = 1e-9, mS = 1e-9, mMsg = 1e-9, mF = 1e-9;
+    for (const q of m.Q) for (const v of q) mQ = Math.max(mQ, Math.abs(v));
+    for (const k of m.K) for (const v of k) mK = Math.max(mK, Math.abs(v));
+    for (const k of m.V) for (const v of k) mV = Math.max(mV, Math.abs(v));
+    for (let j = 0; j < n; j++) if (j !== i) { for (let d = 0; d < dk; d++) mP = Math.max(mP, Math.abs(prod(j, d))); mM = Math.max(mM, Math.abs(m.match[j])); mC = Math.max(mC, m.costs[j]); mS = Math.max(mS, m.shares[j]); }
+    for (const v of m.C) mMsg = Math.max(mMsg, Math.abs(v));
+    for (const arr of [m.X[i], m.heard, m.after, m.final]) for (const v of arr) mF = Math.max(mF, Math.abs(v));
+    const stageInk = st => (w && w.stage === st ? c.accent : c.ink3);
+    const caption = (text, x, y, st, align) => { ctx.font = mono9; ctx.fillStyle = stageInk(st); ctx.textAlign = align || 'center'; ctx.textBaseline = 'top'; ctx.fillText(text, x, y); };
+    const arrow = (x1, x2, y) => { ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.moveTo(x2 - 4, y - 3); ctx.lineTo(x2, y); ctx.lineTo(x2 - 4, y + 3); ctx.stroke(); };
+    const truthDot = (x, y, r, pos) => { ctx.fillStyle = pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); };
+
+    // the head: the asking nucleus, its code, and its query
+    const H0 = L.head;
+    ctx.font = capFont; ctx.fillStyle = stageInk('query'); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(`NUCLEUS ${i + 1} ASKS`, H0.xThumb, 6);
+    ctx.drawImage(imageToCanvas(m.nuclei[i].px, m.size, m.tint), H0.xThumb, H0.y - 9, H0.thumb, H0.thumb);
+    ctx.strokeStyle = c.accent; ctx.lineWidth = 2; ctx.strokeRect(H0.xThumb - 1, H0.y - 10, H0.thumb + 2, H0.thumb + 2);
+    if (m.reveal) truthDot(H0.xThumb + 5, H0.y - 4, 3.5, m.nuclei[i].pos);
+    codeStrip(ctx, c, H0.xCode, H0.y, H0.codeW, H0.h, m.X[i], mF);
+    caption(`its code · ${D}`, H0.xCode + H0.codeW / 2, H0.y + H0.h + 4, null);
+    ctx.save(); ctx.globalAlpha = during('query') ? Math.max(0.08, w.t) : 1;
+    arrow(H0.xCode + H0.codeW + 6, H0.xQuery - 6, H0.y + H0.h / 2); caption('× Wq', (H0.xCode + H0.codeW + H0.xQuery) / 2, H0.y + H0.h + 4, 'query');
+    codeStrip(ctx, c, H0.xQuery, H0.y, H0.qW, H0.h, m.Q[i], mQ); caption(`its query · ${dk}`, H0.xQuery + H0.qW / 2, H0.y + H0.h + 4, 'query');
+    ctx.restore();
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    [`the query is what nucleus ${i + 1} is looking for, made from its code by Wq`,
+      'every nucleus also makes a key, × Wk: how it looks to the others,',
+      `and a value, × Wv: what it says when heard · the same three maps for all ${n}`,
+      'a nucleus never listens to itself: its own code stays, through the residual'].forEach((t, k) => ctx.fillText(t, H0.xText, 8 + 12 * k));
+    // column captions
+    caption('nucleus', 8, 72, null, 'left');
+    caption('key', L.xKey + L.kW / 2, 72, 'keys'); caption(`${dk} numbers`, L.xKey + L.kW / 2, 83, 'keys');
+    caption('query × key', L.xProd + L.pW / 2, 72, 'match'); caption(`${dk} products`, L.xProd + L.pW / 2, 83, 'match');
+    caption('match', L.xMatch + 16, 72, 'match'); caption('their sum', L.xMatch + 16, 83, 'match');
+    caption('− distance', L.xCost - 12, 72, 'distance'); caption(`× ${m.cost.toFixed(2)}`, L.xCost - 12, 83, 'distance');
+    caption('= score', L.xScoreTxt + 20, 72, 'distance');
+    caption('share', L.xBar + 40, 72, 'softmax'); caption('100% together', L.xBar + 40, 83, 'softmax');
+    caption('value', L.xValue + L.vW / 2, 72, 'keys'); caption(`${dk} numbers`, L.xValue + L.vW / 2, 83, 'keys');
+    caption('the message', L.xMsg + 10, 72, 'message'); caption('Σ share × value', L.xMsg + 10, 83, 'message');
+    // the rows: every nucleus of the slide in its order on the slide
+    const keysDone = j => past('keys') || (during('keys') && j < w.k), matchDone = j => past('match') || (during('match') && j < w.k);
+    const distT = past('distance') ? 1 : during('distance') ? w.t : 0, softT = past('softmax') ? 1 : during('softmax') ? w.t : 0;
+    for (let j = 0; j < n; j++) {
+      const y = L.rowY(j), self = j === i, strong = j === hl;
+      if (strong || (self && hl == null)) { ctx.fillStyle = rgbStr(c.rgb.accent, strong ? 0.12 : 0.05); roundedRect(ctx, 6, y - L.pitch / 2 + 1, L.xRowEnd - 6, L.pitch - 2, 6); ctx.fill(); }
+      ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(j + 1), L.xIdx, y);
+      ctx.drawImage(imageToCanvas(m.nuclei[j].px, m.size, m.tint), L.xThumb, y - L.thumb / 2, L.thumb, L.thumb);
+      ctx.strokeStyle = self ? c.accent : strong ? c.ink : c.lineStrong; ctx.lineWidth = self || strong ? 2 : 1; ctx.strokeRect(L.xThumb - 0.5, y - L.thumb / 2 - 0.5, L.thumb + 1, L.thumb + 1);
+      if (m.reveal) truthDot(L.xThumb + 4, y - L.thumb / 2 + 4, 3.5, m.nuclei[j].pos);
+      if (self) { ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.fillText(`nucleus ${i + 1} itself: it asks, and is not listened to`, L.xKey, y); continue; }
+      if (keysDone(j)) { codeStrip(ctx, c, L.xKey, y - L.sH / 2, L.kW, L.sH, m.K[j], mK); codeStrip(ctx, c, L.xValue, y - L.sH / 2, L.vW, L.sH, m.V[j], mV); }
+      if (matchDone(j)) {
+        codeStrip(ctx, c, L.xProd, y - L.sH / 2, L.pW, L.sH, Float64Array.from({ length: dk }, (_, d) => prod(j, d)), mP);
+        const rel = m.match[j] / mM, len = Math.abs(rel) * L.matchHalf;
+        ctx.fillStyle = rgbStr(rel < 0 ? c.rgb.regular : c.rgb.irregular, 0.3 + 0.7 * Math.abs(rel)); ctx.fillRect(rel < 0 ? L.xMatch - len : L.xMatch, y - 6, Math.max(1, len), 12);
+        ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.fillText(fmtSigned(m.match[j], 2), L.xMatchTxt, y);
+      }
+      if (matchDone(j) && distT > 0) {
+        const len = L.costMax * (m.costs[j] / mC) * distT;
+        if (len > 0) { ctx.fillStyle = rgbStr(c.rgb.ink3, 0.25 + 0.5 * m.costs[j] / mC); ctx.fillRect(L.xCost - len, y - 6, len, 12); }
+        if (distT >= 1) { ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.fillText(`−${m.costs[j].toFixed(2)}`, L.xCostTxt, y); ctx.fillText(`= ${fmtSigned(m.match[j] - m.costs[j], 2)}`, L.xScoreTxt, y); }
+      }
+      if (matchDone(j) && softT > 0) {
+        const share = uniform + (m.shares[j] - uniform) * softT, rel = share / mS, len = L.barMax * rel;
+        if (len > 0) { ctx.fillStyle = rgbStr(c.rgb.accent, 0.25 + 0.75 * rel); ctx.fillRect(L.xBar, y - 7, Math.max(1, len), 14); }
+        if (softT >= 1) { ctx.font = mono9; ctx.fillStyle = rel > 0.5 ? c.accent : c.ink3; ctx.textAlign = 'right'; ctx.fillText(pctText(m.shares[j]), L.xPct, y); }
+      }
+    }
+    // the zero line of the match bars, and the cost's baseline
+    ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.4); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L.xMatch + 0.5, L.top); ctx.lineTo(L.xMatch + 0.5, L.bottom); ctx.moveTo(L.xCost + 0.5, L.top); ctx.lineTo(L.xCost + 0.5, L.bottom); ctx.stroke();
+    // the softmax band across the rows
+    ctx.fillStyle = rgbStr(c.rgb.accent, 0.07 + (during('softmax') ? 0.14 * Math.sin(Math.PI * w.t) : 0) + (hov && hov.kind === 'softmax' ? 0.06 : 0));
+    roundedRect(ctx, L.band.x, L.top - 6, L.band.w, L.bottom - L.top + 12, 8); ctx.fill(); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.35); ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.translate(L.band.x + L.band.w / 2, L.mid); ctx.rotate(-Math.PI / 2); ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`softmax over the other ${n - 1}`, 0, 0); ctx.restore();
+    // the values, weighted by their shares, into the message
+    const msgT = past('message') ? 1 : during('message') ? w.t : 0;
+    if (msgT > 0) {
+      const ranked = []; for (let j = 0; j < n; j++) if (j !== i) ranked.push({ j, rel: m.shares[j] / mS }); ranked.sort((a, b) => b.rel - a.rel);
+      const shown = new Set(ranked.slice(0, during('message') ? Math.max(1, Math.ceil(w.t * ranked.length)) : ranked.length).map(r => r.j)), wScale = Math.min(1, mS * 2.2);
+      const line = r => { const st = r.j === hl; ctx.strokeStyle = st ? c.ink : rgbStr(c.rgb.accent, 0.12 + 0.88 * r.rel); ctx.lineWidth = (0.6 + 5 * r.rel * wScale) * (st ? 1.3 : 1); ctx.beginPath(); ctx.moveTo(L.xLines, L.rowY(r.j)); ctx.lineTo(L.sum.x - L.sum.r, L.mid); ctx.stroke(); };
+      for (const r of ranked.slice().reverse()) if (shown.has(r.j) && r.j !== hl) line(r);
+      if (hl != null && shown.has(hl)) line(ranked.find(r => r.j === hl));
+    }
+    circleNode(ctx, L.sum.x, L.mid, L.sum.r, msgT > 0 ? c.accentSoft : c.surface2, 'Σ', `600 13px "IBM Plex Sans", system-ui, sans-serif`, !!hov && hov.kind === 'sum');
+    if (msgT >= 1) { arrow(L.sum.x + L.sum.r + 2, L.xMsg - 3, L.mid); codeStrip(ctx, c, L.xMsg, L.mid - 9, L.mW, 18, m.C, mMsg); }
+    else { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(L.xMsg - 0.5, L.mid - 9.5, L.mW + 1, 19); }
+    // the foot: the message projected back and added to the asker's own code, then the feed-forward
+    const F0 = L.foot, addT = past('add') ? 1 : during('add') ? w.t : 0, foot = F0.sy, cap = (t, x) => caption(t, x, foot + F0.h + 4, 'add');
+    ctx.font = capFont; ctx.fillStyle = stageInk('add'); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(`WHAT NUCLEUS ${i + 1} HEARS, ADDED TO ITS OWN CODE`, 12, F0.y);
+    const strip = (x, wd, code, scale, on, label) => { if (on) codeStrip(ctx, c, x, foot, wd, F0.h, code, scale); else { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x - 0.5, foot - 0.5, wd + 1, F0.h + 1); } cap(label, x + wd / 2); };
+    strip(F0.xMsg, F0.mW, m.C, mMsg, msgT >= 1, 'message');
+    arrow(F0.xMsg + F0.mW + 6, F0.xHeard - 6, foot + F0.h / 2); caption('× Wo', (F0.xMsg + F0.mW + F0.xHeard) / 2, foot + F0.h + 15, 'add');
+    strip(F0.xHeard, F0.w, m.heard, mF, addT > 0, 'what it hears');
+    ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('+', (F0.xHeard + F0.w + F0.xOwn) / 2, foot + F0.h / 2);
+    strip(F0.xOwn, F0.w, m.X[i], mF, true, 'its own code');
+    ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('=', (F0.xOwn + F0.w + F0.xAfter) / 2, foot + F0.h / 2);
+    strip(F0.xAfter, F0.w, m.after, mF, addT >= 0.5, 'after context');
+    arrow(F0.xAfter + F0.w + 6, F0.xFinal - 6, foot + F0.h / 2); caption(`+ ${m.ffn} tanh feed-forward`, (F0.xAfter + F0.w + F0.xFinal) / 2, foot + F0.h + 15, 'add');
+    strip(F0.xFinal, F0.w, m.final, mF, addT >= 1, 'to the scorer');
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    [`the message, back to ${D} numbers, is added`, 'to the code, not swapped for it: the scorer', 'sees the same nucleus, plus what it heard'].forEach((t, k) => ctx.fillText(t, F0.xText, F0.y + 1 + 12 * k));
+    // the footer: what is going on
+    let text;
+    if (w) text = ({ query: `nucleus ${i + 1}’s code × Wq: its query, what it is looking for`, keys: `every other nucleus: code × Wk = its key, code × Wv = its value (nucleus ${Math.min(n, Math.max(1, w.k))} of ${n})`, match: `the query meets each key: ${dk} products, summed, ÷ √${dk} (nucleus ${Math.min(n, Math.max(1, w.k))} of ${n})`, distance: `minus the learned cost, ${m.cost.toFixed(2)} per cell of distance`, softmax: `softmax over the other ${n - 1}: the scores become shares that add up to 100%`, message: 'the values, each weighted by its share, add up to the message', add: 'the message is projected back and added to the code; the feed-forward is added too' })[w.stage];
+    else if (hovRow != null && hovRow !== i) text = `nucleus ${hovRow + 1}: match ${fmtSigned(m.match[hovRow], 2)} − distance cost ${m.costs[hovRow].toFixed(2)} = ${fmtSigned(m.match[hovRow] - m.costs[hovRow], 2)} → ${pctText(m.shares[hovRow])} of what nucleus ${i + 1} hears`;
+    else text = `hover a row to read its numbers · click a nucleus on the slide to keep it as the one asking`;
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(text, 12, L.H - 16);
+  }
+  // what is under a point of the decision diagram (canvas-relative CSS pixels): a row (nucleus j; the app words it),
+  // the asker, a number of a strip (with its text), the softmax band or the sum
+  function hitDecision(canvas, px, py, m) {
+    const L = canvas._decision; if (!L) return null;
+    const x = px * DE_W / canvas.clientWidth, y = py * DE_W / canvas.clientWidth, n = m.nuclei.length, dk = m.dk, i = m.asker, H0 = L.head, F0 = L.foot;
+    const cell = (x0, wd, len) => Math.min(len - 1, Math.max(0, Math.floor((x - x0) / (wd / len))));
+    const inStrip = (x0, wd, y0, h) => x >= x0 && x <= x0 + wd && y >= y0 - 2 && y <= y0 + h + 2;
+    if (x >= H0.xThumb && x <= H0.xThumb + H0.thumb && y >= H0.y - 10 && y <= H0.y + H0.thumb - 8) return { kind: 'asker' };
+    if (inStrip(H0.xCode, H0.codeW, H0.y, H0.h)) { const d = cell(H0.xCode, H0.codeW, m.D); return { kind: 'code', d, text: `code ${d + 1} of nucleus ${i + 1} = ${fmtSigned(m.X[i][d], 2)} (before context)` }; }
+    if (inStrip(H0.xQuery, H0.qW, H0.y, H0.h)) { const d = cell(H0.xQuery, H0.qW, dk); return { kind: 'query', d, text: `query ${d + 1} = ${fmtSigned(m.Q[i][d], 2)} · from the code × Wq` }; }
+    if (Math.hypot(x - L.sum.x, y - L.mid) <= L.sum.r + 4) return { kind: 'sum', text: `Σ share × value over the other ${n - 1} nuclei: the message, ${dk} numbers` };
+    if (inStrip(L.xMsg, L.mW, L.mid - 9, 18)) { const d = cell(L.xMsg, L.mW, dk); return { kind: 'message', d, text: `message ${d + 1} = ${fmtSigned(m.C[d], 2)} (Σ share × value ${d + 1})` }; }
+    if (x >= L.band.x - 4 && x <= L.band.x + L.band.w + 4 && y >= L.top - 6 && y <= L.bottom + 6) return { kind: 'softmax', text: `softmax: share = e^score ÷ Σ e^score over the other ${n - 1} nuclei, so the shares add up to 100% and a score only counts relative to the others` };
+    for (const [key, x0, wd, code, label] of [['message', F0.xMsg, F0.mW, m.C, 'message'], ['heard', F0.xHeard, F0.w, m.heard, 'what it hears'], ['own', F0.xOwn, F0.w, m.X[i], 'its own code'], ['after', F0.xAfter, F0.w, m.after, 'code after context'], ['final', F0.xFinal, F0.w, m.final, 'what the scorer sees']]) {
+      if (inStrip(x0, wd, F0.sy, F0.h)) { const d = cell(x0, wd, code.length); return { kind: key, d, text: `${label} ${d + 1} = ${fmtSigned(code[d], 2)}${key === 'after' ? ` (${fmtSigned(m.X[i][d], 2)} + ${fmtSigned(m.heard[d], 2)})` : key === 'final' ? ` (${fmtSigned(m.after[d], 2)} + ${fmtSigned(m.final[d] - m.after[d], 2)} from the feed-forward)` : ''}` }; }
+    }
+    if (y >= L.top && y < L.bottom && x >= 6 && x <= L.xRowEnd) {
+      const j = Math.floor((y - L.top) / L.pitch); if (j < 0 || j >= n) return null;
+      if (j === i) return { kind: 'asker' };
+      const sy = L.rowY(j) - L.sH / 2;
+      if (inStrip(L.xKey, L.kW, sy, L.sH)) { const d = cell(L.xKey, L.kW, dk); return { kind: 'key', j, d, text: `key ${d + 1} of nucleus ${j + 1} = ${fmtSigned(m.K[j][d], 2)} · its code × Wk` }; }
+      if (inStrip(L.xProd, L.pW, sy, L.sH)) { const d = cell(L.xProd, L.pW, dk); return { kind: 'product', j, d, text: `product ${d + 1}: query ${fmtSigned(m.Q[i][d], 2)} × key ${fmtSigned(m.K[j][d], 2)} ÷ √${dk} = ${fmtSigned(m.Q[i][d] * m.K[j][d] / Math.sqrt(dk), 3)}` }; }
+      if (inStrip(L.xValue, L.vW, sy, L.sH)) { const d = cell(L.xValue, L.vW, dk); return { kind: 'value', j, d, text: `value ${d + 1} of nucleus ${j + 1} = ${fmtSigned(m.V[j][d], 2)} · its code × Wv · × share ${pctText(m.shares[j])} into the message` }; }
+      return { kind: 'row', j };
+    }
     return null;
   }
   // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct,
@@ -1971,5 +2151,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
