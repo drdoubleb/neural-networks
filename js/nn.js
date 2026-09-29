@@ -383,20 +383,22 @@
   // discounted by a learned amount per unit of distance, so the layer can prefer near neighbours.
   const softplus = x => (x > 30 ? x : Math.log1p(Math.exp(x)));
   class ContextLayer {
-    constructor({ inputSize, dk = 8, ffn = 8, heads = 1, distanceBias = false, excludeSelf = false, costInit = 0, seed = 1 }) {
-      this.D = inputSize; this.dk = dk; this.H = heads; this.F = ffn; this.distanceBias = distanceBias; this.excludeSelf = excludeSelf; this.seed = seed;
-      const rnd = mulberry32(seed * 104729 + 3), u = s => (rnd() * 2 - 1) * s, mk = (n, s) => Float64Array.from({ length: n }, () => u(s)), D = inputSize, HD = heads * dk;
+    constructor({ inputSize, dk = 8, ffn = 8, heads = 1, distanceBias = false, excludeSelf = false, costInit = 0, relative = false, seed = 1 }) {
+      this.D = inputSize; this.dk = dk; this.H = heads; this.F = ffn; this.distanceBias = distanceBias; this.excludeSelf = excludeSelf; this.relative = relative; this.seed = seed;
+      const rnd = mulberry32(seed * 104729 + 3), u = s => (rnd() * 2 - 1) * s, mk = (n, s) => Float64Array.from({ length: n }, () => u(s)), D = inputSize, HD = heads * dk, HM = heads * (dk + (relative ? 2 : 0));
       this.Wq = mk(HD * D, 0.3); this.bq = new Float64Array(HD); this.Wk = mk(HD * D, 0.3); this.bk = new Float64Array(HD);
-      this.Wv = mk(HD * D, 0.3); this.bv = new Float64Array(HD); this.Wo = mk(D * HD, 0.1); this.bo = new Float64Array(D); // small: the layer starts close to doing nothing
+      this.Wv = mk(HD * D, 0.3); this.bv = new Float64Array(HD); this.Wo = mk(D * HM, 0.1); this.bo = new Float64Array(D); // small: the layer starts close to doing nothing
       this.W1 = mk(ffn * D, 0.3); this.b1 = new Float64Array(ffn); this.W2 = mk(D * ffn, 0.1); this.b2 = new Float64Array(D);
       this.beta = new Float64Array(heads).fill(costInit > 0 ? Math.log(Math.expm1(costInit)) : 0); // softplus(beta) is each head's cost per unit of distance, when distanceBias is on
     }
     // X: the slide's tokens (rows of D numbers); dist: n × n distances between them (only with the distance bias).
     // With several heads, every head has its own query, key and value maps and its own distance cost, and their
     // messages are concatenated before the output projection. S, A and cost are the first head's (what a single-head
-    // layer shows); Sh, Ah and costs hold every head's.
-    forward(X, dist) {
+    // layer shows); Sh, Ah and costs hold every head's. With relative on, every head's message also carries where the
+    // nuclei it listened to lie, relative to the listener (the weighted mean offset, from xy: n × 2 positions).
+    forward(X, dist, xy) {
       const n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1; // a nucleus reads the others, not itself (its own vector is the residual)
+      const rel = this.relative && !!xy, mw = dk + (rel ? 2 : 0), HM = H * mw;
       const costs = Array.from(this.beta, b => (this.distanceBias ? softplus(b) : 0));
       const lin = (W, bias, out) => X.map(x => { const o = new Float64Array(out); for (let j = 0; j < out; j++) { let s = bias[j]; const off = j * D; for (let i = 0; i < D; i++) s += W[off + i] * x[i]; o[j] = s; } return o; });
       const Q = lin(this.Wq, this.bq, HD), K = lin(this.Wk, this.bk, HD), V = lin(this.Wv, this.bv, HD), Sh = [], Ah = [];
@@ -411,11 +413,11 @@
         }
         Sh.push(S); Ah.push(A);
       }
-      const C = X.map((_, i) => { const c = new Float64Array(HD); for (let h = 0; h < H; h++) { const ai = Ah[h][i], o = h * dk; for (let j = 0; j < n; j++) if (ai[j]) for (let d = 0; d < dk; d++) c[o + d] += ai[j] * V[j][o + d]; } return c; });
-      const Xp = X.map((x, i) => { const o = Float64Array.from(x); for (let d = 0; d < D; d++) { let s = this.bo[d]; const off = d * HD; for (let e = 0; e < HD; e++) s += this.Wo[off + e] * C[i][e]; o[d] += s; } return o; });
+      const C = X.map((_, i) => { const c = new Float64Array(HM); for (let h = 0; h < H; h++) { const ai = Ah[h][i], o = h * dk, om = h * mw; for (let j = 0; j < n; j++) if (ai[j]) { for (let d = 0; d < dk; d++) c[om + d] += ai[j] * V[j][o + d]; if (rel) { c[om + dk] += ai[j] * (xy[j][0] - xy[i][0]); c[om + dk + 1] += ai[j] * (xy[j][1] - xy[i][1]); } } } return c; });
+      const Xp = X.map((x, i) => { const o = Float64Array.from(x); for (let d = 0; d < D; d++) { let s = this.bo[d]; const off = d * HM; for (let e = 0; e < HM; e++) s += this.Wo[off + e] * C[i][e]; o[d] += s; } return o; });
       const U = Xp.map(xp => { const u = new Float64Array(F); for (let f = 0; f < F; f++) { let s = this.b1[f]; const off = f * D; for (let d = 0; d < D; d++) s += this.W1[off + d] * xp[d]; u[f] = Math.tanh(s); } return u; });
       const Y = Xp.map((xp, i) => { const y = Float64Array.from(xp); for (let d = 0; d < D; d++) { let s = this.b2[d]; const off = d * F; for (let f = 0; f < F; f++) s += this.W2[off + f] * U[i][f]; y[d] += s; } return y; });
-      return { X, dist, Q, K, V, S: Sh[0], A: Ah[0], cost: costs[0], Sh, Ah, costs, C, Xp, U, Y };
+      return { X, dist, xy: rel ? xy : null, Q, K, V, S: Sh[0], A: Ah[0], cost: costs[0], Sh, Ah, costs, C, Xp, U, Y };
     }
     // One forward pass taken apart, for showing, for head h: match[i][j] = query_i · key_j / √dk, cost[i][j] = the
     // learned cost × the distance, and the shares the softmax would give from the match alone or from the distance
@@ -437,7 +439,7 @@
     newGradient() { const z = a => new Float64Array(a.length); return { Wq: z(this.Wq), bq: z(this.bq), Wk: z(this.Wk), bk: z(this.bk), Wv: z(this.Wv), bv: z(this.bv), Wo: z(this.Wo), bo: z(this.bo), W1: z(this.W1), b1: z(this.b1), W2: z(this.W2), b2: z(this.b2), beta: new Float64Array(this.H) }; }
     // d(loss)/d(Y) in, the layer's gradients accumulated into g, d(loss)/d(X) out
     backward(fw, dY, g) {
-      const { X, dist, Q, K, V, Ah, C, Xp, U } = fw, n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk);
+      const { X, dist, xy, Q, K, V, Ah, C, Xp, U } = fw, n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), rel = !!xy, mw = dk + (rel ? 2 : 0), HM = H * mw;
       const dXp = dY.map(v => Float64Array.from(v));
       for (let i = 0; i < n; i++) { // the feed-forward, then its residual
         const dU = new Float64Array(F);
@@ -446,16 +448,16 @@
       }
       const dX = dXp.map(v => Float64Array.from(v)), dC = [], dQ = X.map(() => new Float64Array(HD)), dK = X.map(() => new Float64Array(HD)), dV = X.map(() => new Float64Array(HD));
       for (let i = 0; i < n; i++) { // the output projection
-        const dc = new Float64Array(HD);
-        for (let d = 0; d < D; d++) { const gd = dXp[i][d]; if (!gd) continue; g.bo[d] += gd; const off = d * HD; for (let e = 0; e < HD; e++) { g.Wo[off + e] += gd * C[i][e]; dc[e] += gd * this.Wo[off + e]; } }
+        const dc = new Float64Array(HM);
+        for (let d = 0; d < D; d++) { const gd = dXp[i][d]; if (!gd) continue; g.bo[d] += gd; const off = d * HM; for (let e = 0; e < HM; e++) { g.Wo[off + e] += gd * C[i][e]; dc[e] += gd * this.Wo[off + e]; } }
         dC.push(dc);
       }
       const dbeta = new Float64Array(H);
       for (let h = 0; h < H; h++) { // every head: the weighted values and the softmax over the slide
-        const A = Ah[h], o = h * dk;
+        const A = Ah[h], o = h * dk, om = h * mw;
         for (let i = 0; i < n; i++) {
           const dA = new Float64Array(n); let dot = 0;
-          for (let j = 0; j < n; j++) { let v = 0; for (let e = 0; e < dk; e++) { v += dC[i][o + e] * V[j][o + e]; dV[j][o + e] += A[i][j] * dC[i][o + e]; } dA[j] = v; dot += A[i][j] * v; }
+          for (let j = 0; j < n; j++) { let v = 0; for (let e = 0; e < dk; e++) { v += dC[i][om + e] * V[j][o + e]; dV[j][o + e] += A[i][j] * dC[i][om + e]; } if (rel) v += dC[i][om + dk] * (xy[j][0] - xy[i][0]) + dC[i][om + dk + 1] * (xy[j][1] - xy[i][1]); dA[j] = v; dot += A[i][j] * v; }
           for (let j = 0; j < n; j++) { const dS = A[i][j] * (dA[j] - dot); if (!dS) continue; for (let e = 0; e < dk; e++) { dQ[i][o + e] += dS * sc * K[j][o + e]; dK[j][o + e] += dS * sc * Q[i][o + e]; } if (this.distanceBias) dbeta[h] -= dS * dist[i][j]; }
         }
       }
@@ -470,8 +472,8 @@
       step(this.Wo, g.Wo, 1); step(this.bo, g.bo); step(this.W1, g.W1, 1); step(this.b1, g.b1); step(this.W2, g.W2, 1); step(this.b2, g.b2);
       if (this.distanceBias) for (let h = 0; h < this.H; h++) this.beta[h] -= lr * g.beta[h] / k;
     }
-    parameterCount() { const HD = this.H * this.dk; return 3 * (HD * this.D + HD) + this.D * HD + this.D + this.F * this.D + this.F + this.D * this.F + this.D + (this.distanceBias ? this.H : 0); }
-    describe() { return `self-attention over the ${this.excludeSelf ? 'other ' : ''}nuclei (${this.H > 1 ? `${this.H} heads, each ` : ''}query · key of ${this.dk}${this.distanceBias ? ' − a learned distance cost' : ''}, values added back) + ${this.F} tanh feed-forward`; }
+    parameterCount() { const HD = this.H * this.dk, HM = this.H * (this.dk + (this.relative ? 2 : 0)); return 3 * (HD * this.D + HD) + this.D * HM + this.D + this.F * this.D + this.F + this.D * this.F + this.D + (this.distanceBias ? this.H : 0); }
+    describe() { return `self-attention over the ${this.excludeSelf ? 'other ' : ''}nuclei (${this.H > 1 ? `${this.H} heads, each ` : ''}query · key of ${this.dk}${this.distanceBias ? ' − a learned distance cost' : ''}, values${this.relative ? ' and where they lie, relative,' : ''} added back) + ${this.F} tanh feed-forward`; }
   }
 
   // ---------------------------------------------------------------------------- attention over a slide
@@ -486,19 +488,20 @@
     constructor({ inputSize, attentionUnits = 4, attention = true, context = null, outputs = 1, seed = 1 }) {
       this.D = inputSize; this.A = attentionUnits; this.attention = attention; this.seed = seed; this.K = outputs;
       const nl = context ? (context.layers || 1) : 0;
-      this.layers = Array.from({ length: nl }, (_, l) => new ContextLayer({ inputSize, dk: context.dk || 8, ffn: context.ffn == null ? 8 : context.ffn, heads: context.heads || 1, distanceBias: !!context.distanceBias, excludeSelf: !!context.excludeSelf, costInit: context.costInit || 0, seed: seed + 2 + l }));
+      this.layers = Array.from({ length: nl }, (_, l) => new ContextLayer({ inputSize, dk: context.dk || 8, ffn: context.ffn == null ? 8 : context.ffn, heads: context.heads || 1, distanceBias: !!context.distanceBias, excludeSelf: !!context.excludeSelf, costInit: context.costInit || 0, relative: !!context.relative, seed: seed + 2 + l }));
       this.context = this.layers[0] || null;
       this.scorers = Array.from({ length: outputs }, (_, k) => new Net({ inputSize, hidden: [attentionUnits], activation: 'tanh', seed: seed + 10 * k }));
       this.heads = Array.from({ length: outputs }, (_, k) => new Net({ inputSize, hidden: [], activation: 'relu', seed: seed + 1 + 10 * k }));
       this.scorer = this.scorers[0]; this.head = this.heads[0];
       this.steps = 0;
     }
-    // H: the slide's instances; dist: their distances (with a distance bias). Returns the context (ctx: the first
+    // H: the slide's instances; dist: their distances (with a distance bias); xy: their positions (with relative
+    // messages). Returns the context (ctx: the first
     // layer's forward, ctxs: every layer's), the tokens after context (T), and per output (outs[k]) the scores, the
     // weights, the summary and the call; the first output's are also on the result itself.
-    forward(H, dist) {
+    forward(H, dist, xy) {
       const ctxs = []; let T = H;
-      for (const layer of this.layers) { const c = layer.forward(T, dist); ctxs.push(c); T = c.Y; }
+      for (const layer of this.layers) { const c = layer.forward(T, dist, xy); ctxs.push(c); T = c.Y; }
       const n = T.length, D = this.D;
       const outs = this.scorers.map((scorer, k) => {
         const fws = this.attention ? T.map(t => scorer.forward(t)) : null, s = new Float64Array(n), a = new Float64Array(n);
@@ -520,7 +523,7 @@
     trainBatch(slides, lr, l2 = 0) {
       const gss = this.scorers.map(s => s.newGradient()), ghs = this.heads.map(h => h.newGradient()), gcs = this.layers.map(c => c.newGradient()); let loss = 0;
       for (const sl of slides) {
-        const fw = this.forward(sl.H, sl.dist), T = fw.T, n = T.length, ys = Array.isArray(sl.y) ? sl.y : [sl.y];
+        const fw = this.forward(sl.H, sl.dist, sl.xy), T = fw.T, n = T.length, ys = Array.isArray(sl.y) ? sl.y : [sl.y];
         const dT = gcs.length ? T.map(() => new Float64Array(this.D)) : null; // d loss / d instance, only needed with a context layer
         fw.outs.forEach((o, k) => {
           const y = ys[k], dl = o.p - y; loss += bce(o.p, y);
@@ -546,7 +549,7 @@
     evaluate(slides, threshold = 0.5) {
       const acc = this.scorers.map(() => ({ loss: 0, correct: 0, mass: 0, nPos: 0, probs: [], weights: [] }));
       for (const sl of slides) {
-        const fw = this.forward(sl.H, sl.dist), ys = Array.isArray(sl.y) ? sl.y : [sl.y], poss = !sl.pos ? null : Array.isArray(sl.pos[0]) ? sl.pos : [sl.pos];
+        const fw = this.forward(sl.H, sl.dist, sl.xy), ys = Array.isArray(sl.y) ? sl.y : [sl.y], poss = !sl.pos ? null : Array.isArray(sl.pos[0]) ? sl.pos : [sl.pos];
         fw.outs.forEach((o, k) => {
           const y = ys[k], A = acc[k], pos = poss ? poss[Math.min(k, poss.length - 1)] : null;
           A.probs.push(o.p); A.weights.push(o.a); A.loss += bce(o.p, y);
@@ -688,13 +691,14 @@
     return { worst, checked };
   }
   // the field model: two layers of two heads, two outputs, every parameter against finite differences
-  function gradientCheckField() {
-    const mil = new AttentionMIL({ inputSize: 5, attentionUnits: 3, outputs: 2, context: { dk: 3, ffn: 3, heads: 2, layers: 2, distanceBias: true, excludeSelf: true, costInit: 0.8 }, seed: 6 });
-    const rnd = mulberry32(23), eps = 1e-6, mk = () => Float64Array.from({ length: 5 }, () => rnd() * 2 - 1);
+  function gradientCheckField({ relative = false } = {}) {
+    const mil = new AttentionMIL({ inputSize: 5, attentionUnits: 3, outputs: 2, context: { dk: 3, ffn: 3, heads: 2, layers: 2, distanceBias: true, excludeSelf: true, costInit: 0.8, relative }, seed: 6 });
+    const rnd = mulberry32(23), eps = 1e-5, mk = () => Float64Array.from({ length: 5 }, () => rnd() * 2 - 1); // eps: the smallest gradients here are ~1e-6, where 1e-6 steps leave 1e-4 of round-off
     const distOf = n => { const d = Array.from({ length: n }, () => new Float64Array(n)); for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const v = rnd() * 2; d[i][j] = v; d[j][i] = v; } return d; };
-    const slides = [{ H: [mk(), mk(), mk(), mk()], dist: distOf(4), y: [1, 0] }, { H: [mk(), mk(), mk()], dist: distOf(3), y: [0, 1] }, { H: [mk(), mk(), mk(), mk(), mk()], dist: distOf(5), y: [1, 1] }];
+    const xyOf = n => (relative ? Array.from({ length: n }, () => [rnd() * 2 - 1, rnd() * 2 - 1]) : null);
+    const slides = [{ H: [mk(), mk(), mk(), mk()], dist: distOf(4), xy: xyOf(4), y: [1, 0] }, { H: [mk(), mk(), mk()], dist: distOf(3), xy: xyOf(3), y: [0, 1] }, { H: [mk(), mk(), mk(), mk(), mk()], dist: distOf(5), xy: xyOf(5), y: [1, 1] }];
     mil.layers[0].beta.set([0.4, -0.2]); mil.layers[1].beta.set([0.1, 0.6]);
-    const lossAt = () => slides.reduce((a, sl) => { const fw = mil.forward(sl.H, sl.dist); return a + fw.outs.reduce((b, o, k) => b + bce(o.p, sl.y[k]), 0); }, 0) / slides.length;
+    const lossAt = () => slides.reduce((a, sl) => { const fw = mil.forward(sl.H, sl.dist, sl.xy); return a + fw.outs.reduce((b, o, k) => b + bce(o.p, sl.y[k]), 0); }, 0) / slides.length;
     const params = [].concat(...mil.layers.map(c => [c.Wq, c.bq, c.Wk, c.bk, c.Wv, c.bv, c.Wo, c.bo, c.W1, c.b1, c.W2, c.b2]), ...mil.scorers.map(s => [s.W[0], s.b[0], s.Wo]), mil.heads.map(h => h.Wo));
     const before = params.map(p => Float64Array.from(p)), sbo = mil.scorers.map(s => s.bo), hbo = mil.heads.map(h => h.bo), betas = mil.layers.map(c => Float64Array.from(c.beta));
     mil.trainBatch(slides, 1);
