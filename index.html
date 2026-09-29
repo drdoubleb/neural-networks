@@ -25,7 +25,7 @@
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>
     <button type="button" class="stage" data-stage="train">2 · Train</button>
     <button type="button" class="stage" data-stage="test">3 · Test</button>
-    <button type="button" class="stage" data-stage="foundation">4 · Foundation</button>
+    <button type="button" class="stage" data-stage="foundation" hidden>4 · Foundation</button>
   </nav>
   <div class="masthead-tools">
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
@@ -103,11 +103,11 @@
             <div class="seg" id="mode-seg">
               <button type="button" data-mode="features" class="is-active">measurements</button>
               <button type="button" data-mode="pixels" id="mode-pixels">1,024 pixels</button>
-              <button type="button" data-mode="code" id="mode-code" title="the foundation model’s code: a few numbers from a pretrained encoder (4 · Foundation)">the code</button>
+              <button type="button" data-mode="code" id="mode-code" title="the foundation model’s code: a few numbers from a pretrained encoder (4 · Foundation)" hidden>the code</button>
             </div>
           </div>
           <div class="ctl" id="code-wrap" hidden><label for="backbone">Code from</label><select id="backbone"></select></div>
-          <div class="ctl slim" id="labelled-wrap"><label for="labelled">Labelled cases</label>
+          <div class="ctl slim" id="labelled-wrap" hidden><label for="labelled">Labelled cases</label>
             <select id="labelled" title="how many training cases carry a label; the rest stay in the tray but the network never sees them"><option value="4">4</option><option value="10">10</option><option value="20">20</option><option value="40">40</option><option value="0" selected>all 80</option></select></div>
           <div class="ctl" id="conv-wrap"><label for="conv">Convolution</label>
             <select id="conv"><option value="0">none</option><option value="4">4 filters 5×5 → ReLU → max-pool</option><option value="8">8 filters 5×5 → ReLU → max-pool</option></select></div>
@@ -445,7 +445,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage pretrains a miniature foundation model on 100 of them without labels. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage, which appears with recipe ⑪, pretrains a miniature foundation model on 100 of them without labels. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukemia/patients_data.js"></script>
