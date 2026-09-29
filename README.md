@@ -148,8 +148,9 @@ style). The network never sees it; the page uses it to show which hidden units r
    session, and the earlier stages are uncluttered until then.
 5. **Slides.** Weak supervision: 60 slides of 20 nuclei with one label each, and attention learns which nuclei matter.
    The slide is shown with a frame on every nucleus scaled by its attention weight, the twenty nuclei ranked by weight
-   beside it, the small attention network for the nucleus under the cursor, the weighted summary and the call, and three
-   curves per epoch: loss, slide accuracy and the share of a positive slide's attention landing on its atypical nuclei
+   beside it, the whole model unrolled on one diagram (every nucleus through the one scorer, the softmax, the weighted
+   sum and the single layer, with a step-by-step walk-through), the small attention network for the nucleus under the
+   cursor, the weighted summary and the call, and three curves per epoch: loss, slide accuracy and the share of a positive slide's attention landing on its atypical nuclei
    (the model never sees which). A *Reveal* checkbox marks the atypical nuclei for the audience, and a *plain average*
    switch shows what the attention buys. Like the fourth stage it stays hidden until recipe ⑬ (or key `5`, or the
    `#slides` link) introduces it. See *Slides: one label for twenty nuclei*.
@@ -392,6 +393,14 @@ positive slide's attention that lands on its atypical nuclei, with the uniform 1
 which nuclei are atypical; a *Reveal* checkbox marks them for the audience. A *plain average* switch replaces the
 attention with equal weights, and the *code from* dropdown swaps in the bigger shipped encoder or the one pretrained in
 stage 4.
+
+The whole model is also drawn unrolled for the slide on screen, in the style of the other stages' diagrams: the twenty
+nuclei with their codes down the left, one copy of the scorer with the note that its weights are the same for every
+nucleus, the column of twenty scores, the softmax band across them, the twenty shares, the weighted sum into the
+eight-number summary and the single layer with its call. Hovering a nucleus lights its path through all of it, and
+*Walk through* animates the slide through the model one nucleus at a time, then the softmax, the sum and the call.
+This is the picture to point at when someone asks how attention differs from the earlier networks: the same small
+network runs once per nucleus, and the only new operation is the softmax that makes the twenty results compete.
 
 Mean of three seeds at the page's settings (`node tools/check_slides.js --epochs 60 --lr 0.02`):
 

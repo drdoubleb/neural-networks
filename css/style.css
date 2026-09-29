@@ -137,8 +137,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, .thumb:focus-vi
 @media (min-width: 900px) { .sl-two { grid-template-columns: 372px minmax(0, 1fr); align-items: start; } }
 #sl-canvas { display: block; width: 100%; max-width: 372px; height: auto; border-radius: 8px; }
 #sl-rank { display: block; width: 100%; height: auto; border-radius: 8px; }
-.sl-rank-wrap { overflow-x: auto; }
-@media (max-width: 899px) { .sl-rank-wrap #sl-rank { min-width: 640px; } .stages { overflow-x: auto; } }
+.sl-rank-wrap, .sl-unrolled-wrap { overflow-x: auto; }
+@media (max-width: 899px) { .sl-rank-wrap #sl-rank { min-width: 640px; } .sl-unrolled-wrap .net-wrap { min-width: 720px; } .stages { overflow-x: auto; } }
 .tray.slides { grid-template-columns: repeat(auto-fill, 66px); gap: 8px; }
 .thumb.slide { width: 66px; height: 54px; }
 .thumb.slide canvas { image-rendering: auto; }

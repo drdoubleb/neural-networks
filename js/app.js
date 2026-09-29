@@ -18,7 +18,7 @@
     foundationShown: false, // the fourth stage, the code input and the labelled-cases control appear once a recipe (or key 4, or #foundation) introduces them, and stay for the session
     slidesShown: false, // the fifth stage likewise (recipe ⑬, key 5, #slides)
     // 5 · Slides: attention over slides of nuclei with one label each
-    sl: { built: false, model: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, reveal: false, encKey: null },
+    sl: { built: false, model: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -1650,12 +1650,12 @@
     return ended;
   }
   function slStart() {
-    const L = S.sl;
+    const L = S.sl; if (L.walk) slWalkStop();
     if (L.epoch >= L.epochs) { slNote(`Already at ${L.epochs} epochs. Raise the epoch count, or reset to train again.`); return; }
     L.running = true; L.lastTime = performance.now(); L.debt = 0; L.lastRender = 0; slSyncButtons();
     requestAnimationFrame(slTick);
   }
-  function slStop(msg) { const L = S.sl; L.running = false; slSyncButtons(); if (msg) slNote(msg); }
+  function slStop(msg) { const L = S.sl; L.running = false; if (L.walk) slWalkStop(); slSyncButtons(); if (msg) slNote(msg); }
   function slFinish() {
     const L = S.sl, last = L.hist[L.hist.length - 1];
     slStop(`Finished ${L.epochs} epochs on the slides' labels alone. Slide accuracy ${pct(last.acc)} on the training slides, ${pct(last.testAcc)} on the test slides${L.attention ? `; ${pct(last.testMass)} of a positive test slide's attention now lands on its atypical nuclei (uniform: ${pct(L.share)}). Tick “Reveal” and look.` : '. A plain average cannot say where it looked.'}`);
@@ -1676,7 +1676,7 @@
   }
   function slStepSlide() { const L = S.sl; slStop(); const ended = slStep(); slRender(true); slNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on slide ${L.byId.get(L.lastSlide).name} (${L.meta.classes[L.byId.get(L.lastSlide).label].name}): step ${L.ptr} of ${L.train.length}.`); }
   function slStepEpoch() { const L = S.sl; slStop(); do { slStep(); } while (L.ptr !== 0); slRender(true); slNote(`Epoch ${L.epoch} complete.`); }
-  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderSummary(); slRenderTrays(); }
+  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderSummary(); slRenderTrays(); }
   function slFocus() { const L = S.sl; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
   function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
@@ -1706,7 +1706,7 @@
   function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H) }; }
   function slRenderSlide() {
     const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes;
-    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus });
+    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus });
     const call = fw.p >= 0.5 ? 1 : 0, k = s.nuclei.filter(n => n.label).length;
     $('sl-slide-title').textContent = `Slide ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · label: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
     $('sl-call').innerHTML = `The model says <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b> → <span class="${call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[call].name)} ${call === s.label ? '✓' : '✗'}</span>${L.selected == null && L.lastSlide != null ? ' · the last slide trained on' : ''}. ${L.attention ? 'Frames and percentages are the attention weights.' : 'Plain average: every nucleus weighs the same.'}`;
@@ -1738,6 +1738,44 @@
     const cv = $('sl-head'), m = { net: L.model.head, mode: 'features', inputCaption: `INPUT · THE SLIDE’S SUMMARY · ${D} NUMBERS`, featureNames: Array.from({ length: D }, (_, i) => `summary ${i + 1}`), x: fw.z, fw: fw.head, stage: 2, hover: L.hoverHead, activation: 'relu', activationLabel: 'ReLU', positiveName: cls[1].name, negativeName: cls[0].name, specimen: null, size: L.size, tint: S.tint };
     cv._model = m; Viz.drawNetwork(cv, m);
   }
+  function slNucleusTip(i) { const L = S.sl, { s, fw } = slFocusForward(), n = s.nuclei[i]; return `nucleus ${i + 1} · attention ${pct(fw.a[i])}${L.attention ? ` (score ${Viz.fmtSigned(fw.s[i], 2)})` : ''}${L.reveal ? ` · ${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'}` : ''}`; }
+  // the whole model for the slide on screen, unrolled: every nucleus through the scorer, the softmax, the sum, the call
+  function slRenderUnrolled() {
+    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, n = s.nuclei.length;
+    let top = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[top]) top = i;
+    const m = { nuclei: s.nuclei.map((q, i) => ({ px: q.px, h: q.h, s: fw.s[i], a: fw.a[i], pos: !!q.label })), D: L.D, size: L.size, tint: S.tint, reveal: L.reveal,
+      scorer: L.attention ? L.model.scorer : null, head: L.model.head, fw, shown: L.hoverNucleus != null ? L.hoverNucleus : top, hover: L.hoverUnrolled, walk: L.walk, positiveName: cls[1].name, negativeName: cls[0].name };
+    const cv = $('sl-unrolled'); cv._model = m; Viz.drawSlideNetwork(cv, m);
+    $('sl-unrolled-note').textContent = L.attention
+      ? `Left to right: the ${n} nuclei of this slide, each as its code of ${L.D} numbers; one scorer, the same weights for all of them, gives each a score; the softmax compares the ${n} scores and turns them into shares that add up to 100%; the codes are added up, each weighted by its share, into the ${L.D}-number summary; a single layer on the summary makes the call. Training sends the label’s error back along the same path, through the softmax into the scorer, which is how the scorer learns where to look without a single nucleus label. Hover a nucleus to follow it, or press Walk through.`
+      : `Plain average: there is no scorer, so every nucleus gets the same share, 1/${n}; the codes are averaged into the ${L.D}-number summary and a single layer makes the call. Nothing can make one nucleus count more than another.`;
+  }
+  // the walk-through: the slide on screen goes through the model step by step, one nucleus at a time
+  const SL_WALK = { score: 110, softmax: 900, sum: 1000, head: 800, pause: 300 };
+  function slWalkStart() {
+    const L = S.sl; if (!L.model) return; slStop();
+    L.walk = { stage: L.attention ? 'score' : 'softmax', k: 0, t: 0, t0: performance.now() }; L.hoverUnrolled = null;
+    slSyncWalk(); requestAnimationFrame(slWalkTick);
+  }
+  function slWalkStop() { const L = S.sl; if (!L.walk) return; L.walk = null; L.walkNucleus = null; slSyncWalk(); if (L.model) { slRenderSlide(); slRenderUnrolled(); } }
+  function slSyncWalk() { $('sl-walk').textContent = S.sl.walk ? '■ Stop' : '▶ Walk through'; }
+  function slWalkTick(now) {
+    const L = S.sl, w = L.walk; if (!w) return;
+    const el = now - w.t0, n = slFocus().nuclei.length, next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
+    if (w.stage === 'score') { w.k = Math.min(n, Math.floor(el / SL_WALK.score) + 1); L.walkNucleus = w.k - 1; if (el >= n * SL_WALK.score + SL_WALK.pause) { L.walkNucleus = null; next('softmax'); } }
+    else if (w.stage === 'softmax') { w.t = Math.min(1, el / SL_WALK.softmax); if (el >= SL_WALK.softmax + SL_WALK.pause) next('sum'); }
+    else if (w.stage === 'sum') { w.t = Math.min(1, el / SL_WALK.sum); if (el >= SL_WALK.sum + SL_WALK.pause) next('head'); }
+    else if (w.stage === 'head') {
+      w.t = Math.min(1, el / SL_WALK.head);
+      if (el >= SL_WALK.head + SL_WALK.pause) {
+        const { s, fw } = slFocusForward(), cls = L.meta.classes, call = fw.p >= 0.5 ? 1 : 0; slWalkStop();
+        slNote(`Slide ${s.name} through the model: ${L.attention ? 'every nucleus scored by the same scorer, softmax, weighted sum' : 'plain average'}, then the single layer: P(${cls[1].name}) = ${fw.p.toFixed(2)} → ${cls[call].name} ${call === s.label ? '✓' : '✗'}.`);
+        return;
+      }
+    }
+    slRenderSlide(); slRenderUnrolled();
+    requestAnimationFrame(slWalkTick);
+  }
   function slRenderCurves() {
     const L = S.sl, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
     Viz.drawCurves($('sl-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
@@ -1755,7 +1793,7 @@
   }
   function slRender(full) {
     const L = S.sl; if (!L.model) return;
-    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderSummary();
+    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderSummary();
     if (full) { slRenderCurves(); slRenderTrays(); }
     slSyncButtons();
   }
@@ -1777,7 +1815,7 @@
     $('sl-epochs').addEventListener('input', () => { S.sl.epochs = +$('sl-epochs').value; $('sl-epochs-val').textContent = S.sl.epochs; if (S.sl.model) { slRenderStatus(); slRenderCurves(); } });
     $('sl-speed').addEventListener('input', () => { S.sl.speed = speedFromSlider(+$('sl-speed').value); $('sl-speed-val').textContent = `${S.sl.speed} epochs/s`; });
     $('sl-seed').addEventListener('change', () => { S.sl.seed = Math.max(1, Math.round(+$('sl-seed').value) || 1); slReset(`Seed ${S.sl.seed} — fresh random weights.`); });
-    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); } });
+    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } });
     $('sl-step-slide').addEventListener('click', slStepSlide);
     $('sl-step-epoch').addEventListener('click', slStepEpoch);
     $('sl-train').addEventListener('click', () => (S.sl.running ? slStop('Paused.') : slStart()));
@@ -1788,11 +1826,24 @@
     cv.addEventListener('mousemove', ev => {
       const L = S.sl; if (!L.model) return;
       const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
-      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); }
-      if (i != null) { const { s, fw } = slFocusForward(), n = s.nuclei[i]; tip.hidden = false; tip.textContent = `nucleus ${i + 1} · attention ${pct(fw.a[i])}${L.attention ? ` (score ${Viz.fmtSigned(fw.s[i], 2)})` : ''}${L.reveal ? ` · ${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'}` : ''}`; tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
+      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); }
+      if (i != null) { tip.hidden = false; tip.textContent = slNucleusTip(i); tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
       else tip.hidden = true;
     });
-    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); } } });
+    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } } });
+    // the unrolled diagram: hovering a nucleus row follows it everywhere; the other parts explain themselves
+    const cu = $('sl-unrolled'), tu = $('sl-unrolled-tip'), hitKey = h => (h ? `${h.kind}:${h.i == null ? '' : h.i}:${h.d == null ? '' : h.d}` : '');
+    cu.addEventListener('mousemove', ev => {
+      const L = S.sl, m = cu._model; if (!m || L.walk) return;
+      const r = cu.getBoundingClientRect(), hit = Viz.hitSlideNetwork(cu, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverUnrolled;
+      const ni = hit && hit.kind === 'nucleus' ? hit.i : null;
+      L.hoverUnrolled = hit;
+      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); }
+      else if (hitKey(prev) !== hitKey(hit)) slRenderUnrolled();
+      if (hit) { tu.hidden = false; tu.textContent = hit.kind === 'nucleus' ? slNucleusTip(hit.i) : hit.text; const half = tu.offsetWidth / 2 + 4; tu.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tu.style.top = (ev.clientY - r.top) + 'px'; } // kept inside the (scrollable) wrapper else tu.hidden = true;
+    });
+    cu.addEventListener('mouseleave', () => { const L = S.sl; tu.hidden = true; const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } });
+    $('sl-walk').addEventListener('click', () => (S.sl.walk ? slWalkStop() : slWalkStart()));
     for (const [cvId, tipId, key, render] of [['sl-scorer', 'sl-scorer-tip', 'hoverScorer', slRenderScorer], ['sl-head', 'sl-head-tip', 'hoverHead', slRenderSummary]]) {
       const c2 = $(cvId), t2 = $(tipId);
       c2.addEventListener('mousemove', ev => {
