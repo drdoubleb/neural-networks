@@ -4,7 +4,8 @@
  * wavy basement membrane, stroma with spindle cells beneath, and nests of urothelial cells below the membrane. Five
  * patterns, one label (invasive or not), so that invasion is the conjunction of three cues and every incomplete
  * combination has a real mimic:
- *   vbn     normal urothelium with von Brunn nests   bland cells, below the membrane, in round smooth nests       not invasive
+ *   vbn     normal urothelium with von Brunn nests   bland cells, below the membrane, in round smooth nests that
+ *                                                    mostly hang from the underside of the membrane                not invasive
  *   ip      inverted papilloma                       bland cells, below the membrane, in anastomosing cords       not invasive
  *   cis     carcinoma in situ                        atypical cells, confined above the membrane                  not invasive
  *   cisvbn  CIS extending into von Brunn nests       atypical cells, below the membrane, in round smooth nests    not invasive
@@ -115,11 +116,13 @@ function makeField(P, id) {
   const clear = (p, min) => taken().every(q => dist(p, q) >= min);
   const belowMembrane = (x, margin) => ym(x) + margin;
   // nests below the membrane, placed where they do not overlap
-  const nestFits = (cx, cy, R) => cy - R >= belowMembrane(cx, 5) && cy + R <= H - 3 && cx - R >= 3 && cx + R <= W - 3 && f.nests.every(n => dist([cx, cy], [n.cx, n.cy]) >= R + n.R + 8);
-  function placeNest(R) { for (let t = 0; t < 40; t++) { const cx = U(R + 4, W - R - 4), cy = U(belowMembrane(cx, 5) + R, H - 3 - R); if (cy - R >= belowMembrane(cx, 5) && nestFits(cx, cy, R)) return [cx, cy]; } return null; }
+  const nestFits = (cx, cy, R, margin) => cy - R >= belowMembrane(cx, margin) && cy + R <= H - 3 && cx - R >= 3 && cx + R <= W - 3 && f.nests.every(n => dist([cx, cy], [n.cx, n.cy]) >= R + n.R + 8);
+  // a round nest hangs from the underside of the membrane three times in four, as the invasive nests do, so that depth
+  // alone does not tell the two apart; otherwise it lies free in the stroma
+  function placeNest(R, attached) { for (let t = 0; t < 40; t++) { const cx = U(R + 4, W - R - 4), cy = attached ? belowMembrane(cx, 0) + R + U(0.5, 3) : U(belowMembrane(cx, 12) + R, H - 3 - R); if (nestFits(cx, cy, R, attached ? 0 : 12)) return [cx, cy]; } return null; }
   const roundNest = (atypical, gid) => {
-    const R = U(19, 25), at = placeNest(R); if (!at) return false;
-    const nest = { kind: 'round', cx: at[0], cy: at[1], R, rx: R, ry: R * U(0.85, 1), rot: U(0, Math.PI), amp: U(0, 0.025), k: RI(2, 3), phase: U(0, TAU), group: gid };
+    const R = U(19, 25), attached = rand() < 0.75, at = placeNest(R, attached); if (!at) return false;
+    const nest = { kind: 'round', cx: at[0], cy: at[1], R, rx: R, ry: R * U(0.85, 1), rot: U(0, Math.PI), amp: U(0, 0.025), k: RI(2, 3), phase: U(0, TAU), group: gid, connected: attached };
     f.nests.push(nest);
     const r = R - 8.5, k = Math.min(8, Math.floor(TAU * r / 13.5)), a0 = U(0, TAU); // nuclei on a ring, and one in the middle of a big nest
     for (let i = 0; i < k; i++) { const ang = a0 + i * TAU / k + U(-0.12, 0.12), rr = r + U(-1, 1); f.nuclei.push(Object.assign(sampleNucleus(atypical ? 1 : 0), { x: nest.cx + rr * Math.cos(ang), y: nest.cy + rr * Math.sin(ang) * nest.ry / nest.rx, kind: 'nest', below: true, group: gid })); }
@@ -297,7 +300,7 @@ const records = rendered.map(({ f, px, seg }) => {
   return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, grainSeed: SEED * 7 + f.id, rows: f.rows,
     membrane: Array.from({ length: W / 8 + 1 }, (_, i) => Math.round(ym(Math.min(W, i * 8)) * 10) / 10), surface: Math.round(f.thickness * 10) / 10,
     nuclei: f.nuclei.map(n => [n.x, n.y, KINDS.indexOf(n.kind), n.label, SUBTYPES.indexOf(n.subtype), n.below ? 1 : 0, n.group == null ? -1 : n.group]), // [x, y, kind, atypical, subtype, below, nest]
-    nests: f.nests.map(n => n.kind === 'cords' ? { kind: 'cords', halfWidth: Math.round(n.halfWidth * 10) / 10, paths: n.paths.map(p => p.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : n.kind === 'jagged' ? { kind: 'jagged', connected: !!n.connected, outlines: n.outlines.map(poly => poly.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : { kind: n.single ? 'single' : 'round', cx: Math.round(n.cx * 10) / 10, cy: Math.round(n.cy * 10) / 10, rx: Math.round(n.rx * 10) / 10, ry: Math.round(n.ry * 10) / 10, rot: Math.round(n.rot * 100) / 100, amp: n.amp, k: n.k, phase: Math.round(n.phase * 100) / 100 }),
+    nests: f.nests.map(n => n.kind === 'cords' ? { kind: 'cords', halfWidth: Math.round(n.halfWidth * 10) / 10, paths: n.paths.map(p => p.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : n.kind === 'jagged' ? { kind: 'jagged', connected: !!n.connected, outlines: n.outlines.map(poly => poly.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : { kind: n.single ? 'single' : 'round', connected: !!n.connected, cx: Math.round(n.cx * 10) / 10, cy: Math.round(n.cy * 10) / 10, rx: Math.round(n.rx * 10) / 10, ry: Math.round(n.ry * 10) / 10, rot: Math.round(n.rot * 100) / 100, amp: n.amp, k: n.k, phase: Math.round(n.phase * 100) / 100 }),
     png: FL.encodePNGNode(W, H, px).toString('base64'), seg: FL.encodePNGNode(W, H, seg).toString('base64') };
 });
 const meta = { seed: SEED, w: W, h: H, size: SIZE, grain: FL.GRAIN, quantum: QUANTUM, kinds: KINDS, subtypes: SUBTYPES, nucleus: ['x', 'y', 'kind', 'atypical', 'subtype', 'below', 'nest'], question: 'Invasion?', short: 'Invasion', positions: true,
@@ -337,5 +340,5 @@ const count = (arr, f) => arr.filter(f).length, mean = (arr, f) => arr.reduce((a
 console.log(`wrote ${meta.train} training and ${meta.test} test fields of ${W} × ${H} to ${OUT} (${(js.length / 1024).toFixed(0)} KB)`);
 for (const P of PATTERNS) {
   const fs_ = fields.filter(f => f.pattern === P.key);
-  console.log(`  ${P.key.padEnd(7)} ${String(fs_.length).padStart(3)} fields · nuclei ${Math.min(...fs_.map(f => f.nuclei.length))}–${Math.max(...fs_.map(f => f.nuclei.length))} (mean ${mean(fs_, f => f.nuclei.length).toFixed(1)}) · atypical ${mean(fs_, f => count(f.nuclei, n => n.label)).toFixed(1)} · below the membrane ${mean(fs_, f => count(f.nuclei, n => n.below)).toFixed(1)} (atypical below ${mean(fs_, f => count(f.nuclei, n => n.below && n.label)).toFixed(1)}) · nests ${mean(fs_, f => f.nests.filter(n => !n.single).length).toFixed(1)} · single cells on ${count(fs_, f => f.nests.some(n => n.single))}${P.key === 'inv' ? ` · nests from the epithelium ${count([].concat(...fs_.map(f => f.nests.filter(n => n.kind === 'jagged'))), n => n.connected)} of ${[].concat(...fs_.map(f => f.nests.filter(n => n.kind === 'jagged'))).length}` : ''}`);
+  console.log(`  ${P.key.padEnd(7)} ${String(fs_.length).padStart(3)} fields · nuclei ${Math.min(...fs_.map(f => f.nuclei.length))}–${Math.max(...fs_.map(f => f.nuclei.length))} (mean ${mean(fs_, f => f.nuclei.length).toFixed(1)}) · atypical ${mean(fs_, f => count(f.nuclei, n => n.label)).toFixed(1)} · below the membrane ${mean(fs_, f => count(f.nuclei, n => n.below)).toFixed(1)} (atypical below ${mean(fs_, f => count(f.nuclei, n => n.below && n.label)).toFixed(1)}) · nests ${mean(fs_, f => f.nests.filter(n => !n.single).length).toFixed(1)} · single cells on ${count(fs_, f => f.nests.some(n => n.single))}${(() => { const nests = [].concat(...fs_.map(f => f.nests.filter(n => (n.kind === 'jagged' || n.kind === 'round') && !n.single))); return nests.length ? ` · nests hanging from the membrane ${count(nests, n => n.connected)} of ${nests.length}` : ''; })()}`);
 }

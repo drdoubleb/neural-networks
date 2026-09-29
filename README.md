@@ -584,17 +584,19 @@ preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50
 `data/fields/fields_data.js`, with two contact sheets in H&E colour (`contact_sheet_fields.png`, and
 `contact_sheet_fields_truth.png` with the membrane, the nest outlines and every nucleus's truth drawn over it). Each
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
-stroma with pale spindle cells beneath, and, in four of the five patterns, cells below the membrane. The nuclei come
+stroma with pale spindle cells beneath, and, in four of the five patterns, cells below the membrane. Round nests and
+invasive nests alike hang from the underside of the membrane three times in four and lie free in the stroma otherwise,
+so that depth does not tell them apart and only their shape does. The nuclei come
 from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a field, the spindle
 cells included, is a token for the model, with its truth kept for the page: atypical or bland, above or below the
 membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a real mimic:
 
 | Pattern | Cytology | Location | Architecture | Label |
 |---|---|---|---|---|
-| Normal urothelium with von Brunn nests | bland | below the membrane | round smooth nests | not invasive |
+| Normal urothelium with von Brunn nests | bland | below the membrane | round smooth nests, three in four hanging from the underside of the membrane | not invasive |
 | Inverted papilloma | bland | below | anastomosing cords | not invasive |
 | Carcinoma in situ | atypical | above only (normal von Brunn nests below on half the fields) | | not invasive |
-| CIS extending into von Brunn nests | atypical | below | round smooth nests | not invasive |
+| CIS extending into von Brunn nests | atypical | below | round smooth nests, three in four hanging from the membrane | not invasive |
 | Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
 Ninety fields of each pattern, 80 for training and 10 held out (the test fields are drawn first, so they stay the same
@@ -610,10 +612,10 @@ crops with the field around the nucleus and for crops masked to the nucleus (`--
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 71% | 86% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 69% | 87% |
 | Atypical vs bland, crops masked to the nucleus | 90% | 92% |
-| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 48% · 81% | 46% · 84% |
-| Below vs above the membrane, from the code alone (majority: 69%): with surroundings · masked | 75% · 70% | 88% · 70% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 49% · 81% | 46% · 84% |
+| Below vs above the membrane, from the code alone (majority: 72%): with surroundings · masked | 75% · 73% | 88% · 73% |
 
 A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
 nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
