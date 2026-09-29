@@ -26,6 +26,7 @@
     <button type="button" class="stage" data-stage="train">2 · Train</button>
     <button type="button" class="stage" data-stage="test">3 · Test</button>
     <button type="button" class="stage" data-stage="foundation" hidden>4 · Foundation</button>
+    <button type="button" class="stage" data-stage="slides" hidden>5 · Slides</button>
   </nav>
   <div class="masthead-tools">
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
@@ -393,6 +394,93 @@
         <p class="small muted" style="margin-top:8px" id="fm-map-hint">Two of the eight code numbers, for every nucleus and its second view (joined by a line). As pretraining runs, the two views of a nucleus pull together and nuclei arrange themselves by what makes them recognisable. Colour by the answers above to see how far the classes separate without any label having been used.</p>
       </div>
     </section>
+
+    <!-- ============================ 5 · SLIDES ============================ -->
+    <section class="stage-panel" id="panel-slides" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Slides: one label for twenty nuclei</h2>
+          <span class="small muted">weak supervision · the attention learns where to look</span>
+        </div>
+        <p class="prose small">A slide carries a diagnosis; its cells do not. Here every <strong>slide</strong> is 20 nuclei and one label, <em>no atypical cells</em> or <em>atypical cells present</em> (2 to 4 atypical nuclei among bland ones, atypical in any of the four ways of the atypia question), and nobody labels the nuclei. Each nucleus becomes its <strong>code</strong> from the frozen foundation encoder; a small <strong>attention</strong> network gives every nucleus a score, a softmax over the slide turns the scores into weights that add up to one, the nuclei’s codes are averaged with those weights into one summary of the slide, and a single layer makes the call. The only teacher is the slide’s label, yet the attention learns which nuclei matter: tick <em>reveal</em> to see where it lands. Switch to a plain average and compare.</p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">Pooling</span><div class="seg" id="sl-pool-seg"><button type="button" data-att="1" class="is-active">attention</button><button type="button" data-att="0">plain average</button></div></div>
+          <div class="ctl"><label for="sl-units">Attention units</label><select id="sl-units"><option value="2">2 tanh</option><option value="4" selected>4 tanh</option><option value="8">8 tanh</option></select></div>
+          <div class="ctl"><label for="sl-backbone">Code from</label><select id="sl-backbone"></select></div>
+          <div class="ctl slim"><label for="sl-epochs">Epochs <span class="val" id="sl-epochs-val">60</span></label><input type="range" id="sl-epochs" min="10" max="300" step="10" value="60"></div>
+          <div class="ctl slim"><label for="sl-speed">Speed <span class="val" id="sl-speed-val"></span></label><input type="range" id="sl-speed" min="0" max="100" step="1" value="39"></div>
+          <div class="ctl slim"><label for="sl-seed">Random seed</label><input type="number" id="sl-seed" min="1" max="9999" value="1"></div>
+          <div class="ctl check"><input type="checkbox" id="sl-reveal"><label for="sl-reveal" class="plainlabel">Reveal which nuclei are atypical (the model never sees this)</label></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="sl-step-slide" title="one gradient step on the next training slide">Step slide</button>
+            <button type="button" class="btn" id="sl-step-epoch" title="one pass through the 60 training slides">Step epoch</button>
+            <button type="button" class="btn primary big" id="sl-train" title="run the remaining epochs (space)">▶ Train</button>
+            <button type="button" class="btn" id="sl-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+          </div>
+        </div>
+        <div class="status" id="sl-status"></div>
+        <div class="note" id="sl-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sl-slide-title">The slide</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="sl-prev" title="the previous slide">◀ previous</button><button type="button" class="btn" id="sl-next" title="the next slide">next ▶</button></div>
+        </div>
+        <div class="sl-two">
+          <div>
+            <div class="net-wrap"><canvas id="sl-canvas" width="372" height="354" aria-label="The slide: twenty nuclei with their attention weights"></canvas><div class="tip" id="sl-tip" hidden></div></div>
+            <p class="small" id="sl-call" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <div class="sl-rank-wrap"><canvas id="sl-rank" width="800" height="116" aria-label="The twenty nuclei ranked by attention"></canvas></div>
+            <p class="small muted" style="margin-top:8px">The nuclei ranked by attention; each bar is that nucleus’s share of the slide’s attention, and the shares add up to 100%. Frames on the slide grow with the share. Hover a nucleus to see how its score is computed below.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="sl-scorer-card">
+        <div class="card-head">
+          <h2>How a nucleus is scored</h2>
+          <span class="small muted" id="sl-scorer-sub">the attention network, the same for every nucleus: its code → tanh units → one score · a softmax over the slide turns the 20 scores into weights</span>
+        </div>
+        <div class="net-wrap"><canvas id="sl-scorer" width="800" height="440" aria-label="The attention network for one nucleus"></canvas><div class="tip" id="sl-scorer-tip" hidden></div></div>
+        <p class="small muted" id="sl-scorer-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The slide’s summary, and the call</h2>
+          <span class="small muted">the nuclei’s codes averaged with the attention weights, then a single layer on the summary</span>
+        </div>
+        <div class="fm-selected" id="sl-summary"></div>
+        <div class="net-wrap"><canvas id="sl-head" width="800" height="440" aria-label="The classifier on the slide's summary"></canvas><div class="tip" id="sl-head-tip" hidden></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Learning curves</h2>
+          <div class="legend"><span><span class="line"></span>training slides</span><span><span class="line test"></span>test slides (peeking)</span><span><span class="line chance"></span>uniform attention</span></div>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Loss (cross-entropy) per epoch</span><span class="now" id="sl-loss-now"></span></div><svg id="sl-loss" role="img" aria-label="Loss per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Slide accuracy per epoch</span><span class="now" id="sl-acc-now"></span></div><svg id="sl-acc" role="img" aria-label="Accuracy per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Attention on the atypical nuclei of a positive slide</span><span class="now" id="sl-mass-now"></span></div><svg id="sl-mass" role="img" aria-label="Share of attention on the atypical nuclei per epoch"></svg></div>
+        </div>
+        <p class="small muted" style="margin-top:8px">The right-hand chart is the point: the share of a positive slide’s attention that lands on its atypical nuclei. Nobody told the model which nuclei those are; with uniform weights they get their share of the slide, about 15%. A plain average stays there by construction.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The slides</h2>
+          <div class="legend"><span><span class="swatch ring"></span>called <span data-slcls="0"></span></span><span><span class="swatch ring pos"></span>called <span data-slcls="1"></span></span><span><span class="swatch badge">✗</span>disagrees with the label</span><span><span class="swatch batch"></span>the last slide trained on</span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px">Training slides (60)</p>
+        <div class="tray slides" id="sl-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px">Test slides (20) · never trained on, scored as it goes</p>
+        <div class="tray slides" id="sl-test-tray"></div>
+      </div>
+    </section>
   </div>
 
   <!-- ============================ INSPECTOR ============================ -->
@@ -445,7 +533,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage, which appears with recipe ⑪, pretrains a miniature foundation model on 100 of them without labels. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>5</kbd> switch stages, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; the fourth stage, which appears with recipe ⑪, pretrains a miniature foundation model on 100 of them without labels, and the fifth, with recipe ⑬, trains attention over slides of twenty nuclei with one label each. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukemia/patients_data.js"></script>
@@ -453,6 +541,7 @@
 <script src="data/enlargement/nuclei_data.js"></script>
 <script src="data/irregularity/nuclei_data.js"></script>
 <script src="data/foundation/backbones.js"></script>
+<script src="data/slides/slides_data.js"></script>
 <script src="js/features.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>

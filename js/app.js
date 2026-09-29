@@ -16,6 +16,9 @@
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
     foundationShown: false, // the fourth stage, the code input and the labelled-cases control appear once a recipe (or key 4, or #foundation) introduces them, and stay for the session
+    slidesShown: false, // the fifth stage likewise (recipe ⑬, key 5, #slides)
+    // 5 · Slides: attention over slides of nuclei with one label each
+    sl: { built: false, model: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, reveal: false, encKey: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -30,7 +33,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases'];
+  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones'];
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -135,7 +138,8 @@
       describe: `the encoder pretrained here${cl.steps ? ` (${S.fm.epoch} epoch${S.fm.epoch === 1 ? '' : 's'}, ${cl.describe()})` : ' (not pretrained yet: a random code)'}` };
   }
   function renderBackboneOptions() {
-    $('backbone').innerHTML = backbones().map(b => `<option value="${esc(b.id)}">shipped: ${esc(b.nuclei.toLocaleString())} nuclei, ${esc(b.conv.K)} filters, code of ${esc(b.code)}${b.note ? ` (${esc(b.note)})` : ''}</option>`).join('') + '<option value="page">pretrained in 4 · Foundation</option>';
+    const opts = backbones().map(b => `<option value="${esc(b.id)}">shipped: ${esc(b.nuclei.toLocaleString())} nuclei, ${esc(b.conv.K)} filters, code of ${esc(b.code)}${b.note ? ` (${esc(b.note)})` : ''}</option>`).join('') + '<option value="page">pretrained in 4 · Foundation</option>';
+    $('backbone').innerHTML = opts; $('sl-backbone').innerHTML = opts;
     S.backbone = defaultBackbone();
   }
   // the label a training case carries (wrong for the mislabelled ones when label noise is on), and whether it is wrong
@@ -1125,6 +1129,12 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
+      if (k === '13') { // the slides have their own stage and controls
+        showStage('slides');
+        S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        slReset(`Recipe ${RECIPE_LABELS[13]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
+        return;
+      }
       if (k === '11') { // the foundation model has its own stage and controls
         showStage('foundation');
         S.fm.labs = true; S.fm.epochs = 100; S.fm.speed = 4;
@@ -1160,7 +1170,7 @@
     $('btn-test-reset').addEventListener('click', () => { clearTestResults(false); $('test-note').textContent = 'Test results cleared.'; renderInspector(); renderTestGraph(); });
     $('threshold').addEventListener('input', () => { S.test.threshold = +$('threshold').value; renderTestPanel(); renderInspector(); });
     $('prev').addEventListener('input', () => { S.test.prevalence = prevFromSlider(+$('prev').value); renderTestPanel(); });
-    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); renderInspector(); if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
+    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); renderInspector(); if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
     $('theme-toggle').addEventListener('click', () => {
       const root = document.documentElement;
       const dark = root.dataset.theme ? root.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1195,11 +1205,12 @@
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
       else if (ev.key === ' ' && S.stage === 'foundation') { ev.preventDefault(); S.fm.running ? fmStop('Paused.') : fmStart(); }
+      else if (ev.key === ' ' && S.stage === 'slides') { ev.preventDefault(); S.sl.running ? slStop('Paused.') : slStart(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && S.stage === 'train') teachNext();
-      else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test'); else if (ev.key === '4') showStage('foundation');
+      else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test'); else if (ev.key === '4') showStage('foundation'); else if (ev.key === '5') showStage('slides');
     });
-    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } });
+    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } if (S.stage === 'slides' && S.sl.model) slRender(false); });
     // playback controls in both strips: previous step, pause/play, next step, speed
     for (const key of ['lesson', 'test']) {
       const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
@@ -1217,7 +1228,7 @@
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
     if (S.stage === 'train') { renderTrainGraph(); renderProfile(true); } if (S.stage === 'test') renderTestGraph();
-    fmRepaint();
+    fmRepaint(); slRepaint();
     renderInspector();
   }
   // the lecture introduces the foundation model late, so its stage and controls stay out of the way until then
@@ -1228,12 +1239,16 @@
   }
   function showStage(name) {
     if (name === 'foundation') revealFoundation();
+    if (name === 'slides') revealSlides();
     S.stage = name;
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
-    $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test'; $('panel-foundation').hidden = name !== 'foundation';
-    document.querySelector('.inspector').hidden = name === 'foundation'; document.querySelector('.bench').classList.toggle('no-inspector', name === 'foundation'); // the foundation stage has no specimen inspector
+    $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test'; $('panel-foundation').hidden = name !== 'foundation'; $('panel-slides').hidden = name !== 'slides';
+    const wide = name === 'foundation' || name === 'slides';
+    document.querySelector('.inspector').hidden = wide; document.querySelector('.bench').classList.toggle('no-inspector', wide); // the foundation and slides stages have no specimen inspector
     if (name !== 'foundation') fmStop();
+    if (name !== 'slides') slStop();
     if (name === 'foundation') { stopTraining(); fmEnter(); }
+    if (name === 'slides') { stopTraining(); slEnter(); }
     if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
     if (name === 'train') {
       if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0];
@@ -1567,23 +1582,248 @@
     cv.addEventListener('mouseleave', () => { S.fm.hover = null; tip.hidden = true; fmRenderGraph(); });
   }
 
+  // ------------------------------------------------------------------ 5 · Slides: attention over a slide of nuclei
+  // A slide is 20 nuclei with one label. Every nucleus becomes its code from the frozen foundation encoder (the one
+  // the code input uses), an AttentionMIL scores the nuclei, a softmax over the slide turns the scores into weights,
+  // the weighted average of the codes is the slide's summary and a single layer makes the call. Only the slide's label
+  // trains it; the pool's truth about the nuclei is only ever used to show, afterwards, where the attention landed.
+  const SLC = { lr: 0.02, batch: 1 };
+  function slNote(msg) { $('sl-note').textContent = msg || ''; }
+  function slData() { return window.LECTURE_SLIDES || null; }
+  function slBuild() {
+    const L = S.sl, D = slData(); if (!D) return false;
+    L.meta = D.meta; L.size = D.meta.size; L.cols = 5;
+    L.pool = D.pool.map(p => { const px = NF.decodeBase64(p.px); return { id: p.id, label: p.label, subtype: p.subtype, px, ink: NF.toInk(px) }; });
+    const mk = s => ({ id: s.id, name: s.name, split: s.split, label: s.label, y: s.label ? 1 : 0, nuclei: s.nuclei.map(([id, t]) => { const p = L.pool[id]; return { id, t, label: p.label, subtype: p.subtype, px: t ? DS.dihedral(p.px, L.size, t) : p.px, ink: t ? DS.dihedral(p.ink, L.size, t) : p.ink }; }) });
+    L.train = D.train.map(mk); L.test = D.test.map(mk); L.all = [...L.train, ...L.test]; L.byId = new Map(L.all.map(s => [s.id, s]));
+    const pos = L.train.filter(s => s.label);
+    L.share = pos.reduce((a, s) => a + s.nuclei.filter(n => n.label).length / s.nuclei.length, 0) / pos.length; // what uniform attention gives the atypical nuclei
+    for (const [id, tray] of [['sl-train-tray', L.train], ['sl-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) el.appendChild(slThumb(s)); }
+    document.querySelectorAll('[data-slcls="0"]').forEach(el => { el.textContent = L.meta.classes[0].name; });
+    document.querySelectorAll('[data-slcls="1"]').forEach(el => { el.textContent = L.meta.classes[1].name; });
+    L.thumbs = new Map(L.all.map(s => [s.id, document.querySelector(`.thumb.slide[data-id="${s.id}"]`)]));
+    L.built = true;
+    return true;
+  }
+  function slThumb(s) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'thumb slide'; b.dataset.id = s.id; b.title = s.name;
+    const cv = document.createElement('canvas'); b.appendChild(cv);
+    Viz.renderSlideThumb(cv, s.nuclei.map(n => n.px), S.sl.cols, S.sl.size, S.tint);
+    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
+    b.addEventListener('click', () => slSelect(s.id));
+    return b;
+  }
+  function slRepaint() { const L = S.sl; if (!L.built) return; for (const s of L.all) Viz.renderSlideThumb(L.thumbs.get(s.id).querySelector('canvas'), s.nuclei.map(n => n.px), L.cols, L.size, S.tint); if (L.model && S.stage === 'slides') slRender(true); }
+  // every nucleus of every slide through the frozen encoder, then standardised on the training slides' nuclei
+  function slEncode() {
+    const L = S.sl, enc = codeEncoder();
+    if (L.encKey === enc.key) return;
+    for (const s of L.all) for (const n of s.nuclei) n.code = enc.encode(n.ink);
+    L.std = NN.fitStandardizer([].concat(...L.train.map(s => s.nuclei.map(n => n.code))), { perDimScale: true });
+    for (const s of L.all) { for (const n of s.nuclei) n.h = L.std.apply(n.code); s.H = s.nuclei.map(n => n.h); s.pos = s.nuclei.map(n => !!n.label); }
+    L.encKey = enc.key; L.D = enc.cl.code; L.encDescribe = enc.describe;
+  }
+  function slReset(reason) {
+    const L = S.sl; slStop();
+    if (!L.built && !slBuild()) return;
+    slEncode();
+    L.model = new NN.AttentionMIL({ inputSize: L.D, attentionUnits: L.units, attention: L.attention, seed: L.seed });
+    L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
+    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null;
+    slRecordEpoch();
+    slSyncControls(); slRender(true);
+    if (reason) slNote(reason);
+  }
+  function slRecordEpoch() {
+    const L = S.sl; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test);
+    L.hist.push({ epoch: L.epoch, loss: L.trainEval.loss, acc: L.trainEval.accuracy, testLoss: L.testEval.loss, testAcc: L.testEval.accuracy, mass: L.trainEval.culpritMass, testMass: L.testEval.culpritMass });
+  }
+  function slStep() { // one gradient step on the next training slide of the epoch's order
+    const L = S.sl, n = L.train.length;
+    if (L.ptr === 0) { const o = L.order; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(L.rng() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } }
+    const idx = L.order.slice(L.ptr, L.ptr + SLC.batch);
+    L.model.trainBatch(idx.map(i => L.train[i]), L.lr, 0);
+    L.lastSlide = L.train[idx[idx.length - 1]].id;
+    L.ptr += idx.length;
+    let ended = false;
+    if (L.ptr >= n) { L.ptr = 0; L.epoch++; slRecordEpoch(); ended = true; }
+    return ended;
+  }
+  function slStart() {
+    const L = S.sl;
+    if (L.epoch >= L.epochs) { slNote(`Already at ${L.epochs} epochs. Raise the epoch count, or reset to train again.`); return; }
+    L.running = true; L.lastTime = performance.now(); L.debt = 0; L.lastRender = 0; slSyncButtons();
+    requestAnimationFrame(slTick);
+  }
+  function slStop(msg) { const L = S.sl; L.running = false; slSyncButtons(); if (msg) slNote(msg); }
+  function slFinish() {
+    const L = S.sl, last = L.hist[L.hist.length - 1];
+    slStop(`Finished ${L.epochs} epochs on the slides' labels alone. Slide accuracy ${pct(last.acc)} on the training slides, ${pct(last.testAcc)} on the test slides${L.attention ? `; ${pct(last.testMass)} of a positive test slide's attention now lands on its atypical nuclei (uniform: ${pct(L.share)}). Tick “Reveal” and look.` : '. A plain average cannot say where it looked.'}`);
+  }
+  function slTick(now) {
+    const L = S.sl; if (!L.running) return;
+    const dt = Math.min(0.1, (now - L.lastTime) / 1000); L.lastTime = now;
+    const spe = Math.ceil(L.train.length / SLC.batch);
+    L.debt += dt * L.speed * spe;
+    const t0 = performance.now(); let did = false, ended = false;
+    while (L.debt >= 1 && performance.now() - t0 < 16) {
+      ended = slStep() || ended; L.debt -= 1; did = true;
+      if (L.ptr === 0 && L.epoch >= L.epochs) { slFinish(); break; }
+    }
+    if (L.debt > spe) L.debt = spe;
+    if (did && (ended || now - L.lastRender >= 80)) { slRender(ended); L.lastRender = now; }
+    if (L.running) requestAnimationFrame(slTick);
+  }
+  function slStepSlide() { const L = S.sl; slStop(); const ended = slStep(); slRender(true); slNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on slide ${L.byId.get(L.lastSlide).name} (${L.meta.classes[L.byId.get(L.lastSlide).label].name}): step ${L.ptr} of ${L.train.length}.`); }
+  function slStepEpoch() { const L = S.sl; slStop(); do { slStep(); } while (L.ptr !== 0); slRender(true); slNote(`Epoch ${L.epoch} complete.`); }
+  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderSummary(); slRenderTrays(); }
+  function slFocus() { const L = S.sl; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
+  function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
+  function slSyncControls() {
+    const L = S.sl;
+    document.querySelectorAll('#sl-pool-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.att === '1') === L.attention));
+    $('sl-units').value = L.units; $('sl-units').disabled = !L.attention;
+    $('sl-epochs').value = L.epochs; $('sl-epochs-val').textContent = L.epochs;
+    $('sl-speed').value = sliderFromSpeed(L.speed); $('sl-speed-val').textContent = `${L.speed} epochs/s`;
+    $('sl-seed').value = L.seed; $('sl-reveal').checked = L.reveal;
+    $('sl-backbone').value = S.backbone;
+    $('sl-scorer-card').hidden = !L.attention;
+    slSyncButtons();
+  }
+  // ---- rendering
+  function slRenderStatus() {
+    const L = S.sl, last = L.hist[L.hist.length - 1], m = L.model, cls = L.meta.classes;
+    $('sl-status').innerHTML =
+      `<span>architecture <b>${L.meta.perSlide} nuclei → code (${L.D} numbers each, from ${esc(L.encDescribe)}) → ${esc(m.describe())} → P</b></span>` +
+      `<span>parameters <b>${m.parameterCount()}</b></span>` +
+      `<span>slides <b>${L.train.length}</b> training (${L.train.filter(s => s.label).length} with atypical cells) · <b>${L.test.length}</b> test</span>` +
+      `<span>epoch <b>${L.epoch}</b> / ${L.epochs}</span><span>slide <b>${L.ptr === 0 ? '–' : L.ptr}</b> / ${L.train.length}</span>` +
+      `<span>loss <b>${last.loss.toFixed(3)}</b></span><span>slide accuracy <b>${pct(last.acc)}</b> training · <b>${pct(last.testAcc)}</b> test (peeking)</span>` +
+      (L.attention ? `<span>attention on the atypical nuclei <b>${pct(last.mass)}</b> training · <b>${pct(last.testMass)}</b> test (uniform: ${pct(L.share)})</span>` : `<span>every nucleus weighs <b>${pct(1 / L.meta.perSlide)}</b> (plain average)</span>`);
+    void cls;
+  }
+  function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H) }; }
+  function slRenderSlide() {
+    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes;
+    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus });
+    const call = fw.p >= 0.5 ? 1 : 0, k = s.nuclei.filter(n => n.label).length;
+    $('sl-slide-title').textContent = `Slide ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · label: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
+    $('sl-call').innerHTML = `The model says <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b> → <span class="${call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[call].name)} ${call === s.label ? '✓' : '✗'}</span>${L.selected == null && L.lastSlide != null ? ' · the last slide trained on' : ''}. ${L.attention ? 'Frames and percentages are the attention weights.' : 'Plain average: every nucleus weighs the same.'}`;
+  }
+  function slRenderRank() {
+    const L = S.sl, { s, fw } = slFocusForward();
+    const items = s.nuclei.map((n, i) => ({ px: n.px, value: fw.a[i], pos: !!n.label, index: i })).sort((a, b) => b.value - a.value);
+    Viz.drawRanked($('sl-rank'), { items, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus, title: L.attention ? 'the 20 nuclei ranked by attention · bars: each one’s share of the slide’s attention' : 'plain average: every nucleus gets the same share' });
+  }
+  function slScorerModel() { // the attention network for one nucleus: the hovered one, or the one with the most attention
+    const L = S.sl, { s, fw } = slFocusForward();
+    let j = L.hoverNucleus; if (j == null) { j = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[j]) j = i; }
+    const n = s.nuclei[j], sf = fw.fws ? fw.fws[j] : L.model.scorer.forward(n.h);
+    return { j, n, m: { net: L.model.scorer, mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S CODE · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => `code ${i + 1}`), x: n.h, fw: sf, stage: 2, hover: L.hoverScorer,
+      activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the slide\n→ ${pct(fw.a[j])} of the attention`, specimen: null, size: L.size, tint: S.tint } };
+  }
+  function slRenderScorer() {
+    const L = S.sl; if (!L.attention) return;
+    const { j, n, m } = slScorerModel(), cv = $('sl-scorer'); cv._model = m; Viz.drawNetwork(cv, m);
+    $('sl-scorer-note').textContent = `${L.hoverNucleus == null ? 'The nucleus with the most attention on this slide' : `Nucleus ${j + 1} of this slide`}${L.reveal ? ` (${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'})` : ''}. Every nucleus of the slide goes through this same little network; the softmax then compares the 20 scores, so a score only means something relative to the others on the slide.`;
+  }
+  function subtypeWord(key) { return { enlarged: 'enlarged', hyperchromatic: 'hyperchromatic', irregular: 'irregular contour', coarse: 'coarse chromatin', combined: 'two or more traits', bland: 'bland' }[key] || key; }
+  function slRenderSummary() {
+    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, D = L.D;
+    const plain = new Float64Array(D); for (const h of s.H) for (let d = 0; d < D; d++) plain[d] += h[d] / s.H.length;
+    const bars = code => { let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v)); return `<span class="code" title="${Array.from(code).map(v => v.toFixed(2)).join(', ')}">${Array.from(code).map(v => `<i class="${v < 0 ? 'neg' : 'pos'}" style="height:${Math.max(2, Math.round(Math.abs(v) / mx * 100))}%"></i>`).join('')}</span>`; };
+    $('sl-summary').innerHTML = `<div class="v"><div class="lbl">${L.attention ? 'weighted average' : 'plain average'}</div>${bars(fw.z)}<div class="n">the summary</div></div>` + (L.attention ? `<div class="v"><div class="lbl">plain average</div>${bars(plain)}<div class="n">for comparison</div></div>` : '') +
+      `<div class="txt"><div>Σ weight × code over the 20 nuclei gives ${D} numbers, the slide’s summary${L.attention ? '; with attention it leans towards the nuclei that weigh most, where a plain average lets 17 bland nuclei drown 3 atypical ones' : ''}.</div><div>Then a single layer on the summary: <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b>.</div></div>`;
+    const cv = $('sl-head'), m = { net: L.model.head, mode: 'features', inputCaption: `INPUT · THE SLIDE’S SUMMARY · ${D} NUMBERS`, featureNames: Array.from({ length: D }, (_, i) => `summary ${i + 1}`), x: fw.z, fw: fw.head, stage: 2, hover: L.hoverHead, activation: 'relu', activationLabel: 'ReLU', positiveName: cls[1].name, negativeName: cls[0].name, specimen: null, size: L.size, tint: S.tint };
+    cv._model = m; Viz.drawNetwork(cv, m);
+  }
+  function slRenderCurves() {
+    const L = S.sl, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
+    Viz.drawCurves($('sl-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
+    Viz.drawCurves($('sl-acc'), { history: L.hist, key: 'acc', showTest: true, maxEpoch: L.epochs });
+    Viz.drawSeries($('sl-mass'), { hist: L.hist, keys: [{ key: 'mass', color: c.accent }, { key: 'testMass', color: testCol, dash: true }], maxEpoch: L.epochs, pct: true, baseline: L.share, baselineLabel: 'uniform' });
+    $('sl-loss-now').textContent = `${last.loss.toFixed(3)} · test ${last.testLoss.toFixed(3)}`; $('sl-acc-now').textContent = `${pct(last.acc)} · test ${pct(last.testAcc)}`; $('sl-mass-now').textContent = `${pct(last.mass)} · test ${pct(last.testMass)}`;
+  }
+  function slRenderTrays() {
+    const L = S.sl, cls = L.meta.classes, focus = slFocus();
+    [['train', L.train, L.trainEval], ['test', L.test, L.testEval]].forEach(([split, slides, ev]) => slides.forEach((s, k) => {
+      const el = L.thumbs.get(s.id), p = ev.probs[k], call = p >= 0.5 ? 1 : 0;
+      el.className = `thumb slide call-${call}${call !== s.label ? ' wrong' : ''}${focus === s ? ' selected' : ''}${L.lastSlide === s.id && split === 'train' ? ' in-batch' : ''}`;
+      el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} slide · label ${cls[s.label].name} · call ${cls[call].name} (P ${p.toFixed(2)})`;
+    }));
+  }
+  function slRender(full) {
+    const L = S.sl; if (!L.model) return;
+    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderSummary();
+    if (full) { slRenderCurves(); slRenderTrays(); }
+    slSyncButtons();
+  }
+  function slEnter() {
+    const L = S.sl; if (!slData()) { slNote('The slides did not load.'); return; }
+    if (!L.model) slReset('Untrained: the attention weights are near uniform and the calls are guesses. Step a slide to watch one gradient step, or press Train and watch the right-hand curve climb.');
+    else { slEncode(); if (L.encKey !== L.modelEnc) { L.modelEnc = L.encKey; } slRender(true); }
+  }
+  // the lecture introduces the slides late: the stage stays hidden until recipe ⑬, key 5 or #slides brings it in
+  function revealSlides() {
+    if (!S.slidesShown) { S.slidesShown = true; try { sessionStorage.setItem('nucleus-net-slides', '1'); } catch (e) { /* ignore */ } }
+    document.querySelector('.stage[data-stage="slides"]').hidden = false;
+    revealFoundation(); // the slides use the foundation encoder's code
+  }
+  function bindSlides() {
+    document.querySelectorAll('#sl-pool-seg button').forEach(b => b.addEventListener('click', () => { const att = b.dataset.att === '1'; if (att === S.sl.attention) return; S.sl.attention = att; slReset(att ? 'Attention on: a scorer weighs the nuclei — fresh random weights.' : 'Plain average: every nucleus weighs the same and the scorer is switched off — fresh random weights.'); }));
+    $('sl-units').addEventListener('change', () => { S.sl.units = +$('sl-units').value; slReset(`${S.sl.units} attention units — fresh random weights.`); });
+    $('sl-backbone').addEventListener('change', () => { S.backbone = $('sl-backbone').value; slReset(`The code now comes from ${codeEncoder().describe} — fresh random weights.`); });
+    $('sl-epochs').addEventListener('input', () => { S.sl.epochs = +$('sl-epochs').value; $('sl-epochs-val').textContent = S.sl.epochs; if (S.sl.model) { slRenderStatus(); slRenderCurves(); } });
+    $('sl-speed').addEventListener('input', () => { S.sl.speed = speedFromSlider(+$('sl-speed').value); $('sl-speed-val').textContent = `${S.sl.speed} epochs/s`; });
+    $('sl-seed').addEventListener('change', () => { S.sl.seed = Math.max(1, Math.round(+$('sl-seed').value) || 1); slReset(`Seed ${S.sl.seed} — fresh random weights.`); });
+    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); } });
+    $('sl-step-slide').addEventListener('click', slStepSlide);
+    $('sl-step-epoch').addEventListener('click', slStepEpoch);
+    $('sl-train').addEventListener('click', () => (S.sl.running ? slStop('Paused.') : slStart()));
+    $('sl-reset').addEventListener('click', () => slReset('Weights re-initialised from the seed.'));
+    $('sl-prev').addEventListener('click', () => slNeighbour(-1));
+    $('sl-next').addEventListener('click', () => slNeighbour(1));
+    const cv = $('sl-canvas'), tip = $('sl-tip');
+    cv.addEventListener('mousemove', ev => {
+      const L = S.sl; if (!L.model) return;
+      const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
+      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); }
+      if (i != null) { const { s, fw } = slFocusForward(), n = s.nuclei[i]; tip.hidden = false; tip.textContent = `nucleus ${i + 1} · attention ${pct(fw.a[i])}${L.attention ? ` (score ${Viz.fmtSigned(fw.s[i], 2)})` : ''}${L.reveal ? ` · ${n.label ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'}` : ''}`; tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
+      else tip.hidden = true;
+    });
+    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); } } });
+    for (const [cvId, tipId, key, render] of [['sl-scorer', 'sl-scorer-tip', 'hoverScorer', slRenderScorer], ['sl-head', 'sl-head-tip', 'hoverHead', slRenderSummary]]) {
+      const c2 = $(cvId), t2 = $(tipId);
+      c2.addEventListener('mousemove', ev => {
+        const m = c2._model; if (!m) return;
+        const r = c2.getBoundingClientRect(), hit = Viz.hitNetwork(c2, ev.clientX - r.left, ev.clientY - r.top, m), prev = S.sl[key];
+        S.sl[key] = hit;
+        if (hit) { t2.hidden = false; t2.textContent = hit.text; t2.style.left = (ev.clientX - r.left) + 'px'; t2.style.top = (ev.clientY - r.top) + 'px'; } else t2.hidden = true;
+        if ((prev && prev.ref) !== (hit && hit.ref)) render();
+      });
+      c2.addEventListener('mouseleave', () => { S.sl[key] = null; t2.hidden = true; if (S.sl.model) render(); });
+    }
+  }
+
   // ------------------------------------------------------------------ boot
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
-    try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; } catch (e) { /* ignore */ }
+    try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; if (sessionStorage.getItem('nucleus-net-slides')) S.slidesShown = true; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
     $('question-select').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<option value="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); renderBackboneOptions();
+    bindControls(); bindFoundation(); bindSlides(); renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
+    if (S.slidesShown) revealSlides();
     syncControls();
     resetModel();
     renderDataTrays(); renderScatter(); renderInspector();
     onThemeChange();
     const hash = (location.hash || '').replace('#', '');
-    showStage(['data', 'train', 'test', 'foundation'].includes(hash) ? hash : 'data');
+    showStage(['data', 'train', 'test', 'foundation', 'slides'].includes(hash) ? hash : 'data');
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onThemeChange);
   }
