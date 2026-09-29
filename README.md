@@ -548,23 +548,29 @@ membrane, which nest. Invasion is the conjunction of three cues, and every patte
 | Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
 Fifty fields of each pattern. A field ships as a PNG without its pixel grain, in steps of four grey levels that the
-grain hides, and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser alike, and cuts
-every nucleus's 32 × 32 crop; the file is 2.4 MB.
+grain hides, with its nuclear segmentation as a second PNG (1 + the index of the nucleus covering each pixel, what a
+segmentation step gives), and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser
+alike, and cuts every nucleus's 32 × 32 crop, either with the field around it or masked to the nucleus alone; the
+file is 3.0 MB.
 
 `tools/check_fields.js` asks what the frozen encoders make of those crops before any model is built on them: a single
-layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds):
+layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds), for
+crops with the field around the nucleus and for crops masked to the nucleus (`--masked`):
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, the nuclei of the test fields (spindle cells aside) | 72% | 87% |
-| The same probe trained on the slides' pool of lone nuclei instead | 87% on the pool's held-out nuclei, 49% on the fields' | 99% on the pool, 46% on the fields' |
-| Below vs above the membrane, from the code alone (majority: 73%) | 78% | 87% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 72% | 87% |
+| Atypical vs bland, crops masked to the nucleus | 92% | 93% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 49% · 83% | 46% · 87% |
+| Below vs above the membrane, from the code alone (majority: 73%): with surroundings · masked | 78% · 74% | 87% · 74% |
 
-Two things follow. A crop from a field holds the edges of neighbours, the membrane or stroma, which the encoder never
-saw: the atypia signal survives, weaker with the small encoder, and a probe trained on lone nuclei does not transfer at
-all, so the codes of crops with neighbours live elsewhere than the codes of lone nuclei. And the surroundings leak
-location, so a model given only the bag of codes is not blind to where a nucleus sits. Both are measured before the
-model exists; pretraining the encoder on crops from fields as well is the fix to try if the slide model needs it.
+A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
+nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
+and the surroundings leak location, so a model given only the bag of such codes is not blind to where a nucleus sits
+or what shape its nest has (the ablations below measure how much). Masked to its nucleus, a crop is what a
+segment-then-encode pipeline produces, the atypia signal comes back, a lone-nucleus probe transfers, and location falls
+to the majority rate: the code carries cytology and nothing else, which is what makes the cues separable by
+construction. The field model uses masked crops; the surroundings stay available as a switch, to show the leak.
 
 ## Code map
 

@@ -16,8 +16,9 @@
  * truth about each (atypical or bland, above or below the membrane, which nest) for the page to reveal afterwards.
  *   node tools/generate_fields.js
  * writes data/fields/fields_data.js (every field as a PNG without its pixel grain, which the loader adds back from the
- * field's seed, in steps of four grey levels that the grain hides, plus the membrane, the nuclei and the nests) and two
- * contact sheets in H&E colour, the fields as they are and with the truth drawn over them.
+ * field's seed, in steps of four grey levels that the grain hides, its nuclear segmentation as a second PNG, plus the
+ * membrane, the nuclei and the nests) and two contact sheets in H&E colour, the fields as they are and with the truth
+ * drawn over them.
  */
 'use strict';
 const fs = require('fs');
@@ -248,12 +249,12 @@ function renderField(f) {
   // the basement membrane: a thin dark line
   for (let x = 0; x < W; x++) { const mem = ym(x); for (let y = Math.max(0, Math.floor(mem - 4)); y <= Math.min(H - 1, Math.ceil(mem + 4)); y++) { const d = y + 0.5 - mem; img[y * W + x] -= VAL.membrane * Math.exp(-(d * d) / (2 * 0.8 * 0.8)); } }
   // the nuclei: stromal cells first, so the epithelium and the nests lie over them
-  const order = f.nuclei.slice().sort((a, b) => (a.kind === 'stroma' ? 0 : 1) - (b.kind === 'stroma' ? 0 : 1));
-  for (const n of order) stampNucleus(img, n);
+  const order = f.nuclei.slice().sort((a, b) => (a.kind === 'stroma' ? 0 : 1) - (b.kind === 'stroma' ? 0 : 1)), seg = new Uint8Array(W * H);
+  for (const n of order) stampNucleus(img, n, seg, f.nuclei.indexOf(n) + 1);
   const px = new Uint8Array(W * H); for (let i = 0; i < px.length; i++) px[i] = Math.min(255, Math.round(Math.max(0, Math.min(1, img[i])) * 255 / QUANTUM) * QUANTUM); // in steps the grain hides, for a smaller file
-  return px;
+  return { px, seg };
 }
-function stampNucleus(img, n) { // the nucleus's coverage from its contour, supersampled, as tools/generate_nuclei.js renders a crop
+function stampNucleus(img, n, seg, index) { // the nucleus's coverage from its contour, supersampled, as tools/generate_nuclei.js renders a crop; seg: the segmentation, 1 + the nucleus's index where it covers more than half a pixel
   const R = Math.ceil(Math.max(n.a, n.b) * 1.5 + 2), SS = 3, cosP = Math.cos(n.phi), sinP = Math.sin(n.phi), soft = n.edgeSoftness / n.a;
   const x0 = Math.max(0, Math.floor(n.x - R)), x1 = Math.min(W - 1, Math.ceil(n.x + R)), y0 = Math.max(0, Math.floor(n.y - R)), y1 = Math.min(H - 1, Math.ceil(n.y + R));
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -268,6 +269,7 @@ function stampNucleus(img, n) { // the nucleus's coverage from its contour, supe
     let nv = n.value + n.textureAmp * n.tex(Math.max(0, Math.min(0.999, (x - n.x) / SIZE + 0.5)), Math.max(0, Math.min(0.999, (y - n.y) / SIZE + 0.5)));
     if (rho > 0.72) nv -= n.rim * Math.min(1, (rho - 0.72) / 0.28);
     const i = y * W + x; img[i] = cov * nv + (1 - cov) * img[i];
+    if (seg && cov >= 0.5) seg[i] = index;
   }
 }
 
@@ -282,20 +284,21 @@ for (const split of ['train', 'test']) {
   fields.push(...batch);
 }
 const t0 = Date.now();
-const rendered = fields.map((f, i) => { if (i % 50 === 0) process.stderr.write(`rendering field ${i + 1} of ${fields.length}\n`); return { f, px: renderField(f) }; });
+const rendered = fields.map((f, i) => { if (i % 50 === 0) process.stderr.write(`rendering field ${i + 1} of ${fields.length}\n`); return Object.assign({ f }, renderField(f)); });
 process.stderr.write(`rendered ${fields.length} fields in ${((Date.now() - t0) / 1000).toFixed(1)} s\n`);
 
 const KINDS = ['epi', 'nest', 'cord', 'single', 'stroma'], SUBTYPES = ['bland', 'enlarged', 'hyperchromatic', 'irregular', 'coarse', 'combined', 'stroma'];
-// ---- the data file: a PNG per field without its grain (the loader adds it back from grainSeed), the membrane sampled
-// every 8 px, the nuclei with their truth, the nest outlines for drawing
+// ---- the data file: a PNG per field without its grain (the loader adds it back from grainSeed), the segmentation as
+// a second PNG (1 + the index of the nucleus covering each pixel, 0 elsewhere, what a nuclear segmentation would give),
+// the membrane sampled every 8 px, the nuclei with their truth, the nest outlines for drawing
 fs.mkdirSync(OUT, { recursive: true });
-const records = rendered.map(({ f, px }) => {
+const records = rendered.map(({ f, px, seg }) => {
   const ym = membraneOf(f);
   return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, grainSeed: SEED * 7 + f.id, rows: f.rows,
     membrane: Array.from({ length: W / 8 + 1 }, (_, i) => Math.round(ym(Math.min(W, i * 8)) * 10) / 10), surface: Math.round(f.thickness * 10) / 10,
     nuclei: f.nuclei.map(n => [n.x, n.y, KINDS.indexOf(n.kind), n.label, SUBTYPES.indexOf(n.subtype), n.below ? 1 : 0, n.group == null ? -1 : n.group]), // [x, y, kind, atypical, subtype, below, nest]
     nests: f.nests.map(n => n.kind === 'cords' ? { kind: 'cords', halfWidth: Math.round(n.halfWidth * 10) / 10, paths: n.paths.map(p => p.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : n.kind === 'jagged' ? { kind: 'jagged', connected: !!n.connected, outlines: n.outlines.map(poly => poly.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : { kind: n.single ? 'single' : 'round', cx: Math.round(n.cx * 10) / 10, cy: Math.round(n.cy * 10) / 10, rx: Math.round(n.rx * 10) / 10, ry: Math.round(n.ry * 10) / 10, rot: Math.round(n.rot * 100) / 100, amp: n.amp, k: n.k, phase: Math.round(n.phase * 100) / 100 }),
-    png: FL.encodePNGNode(W, H, px).toString('base64') };
+    png: FL.encodePNGNode(W, H, px).toString('base64'), seg: FL.encodePNGNode(W, H, seg).toString('base64') };
 });
 const meta = { seed: SEED, w: W, h: H, size: SIZE, grain: FL.GRAIN, quantum: QUANTUM, kinds: KINDS, subtypes: SUBTYPES, nucleus: ['x', 'y', 'kind', 'atypical', 'subtype', 'below', 'nest'], question: 'Invasion?', short: 'Invasion', positions: true,
   classes: [{ key: 'notInvasive', name: 'Not invasive' }, { key: 'invasive', name: 'Invasive carcinoma' }],

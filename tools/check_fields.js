@@ -8,7 +8,8 @@
  *                       same probe trained on the slides' pool of lone nuclei, to see whether it transfers)
  *   below vs above      how much of a nucleus's location leaks into its code through what surrounds it in the crop
  *   pattern from a bag  not here: that is the slide model's job, in the next step
- *   node tools/check_fields.js [--seeds 3] [--epochs 40]
+ *   node tools/check_fields.js [--seeds 3] [--epochs 40] [--masked]
+ * --masked: every crop masked to its nucleus by the field's segmentation, what a segment-then-encode pipeline sees
  */
 'use strict';
 const fs = require('fs');
@@ -17,24 +18,14 @@ const { Net, Contrastive, mulberry32, fitStandardizer } = require('../js/nn.js')
 const NF = require('../js/features.js');
 const FL = require('../js/fields.js');
 const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
-const nSeeds = +arg('--seeds', 3), epochs = +arg('--epochs', 40);
+const nSeeds = +arg('--seeds', 3), epochs = +arg('--epochs', 40), masked = process.argv.includes('--masked'); // --masked: every crop masked to its nucleus by the segmentation
 const window = {};
 for (const f of ['fields/fields_data.js', 'slides/slides_data.js', 'foundation/backbones.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const F = window.LECTURE_FIELDS, meta = F.meta, SL = window.LECTURE_SLIDES, size = meta.size, pc = v => String(Math.round(v * 100)).padStart(3) + '%';
-const K = meta.nucleus.reduce((o, k, i) => Object.assign(o, { [k]: i }), {});
 
-// every nucleus of every field as its crop, with its truth
-function nucleiOf(fields) {
-  const out = [];
-  for (const f of fields) {
-    const d = FL.decodePNGNode(f.png), px = FL.withGrain(d.px, f.grainSeed, meta.grain);
-    for (const n of f.nuclei) out.push({ field: f, ink: NF.toInk(FL.crop(px, d.w, d.h, n[K.x], n[K.y], size)), kind: meta.kinds[n[K.kind]], atypical: n[K.atypical], below: n[K.below], pattern: f.pattern });
-  }
-  return out;
-}
-const train = nucleiOf(F.train), test = nucleiOf(F.test);
+const train = FL.nucleiOf(F, F.train, { masked }), test = FL.nucleiOf(F, F.test, { masked }); // every nucleus as its crop, with its truth
 const poolInk = SL.pool.map(p => NF.toInk(NF.decodeBase64(p.px))), poolTrain = SL.pool.map((p, i) => ({ ink: poolInk[i], atypical: p.label, i })).filter((_, i) => i % 4 !== 3), poolTest = SL.pool.map((p, i) => ({ ink: poolInk[i], atypical: p.label, i })).filter((_, i) => i % 4 === 3);
-console.log(`${F.train.length} training and ${F.test.length} test fields · ${train.length} and ${test.length} nuclei · kinds: ${meta.kinds.map(k => `${k} ${test.filter(n => n.kind === k).length}`).join(', ')} (test)\n`);
+console.log(`${F.train.length} training and ${F.test.length} test fields · ${train.length} and ${test.length} nuclei · crops ${masked ? 'masked to the nucleus by the segmentation' : 'with the field around the nucleus'} · kinds: ${meta.kinds.map(k => `${k} ${test.filter(n => n.kind === k).length}`).join(', ')} (test)\n`);
 
 // a single layer on the code, trained a few epochs on standardised codes, scored on held-out nuclei
 function probe(trainSet, testSet, target, seed) {
