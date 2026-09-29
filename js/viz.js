@@ -577,6 +577,14 @@ window.Viz = (function () {
         circleNode(ctx, n.x, n.y, n.r, unitFill(a, acts || [], signed), a == null ? '·' : fmtNum(a, 2), null, isHov);
         ctx.font = monoFont; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
         if (L.unitColumns[n.l].length <= 8 && !(m.lesson && m.lesson.phase !== 'forward' && m.lesson.phase !== 'loss')) ctx.fillText(`b ${fmtSigned(net.b[n.l][n.j], 2)}`, n.x, n.y + n.r + 4);
+      } else if (n.kind === 'output' && m.scoreLabel) { // a score, not a probability: the attention scorer's output
+        const z = fw && stage >= 2 ? fw.z : null;
+        circleNode(ctx, n.x, n.y, n.r, z == null ? pending : diverging(Math.tanh(z / 2)), z == null ? '?' : fmtSigned(z, 1), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
+        ctx.font = labelFont; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(m.scoreLabel, n.x, n.y + n.r + 6);
+        ctx.font = monoFont; ctx.fillStyle = c.ink3;
+        ctx.fillText(`b ${fmtSigned(net.bo, 2)}`, n.x, n.y + n.r + 24);
+        if (m.scoreNote) String(m.scoreNote).split("\n").forEach((line, k) => { const w = ctx.measureText(line).width; ctx.fillText(line, Math.min(n.x, NET_W - 6 - w / 2), n.y + n.r + 40 + 16 * k); }); // kept inside the canvas
       } else if (n.kind === 'output') {
         const p = fw && (m.reveal != null ? m.reveal >= m.hops : stage >= 2) ? fw.p : null;
         circleNode(ctx, n.x, n.y, n.r, p == null ? pending : diverging((p - 0.5) * 2), p == null ? '?' : p.toFixed(2), `600 14px "IBM Plex Mono", ui-monospace, monospace`, isHov);
@@ -763,7 +771,72 @@ window.Viz = (function () {
       });
     });
   }
-  // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct }
+  // ---- a slide of nuclei and its attention
+  // The slide as a grid, every nucleus framed by its attention weight (relative to the largest), the weight written
+  // under it, a truth dot when revealed (orange atypical, blue bland), the hovered nucleus outlined.
+  // opt = { nuclei: [{ px, a, pos }], cols, size, tint, reveal, hover }
+  function drawSlide(canvas, opt) {
+    const cols = opt.cols || 5, n = opt.nuclei.length, rows = Math.ceil(n / cols), cell = 64, gap = 10, pad = 6, rowH = cell + 14 + gap;
+    const W = pad * 2 + cols * cell + (cols - 1) * gap, H = pad * 2 + rows * rowH - gap;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    let mx = 1e-9; for (const q of opt.nuclei) mx = Math.max(mx, q.a);
+    opt.nuclei.forEach((q, i) => {
+      const x = pad + (i % cols) * (cell + gap), y = pad + Math.floor(i / cols) * rowH, rel = q.a / mx;
+      ctx.drawImage(imageToCanvas(q.px, opt.size, opt.tint), x, y, cell, cell);
+      const lw = 1 + 5 * rel; // the attention frame: thicker and stronger with the weight
+      ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(x + lw / 2, y + lw / 2, cell - lw, cell - lw);
+      if (opt.hover === i) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 2, cell + 4, cell + 4); }
+      ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(`${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`, x + cell / 2, y + cell + 2);
+      if (opt.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1.5; ctx.stroke(); }
+    });
+    canvas._slideLayout = { cols, cell, gap, pad, rowH, W, n };
+  }
+  // which nucleus of a drawn slide is under a point (canvas-relative CSS pixels), or null
+  function hitSlide(canvas, px, py) {
+    const L = canvas._slideLayout; if (!L) return null;
+    const x = px * L.W / canvas.clientWidth, y = py * L.W / canvas.clientWidth;
+    const col = Math.floor((x - L.pad) / (L.cell + L.gap)), row = Math.floor((y - L.pad) / L.rowH);
+    if (col < 0 || col >= L.cols || row < 0) return null;
+    const i = row * L.cols + col; if (i >= L.n) return null;
+    const cx = L.pad + col * (L.cell + L.gap), cy = L.pad + row * L.rowH;
+    return x >= cx && x <= cx + L.cell && y >= cy && y <= cy + L.cell ? i : null;
+  }
+  // The nuclei ranked by attention: a thumbnail and a bar each (the bar is the nucleus's share of the slide's
+  // attention, scaled to the largest), a truth dot when revealed, the hovered one outlined.
+  // opt = { items: [{ px, value, pos, index }] best first, size, tint, reveal, hover, title }
+  function drawRanked(canvas, opt) {
+    const n = opt.items.length, W = 800, x0 = 10, slot = Math.floor((W - 2 * x0) / n), thumb = Math.min(32, slot - 6), barH = 40, H = 24 + thumb + 4 + barH + 16;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = false;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`;
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    if (opt.title) ctx.fillText(opt.title, x0, 6);
+    let mx = 1e-9; for (const d of opt.items) mx = Math.max(mx, d.value);
+    opt.items.forEach((d, k) => {
+      const x = x0 + k * slot + Math.floor((slot - thumb) / 2), y = 24, rel = d.value / mx;
+      ctx.drawImage(imageToCanvas(d.px, opt.size, opt.tint), x, y, thumb, thumb);
+      ctx.strokeStyle = opt.hover === d.index ? c.ink : c.lineStrong; ctx.lineWidth = opt.hover === d.index ? 2 : 1; ctx.strokeRect(x - 0.5, y - 0.5, thumb + 1, thumb + 1);
+      if (opt.reveal) { ctx.fillStyle = d.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x + 5, y + 5, 4, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); }
+      const bh = Math.max(1, Math.round(rel * barH));
+      ctx.fillStyle = rgbStr(c.rgb.irregular, 0.25 + 0.75 * rel); ctx.fillRect(x + 3, y + thumb + 4 + barH - bh, thumb - 6, bh);
+      ctx.font = mono9; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'center';
+      ctx.fillText(d.value >= 0.095 ? `${Math.round(d.value * 100)}%` : `${(d.value * 100).toFixed(1)}%`, x + thumb / 2, y + thumb + 4 + barH + 3);
+      ctx.textAlign = 'left';
+    });
+  }
+  // a slide as a small tile for the trays: its nuclei in a grid of tiny cells
+  function renderSlideThumb(canvas, pxs, cols, size, tint) {
+    const cell = 12, rows = Math.ceil(pxs.length / cols), W = cols * cell, H = rows * cell;
+    if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
+    const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = true;
+    pxs.forEach((px, i) => ctx.drawImage(imageToCanvas(px, size, tint), (i % cols) * cell, Math.floor(i / cols) * cell, cell, cell));
+  }
+  // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct,
+  // baseline (a dashed reference level, with baselineLabel) }
   function drawSeries(svg, opt) {
     const W = 400, H = 170, ml = 40, mr = 16, mt = 10, mb = 22, pw = W - ml - mr, ph = H - mt - mb;
     const hist = opt.hist || [], maxX = Math.max(10, opt.maxEpoch || 0, hist.length ? hist[hist.length - 1].epoch : 0);
@@ -777,7 +850,8 @@ window.Viz = (function () {
     const xstep = niceStep(maxX, 5);
     for (let e = 0; e <= maxX + 1e-9; e += xstep) g += `<text x="${sx(e).toFixed(1)}" y="${H - 6}" text-anchor="middle">${e}</text>`;
     g += `<line class="axis" x1="${ml}" x2="${W - mr}" y1="${mt + ph}" y2="${mt + ph}"/>`;
-    if (opt.pct) g += `<line class="chance" x1="${ml}" x2="${W - mr}" y1="${sy(0.5)}" y2="${sy(0.5)}"/>`;
+    const base = opt.baseline != null ? opt.baseline : (opt.pct ? 0.5 : null);
+    if (base != null) g += `<line class="chance" x1="${ml}" x2="${W - mr}" y1="${sy(base).toFixed(1)}" y2="${sy(base).toFixed(1)}"/>` + (opt.baselineLabel ? `<text x="${W - mr}" y="${(sy(base) - 4).toFixed(1)}" text-anchor="end">${esc(opt.baselineLabel)}</text>` : '');
     for (const k of opt.keys) {
       const pts = hist.filter(h => h[k.key] != null);
       if (!pts.length) continue;
@@ -1508,7 +1582,7 @@ window.Viz = (function () {
     const net = m.net, fw = m.fw;
     const inBox = (n, pad) => Math.abs(x - n.x) <= n.size / 2 + pad && Math.abs(y - n.y) <= (n.h || n.size) / 2 + pad;
     for (const n of L.nodes) {
-      if (n.kind === 'output' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: fw ? `score z = ${fmtSigned(fw.z, 2)} → P(${m.positiveName}) = ${fw.p.toFixed(3)} · bias ${fmtSigned(net.bo, 3)}` : `output · bias ${fmtSigned(net.bo, 3)}` };
+      if (n.kind === 'output' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) return { kind: 'node', ref: n, text: m.scoreLabel ? (fw ? `${m.scoreLabel} = ${fmtSigned(fw.z, 2)} · bias ${fmtSigned(net.bo, 3)}` : `${m.scoreLabel} · bias ${fmtSigned(net.bo, 3)}`) : fw ? `score z = ${fmtSigned(fw.z, 2)} → P(${m.positiveName}) = ${fw.p.toFixed(3)} · bias ${fmtSigned(net.bo, 3)}` : `output · bias ${fmtSigned(net.bo, 3)}` };
       if (n.kind === 'unit' && Math.hypot(x - n.x, y - n.y) <= n.r + 4) {
         const a = fw ? ` · activation ${fmtNum(fw.a[n.l + 1][n.j], 3)}` : '';
         const out = n.l === net.hidden.length - 1 ? ` · to output ${fmtSigned(net.Wo[n.j], 3)}` : '';
@@ -1696,5 +1770,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();

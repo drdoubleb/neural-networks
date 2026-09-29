@@ -375,6 +375,65 @@
     }
   }
 
+  // ---------------------------------------------------------------------------- attention over a slide
+  // A slide is a set of instances (the codes of its nuclei) with ONE label. A small scorer (D → A tanh → score) scores
+  // every instance, a softmax over the slide turns the scores into weights that sum to 1, the instances' codes are
+  // averaged with those weights into one summary, and a single layer classifies the summary. Trained on the slide's
+  // label only, the scorer learns where to look. With attention off the weights are uniform: a plain average.
+  class AttentionMIL {
+    constructor({ inputSize, attentionUnits = 4, attention = true, seed = 1 }) {
+      this.D = inputSize; this.A = attentionUnits; this.attention = attention; this.seed = seed;
+      this.scorer = new Net({ inputSize, hidden: [attentionUnits], activation: 'tanh', seed });
+      this.head = new Net({ inputSize, hidden: [], activation: 'relu', seed: seed + 1 });
+      this.steps = 0;
+    }
+    // H: the slide's instances (codes). Returns the scores, the weights, the summary and the call.
+    forward(H) {
+      const n = H.length, D = this.D, fws = this.attention ? H.map(h => this.scorer.forward(h)) : null;
+      const s = new Float64Array(n), a = new Float64Array(n);
+      if (this.attention) {
+        let mx = -Infinity; for (let i = 0; i < n; i++) { s[i] = fws[i].z; mx = Math.max(mx, s[i]); }
+        let Z = 0; for (let i = 0; i < n; i++) { a[i] = Math.exp(s[i] - mx); Z += a[i]; }
+        for (let i = 0; i < n; i++) a[i] /= Z;
+      } else a.fill(1 / n);
+      const z = new Float64Array(D);
+      for (let i = 0; i < n; i++) for (let d = 0; d < D; d++) z[d] += a[i] * H[i][d];
+      const head = this.head.forward(z);
+      return { s, a, z, fws, head, p: head.p, logit: head.z };
+    }
+    // one gradient step on a batch of slides [{ H, y }]; returns their mean loss before the step
+    trainBatch(slides, lr, l2 = 0) {
+      const gs = this.scorer.newGradient(), gh = this.head.newGradient(); let loss = 0;
+      for (const { H, y } of slides) {
+        const fw = this.forward(H), n = H.length, dl = fw.p - y; loss += bce(fw.p, y);
+        const dz = this.head.backDense(fw.head, dl, gh); // d loss / d summary, the head's gradient collected on the way
+        if (this.attention) { // through the weighted average and the softmax to every score, then through the scorer
+          const da = new Float64Array(n); let dot = 0;
+          for (let i = 0; i < n; i++) { let v = 0; for (let d = 0; d < this.D; d++) v += dz[d] * H[i][d]; da[i] = v; dot += fw.a[i] * v; }
+          for (let i = 0; i < n; i++) { const ds = fw.a[i] * (da[i] - dot); if (ds !== 0) this.scorer.backDense(fw.fws[i], ds, gs); }
+        }
+      }
+      const k = slides.length;
+      this.head.applyGradient(gh, k, lr, l2); if (this.attention) this.scorer.applyGradient(gs, k, lr, l2);
+      this.steps++;
+      return loss / k;
+    }
+    // slides: [{ H, y, pos }] with pos[i] true for the instances that are truly positive (never used to train); returns
+    // the loss, the accuracy, every slide's call and weights, and the share of a positive slide's attention that falls
+    // on its positive instances (uniform weights give their share of the slide)
+    evaluate(slides, threshold = 0.5) {
+      let loss = 0, correct = 0, mass = 0, nPos = 0; const probs = [], weights = [];
+      for (const sl of slides) {
+        const fw = this.forward(sl.H); probs.push(fw.p); weights.push(fw.a); loss += bce(fw.p, sl.y);
+        if ((fw.p >= threshold ? 1 : 0) === sl.y) correct++;
+        if (sl.y && sl.pos) { let m = 0; for (let i = 0; i < sl.H.length; i++) if (sl.pos[i]) m += fw.a[i]; mass += m; nPos++; }
+      }
+      return { loss: loss / slides.length, accuracy: correct / slides.length, probs, weights, culpritMass: nPos ? mass / nPos : null };
+    }
+    parameterCount() { return this.head.parameterCount() + (this.attention ? this.scorer.parameterCount() : 0); }
+    describe() { return this.attention ? `attention (${this.D} → ${this.A} tanh → score) over the slide → weighted average → single layer` : `plain average over the slide → single layer`; }
+  }
+
   // z-scoring helpers. Fit on the training set only, apply to everything.
   function fitStandardizer(rows, { perDimScale = true } = {}) {
     const D = rows[0].length, n = rows.length;
@@ -463,5 +522,25 @@
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL };
+  // and for the attention model, on two small slides
+  function gradientCheckMIL() {
+    const mil = new AttentionMIL({ inputSize: 5, attentionUnits: 3, seed: 4 });
+    const rnd = mulberry32(21), eps = 1e-6, mk = () => Float64Array.from({ length: 5 }, () => rnd() * 2 - 1);
+    const slides = [{ H: [mk(), mk(), mk(), mk()], y: 1 }, { H: [mk(), mk(), mk()], y: 0 }];
+    const lossAt = () => slides.reduce((a, sl) => a + bce(mil.forward(sl.H).p, sl.y), 0) / slides.length;
+    const params = [mil.scorer.W[0], mil.scorer.b[0], mil.scorer.Wo, mil.head.Wo];
+    const before = params.map(p => Float64Array.from(p)), bo = [mil.scorer.bo, mil.head.bo];
+    mil.trainBatch(slides, 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j]));
+    params.forEach((p, i) => p.set(before[i])); mil.scorer.bo = bo[0]; mil.head.bo = bo[1];
+    let worst = 0, checked = 0;
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) {
+      const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o;
+      const num = (lp - lm) / (2 * eps);
+      if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - analytic[pi][i]) / (Math.abs(num) + Math.abs(analytic[pi][i]))); }
+    } });
+    return { worst, checked };
+  }
+
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL };
 });
