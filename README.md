@@ -147,6 +147,8 @@ style). The network never sees it; the page uses it to show which hidden units r
    hidden until recipe ⑪ or ⑫ (or key `4`, or the `#foundation` link) introduces them; once shown they stay for the
    session, and the earlier stages are uncluttered until then.
 5. **Slides.** Weak supervision: 60 slides of 20 nuclei with one label each, and attention learns which nuclei matter.
+   A second question, *a focus of atypical cells?*, has the same nuclei in both classes and only their arrangement
+   differs; a *context* switch adds one layer of self-attention, and a *Who looks at whom* card draws it.
    The slide is shown with a frame on every nucleus scaled by its attention weight, the twenty nuclei ranked by weight
    beside it, the whole model unrolled on one diagram (every nucleus through the one scorer, the softmax, the weighted
    sum and the single layer, with a step-by-step walk-through), the small attention network for the nucleus under the
@@ -161,10 +163,11 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the thirteen recipe buttons
+## The lecture arc: the fourteen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
-`node tools/check_slides.js --epochs 60 --lr 0.02`).
+`node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
+--decay 0.001 --nopos --epochs 150 --lr 0.02`).
 
 | Recipe | Parameters | Test accuracy | What it shows |
 |---|---|---|---|
@@ -181,6 +184,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
 | ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑪ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
 | ⑬ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
+| ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to. See *A focus, and the nuclei look at each other*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -423,6 +427,42 @@ correlates with, so a shortcut in the data (a stain, a lab) would collect the at
 What does not transfer is scale: a real slide is a hundred thousand patches rather than twenty nuclei, and the encoder
 under a real slide-level model is far larger and often trained on the slides themselves.
 
+### A focus, and the nuclei look at each other
+
+The second slide question is the warm-up for a transformer. Every slide holds exactly four atypical nuclei among sixteen
+bland ones, from the same pool: on a positive slide the four sit together as a 2 × 2 block on the 5 × 4 grid, a focus;
+on a negative slide they are scattered, no two adjacent, not even diagonally. The nuclei are the same in both classes,
+so the bag of codes is identical by construction, and the model of recipe ⑬, which scores every nucleus on its own,
+cannot tell the classes apart however long it trains. 200 training slides and 40 test slides, drawn by
+`tools/generate_slides.js` next to the first question's.
+
+The *context* switch adds one layer of self-attention before the pooling, the mechanism of a transformer, hand-written
+like everything else. Every nucleus turns its code into a query, a key and a value (three linear maps to 8 numbers);
+query · key over the other nineteen nuclei, minus a learned cost per cell of distance, goes through a softmax, so each
+nucleus listens to the others in proportion to the match; the weighted values are projected and added to its own code
+(a residual), then an 8-unit tanh feed-forward is added too. A nucleus does not listen to itself, since its own code
+comes through the residual, and the model is never given coordinates: what it knows about position is the distance
+between nuclei, inside the attention. 483 parameters in all, weight decay 0.001, learning rate 0.02, 150 epochs.
+
+The page draws who looks at whom: a 20 × 20 map, rows asking and columns answering, the lines from a hovered nucleus
+on the slide to the nuclei it listens to, and its code before and after context. Mean of three seeds
+(`node tools/check_slides.js --context none,distX --decay 0.001 --nopos --epochs 150 --lr 0.02`):
+
+| Question | No context: test slide accuracy | With context | Attention on the atypical nuclei, with context | Learned distance cost |
+|---|---|---|---|---|
+| Atypical cells on the slide? | 98% | 100% | 94% | 0.7 per cell |
+| A focus of atypical cells? | 52% | 88% | 90% | 3.7 per cell |
+
+Three things to say in front of it. On the first question context buys nothing, because every atypical nucleus is
+recognisable alone, and the layer learns a distance cost of 0.7, which hardly prefers neighbours. On the focus question
+the same layer learns a cost of about 3.7 per cell, which divides a nucleus's weight by 40 for every cell of distance,
+so each nucleus listens almost only to its immediate neighbours, and the scorer can weigh "atypical, with atypical
+neighbours" rather than "atypical" alone. And the ceiling is the encoder: a single layer on the code reads one nucleus
+right 88% of the time, and a focus decision leans on four of them at once, which is why the model settles near 88%, and
+why a first version of this question, with a focus of three, could not be learned at all: a single bland nucleus misread
+as atypical next to a scattered one faked a focus. The bigger shipped encoder reads a nucleus right 98% of the time and
+is the *code from* option to try.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -457,7 +497,9 @@ perimeter of the smooth ellipse with the same area and elongation). Standardizat
 `tools/generate_slides.js` (no dependencies) draws the slides' pool with the atypia generator from a fixed seed and
 writes `data/slides/slides_data.js` (the 240 nuclei, base64-encoded, and the 80 slides as lists of pool indices with an
 orientation each) and `data/slides/contact_sheet.png` (the pool at 4×). Every fourth nucleus of the pool is held out for
-the 20 test slides, so no test slide shares a nucleus with a training slide.
+the 20 test slides, so no test slide shares a nucleus with a training slide. The focus question's 200 training and 40 test
+slides come from the same pool under the same held-out rule; every slide holds four atypical nuclei, placed as one of the
+12 possible 2 × 2 blocks or as one of the 454 ways to scatter four cells with no two adjacent.
 
 ## Code map
 
@@ -465,18 +507,18 @@ the 20 test slides, so no test slide shares a nucleus with a training slide.
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
-js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer and the attention ranking
+js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer and the attention ranking, the unrolled slide model and the who-looks-at-whom map
 js/app.js                  state, task switch, training loop, the five stages (with the foundation model's pretraining loop and probes, and the slides' attention loop), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
-data/slides/slides_data.js the slides: a pool of 240 nuclei and 80 slides of 20, written by tools/generate_slides.js
+data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
 tools/check_training.js    gradient check + the ten recipes, the other lab, the shortcut and the label-noise curve in Node
 tools/check_foundation.js  the foundation model's pretraining and what its code is worth, in Node
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
-tools/check_slides.js      attention over slides against a plain average, in Node
+tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```

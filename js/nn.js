@@ -375,21 +375,96 @@
     }
   }
 
+  // ---------------------------------------------------------------------------- context: the nuclei look at each other
+  // One layer of self-attention over the slide, the mechanism of a transformer. Every nucleus turns its vector into a
+  // query (what it is looking for), a key (what it offers) and a value (what it passes on). Query · key over all the
+  // nuclei, through a softmax, says how much each one listens to each other; the weighted values are projected and
+  // added to its own vector (a residual), then a small feed-forward, added again. With a distance bias, the match is
+  // discounted by a learned amount per unit of distance, so the layer can prefer near neighbours.
+  const softplus = x => (x > 30 ? x : Math.log1p(Math.exp(x)));
+  class ContextLayer {
+    constructor({ inputSize, dk = 8, ffn = 8, distanceBias = false, excludeSelf = false, costInit = 0, seed = 1 }) {
+      this.D = inputSize; this.dk = dk; this.F = ffn; this.distanceBias = distanceBias; this.excludeSelf = excludeSelf; this.seed = seed;
+      const rnd = mulberry32(seed * 104729 + 3), u = s => (rnd() * 2 - 1) * s, mk = (n, s) => Float64Array.from({ length: n }, () => u(s)), D = inputSize;
+      this.Wq = mk(dk * D, 0.3); this.bq = new Float64Array(dk); this.Wk = mk(dk * D, 0.3); this.bk = new Float64Array(dk);
+      this.Wv = mk(dk * D, 0.3); this.bv = new Float64Array(dk); this.Wo = mk(D * dk, 0.1); this.bo = new Float64Array(D); // small: the layer starts close to doing nothing
+      this.W1 = mk(ffn * D, 0.3); this.b1 = new Float64Array(ffn); this.W2 = mk(D * ffn, 0.1); this.b2 = new Float64Array(D);
+      this.beta = costInit > 0 ? Math.log(Math.expm1(costInit)) : 0; // softplus(beta) is the cost per unit of distance, when distanceBias is on
+    }
+    // X: the slide's tokens (rows of D numbers); dist: n × n distances between them (only with the distance bias)
+    forward(X, dist) {
+      const n = X.length, D = this.D, dk = this.dk, F = this.F, sc = 1 / Math.sqrt(dk), b = this.distanceBias ? softplus(this.beta) : 0, mask = this.excludeSelf && n > 1; // a nucleus reads the others, not itself (its own vector is the residual)
+      const lin = (W, bias, out) => X.map(x => { const o = new Float64Array(out); for (let j = 0; j < out; j++) { let s = bias[j]; const off = j * D; for (let i = 0; i < D; i++) s += W[off + i] * x[i]; o[j] = s; } return o; });
+      const Q = lin(this.Wq, this.bq, dk), K = lin(this.Wk, this.bk, dk), V = lin(this.Wv, this.bv, dk), S = [], A = [];
+      for (let i = 0; i < n; i++) {
+        const si = new Float64Array(n), ai = new Float64Array(n); let mx = -Infinity;
+        for (let j = 0; j < n; j++) { let v = 0; for (let d = 0; d < dk; d++) v += Q[i][d] * K[j][d]; si[j] = mask && j === i ? -Infinity : v * sc - (b ? b * dist[i][j] : 0); mx = Math.max(mx, si[j]); }
+        let Z = 0; for (let j = 0; j < n; j++) { ai[j] = Math.exp(si[j] - mx); Z += ai[j]; }
+        for (let j = 0; j < n; j++) ai[j] /= Z;
+        S.push(si); A.push(ai);
+      }
+      const C = A.map(ai => { const c = new Float64Array(dk); for (let j = 0; j < n; j++) if (ai[j]) for (let d = 0; d < dk; d++) c[d] += ai[j] * V[j][d]; return c; });
+      const Xp = X.map((x, i) => { const o = Float64Array.from(x); for (let d = 0; d < D; d++) { let s = this.bo[d]; const off = d * dk; for (let e = 0; e < dk; e++) s += this.Wo[off + e] * C[i][e]; o[d] += s; } return o; });
+      const U = Xp.map(xp => { const u = new Float64Array(F); for (let f = 0; f < F; f++) { let s = this.b1[f]; const off = f * D; for (let d = 0; d < D; d++) s += this.W1[off + d] * xp[d]; u[f] = Math.tanh(s); } return u; });
+      const Y = Xp.map((xp, i) => { const y = Float64Array.from(xp); for (let d = 0; d < D; d++) { let s = this.b2[d]; const off = d * F; for (let f = 0; f < F; f++) s += this.W2[off + f] * U[i][f]; y[d] += s; } return y; });
+      return { X, dist, Q, K, V, S, A, C, Xp, U, Y, cost: b };
+    }
+    newGradient() { const z = a => new Float64Array(a.length); return { Wq: z(this.Wq), bq: z(this.bq), Wk: z(this.Wk), bk: z(this.bk), Wv: z(this.Wv), bv: z(this.bv), Wo: z(this.Wo), bo: z(this.bo), W1: z(this.W1), b1: z(this.b1), W2: z(this.W2), b2: z(this.b2), beta: 0 }; }
+    // d(loss)/d(Y) in, the layer's gradients accumulated into g, d(loss)/d(X) out
+    backward(fw, dY, g) {
+      const { X, dist, Q, K, V, A, C, Xp, U } = fw, n = X.length, D = this.D, dk = this.dk, F = this.F, sc = 1 / Math.sqrt(dk);
+      const dXp = dY.map(v => Float64Array.from(v));
+      for (let i = 0; i < n; i++) { // the feed-forward, then its residual
+        const dU = new Float64Array(F);
+        for (let d = 0; d < D; d++) { const gd = dY[i][d]; if (!gd) continue; g.b2[d] += gd; const off = d * F; for (let f = 0; f < F; f++) { g.W2[off + f] += gd * U[i][f]; dU[f] += gd * this.W2[off + f]; } }
+        for (let f = 0; f < F; f++) { const dp = dU[f] * (1 - U[i][f] * U[i][f]); if (!dp) continue; g.b1[f] += dp; const off = f * D; for (let d = 0; d < D; d++) { g.W1[off + d] += dp * Xp[i][d]; dXp[i][d] += dp * this.W1[off + d]; } }
+      }
+      const dX = dXp.map(v => Float64Array.from(v)), dC = [], dQ = X.map(() => new Float64Array(dk)), dK = X.map(() => new Float64Array(dk)), dV = X.map(() => new Float64Array(dk));
+      for (let i = 0; i < n; i++) { // the output projection
+        const dc = new Float64Array(dk);
+        for (let d = 0; d < D; d++) { const gd = dXp[i][d]; if (!gd) continue; g.bo[d] += gd; const off = d * dk; for (let e = 0; e < dk; e++) { g.Wo[off + e] += gd * C[i][e]; dc[e] += gd * this.Wo[off + e]; } }
+        dC.push(dc);
+      }
+      let dbeta = 0;
+      for (let i = 0; i < n; i++) { // the weighted values and the softmax over the slide
+        const dA = new Float64Array(n); let dot = 0;
+        for (let j = 0; j < n; j++) { let v = 0; for (let e = 0; e < dk; e++) { v += dC[i][e] * V[j][e]; dV[j][e] += A[i][j] * dC[i][e]; } dA[j] = v; dot += A[i][j] * v; }
+        for (let j = 0; j < n; j++) { const dS = A[i][j] * (dA[j] - dot); if (!dS) continue; for (let e = 0; e < dk; e++) { dQ[i][e] += dS * sc * K[j][e]; dK[j][e] += dS * sc * Q[i][e]; } if (this.distanceBias) dbeta -= dS * dist[i][j]; }
+      }
+      if (this.distanceBias) g.beta += dbeta * sigmoid(this.beta); // through the softplus
+      const back = (dOut, W, gW, gb) => { for (let i = 0; i < n; i++) for (let j = 0; j < dk; j++) { const gd = dOut[i][j]; if (!gd) continue; gb[j] += gd; const off = j * D; for (let d = 0; d < D; d++) { gW[off + d] += gd * X[i][d]; dX[i][d] += gd * W[off + d]; } } };
+      back(dQ, this.Wq, g.Wq, g.bq); back(dK, this.Wk, g.Wk, g.bk); back(dV, this.Wv, g.Wv, g.bv);
+      return dX;
+    }
+    applyGradient(g, k, lr, l2 = 0) {
+      const step = (p, gp, decay) => { for (let i = 0; i < p.length; i++) p[i] -= lr * (gp[i] / k + (decay ? l2 * p[i] : 0)); };
+      step(this.Wq, g.Wq, 1); step(this.bq, g.bq); step(this.Wk, g.Wk, 1); step(this.bk, g.bk); step(this.Wv, g.Wv, 1); step(this.bv, g.bv);
+      step(this.Wo, g.Wo, 1); step(this.bo, g.bo); step(this.W1, g.W1, 1); step(this.b1, g.b1); step(this.W2, g.W2, 1); step(this.b2, g.b2);
+      if (this.distanceBias) this.beta -= lr * g.beta / k;
+    }
+    parameterCount() { return 3 * (this.dk * this.D + this.dk) + this.D * this.dk + this.D + this.F * this.D + this.F + this.D * this.F + this.D + (this.distanceBias ? 1 : 0); }
+    describe() { return `self-attention over the ${this.excludeSelf ? 'other ' : ''}nuclei (query · key of ${this.dk}${this.distanceBias ? ' − a learned distance cost' : ''}, values added back) + ${this.F} tanh feed-forward`; }
+  }
+
   // ---------------------------------------------------------------------------- attention over a slide
-  // A slide is a set of instances (the codes of its nuclei) with ONE label. A small scorer (D → A tanh → score) scores
-  // every instance, a softmax over the slide turns the scores into weights that sum to 1, the instances' codes are
+  // A slide is a set of instances (the codes of its nuclei, with their positions when the question needs them) with ONE
+  // label. Optionally a context layer first lets the instances look at each other. A small scorer (D → A tanh → score)
+  // scores every instance, a softmax over the slide turns the scores into weights that sum to 1, the instances are
   // averaged with those weights into one summary, and a single layer classifies the summary. Trained on the slide's
   // label only, the scorer learns where to look. With attention off the weights are uniform: a plain average.
   class AttentionMIL {
-    constructor({ inputSize, attentionUnits = 4, attention = true, seed = 1 }) {
+    constructor({ inputSize, attentionUnits = 4, attention = true, context = null, seed = 1 }) {
       this.D = inputSize; this.A = attentionUnits; this.attention = attention; this.seed = seed;
+      this.context = context ? new ContextLayer({ inputSize, dk: context.dk || 8, ffn: context.ffn == null ? 8 : context.ffn, distanceBias: !!context.distanceBias, excludeSelf: !!context.excludeSelf, costInit: context.costInit || 0, seed: seed + 2 }) : null;
       this.scorer = new Net({ inputSize, hidden: [attentionUnits], activation: 'tanh', seed });
       this.head = new Net({ inputSize, hidden: [], activation: 'relu', seed: seed + 1 });
       this.steps = 0;
     }
-    // H: the slide's instances (codes). Returns the scores, the weights, the summary and the call.
-    forward(H) {
-      const n = H.length, D = this.D, fws = this.attention ? H.map(h => this.scorer.forward(h)) : null;
+    // H: the slide's instances; dist: their distances (with a distance bias). Returns the context, the scores, the
+    // weights, the summary and the call.
+    forward(H, dist) {
+      const ctx = this.context ? this.context.forward(H, dist) : null, T = ctx ? ctx.Y : H;
+      const n = T.length, D = this.D, fws = this.attention ? T.map(t => this.scorer.forward(t)) : null;
       const s = new Float64Array(n), a = new Float64Array(n);
       if (this.attention) {
         let mx = -Infinity; for (let i = 0; i < n; i++) { s[i] = fws[i].z; mx = Math.max(mx, s[i]); }
@@ -397,41 +472,44 @@
         for (let i = 0; i < n; i++) a[i] /= Z;
       } else a.fill(1 / n);
       const z = new Float64Array(D);
-      for (let i = 0; i < n; i++) for (let d = 0; d < D; d++) z[d] += a[i] * H[i][d];
+      for (let i = 0; i < n; i++) for (let d = 0; d < D; d++) z[d] += a[i] * T[i][d];
       const head = this.head.forward(z);
-      return { s, a, z, fws, head, p: head.p, logit: head.z };
+      return { s, a, z, fws, head, p: head.p, logit: head.z, ctx, T };
     }
-    // one gradient step on a batch of slides [{ H, y }]; returns their mean loss before the step
+    // one gradient step on a batch of slides [{ H, y, dist }]; returns their mean loss before the step
     trainBatch(slides, lr, l2 = 0) {
-      const gs = this.scorer.newGradient(), gh = this.head.newGradient(); let loss = 0;
-      for (const { H, y } of slides) {
-        const fw = this.forward(H), n = H.length, dl = fw.p - y; loss += bce(fw.p, y);
+      const gs = this.scorer.newGradient(), gh = this.head.newGradient(), gc = this.context ? this.context.newGradient() : null; let loss = 0;
+      for (const sl of slides) {
+        const fw = this.forward(sl.H, sl.dist), T = fw.T, n = T.length, dl = fw.p - sl.y; loss += bce(fw.p, sl.y);
         const dz = this.head.backDense(fw.head, dl, gh); // d loss / d summary, the head's gradient collected on the way
+        const dT = gc ? T.map(() => new Float64Array(this.D)) : null; // d loss / d instance, only needed with a context layer
+        if (dT) for (let i = 0; i < n; i++) for (let d = 0; d < this.D; d++) dT[i][d] = fw.a[i] * dz[d]; // through the weighted average
         if (this.attention) { // through the weighted average and the softmax to every score, then through the scorer
           const da = new Float64Array(n); let dot = 0;
-          for (let i = 0; i < n; i++) { let v = 0; for (let d = 0; d < this.D; d++) v += dz[d] * H[i][d]; da[i] = v; dot += fw.a[i] * v; }
-          for (let i = 0; i < n; i++) { const ds = fw.a[i] * (da[i] - dot); if (ds !== 0) this.scorer.backDense(fw.fws[i], ds, gs); }
+          for (let i = 0; i < n; i++) { let v = 0; for (let d = 0; d < this.D; d++) v += dz[d] * T[i][d]; da[i] = v; dot += fw.a[i] * v; }
+          for (let i = 0; i < n; i++) { const ds = fw.a[i] * (da[i] - dot); if (ds !== 0) { const dIn = this.scorer.backDense(fw.fws[i], ds, gs); if (dT) for (let d = 0; d < this.D; d++) dT[i][d] += dIn[d]; } }
         }
+        if (gc) this.context.backward(fw.ctx, dT, gc);
       }
       const k = slides.length;
-      this.head.applyGradient(gh, k, lr, l2); if (this.attention) this.scorer.applyGradient(gs, k, lr, l2);
+      this.head.applyGradient(gh, k, lr, l2); if (this.attention) this.scorer.applyGradient(gs, k, lr, l2); if (gc) this.context.applyGradient(gc, k, lr, l2);
       this.steps++;
       return loss / k;
     }
-    // slides: [{ H, y, pos }] with pos[i] true for the instances that are truly positive (never used to train); returns
-    // the loss, the accuracy, every slide's call and weights, and the share of a positive slide's attention that falls
-    // on its positive instances (uniform weights give their share of the slide)
+    // slides: [{ H, y, pos, dist }] with pos[i] true for the instances that are truly positive (never used to train);
+    // returns the loss, the accuracy, every slide's call and weights, and the share of a positive slide's attention
+    // that falls on its positive instances (uniform weights give their share of the slide)
     evaluate(slides, threshold = 0.5) {
       let loss = 0, correct = 0, mass = 0, nPos = 0; const probs = [], weights = [];
       for (const sl of slides) {
-        const fw = this.forward(sl.H); probs.push(fw.p); weights.push(fw.a); loss += bce(fw.p, sl.y);
+        const fw = this.forward(sl.H, sl.dist); probs.push(fw.p); weights.push(fw.a); loss += bce(fw.p, sl.y);
         if ((fw.p >= threshold ? 1 : 0) === sl.y) correct++;
         if (sl.y && sl.pos) { let m = 0; for (let i = 0; i < sl.H.length; i++) if (sl.pos[i]) m += fw.a[i]; mass += m; nPos++; }
       }
       return { loss: loss / slides.length, accuracy: correct / slides.length, probs, weights, culpritMass: nPos ? mass / nPos : null };
     }
-    parameterCount() { return this.head.parameterCount() + (this.attention ? this.scorer.parameterCount() : 0); }
-    describe() { return this.attention ? `attention (${this.D} → ${this.A} tanh → score) over the slide → weighted average → single layer` : `plain average over the slide → single layer`; }
+    parameterCount() { return this.head.parameterCount() + (this.attention ? this.scorer.parameterCount() : 0) + (this.context ? this.context.parameterCount() : 0); }
+    describe() { return `${this.context ? `context: ${this.context.describe()} → ` : ''}${this.attention ? `attention (${this.D} → ${this.A} tanh → score) over the slide → weighted average → single layer` : `plain average over the slide → single layer`}`; }
   }
 
   // z-scoring helpers. Fit on the training set only, apply to everything.
@@ -542,5 +620,24 @@
     return { worst, checked };
   }
 
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL };
+  function gradientCheckContext() {
+    const mil = new AttentionMIL({ inputSize: 5, attentionUnits: 3, context: { dk: 3, ffn: 3, distanceBias: true, excludeSelf: true, costInit: 0.8 }, seed: 5 });
+    const rnd = mulberry32(22), eps = 1e-6, mk = () => Float64Array.from({ length: 5 }, () => rnd() * 2 - 1);
+    const distOf = n => { const d = Array.from({ length: n }, () => new Float64Array(n)); for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const v = rnd() * 2; d[i][j] = v; d[j][i] = v; } return d; };
+    const slides = [{ H: [mk(), mk(), mk(), mk()], dist: distOf(4), y: 1 }, { H: [mk(), mk(), mk()], dist: distOf(3), y: 0 }];
+    const c = mil.context; c.beta = 0.4;
+    const lossAt = () => slides.reduce((a, sl) => a + bce(mil.forward(sl.H, sl.dist).p, sl.y), 0) / slides.length;
+    const params = [c.Wq, c.bq, c.Wk, c.bk, c.Wv, c.bv, c.Wo, c.bo, c.W1, c.b1, c.W2, c.b2, mil.scorer.W[0], mil.scorer.b[0], mil.scorer.Wo, mil.head.Wo];
+    const before = params.map(p => Float64Array.from(p)), scalars = [mil.scorer.bo, mil.head.bo, c.beta];
+    mil.trainBatch(slides, 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j])), aBeta = scalars[2] - c.beta;
+    params.forEach((p, i) => p.set(before[i])); mil.scorer.bo = scalars[0]; mil.head.bo = scalars[1]; c.beta = scalars[2];
+    let worst = 0, checked = 0;
+    const cmp = (num, an) => { if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - an) / (Math.abs(num) + Math.abs(an))); } };
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) { const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o; cmp((lp - lm) / (2 * eps), analytic[pi][i]); } });
+    { const o = c.beta; c.beta = o + eps; const lp = lossAt(); c.beta = o - eps; const lm = lossAt(); c.beta = o; cmp((lp - lm) / (2 * eps), aBeta); }
+    return { worst, checked };
+  }
+
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext };
 });
