@@ -785,11 +785,11 @@ window.Viz = (function () {
     opt.nuclei.forEach((q, i) => {
       const x = pad + (i % cols) * (cell + gap), y = pad + Math.floor(i / cols) * rowH, rel = q.a / mx;
       ctx.drawImage(imageToCanvas(q.px, opt.size, opt.tint), x, y, cell, cell);
-      const lw = 1 + 5 * rel; // the attention frame: thicker and stronger with the weight
-      ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(x + lw / 2, y + lw / 2, cell - lw, cell - lw);
+      if (opt.plain) { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cell - 1, cell - 1); } // no model yet: a plain border
+      else { const lw = 1 + 5 * rel; ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(x + lw / 2, y + lw / 2, cell - lw, cell - lw); } // the attention frame: thicker and stronger with the weight
       if (opt.hover === i) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 2, y - 2, cell + 4, cell + 4); }
       ctx.font = `500 10px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-      ctx.fillText(`${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`, x + cell / 2, y + cell + 2);
+      if (!opt.plain) ctx.fillText(`${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`, x + cell / 2, y + cell + 2);
       if (opt.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1.5; ctx.stroke(); }
     });
     if (opt.links) { // who the hovered nucleus listens to: a line to each, thicker with the weight

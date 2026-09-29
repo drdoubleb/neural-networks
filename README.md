@@ -20,7 +20,7 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
   `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) and `node tools/check_slides.js`
   (attention over slides) reproduce them.
 
-Keys during a lecture: `1` `2` `3` `4` `5` switch stages, `space` trains/pauses, `T` or `N` teaches the next case one step
+Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
 
 The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
@@ -43,7 +43,11 @@ The **question** dropdown switches between four datasets, each with its own synt
 Every case also carries a hidden **subtype** (the kind of blood count, the traits of an atypical nucleus, or the contour
 style). The network never sees it; the page uses it to show which hidden units respond to which kind of case.
 
-## The five stages
+## Three steps for every question
+
+The masthead lists seven questions: a blood count, three nucleus questions, the foundation model, and two questions asked
+of slides. Whatever the question, the nav has the same three steps, and a lecture recipe simply selects a question and
+its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
@@ -52,7 +56,7 @@ style). The network never sees it; the page uses it to show which hidden units r
    how separable any two parameters are. For the nucleus questions, a *Where the cases come from* card says which lab's
    scans each set uses (see *Another lab, and the shortcut* below).
 2. **Train.** Choose the input (the measurements or blood count, all 1,024 raw pixels, or the **code** from a foundation
-   encoder: the one pretrained in stage 4 or the one shipped with the page), tick which inputs the network
+   encoder: the one pretrained in the foundation question or the one shipped with the page), tick which inputs the network
    may use (withhold blasts and watch it lean on cytopenias), an optional convolutional layer (4 or 8 filters of 5 × 5,
    ReLU, 4 × 4 max-pooling), zero to two dense hidden layers with a ReLU / sigmoid / tanh activation, and the learning
    rate, batch size, epochs, seed, weight decay and flip/rotation augmentation. Teach one case, step one batch or one
@@ -127,37 +131,39 @@ style). The network never sees it; the page uses it to show which hidden units r
    pooled cell it feeds, and hovering a cell of a stacked weight or product map names the pooled map and cell it belongs to. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population.
-4. **Foundation.** A miniature foundation model, pretrained live on 100 nuclei from all three image questions (34 / 33 /
-   33 of their training sets) without a single label: a convolutional encoder (4 filters of 5 × 5, pool 4 × 4, a linear
-   layer to a **code** of 8 numbers) trained by instance discrimination. Every batch takes 20 nuclei and two random
-   *views* of each (a flip or rotation, and the other lab's scan of it when the checkbox allows); the loss pulls the two
-   views of a nucleus together and pushes every other view of the batch away. The stage shows the rule as the game it
-   is, *spot the same nucleus*: a line-up puts one view against every other view of the batch as a candidate, best
-   first, with the encoder's vote for each (a softmax over the cosines of the codes) and the answer framed in orange;
-   the encoder diagram shows the same pair live (the codes of both views as strips, their cosine, the three nearest
-   other nuclei of the batch and the pair's share of the vote, which is the loss); a strip shows what the code keeps
-   and ignores (one nucleus in all 8 orientations from both labs with the code of each view, at the start and now,
-   then another nucleus); a similarity matrix shows the batch, every view against every other, with the pairs ringed;
-   the tray of 100 can be coloured by question or by the answer to each nucleus's own question (which the model never
-   saw); an embedding map plots any two code numbers for every nucleus and its second view. Two curves run
-   per epoch: the contrastive loss on the batches and on 60 held-out nuclei, and *what the code is worth*: a single
-   layer trained on the frozen code with 20 labelled cases per question, scored on 40 nuclei it never saw. See *A
-   foundation model, in miniature*. The encoder then serves as the *code* input of stage 2 (see *The code as an input*).
-   The lecture introduces all this late, so the fourth stage, the code input and the *Labelled cases* control stay
-   hidden until recipe ⑪ or ⑫ (or key `4`, or the `#foundation` link) introduces them; once shown they stay for the
-   session, and the earlier stages are uncluttered until then.
-5. **Slides.** Weak supervision: 60 slides of 20 nuclei with one label each, and attention learns which nuclei matter.
-   A second question, *a focus of atypical cells?*, has the same nuclei in both classes and only their arrangement
-   differs; a *context* switch adds one layer of self-attention, and a *Who looks at whom* card draws it.
-   The slide is shown with a frame on every nucleus scaled by its attention weight, the twenty nuclei ranked by weight
-   beside it, the whole model unrolled on one diagram (every nucleus through the one scorer, the softmax, the weighted
-   sum and the single layer, with a step-by-step walk-through), the small attention network for the nucleus under the
-   cursor, the weighted summary and the call, and three curves per epoch: loss, slide accuracy and the share of a positive slide's attention landing on its atypical nuclei
-   (the model never sees which). A *Reveal* checkbox marks the atypical nuclei for the audience, and a *plain average*
-   switch shows what the attention buys. Like the fourth stage it stays hidden until recipe ⑬ (or key `5`, or the
-   `#slides` link) introduces it. See *Slides: one label for twenty nuclei*.
+For the **foundation question** the three steps are the same three, with pretraining in the middle. *Specimens* is the
+100 nuclei from all three image questions (34 / 33 / 33 of their training sets) without a single label; the tray can be
+coloured by question or by the answer to each nucleus's own question, which the model never sees. *Train* is the
+pretraining: a convolutional encoder (4 filters of 5 × 5, pool 4 × 4, a linear layer to a **code** of 8 numbers) trained
+by instance discrimination. Every batch takes 20 nuclei and two random *views* of each (a flip or rotation, and the
+other lab's scan of it when the checkbox allows); the loss pulls the two views of a nucleus together and pushes every
+other view of the batch away. The page shows the rule as the game it is, *spot the same nucleus*: a line-up puts one
+view against every other view of the batch as a candidate, best first, with the encoder's vote for each (a softmax over
+the cosines of the codes) and the answer framed in orange; the encoder diagram shows the same pair live (the codes of
+both views as strips, their cosine, the three nearest other nuclei of the batch and the pair's share of the vote, which
+is the loss); a strip shows what the code keeps and ignores (one nucleus in all 8 orientations from both labs with the
+code of each view, at the start and now, then another nucleus); a similarity matrix shows the batch, every view against
+every other, with the pairs ringed; an embedding map plots any two code numbers for every nucleus and its second view;
+and the contrastive loss runs per epoch on the batches and on 60 held-out nuclei. *Test* is *what the code is worth*:
+after every epoch a single layer is trained on the frozen code with 20 labelled cases per question and scored on 40
+nuclei it never saw, as a curve per question and a table before and after pretraining. See *A foundation model, in
+miniature*. The encoder then serves as the *code* input of the nucleus questions (see *The code as an input*); that
+input and the *Labelled cases* control stay hidden until the foundation question, a slides question or recipe ⑪ or ⑫
+has been visited, so the earlier steps are uncluttered until then.
 
-The **inspector** on the right follows the selected nucleus through the first three stages. Its *Evidence* view shows what the
+For the **slides questions** *Specimens* is the training and test slides with their labels: click a slide to see its
+20 nuclei, and *Reveal* marks the atypical ones, which the model never sees. *Train* is weak supervision: one label per
+slide, and attention learns which nuclei matter. The slide is shown with a frame on every nucleus scaled by its
+attention weight, the twenty nuclei ranked by weight beside it, the whole model unrolled on one diagram (every nucleus
+through the one scorer, the softmax, the weighted sum and the single layer, with a step-by-step walk-through), the small
+attention network for the nucleus under the cursor, the weighted summary and the call, and three curves per epoch:
+loss, slide accuracy and the share of a positive slide's attention landing on its atypical nuclei. A *plain average*
+switch shows what the attention buys. The second slides question, *a focus of atypical cells?*, has the same nuclei in
+both classes and only their arrangement differs; a *context* switch adds one layer of self-attention, and a *Who looks
+at whom* card draws it. *Test* walks through the held-out slides one at a time, like Test for any other question: the
+call, the truth, the attention on that slide and a running tally. See *Slides: one label for twenty nuclei*.
+
+The **inspector** on the right follows the selected nucleus through the three steps of a blood count or nucleus question. Its *Evidence* view shows what the
 network is weighing: on pixels, a per-pixel overlay (orange pushes toward the positive class, blue away from it), computed
 by back-propagating the score to the input, so it works through hidden layers and the convolution too; on measurements, a
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
@@ -267,7 +273,7 @@ above the 75% ceiling.
 
 ## A foundation model, in miniature
 
-Recipe ⑪ and the fourth stage. The idea of a foundation model is that the expensive part, learning what images are
+Recipe ⑪ and the foundation question. The idea of a foundation model is that the expensive part, learning what images are
 made of, is done once, on many unlabelled images, and every later question is a small model on top of the resulting
 **code**. The miniature keeps every part visible: 100 nuclei from the three image questions' training sets (34 / 33 /
 33, our lab's scans, never a label), an encoder of 1,680 weights (4 filters of 5 × 5, pool 4 × 4, a linear layer to a
@@ -308,10 +314,10 @@ per epoch for both in Node); at the default speed of 4 epochs per second the 100
 
 ## The code as an input, and how many labelled cases it needs
 
-Recipe ⑫ and the *Labelled cases* control close the loop on why anyone pretrains. In stage 2 the third input, **the
+Recipe ⑫ and the *Labelled cases* control close the loop on why anyone pretrains. In the Train step of a nucleus question the third input, **the
 code**, feeds the network the encoder's 8 (or 16) numbers for each nucleus instead of its pixels or measurements; the
-*Code from* control picks the encoder: the one pretrained in stage 4, or one of two shipped with the page
-(`data/foundation/backbones.js`, written by `tools/pretrain_backbone.js`): a saved copy of exactly what stage 4
+*Code from* control picks the encoder: the one pretrained in the foundation question, or one of two shipped with the page
+(`data/foundation/backbones.js`, written by `tools/pretrain_backbone.js`): a saved copy of exactly what the foundation question
 makes with seed 1 (100 nuclei, 4 filters, a code of 8, 100 epochs), so the recipe works before anyone has run ⑪, and a
 bigger encoder (the page's 240 training nuclei, 8 filters, a code of 16, 200 epochs). Everything else works as for the
 measurements: the diagram shows the code numbers as inputs, the checklist lists their weights, the inspector adds a
@@ -356,7 +362,7 @@ test nuclei); mean over the three questions and two pretraining seeds:
 
 | Pretraining set · encoder | 4 | 10 | 20 | 40 | 80 | Other lab, 20 |
 |---|---|---|---|---|---|---|
-| The page's 100 nuclei · 4 filters, code of 8 · 100 epochs (stage 4; shipped) | 69% | 80% | 86% | 88% | 88% | 84% |
+| The page's 100 nuclei · 4 filters, code of 8 · 100 epochs (the foundation question; shipped) | 69% | 80% | 86% | 88% | 88% | 84% |
 | The page's 240 training nuclei · 4 filters, code of 8 · 200 epochs | 63% | 75% | 83% | 86% | 86% | 83% |
 | The page's 240 training nuclei · 8 filters, code of 16 · 200 epochs (shipped) | 66% | 75% | 89% | 91% | 93% | 87% |
 | 2,100 generated nuclei · 4 filters, code of 8 · 60 epochs | 62% | 74% | 87% | 87% | 86% | 86% |
@@ -372,7 +378,7 @@ foundation models does not reproduce, and the page says so rather than pretendin
 
 ## Slides: one label for twenty nuclei
 
-Recipe ⑬ and the fifth stage. Everything before it labels the nucleus. A pathologist's label is a diagnosis for the
+Recipe ⑬ and the slides questions. Everything before it labels the nucleus. A pathologist's label is a diagnosis for the
 slide, and a slide holds thousands of cells of which the decisive ones may be a handful; nobody outlines them. That is
 the setting of *multiple-instance learning*: a bag of instances, one label for the bag, and the instances that earned
 the label unknown. The miniature keeps the word *slide*: 60 training slides and 20 test slides of 20 nuclei each, drawn
@@ -396,9 +402,9 @@ weighted summary next to a plain average, the call, and three curves per epoch: 
 positive slide's attention that lands on its atypical nuclei, with the uniform 15% as a baseline. The model never sees
 which nuclei are atypical; a *Reveal* checkbox marks them for the audience. A *plain average* switch replaces the
 attention with equal weights, and the *code from* dropdown swaps in the bigger shipped encoder or the one pretrained in
-stage 4.
+the foundation question.
 
-The whole model is also drawn unrolled for the slide on screen, in the style of the other stages' diagrams: the twenty
+The whole model is also drawn unrolled for the slide on screen, in the style of the other network diagrams: the twenty
 nuclei with their codes down the left, one copy of the scorer with the note that its weights are the same for every
 nucleus, the column of twenty scores, the softmax band across them, the twenty shares, the weighted sum into the
 eight-number summary and the single layer with its call. Hovering a nucleus lights its path through all of it, and
@@ -510,7 +516,7 @@ js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer and the attention ranking, the unrolled slide model and the who-looks-at-whom map
-js/app.js                  state, task switch, training loop, the five stages (with the foundation model's pretraining loop and probes, and the slides' attention loop), the code input and its encoders, the inspector, unit heatmap, prevalence
+js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
 tools/generate_cbc.js      make the blood-count dataset

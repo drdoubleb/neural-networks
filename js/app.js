@@ -10,15 +10,14 @@
 
   // ------------------------------------------------------------------ state
   const S = {
-    tasks: null, taskId: 'leukemia', task: null, ds: null, kind: 'tabular', size: 0, featureDefs: [],
+    tasks: null, taskId: 'leukemia', task: null, world: 'classic', questionId: 'leukemia', // world: which kind of question is selected (classic = a blood count or a nucleus question) ds: null, kind: 'tabular', size: 0, featureDefs: [],
     mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
-    foundationShown: false, // the fourth stage, the code input and the labelled-cases control appear once a recipe (or key 4, or #foundation) introduces them, and stay for the session
-    slidesShown: false, // the fifth stage likewise (recipe ⑬, key 5, #slides)
-    // 5 · Slides: attention over slides of nuclei with one label each
-    sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
+    foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe ⑪/⑫ introduces them, and stay for the session
+    // the Slides questions: attention over slides of nuclei with one label each
+    sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -28,7 +27,7 @@
     test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01, scores: {} },
     hover: { train: null, test: null },
     lesson: null, lastLesson: null, lessonCursor: 0,
-    // 4 · Foundation: the miniature foundation model's pretraining (its set, encoder and run live here)
+    // the Foundation question: the miniature foundation model's pretraining (its set, encoder and run live here)
     fm: { set: null, cl: null, labs: true, epochs: 100, speed: 4, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastBatch: null, selected: null, color: 'none', x: 0, y: 1, showPairs: true, hover: null },
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
@@ -70,6 +69,33 @@
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
   // ------------------------------------------------------------------ task + model lifecycle
+  // the questions that are not a dataset of their own: the foundation model, and the slides
+  const WORLD_QUESTIONS = [
+    { id: 'foundation', title: 'Foundation: a code from 100 unlabelled nuclei', world: 'foundation' },
+    { id: 'slides-atypia', title: 'Slides: atypical cells?', world: 'slides', q: 'atypia' },
+    { id: 'slides-focus', title: 'Slides: a focus of atypical cells?', world: 'slides', q: 'focus' },
+  ];
+  const onClassic = step => S.world === 'classic' && S.stage === step;
+  function selectQuestion(id) {
+    const wq = WORLD_QUESTIONS.find(q => q.id === id);
+    if (!wq) {
+      const switched = S.taskId !== id;
+      S.world = 'classic'; S.questionId = id;
+      if (switched) {
+        loadTask(id);
+        if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
+        syncControls();
+        resetModel(`Question changed to “${S.task.title}” — new ${noun(2)}, fresh random weights.`);
+        renderDataTrays(); renderScatter(); renderInspector();
+      }
+    } else {
+      S.world = wq.world; S.questionId = id;
+      if (wq.world === 'slides') S.sl.question = wq.q;
+      revealFoundation(); // both use the foundation encoder's code
+    }
+    $('question-select').value = id;
+    showStage(S.stage);
+  }
   function loadTask(id) {
     S.taskId = id;
     const raw = S.tasks[id];
@@ -123,7 +149,7 @@
     }
     return S.inputCache.get(key);
   }
-  // ---- the foundation encoder behind the code input: the one shipped with the page, or the one pretrained in 4 · Foundation
+  // ---- the foundation encoder behind the code input: the one shipped with the page, or the one pretrained in the Foundation question
   function backbones() { return window.FOUNDATION_BACKBONES || []; }
   function shippedEncoder(id) { const b = backbones().find(x => x.id === id); if (!b) return null; if (!S.shipped[id]) S.shipped[id] = NN.Contrastive.fromJSON(b); return S.shipped[id]; }
   function defaultBackbone() { return backbones().length ? backbones()[0].id : 'page'; }
@@ -138,7 +164,7 @@
       describe: `the encoder pretrained here${cl.steps ? ` (${S.fm.epoch} epoch${S.fm.epoch === 1 ? '' : 's'}, ${cl.describe()})` : ' (not pretrained yet: a random code)'}` };
   }
   function renderBackboneOptions() {
-    const opts = backbones().map(b => `<option value="${esc(b.id)}">shipped: ${esc(b.nuclei.toLocaleString())} nuclei, ${esc(b.conv.K)} filters, code of ${esc(b.code)}${b.note ? ` (${esc(b.note)})` : ''}</option>`).join('') + '<option value="page">pretrained in 4 · Foundation</option>';
+    const opts = backbones().map(b => `<option value="${esc(b.id)}">shipped: ${esc(b.nuclei.toLocaleString())} nuclei, ${esc(b.conv.K)} filters, code of ${esc(b.code)}${b.note ? ` (${esc(b.note)})` : ''}</option>`).join('') + '<option value="page">pretrained in the Foundation question</option>';
     $('backbone').innerHTML = opts; $('sl-backbone').innerHTML = opts;
     S.backbone = defaultBackbone();
   }
@@ -194,7 +220,7 @@
     S.inputs = inputsFor(S.mode, S.augment, S.excluded);
     clearTestResults(false, true); evaluateAll(); syncControls(); renderStatus();
     $('test-note').textContent = { ours: 'The test nuclei are now our lab’s scans. Classify them again.', other: 'The test nuclei are now the other lab’s scans of the same 20 nuclei: paler, less contrast. Classify them again and compare.', mixed: 'The test nuclei now come from both labs, mixed at random. Classify them again.', byClass: `The test nuclei are now split by class: ${posName().toLowerCase()} from the other lab, ${negName().toLowerCase()} from ours. Classify them again.` }[v];
-    renderDataTrays(); renderScatter(); renderInspector(); if (S.stage === 'train') renderTraining(true); if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
+    renderDataTrays(); renderScatter(); renderInspector(); if (onClassic('train')) renderTraining(true); if (onClassic('test')) { renderTestPanel(); renderTestGraph(); }
   }
   function resetModel(reason) {
     stopTraining();
@@ -312,7 +338,7 @@
   function setAnimSpeed(v) { S.animSpeed = v; try { localStorage.setItem('nn-anim-speed', String(v)); } catch (e) { /* ignore */ } syncSpeedControls(); }
   function syncSpeedControls() { for (const key of ['lesson', 'test']) { const r = $(`${key}-speed`), l = $(`${key}-speed-val`); if (r) r.value = S.animSpeed; if (l) l.textContent = `${S.animSpeed}×`; } }
   function renderPlayerControls(key, P) { const box = $(`${key}-player`); if (!box) return; box.hidden = !P; if (P) $(`${key}-pause`).textContent = P.playing ? '⏸ Pause' : '▶ Play'; }
-  function activePlayer() { return (S.stage === 'train' ? (S.lesson && S.lesson.player) : S.stage === 'test' ? (S.test.animating && S.test.player) : null) || null; }
+  function activePlayer() { return (onClassic('train') ? (S.lesson && S.lesson.player) : onClassic('test') ? (S.test.animating && S.test.player) : null) || null; }
 
   // ------------------------------------------------------------------ the lesson: one case teaches the network
   // A walk-through of one gradient step on a training case in six steps (five without a hidden layer):
@@ -826,8 +852,8 @@
   function renderTraining(fresh) {
     if (fresh || !S.trainEval) evaluateAll();
     renderStatus();
-    if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); renderCharts(); renderScorecard(); renderProfile(fresh === true && !S.running); }
-    if (S.stage === 'test') { renderTestPanel(); renderTestGraph(); }
+    if (onClassic('train')) { renderTrainTray(); renderTrainGraph(); renderCharts(); renderScorecard(); renderProfile(fresh === true && !S.running); }
+    if (onClassic('test')) { renderTestPanel(); renderTestGraph(); }
     renderInspector();
     updateTeachButton();
   }
@@ -882,9 +908,9 @@
   function selectSpecimen(s, opts) {
     S.selected = s;
     renderDataTrays();
-    if (S.stage === 'train') { renderTrainTray(); renderTrainGraph(); }
-    if (S.stage === 'test') { renderTestTray(); if (!(opts && opts.silent)) renderTestGraph(); }
-    if (S.stage === 'data') renderScatter();
+    if (onClassic('train')) { renderTrainTray(); renderTrainGraph(); }
+    if (onClassic('test')) { renderTestTray(); if (!(opts && opts.silent)) renderTestGraph(); }
+    if (onClassic('data')) renderScatter();
     renderInspector();
     updateTeachButton();
   }
@@ -906,7 +932,7 @@
     const m = s.measurement;
     const x = S.inputs.xOf(s);
     const classified = isClassified(s) && (s.split === 'train' || S.test.revealed.has(s.id));
-    const untrainedHere = S.stage === 'data' && S.net.steps === 0;
+    const untrainedHere = onClassic('data') && S.net.steps === 0;
     const fw = classified && !untrainedHere ? S.net.forward(x) : null;
     let caption = '';
     if (tabular) { Viz.renderFingerprint(cv, s.deviation, true); caption = 'Blood-count fingerprint: one bar per parameter in report order, up = above the reference range, down = below, dotted lines = the limits of the range.'; }
@@ -1080,15 +1106,7 @@
     renderInputPicker();
   }
   function bindControls() {
-    $('question-select').addEventListener('change', () => {
-      const id = $('question-select').value;
-      if (S.taskId === id) return;
-      loadTask(id);
-      if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
-      syncControls();
-      resetModel(`Question changed to “${S.task.title}” — new ${noun(2)}, fresh random weights.`);
-      renderDataTrays(); renderScatter(); renderInspector();
-    });
+    $('question-select').addEventListener('change', () => selectQuestion($('question-select').value));
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode || b.disabled) return;
       S.mode = b.dataset.mode;
@@ -1102,26 +1120,26 @@
     $('activation').addEventListener('change', () => { S.activation = $('activation').value; resetModel('Activation changed — fresh random weights.'); });
     $('lr').addEventListener('input', () => { S.lr = lrFromSlider(+$('lr').value); $('lr-val').textContent = S.lr; });
     $('batch').addEventListener('change', () => { S.batch = +$('batch').value; S.ptr = 0; renderStatus(); });
-    $('epochs').addEventListener('input', () => { S.epochs = +$('epochs').value; $('epochs-val').textContent = S.epochs; renderStatus(); if (S.stage === 'train') renderCharts(); });
+    $('epochs').addEventListener('input', () => { S.epochs = +$('epochs').value; $('epochs-val').textContent = S.epochs; renderStatus(); if (onClassic('train')) renderCharts(); });
     $('speed').addEventListener('input', () => { S.speed = speedFromSlider(+$('speed').value); $('speed-val').textContent = `${S.speed} epochs/s`; });
     $('seed').addEventListener('change', () => { S.seed = Math.max(1, Math.floor(+$('seed').value || 1)); syncControls(); resetModel(`Seed ${S.seed} — fresh random weights.`); });
     $('seed-random').addEventListener('click', () => { S.seed = 1 + Math.floor(Math.random() * 9999); syncControls(); resetModel(`Seed ${S.seed} — fresh random weights.`); });
     $('augment').addEventListener('change', () => { S.augment = $('augment').checked; resetModel(S.augment ? 'Training set augmented with flips and rotations (80 × 8 = 640 views) — fresh random weights.' : 'Augmentation off — fresh random weights.'); });
     $('l2').addEventListener('input', () => { S.l2 = +$('l2').value; $('l2-val').textContent = S.l2 === 0 ? 'off' : S.l2.toFixed(2); });
-    $('peek').addEventListener('change', () => { S.peek = $('peek').checked; renderStatus(); if (S.stage === 'train') renderCharts(); });
+    $('peek').addEventListener('change', () => { S.peek = $('peek').checked; renderStatus(); if (onClassic('train')) renderCharts(); });
     $('labelled').addEventListener('change', () => { S.labelled = +$('labelled').value; resetModel(S.labelled ? `${S.labelled} labelled training cases: the other ${S.ds.train.length - S.labelled} stay in the tray without a label, and the network never sees them — fresh random weights.` : 'Every training case labelled again — fresh random weights.'); renderDataTrays(); });
     $('backbone').addEventListener('change', () => { S.backbone = $('backbone').value; resetModel(`The code now comes from ${codeEncoder().describe} — fresh random weights.`); });
     for (const id of ['source-train', 'source-train-2']) $(id).addEventListener('change', ev => setTrainSource(ev.target.value));
     for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
     $('normalize').addEventListener('change', () => { S.normalize = $('normalize').value; syncControls(); resetModel(S.normalize === 'off' ? 'Stain normalisation off — fresh random weights.' : `Stain normalisation ${S.normalize === 'lab' ? 'per lab' : 'per image'} — fresh random weights.`); });
-    $('show-lab').addEventListener('change', () => { S.showLab = $('show-lab').checked; renderDataTrays(); if (S.stage === 'train') renderTrainTray(); if (S.stage === 'test') renderTestTray(); });
+    $('show-lab').addEventListener('change', () => { S.showLab = $('show-lab').checked; renderDataTrays(); if (onClassic('train')) renderTrainTray(); if (onClassic('test')) renderTestTray(); });
     $('noise').addEventListener('input', () => { const v = +$('noise').value; $('noise-val').textContent = v ? `${v}% of the labels wrong` : 'off'; });
     $('noise').addEventListener('change', () => {
       S.labelNoise = +$('noise').value / 100; syncControls();
       resetModel(S.labelNoise ? `${Math.round(S.labelNoise * 100)}% of the training labels flipped (${S.inputs.flipped.size} of ${S.ds.train.length}), as a second pathologist might have called them — fresh random weights.` : 'Every training label right again — fresh random weights.');
       renderDataTrays(); renderScatter(); renderInspector();
     });
-    for (const id of ['show-flipped', 'show-flipped-2']) $(id).addEventListener('change', ev => { S.showFlipped = ev.target.checked; syncControls(); renderDataTrays(); renderScatter(); renderInspector(); if (S.stage === 'train') renderTrainTray(); });
+    for (const id of ['show-flipped', 'show-flipped-2']) $(id).addEventListener('change', ev => { S.showFlipped = ev.target.checked; syncControls(); renderDataTrays(); renderScatter(); renderInspector(); if (onClassic('train')) renderTrainTray(); });
     $('btn-train').addEventListener('click', () => (S.running ? stopTraining('Paused.') : startTraining()));
     $('btn-step-batch').addEventListener('click', stepBatch);
     $('btn-step-epoch').addEventListener('click', stepEpoch);
@@ -1130,25 +1148,26 @@
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
       if (k === '14') { // the focus question, with the context layer
-        showStage('slides');
-        S.sl.question = 'focus'; S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        selectQuestion('slides-focus'); showStage('train');
         slReset(`Recipe ${RECIPE_LABELS[14]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe ⑬ stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
       }
-      if (k === '13') { // the slides have their own stage and controls
-        showStage('slides');
-        S.sl.question = 'atypia'; S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+      if (k === '13') { // the slides question, without context
+        S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        selectQuestion('slides-atypia'); showStage('train');
         slReset(`Recipe ${RECIPE_LABELS[13]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
         return;
       }
-      if (k === '11') { // the foundation model has its own stage and controls
-        showStage('foundation');
+      if (k === '11') { // the foundation question
         S.fm.labs = true; S.fm.epochs = 100; S.fm.speed = 4;
+        selectQuestion('foundation'); showStage('train');
         fmReset(`Recipe ${RECIPE_LABELS[11]}: 100 nuclei from all three questions, no labels. Press Pretrain and watch the right-hand curve: a single layer on the code gets better at every question, though the code was never told what any of them asks.`);
         return;
       }
       const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
+      S.world = 'classic'; S.questionId = taskId; $('question-select').value = taskId;
       if (settings.mode === 'code') { revealFoundation(); S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); } // the encoder you pretrained, if you did; else the shipped copy of it
       Object.assign(S, LAB_SETTINGS, settings);
       applySources();
@@ -1159,7 +1178,7 @@
       S.applyingRecipe = false;
       $('recipe-select').value = k;
       renderDataTrays(); renderScatter(); renderInspector();
-      if (S.stage !== 'train') showStage('train');
+      showStage('train');
       if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
       if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
       if (k === '12') note(`Recipe ${RECIPE_LABELS[12]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe ⑥ (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
@@ -1175,7 +1194,7 @@
     $('btn-test-reset').addEventListener('click', () => { clearTestResults(false); $('test-note').textContent = 'Test results cleared.'; renderInspector(); renderTestGraph(); });
     $('threshold').addEventListener('input', () => { S.test.threshold = +$('threshold').value; renderTestPanel(); renderInspector(); });
     $('prev').addEventListener('input', () => { S.test.prevalence = prevFromSlider(+$('prev').value); renderTestPanel(); });
-    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); renderInspector(); if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
+    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); renderInspector(); if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
     $('theme-toggle').addEventListener('click', () => {
       const root = document.documentElement;
       const dark = root.dataset.theme ? root.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1208,14 +1227,12 @@
       if (P && ev.key === 'ArrowRight') { ev.preventDefault(); P.next(); return; }
       if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
-      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); S.running ? stopTraining('Paused.') : startTraining(); }
-      else if (ev.key === ' ' && S.stage === 'foundation') { ev.preventDefault(); S.fm.running ? fmStop('Paused.') : fmStart(); }
-      else if (ev.key === ' ' && S.stage === 'slides') { ev.preventDefault(); S.sl.running ? slStop('Paused.') : slStart(); }
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') classifyNext(false);
-      else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && S.stage === 'train') teachNext();
-      else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test'); else if (ev.key === '4') showStage('foundation'); else if (ev.key === '5') showStage('slides');
+      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else S.sl.running ? slStop('Paused.') : slStart(); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); }
+      else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && onClassic('train')) teachNext();
+      else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
-    window.addEventListener('resize', () => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); if (S.stage === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } if (S.stage === 'slides' && S.sl.model) slRender(false); });
+    window.addEventListener('resize', () => { if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); if (S.world === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } if (S.world === 'slides') slRenderAll(); });
     // playback controls in both strips: previous step, pause/play, next step, speed
     for (const key of ['lesson', 'test']) {
       const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
@@ -1232,44 +1249,46 @@
     const dark = getComputedStyle(document.documentElement).colorScheme.includes('dark');
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
-    if (S.stage === 'train') { renderTrainGraph(); renderProfile(true); } if (S.stage === 'test') renderTestGraph();
+    if (onClassic('train')) { renderTrainGraph(); renderProfile(true); } if (onClassic('test')) renderTestGraph();
     fmRepaint(); slRepaint();
     renderInspector();
   }
   // the lecture introduces the foundation model late, so its stage and controls stay out of the way until then
   function revealFoundation() {
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
-    document.querySelector('.stage[data-stage="foundation"]').hidden = false;
     applyVisibility();
   }
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test' };
   function showStage(name) {
-    if (name === 'foundation') revealFoundation();
-    if (name === 'slides') revealSlides();
+    if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
+    const w = S.world, show = PANELS[`${w}:${name}`];
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
-    $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test'; $('panel-foundation').hidden = name !== 'foundation'; $('panel-slides').hidden = name !== 'slides';
-    const wide = name === 'foundation' || name === 'slides';
-    document.querySelector('.inspector').hidden = wide; document.querySelector('.bench').classList.toggle('no-inspector', wide); // the foundation and slides stages have no specimen inspector
-    if (name !== 'foundation') fmStop();
-    if (name !== 'slides') slStop();
-    if (name === 'foundation') { stopTraining(); fmEnter(); }
-    if (name === 'slides') { stopTraining(); slEnter(); }
-    if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
-    if (name === 'train') {
-      if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0];
-      if (S.mode === 'code' && S.inputs && S.inputs.encoderKey !== codeEncoder().key) resetModel('The code follows the encoder pretrained in 4 · Foundation, which has changed — fresh random weights on the new code.');
-      renderTraining(true);
-    }
-    if (name === 'test') {
-      stopTraining(); renderTestPanel();
-      if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
-      renderTestGraph(); renderInspector(); renderDataTrays();
-      if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead; space pauses, ← → step.';
-    }
-    try { history.replaceState(null, '', '#' + name); } catch (e) { /* ignore */ }
+    for (const id of Object.values(PANELS)) $(id).hidden = id !== show;
+    const wide = w !== 'classic';
+    document.querySelector('.inspector').hidden = wide; document.querySelector('.bench').classList.toggle('no-inspector', wide); // only the blood counts and the nuclei have a specimen inspector
+    if (!(w === 'foundation' && name === 'train')) fmStop();
+    if (!(w === 'slides' && name === 'train')) slStop();
+    if (w !== 'classic' || name === 'test') stopTraining();
+    if (w === 'classic') {
+      if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
+      if (name === 'train') {
+        if (S.selected && S.selected.split !== 'train') S.selected = S.ds.train[0];
+        if (S.mode === 'code' && S.inputs && S.inputs.encoderKey !== codeEncoder().key) resetModel('The code follows the encoder pretrained in the Foundation question, which has changed — fresh random weights on the new code.');
+        renderTraining(true);
+      }
+      if (name === 'test') {
+        renderTestPanel();
+        if (!S.selected || S.selected.split !== 'test') { S.selected = S.ds.test[Math.max(0, S.test.next - 1)]; }
+        renderTestGraph(); renderInspector(); renderDataTrays();
+        if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead; space pauses, ← → step.';
+      }
+      } else if (w === 'foundation') { if (name === 'data') fmEnterData(); else if (name === 'train') fmEnter(); else fmEnterTest(); }
+    else { if (name === 'data') slEnterData(); else if (name === 'train') slEnter(); else slEnterTest(); }
+    try { history.replaceState(null, '', '#' + (w === 'classic' ? name : `${S.questionId}/${name}`)); } catch (e) { /* ignore */ }
   }
 
-  // ------------------------------------------------------------------ 4 · Foundation: a miniature foundation model, pretrained live
+  // ------------------------------------------------------------------ the Foundation question: a miniature foundation model, pretrained live
   // 100 nuclei from the three image questions' training sets (34 / 33 / 33) and no labels. The encoder (4 filters 5×5,
   // pool 4×4, a linear layer to a code of 8) is pretrained by instance discrimination: a batch takes 20 nuclei and two
   // random views of each (a flip or rotation, and the other lab's scan when allowed); the loss pulls the two views of a
@@ -1551,8 +1570,20 @@
   function fmRender(full) {
     const F = S.fm; if (!F.cl) return;
     fmRenderStatus(); fmRenderLineup(); fmRenderGraph(); fmRenderBatch();
-    if (full) { fmRenderViews(); fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); }
+    if (full) { fmRenderViews(); fmRenderCurves(); fmRenderMap(); fmRenderTray(); fmRenderSelected(); fmRenderWorth(); }
     fmSyncButtons();
+  }
+  function fmEnterData() { fmEnter(); }
+  function fmEnterTest() { fmEnter(); fmRenderWorth(); }
+  // what the code is worth: the probe accuracies per question, before pretraining and now
+  function fmRenderWorth() {
+    const F = S.fm; if (!F.hist || !F.hist.length) return;
+    const first = F.hist[0], last = F.hist[F.hist.length - 1];
+    $('fm-worth-table').innerHTML = `<div class="profile-wrap"><table class="profile"><thead><tr><th class="row">question</th><th>a random code (epoch 0)</th><th>after ${F.epoch} epoch${F.epoch === 1 ? '' : 's'}</th></tr></thead><tbody>` +
+      FM.tasks.map(id => `<tr><td class="row"><span class="udot" style="background:${FM.colors[id]}"></span>${esc(S.tasks[id].meta.task.title)}</td><td>${pct(first[id])}</td><td><b>${pct(last[id])}</b></td></tr>`).join('') + '</tbody></table></div>';
+    $('fm-worth-note').textContent = F.epoch === 0
+      ? 'Nothing has been pretrained yet: this is what a single layer gets from a random code. Go to 2 · Train, press Pretrain, and come back.'
+      : `After ${F.epoch} epoch${F.epoch === 1 ? '' : 's'} of pretraining on 100 unlabelled nuclei, a single layer on the frozen code, with 20 labelled cases per question, scores this on nuclei it never saw. The code was never told what any question asks.`;
   }
   function fmEnter() {
     const F = S.fm;
@@ -1587,7 +1618,7 @@
     cv.addEventListener('mouseleave', () => { S.fm.hover = null; tip.hidden = true; fmRenderGraph(); });
   }
 
-  // ------------------------------------------------------------------ 5 · Slides: attention over a slide of nuclei
+  // ------------------------------------------------------------------ the Slides questions: attention over a slide of nuclei
   // A slide is 20 nuclei with one label. Every nucleus becomes its code from the frozen foundation encoder (the one
   // the code input uses), an AttentionMIL scores the nuclei, a softmax over the slide turns the scores into weights,
   // the weighted average of the codes is the slide's summary and a single layer makes the call. Only the slide's label
@@ -1612,7 +1643,7 @@
     }
     if (L.loaded !== q) {
       const set = L.sets[q]; L.meta = set.meta; L.train = set.train; L.test = set.test; L.all = set.all; L.byId = set.byId; L.share = set.share; L.loaded = q;
-      L.selected = null; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.encKey = null;
+      L.selected = null; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.encKey = null; L.trayFor = {}; L.dataSelected = null; L.testSelected = null; L.trial = { next: 0, results: new Map() };
       for (const [id, tray] of [['sl-train-tray', L.train], ['sl-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) el.appendChild(slThumb(s)); }
       document.querySelectorAll('[data-slcls="0"]').forEach(el => { el.textContent = L.meta.classes[0].name; });
       document.querySelectorAll('[data-slcls="1"]').forEach(el => { el.textContent = L.meta.classes[1].name; });
@@ -1625,15 +1656,15 @@
     L.built = true;
     return true;
   }
-  function slThumb(s) {
+  function slThumb(s, onClick) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'thumb slide'; b.dataset.id = s.id; b.title = s.name;
     const cv = document.createElement('canvas'); b.appendChild(cv);
     Viz.renderSlideThumb(cv, s.nuclei.map(n => n.px), S.sl.cols, S.sl.size, S.tint);
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
-    b.addEventListener('click', () => slSelect(s.id));
+    b.addEventListener('click', () => (onClick || slSelect)(s.id));
     return b;
   }
-  function slRepaint() { const L = S.sl; if (!L.built) return; for (const s of L.all) Viz.renderSlideThumb(L.thumbs.get(s.id).querySelector('canvas'), s.nuclei.map(n => n.px), L.cols, L.size, S.tint); if (L.model && S.stage === 'slides') slRender(true); }
+  function slRepaint() { const L = S.sl; if (!L.built) return; for (const map of [L.thumbs, L.dataThumbs, L.testThumbs]) if (map) for (const [id, el] of map) { const s = L.byId.get(id); if (s) Viz.renderSlideThumb(el.querySelector('canvas'), s.nuclei.map(n => n.px), L.cols, L.size, S.tint); } slRenderAll(); }
   // every nucleus of every slide through the frozen encoder, then standardised on the training slides' nuclei
   function slEncode() {
     const L = S.sl, enc = codeEncoder();
@@ -1650,8 +1681,9 @@
     L.model = new NN.AttentionMIL({ inputSize: L.D, attentionUnits: L.units, attention: L.attention, context: L.context ? SLC.context : null, seed: L.seed });
     L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
     L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null;
+    L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelQuestion = L.loaded; // a new model: the test step starts over
     slRecordEpoch();
-    slSyncControls(); slRender(true);
+    slSyncControls(); slRenderAll();
     if (reason) slNote(reason);
   }
   function slRecordEpoch() {
@@ -1703,13 +1735,12 @@
   function slSyncControls() {
     const L = S.sl;
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.att === '1') === L.attention));
-    document.querySelectorAll('#sl-question-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.q === L.question));
     document.querySelectorAll('#sl-context-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.context));
     $('sl-context-card').hidden = !L.context;
     $('sl-units').value = L.units; $('sl-units').disabled = !L.attention;
     $('sl-epochs').value = L.epochs; $('sl-epochs-val').textContent = L.epochs;
     $('sl-speed').value = sliderFromSpeed(L.speed); $('sl-speed-val').textContent = `${L.speed} epochs/s`;
-    $('sl-seed').value = L.seed; $('sl-reveal').checked = L.reveal;
+    $('sl-seed').value = L.seed; for (const id of ['sl-reveal', 'sl-data-reveal', 'sl-test-reveal']) $(id).checked = L.reveal;
     $('sl-backbone').value = S.backbone;
     $('sl-scorer-card').hidden = !L.attention;
     slSyncButtons();
@@ -1836,15 +1867,78 @@
   }
   function slEnter() {
     const L = S.sl; if (!slData()) { slNote('The slides did not load.'); return; }
-    if (!L.model) slReset('Untrained: the attention weights are near uniform and the calls are guesses. Step a slide to watch one gradient step, or press Train and watch the right-hand curve climb.');
-    else { slEncode(); if (L.encKey !== L.modelEnc) { L.modelEnc = L.encKey; } slRender(true); }
+    if (!slBuild()) return;
+    if (!L.model || L.modelQuestion !== L.loaded) slReset(L.model ? 'A new question — fresh random weights.' : 'Untrained: the attention weights are near uniform and the calls are guesses. Step a slide to watch one gradient step, or press Train and watch the right-hand curve climb.');
+    else { slEncode(); slRender(true); }
+  }
+  // ---- the slides' other two steps: Specimens (the slides with their labels) and Test (the held-out slides, one at a time)
+  function slSetReveal(v) { S.sl.reveal = v; for (const id of ['sl-reveal', 'sl-data-reveal', 'sl-test-reveal']) $(id).checked = v; slRenderAll(); }
+  function slRenderAll() { const L = S.sl; if (S.world !== 'slides' || !L.built) return; if (S.stage === 'data') slRenderData(); else if (S.stage === 'test') slRenderTest(); else if (L.model) slRender(true); }
+  function slTrays(kind, onClick) { // a panel's trays, rebuilt when the question changes
+    const L = S.sl; if (L.trayFor[kind] === L.loaded) return; L.trayFor[kind] = L.loaded;
+    const map = new Map(), fill = (id, tray) => { const el = $(id); el.innerHTML = ''; for (const s of tray) { const b = slThumb(s, onClick); el.appendChild(b); map.set(s.id, b); } };
+    if (kind === 'data') { fill('sl-data-train-tray', L.train); fill('sl-data-test-tray', L.test); L.dataThumbs = map; $('sl-data-train-label').textContent = `Training slides (${L.train.length})`; $('sl-data-test-label').textContent = `Test slides (${L.test.length}) · held out`; }
+    else { fill('sl-test-results', L.test); L.testThumbs = map; $('sl-test-count').textContent = `${L.test.length} slides`; }
+  }
+  function slEnterData() { const L = S.sl; if (!slData() || !slBuild()) return; slTrays('data', slDataSelect); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id; slRenderData(); }
+  function slDataSelect(id) { S.sl.dataSelected = id; slRenderData(); }
+  function slDataNeighbour(step) { const L = S.sl, i = L.all.findIndex(s => s.id === L.dataSelected); slDataSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function slRenderData() {
+    const L = S.sl; slTrays('data', slDataSelect); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id;
+    const s = L.byId.get(L.dataSelected) || L.train[0], cls = L.meta.classes, k = s.nuclei.filter(n => n.label).length;
+    $('sl-data-title').textContent = L.meta.question; $('sl-data-sub').textContent = `${L.train.length} training and ${L.test.length} test slides of ${L.meta.perSlide} nuclei · one label per slide`;
+    $('sl-data-blurb').textContent = L.meta.blurb;
+    Viz.drawSlide($('sl-data-canvas'), { nuclei: s.nuclei.map(n => ({ px: n.px, a: 0, pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, plain: true });
+    $('sl-data-slide-title').textContent = `Slide ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · label: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
+    $('sl-data-note').textContent = `${L.meta.perSlide} nuclei from the pool, each in a random orientation, and one label for the whole slide. ${L.reveal ? 'The dots mark the atypical nuclei; the model never sees them.' : 'Nobody labels the nuclei: tick Reveal to see which are atypical.'} Click a slide below, or step through them.`;
+    for (const [id, el] of L.dataThumbs) { const sl = L.byId.get(id); el.classList.toggle('selected', id === L.dataSelected); el.classList.toggle('call-1', !!sl.label); el.classList.toggle('call-0', !sl.label); }
+  }
+  function slEnterTest() { const L = S.sl; if (!slData() || !slBuild()) return; if (!L.model || L.modelQuestion !== L.loaded) slReset(); slTrays('test', slTestSelect); slRenderTest(); }
+  function slTestClear() { const L = S.sl; L.trial = { next: 0, results: new Map() }; L.testSelected = null; slRenderTest(); }
+  function slClassifyNext(quiet) {
+    const L = S.sl, T = L.trial; if (!L.model || T.next >= L.test.length) return false;
+    const s = L.test[T.next++], fw = L.model.forward(s.H, s.dist);
+    T.results.set(s.id, { p: fw.p, call: fw.p >= 0.5 ? 1 : 0, a: fw.a }); L.testSelected = s.id;
+    if (!quiet) slRenderTest();
+    return true;
+  }
+  function slClassifyAll() { const L = S.sl; if (!L.model) return; const go = () => { if (slClassifyNext(false) && S.world === 'slides' && S.stage === 'test') setTimeout(go, reducedMotion ? 0 : 120); }; go(); }
+  function slTestSelect(id) { const L = S.sl; if (!L.trial.results.has(id)) return; L.testSelected = id; slRenderTest(); }
+  function slTestStats() { const L = S.sl; let tp = 0, tn = 0, fp = 0, fn = 0; for (const [id, r] of L.trial.results) { const y = L.byId.get(id).label; if (r.call && y) tp++; else if (!r.call && !y) tn++; else if (r.call && !y) fp++; else fn++; } const n = tp + tn + fp + fn; return { n, tp, tn, fp, fn, acc: n ? (tp + tn) / n : null, sens: tp + fn ? tp / (tp + fn) : null, spec: tn + fp ? tn / (tn + fp) : null }; }
+  function slRenderTest() {
+    const L = S.sl; slTrays('test', slTestSelect);
+    const T = L.trial, cls = L.meta.classes, st = slTestStats(), pos = cls[1].name, neg = cls[0].name;
+    $('sl-stat-n').textContent = `${st.n} / ${L.test.length}`;
+    $('sl-stat-acc').textContent = st.acc == null ? '–' : pct(st.acc); $('sl-stat-acc-sub').textContent = st.n ? `${st.tp + st.tn} of ${st.n} correct` : 'no calls yet';
+    $('sl-stat-sens').textContent = st.sens == null ? '–' : pct(st.sens); $('sl-stat-sens-sub').textContent = st.tp + st.fn ? `${st.tp} of ${st.tp + st.fn} caught` : 'none seen yet';
+    $('sl-stat-spec').textContent = st.spec == null ? '–' : pct(st.spec); $('sl-stat-spec-sub').textContent = st.tn + st.fp ? `${st.tn} of ${st.tn + st.fp} cleared` : 'none seen yet';
+    const cell = (v, kind) => `<div class="cell ${v ? kind : 'empty'}">${v}</div>`;
+    $('sl-confusion').innerHTML = `<div></div><div class="hd">called ${esc(neg)}</div><div class="hd">called ${esc(pos)}</div><div class="rh">truth ${esc(neg)}</div>${cell(st.tn, 'hit')}${cell(st.fp, 'miss')}<div class="rh">truth ${esc(pos)}</div>${cell(st.fn, 'miss')}${cell(st.tp, 'hit')}`;
+    const done = T.next >= L.test.length;
+    $('sl-classify-next').disabled = done; $('sl-classify-all').disabled = done;
+    $('sl-classify-next').textContent = done ? `All ${L.test.length} classified` : `Classify next slide (${T.next + 1} of ${L.test.length})`;
+    $('sl-classify-all').textContent = `Classify all ${L.test.length}`;
+    $('sl-test-warning').hidden = !(L.model && L.model.steps === 0);
+    document.querySelectorAll('[data-slcalled="0"]').forEach(el => { el.textContent = `called ${neg}`; }); document.querySelectorAll('[data-slcalled="1"]').forEach(el => { el.textContent = `called ${pos}`; });
+    const s = L.testSelected != null ? L.byId.get(L.testSelected) : null, r = s ? T.results.get(s.id) : null;
+    if (s && r) {
+      const k = s.nuclei.filter(n => n.label).length;
+      Viz.drawSlide($('sl-test-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: r.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: null });
+      Viz.drawRanked($('sl-test-rank'), { items: s.nuclei.map((n, i) => ({ px: n.px, value: r.a[i], pos: !!n.label, index: i })).sort((a, b) => b.value - a.value), size: L.size, tint: S.tint, reveal: L.reveal, hover: null, title: L.attention ? 'the nuclei ranked by the attention they got on this slide' : 'plain average: every nucleus gets the same share' });
+      $('sl-test-slide-title').textContent = `Slide ${s.name} · test · truth: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
+      $('sl-test-call').innerHTML = `The model says <b>P(${esc(pos)}) = ${r.p.toFixed(2)}</b> → <span class="${r.call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[r.call].name)} ${r.call === s.label ? '✓' : '✗'}</span>. ${L.attention ? 'Frames and percentages are the attention weights; the weights never change here.' : 'Plain average: every nucleus weighs the same.'}`;
+      $('sl-test-rank-note').textContent = L.attention ? 'With Reveal ticked the dots say which nuclei were atypical: a call for the right reason lands the attention on them.' : 'A plain average has no ranking to show: every nucleus counts the same.';
+    } else {
+      const s0 = L.test[Math.min(T.next, L.test.length - 1)];
+      Viz.drawSlide($('sl-test-canvas'), { nuclei: s0.nuclei.map(n => ({ px: n.px, a: 0, pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: false, plain: true });
+      Viz.drawRanked($('sl-test-rank'), { items: s0.nuclei.map((n, i) => ({ px: n.px, value: 0, pos: false, index: i })), size: L.size, tint: S.tint, reveal: false, hover: null, title: 'not classified yet' });
+      $('sl-test-slide-title').textContent = `Slide ${s0.name} · test · next up`;
+      $('sl-test-call').textContent = 'Press Classify next slide: the model reads the twenty nuclei and makes one call, and the truth is shown after.';
+      $('sl-test-rank-note').textContent = '';
+    }
+    for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), sl = L.byId.get(id), right = !!rr && rr.call === sl.label; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call === 0); el.classList.toggle('call-1', !!rr && rr.call === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
   }
   // the lecture introduces the slides late: the stage stays hidden until recipe ⑬, key 5 or #slides brings it in
-  function revealSlides() {
-    if (!S.slidesShown) { S.slidesShown = true; try { sessionStorage.setItem('nucleus-net-slides', '1'); } catch (e) { /* ignore */ } }
-    document.querySelector('.stage[data-stage="slides"]').hidden = false;
-    revealFoundation(); // the slides use the foundation encoder's code
-  }
   function bindSlides() {
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.addEventListener('click', () => { const att = b.dataset.att === '1'; if (att === S.sl.attention) return; S.sl.attention = att; slReset(att ? 'Attention on: a scorer weighs the nuclei — fresh random weights.' : 'Plain average: every nucleus weighs the same and the scorer is switched off — fresh random weights.'); }));
     $('sl-units').addEventListener('change', () => { S.sl.units = +$('sl-units').value; slReset(`${S.sl.units} attention units — fresh random weights.`); });
@@ -1852,7 +1946,9 @@
     $('sl-epochs').addEventListener('input', () => { S.sl.epochs = +$('sl-epochs').value; $('sl-epochs-val').textContent = S.sl.epochs; if (S.sl.model) { slRenderStatus(); slRenderCurves(); } });
     $('sl-speed').addEventListener('input', () => { S.sl.speed = speedFromSlider(+$('sl-speed').value); $('sl-speed-val').textContent = `${S.sl.speed} epochs/s`; });
     $('sl-seed').addEventListener('change', () => { S.sl.seed = Math.max(1, Math.round(+$('sl-seed').value) || 1); slReset(`Seed ${S.sl.seed} — fresh random weights.`); });
-    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } });
+    for (const id of ['sl-reveal', 'sl-data-reveal', 'sl-test-reveal']) $(id).addEventListener('change', ev => slSetReveal(ev.target.checked));
+    $('sl-data-prev').addEventListener('click', () => slDataNeighbour(-1)); $('sl-data-next').addEventListener('click', () => slDataNeighbour(1));
+    $('sl-classify-next').addEventListener('click', () => slClassifyNext()); $('sl-classify-all').addEventListener('click', slClassifyAll); $('sl-test-clear').addEventListener('click', slTestClear);
     $('sl-step-slide').addEventListener('click', slStepSlide);
     $('sl-step-epoch').addEventListener('click', slStepEpoch);
     $('sl-train').addEventListener('click', () => (S.sl.running ? slStop('Paused.') : slStart()));
@@ -1868,7 +1964,6 @@
       else tip.hidden = true;
     });
     cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } } });
-    document.querySelectorAll('#sl-question-seg button').forEach(b => b.addEventListener('click', () => { const q = b.dataset.q; if (q === S.sl.question) return; S.sl.question = q; slReset(q === 'focus' ? 'The focus question: four atypical nuclei on every slide, a 2 × 2 block or scattered — fresh random weights. Without context this model cannot tell the classes apart; switch context on and train.' : 'The atypical-cells question — fresh random weights.'); }));
     document.querySelectorAll('#sl-context-seg button').forEach(b => b.addEventListener('click', () => { const on = b.dataset.ctx === '1'; if (on === S.sl.context) return; S.sl.context = on; slReset(on ? 'Context on: one layer of self-attention lets every nucleus read the others before the pooling — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
     const ca = $('sl-attmap'), ta = $('sl-attmap-tip');
     ca.addEventListener('mousemove', ev => {
@@ -1915,22 +2010,26 @@
   // ------------------------------------------------------------------ boot
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
-    try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; if (sessionStorage.getItem('nucleus-net-slides')) S.slidesShown = true; } catch (e) { /* ignore */ }
+    try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
-    $('question-select').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<option value="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</option>`).join('');
+    const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
+    $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
-    if (S.slidesShown) revealSlides();
     syncControls();
     resetModel();
     renderDataTrays(); renderScatter(); renderInspector();
     onThemeChange();
-    const hash = (location.hash || '').replace('#', '');
-    showStage(['data', 'train', 'test', 'foundation', 'slides'].includes(hash) ? hash : 'data');
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.stage === 'train') renderTrainGraph(); if (S.stage === 'test') renderTestGraph(); });
+    const hash = (location.hash || '').replace('#', ''), steps = ['data', 'train', 'test'];
+    let qid = null, step = 'data';
+    if (hash.includes('/')) [qid, step] = hash.split('/'); else if (steps.includes(hash)) step = hash; else if (hash) { qid = hash; step = 'train'; }
+    if (qid === 'slides') qid = 'slides-atypia';
+    if (qid && (WORLD_QUESTIONS.some(q => q.id === qid) || S.tasks[qid])) selectQuestion(qid);
+    showStage(steps.includes(step) ? step : 'data');
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onThemeChange);
   }
   document.addEventListener('DOMContentLoaded', init);
