@@ -27,7 +27,7 @@ const zlib = require('zlib');
 const gen = require('./generate_nuclei.js');
 const FL = require('../js/fields.js');
 
-const SEED = 20260930, W = 176, H = 128, SIZE = gen.SIZE, PER_PATTERN_TRAIN = +(process.env.FIELDS_TRAIN || 40), PER_PATTERN_TEST = +(process.env.FIELDS_TEST || 10), SHEET_PER_PATTERN = 4; // FIELDS_TRAIN / FIELDS_TEST: other counts, for experiments
+const SEED = 20260930, W = 176, H = 128, SIZE = gen.SIZE, PER_PATTERN_TRAIN = +(process.env.FIELDS_TRAIN || 80), PER_PATTERN_TEST = +(process.env.FIELDS_TEST || 10), SHEET_PER_PATTERN = 4; // FIELDS_TRAIN / FIELDS_TEST: other counts, for experiments
 const OUT = process.env.FIELDS_OUT || path.join(__dirname, '..', 'data', 'fields'); // FIELDS_OUT: another folder, for experiments
 const task = gen.TASKS.find(t => t.id === 'atypia');
 const PATTERNS = [
@@ -276,7 +276,7 @@ function stampNucleus(img, n, seg, index) { // the nucleus's coverage from its c
 // ---- the fields
 const fields = [];
 let id = 0;
-for (const split of ['train', 'test']) {
+for (const split of ['test', 'train']) { // the test fields first, so they stay the same when the training count changes
   const per = split === 'train' ? PER_PATTERN_TRAIN : PER_PATTERN_TEST, batch = [];
   for (const P of PATTERNS) for (let i = 0; i < per; i++) batch.push(makeField(P, id++));
   for (let i = batch.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [batch[i], batch[j]] = [batch[j], batch[i]]; }
@@ -305,7 +305,7 @@ const meta = { seed: SEED, w: W, h: H, size: SIZE, grain: FL.GRAIN, quantum: QUA
   patterns: PATTERNS.map(({ key, name, short, label, cues, blurb }) => ({ key, name, short, label, cues, blurb })),
   blurb: 'A strip of bladder: urothelium on its basement membrane, stroma beneath. Every field is one of five patterns and carries one label, invasive or not. Invasion is atypical cells below the membrane in angulated nests: every pattern that lacks one of the three cues is a mimic, and a real one.',
   train: records.filter(r => r.split === 'train').length, test: records.filter(r => r.split === 'test').length };
-const js = `window.LECTURE_FIELDS = ${JSON.stringify({ meta, train: records.filter(r => r.split === 'train'), test: records.filter(r => r.split === 'test') })};\n`;
+const js = `window.LECTURE_FIELDS = ${JSON.stringify({ meta, train: records.filter(r => r.split === 'train'), test: records.filter(r => r.split === 'test') })};\n`; // training fields first in the file, as the page reads them
 fs.writeFileSync(path.join(OUT, 'fields_data.js'), js);
 
 // ---- contact sheets in H&E colour: the first fields of each pattern, at 2×, as they are and with the truth over them

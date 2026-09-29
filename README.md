@@ -530,7 +530,7 @@ slides come from the same pool under the same held-out rule; every slide holds f
 12 possible 2 × 2 blocks or as one of the 454 ways to scatter four cells with no two adjacent.
 
 `tools/generate_fields.js` (no dependencies) draws the tissue fields of the invasion question, the next question in
-preparation: 250 strips of bladder of 176 × 128 pixels, 200 for training and 50 held out, written to
+preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50 held out, written to
 `data/fields/fields_data.js`, with two contact sheets in H&E colour (`contact_sheet_fields.png`, and
 `contact_sheet_fields_truth.png` with the membrane, the nest outlines and every nucleus's truth drawn over it). Each
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
@@ -547,11 +547,12 @@ membrane, which nest. Invasion is the conjunction of three cues, and every patte
 | CIS extending into von Brunn nests | atypical | below | round smooth nests | not invasive |
 | Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
-Fifty fields of each pattern. A field ships as a PNG without its pixel grain, in steps of four grey levels that the
-grain hides, with its nuclear segmentation as a second PNG (1 + the index of the nucleus covering each pixel, what a
-segmentation step gives), and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser
-alike, and cuts every nucleus's 32 × 32 crop, either with the field around it or masked to the nucleus alone; the
-file is 3.0 MB.
+Ninety fields of each pattern, 80 for training and 10 held out (the test fields are drawn first, so they stay the same
+when the training count changes; 40 per pattern was not enough, see the model below). A field ships as a PNG without
+its pixel grain, in steps of four grey levels that the grain hides, with its nuclear segmentation as a second PNG (1 +
+the index of the nucleus covering each pixel, what a segmentation step gives), and `js/fields.js` adds the grain back
+from the field's seed, in Node and in the browser alike, and cuts every nucleus's 32 × 32 crop, either with the field
+around it or masked to the nucleus alone; the file is 5.5 MB.
 
 `tools/check_fields.js` asks what the frozen encoders make of those crops before any model is built on them: a single
 layer on the code, trained on the training fields' nuclei and scored on the test fields' (mean of three seeds), for
@@ -559,10 +560,10 @@ crops with the field around the nucleus and for crops masked to the nucleus (`--
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 72% | 87% |
-| Atypical vs bland, crops masked to the nucleus | 92% | 93% |
-| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 49% · 83% | 46% · 87% |
-| Below vs above the membrane, from the code alone (majority: 73%): with surroundings · masked | 78% · 74% | 87% · 74% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 71% | 86% |
+| Atypical vs bland, crops masked to the nucleus | 90% | 92% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 48% · 81% | 46% · 84% |
+| Below vs above the membrane, from the code alone (majority: 69%): with surroundings · masked | 75% · 70% | 88% · 70% |
 
 A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
 nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
@@ -585,7 +586,7 @@ js/viz.js                  canvas + SVG drawing: images, fingerprints, weight ma
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
-data/fields/fields_data.js the tissue fields of the invasion question: 250 strips of bladder as grainless PNGs with their membrane, nuclei and nests, written by tools/generate_fields.js
+data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
