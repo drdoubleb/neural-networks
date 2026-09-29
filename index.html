@@ -452,6 +452,11 @@
           <div>
             <div class="net-wrap"><canvas id="sl-canvas" width="372" height="354" aria-label="The slide: twenty nuclei with their attention weights"></canvas><div class="tip" id="sl-tip" hidden></div></div>
             <p class="small" id="sl-call" style="margin-top:8px"></p>
+            <div class="bar-row" id="sl-links-ctl" hidden style="margin-top:10px">
+              <div class="ctl"><span class="lbl">Links</span><div class="seg small" id="sl-links-seg"><button type="button" data-links="0" class="is-active" title="lines from the hovered (or pinned) nucleus to the nuclei it listens to">one nucleus</button><button type="button" data-links="1" title="every pair at once, a link wide at the end that listens">every nucleus</button></div></div>
+              <div class="ctl slim"><label for="sl-links-min">Links above <span class="val" id="sl-links-min-val">10%</span></label><input type="range" id="sl-links-min" min="0" max="40" step="1" value="10"></div>
+            </div>
+            <p class="small muted" id="sl-links-note" style="margin-top:6px"></p>
           </div>
           <div>
             <div class="sl-rank-wrap"><canvas id="sl-rank" width="800" height="116" aria-label="The twenty nuclei ranked by attention"></canvas></div>
@@ -467,14 +472,24 @@
         </div>
         <div class="sl-two">
           <div>
+            <div class="actions-inline" style="margin:0 0 8px"><span class="small muted">shares from</span><div class="seg small" id="sl-attview-seg"><button type="button" data-view="both" class="is-active" title="what the layer uses: query · key minus the distance cost, then the softmax">match − distance</button><button type="button" data-view="match" title="what the softmax would give from query · key alone">match only</button><button type="button" data-view="distance" title="what the softmax would give from the distance cost alone">distance only</button></div></div>
             <div class="net-wrap"><canvas id="sl-attmap" width="346" height="346" aria-label="The attention between the nuclei of the slide: rows ask, columns answer"></canvas><div class="tip" id="sl-attmap-tip" hidden></div></div>
             <p class="small muted" id="sl-attmap-note" style="margin-top:8px"></p>
           </div>
           <div>
             <div class="fm-selected" id="sl-context-focus"></div>
-            <p class="small muted" id="sl-context-note" style="margin-top:8px">Hover a nucleus on the slide or a row of the map: the lines on the slide show whom it listens to. With the distance cost the model learns how far to look; with a 2 × 2 focus every member has two atypical neighbours, a scattered one has none, and that difference is what reaches the scorer.</p>
+            <p class="small muted" id="sl-context-note" style="margin-top:8px">Hover a nucleus on the slide, a row of the map or a row of the card below, or click one on the slide or the map to pin it: the lines on the slide show whom it listens to, and the card below takes its decision apart. With the distance cost the model learns how far to look; with a 2 × 2 focus every member has two atypical neighbours, a scattered one has none, and that difference is what reaches the scorer.</p>
           </div>
         </div>
+      </div>
+
+      <div class="card" id="sl-decide-card" hidden>
+        <div class="card-head">
+          <h2 id="sl-decide-title">How a nucleus decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">query · key → match − distance cost → softmax → shares → Σ share × value → added to its own code</span><button type="button" class="btn" id="sl-decide-walk" title="animate this nucleus’s decision, step by step">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="sl-decide" width="800" height="636" aria-label="How one nucleus decides where to look: its query against every other nucleus’s key, the distance cost, the softmax, the values weighted into the message it hears, added to its own code"></canvas><div class="tip" id="sl-decide-tip" hidden></div></div></div>
+        <p class="small muted" id="sl-decide-note" style="margin-top:8px"></p>
       </div>
 
       <div class="card" id="sl-unrolled-card">

@@ -190,7 +190,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
 | ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑪ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
 | ⑬ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
-| ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to. See *A focus, and the nuclei look at each other*. |
+| ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -450,9 +450,24 @@ nucleus listens to the others in proportion to the match; the weighted values ar
 comes through the residual, and the model is never given coordinates: what it knows about position is the distance
 between nuclei, inside the attention. 483 parameters in all, weight decay 0.001, learning rate 0.02, 150 epochs.
 
-The page draws who looks at whom: a 20 × 20 map, rows asking and columns answering, the lines from a hovered nucleus
-on the slide to the nuclei it listens to, and its code before and after context. Mean of three seeds
-(`node tools/check_slides.js --context none,distX --decay 0.001 --nopos --epochs 150 --lr 0.02`):
+The page draws who looks at whom, and how a nucleus decides:
+
+- **The map.** A 20 × 20 map, rows asking and columns answering, with the asking nucleus's code before and after
+  context. A switch shows the shares the softmax would give from the *match only* (query · key, as if distance cost
+  nothing: the columns of the atypical nuclei light up, wherever they sit) or from the *distance only* (a banded
+  neighbour pattern); the layer uses both.
+- **The links on the slide.** Hovering a nucleus draws lines to the nuclei it listens to, thicker with the share; *every
+  nucleus* draws every link at once, above a threshold you set: a link is wide at the end that listens (its width that
+  nucleus's share for the other) and comes to a point at an end that does not listen back. After training on the focus
+  question it is a lattice of neighbours, thickest inside the 2 × 2 block.
+- **How a nucleus decides where to look.** One card takes the hovered or pinned nucleus's decision apart on one canvas:
+  its code becomes its query; every other nucleus's key meets it in eight products whose sum is the match; the distance
+  cost comes off; the softmax over the other nineteen turns the scores into shares; the values, each weighted by its
+  share, add up to the message, which is projected back and added to the nucleus's own code, then the feed-forward. Every
+  number has a tooltip, hovering a row outlines the pair on the map, and *Walk through* animates the decision stage by
+  stage. Clicking a nucleus on the slide or a row of the map pins it, so the cards keep following it.
+
+Mean of three seeds (`node tools/check_slides.js --context none,distX --decay 0.001 --nopos --epochs 150 --lr 0.02`):
 
 | Question | No context: test slide accuracy | With context | Attention on the atypical nuclei, with context | Learned distance cost |
 |---|---|---|---|---|
@@ -515,7 +530,7 @@ css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
-js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer and the attention ranking, the unrolled slide model and the who-looks-at-whom map
+js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js

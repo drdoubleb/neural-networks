@@ -136,6 +136,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, .thumb:focus-vi
 .sl-two { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .sl-two > div { min-width: 0; }
 #sl-attmap { max-width: 372px; }
+#sl-links-ctl .ctl { min-width: 0; }
+#sl-links-ctl .ctl.slim { min-width: 150px; }
+#sl-links-seg button { white-space: nowrap; flex: 0 0 auto; }
 @media (min-width: 900px) { .sl-two { grid-template-columns: 372px minmax(0, 1fr); align-items: start; } }
 #sl-canvas, #sl-data-canvas, #sl-test-canvas { display: block; width: 100%; max-width: 372px; height: auto; border-radius: 8px; }
 #sl-rank { display: block; width: 100%; height: auto; border-radius: 8px; }

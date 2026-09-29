@@ -409,6 +409,22 @@
       const Y = Xp.map((xp, i) => { const y = Float64Array.from(xp); for (let d = 0; d < D; d++) { let s = this.b2[d]; const off = d * F; for (let f = 0; f < F; f++) s += this.W2[off + f] * U[i][f]; y[d] += s; } return y; });
       return { X, dist, Q, K, V, S, A, C, Xp, U, Y, cost: b };
     }
+    // One forward pass taken apart, for showing: match[i][j] = query_i · key_j / √dk, cost[i][j] = the learned cost × the
+    // distance, and the shares the softmax would give from the match alone or from the distance alone (each row over the
+    // other nuclei, like the real attention); both = the shares actually used. Nothing here changes the layer.
+    explain(fw) {
+      const { Q, K, dist, cost } = fw, n = Q.length, dk = this.dk, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1;
+      const soft = row => { let mx = -Infinity; for (const v of row) mx = Math.max(mx, v); const e = Float64Array.from(row, v => Math.exp(v - mx)); let Z = 0; for (const v of e) Z += v; for (let j = 0; j < n; j++) e[j] /= Z; return e; };
+      const match = [], costs = [], matchOnly = [], distOnly = [];
+      for (let i = 0; i < n; i++) {
+        const m = new Float64Array(n), ct = new Float64Array(n);
+        for (let j = 0; j < n; j++) { let v = 0; for (let d = 0; d < dk; d++) v += Q[i][d] * K[j][d]; m[j] = v * sc; ct[j] = cost && dist ? cost * dist[i][j] : 0; }
+        match.push(m); costs.push(ct);
+        matchOnly.push(soft(Float64Array.from(m, (v, j) => (mask && j === i ? -Infinity : v))));
+        distOnly.push(soft(Float64Array.from(ct, (v, j) => (mask && j === i ? -Infinity : -v))));
+      }
+      return { match, cost: costs, matchOnly, distOnly, both: fw.A };
+    }
     newGradient() { const z = a => new Float64Array(a.length); return { Wq: z(this.Wq), bq: z(this.bq), Wk: z(this.Wk), bk: z(this.bk), Wv: z(this.Wv), bv: z(this.bv), Wo: z(this.Wo), bo: z(this.bo), W1: z(this.W1), b1: z(this.b1), W2: z(this.W2), b2: z(this.b2), beta: 0 }; }
     // d(loss)/d(Y) in, the layer's gradients accumulated into g, d(loss)/d(X) out
     backward(fw, dY, g) {
