@@ -15,6 +15,7 @@
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
+    foundationShown: false, // the fourth stage, the code input and the labelled-cases control appear once a recipe (or key 4, or #foundation) introduces them, and stay for the session
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -1043,6 +1044,7 @@
     $('augment-wrap').hidden = !pixels;
     $('picker-wrap').hidden = pixels || code;
     $('code-wrap').hidden = !code;
+    $('mode-code').hidden = !S.foundationShown; $('labelled-wrap').hidden = !S.foundationShown;
     $('tint-wrap').hidden = tabular;
     $('prevalence-card').hidden = !tabular;
     $('legend-conv').hidden = !(pixels && S.convK > 0);
@@ -1132,7 +1134,7 @@
       const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
-      if (settings.mode === 'code') S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); // the encoder you pretrained, if you did; else the shipped copy of it
+      if (settings.mode === 'code') { revealFoundation(); S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); } // the encoder you pretrained, if you did; else the shipped copy of it
       Object.assign(S, LAB_SETTINGS, settings);
       applySources();
       S.excluded = new Set();
@@ -1218,7 +1220,14 @@
     fmRepaint();
     renderInspector();
   }
+  // the lecture introduces the foundation model late, so its stage and controls stay out of the way until then
+  function revealFoundation() {
+    if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
+    document.querySelector('.stage[data-stage="foundation"]').hidden = false;
+    applyVisibility();
+  }
   function showStage(name) {
+    if (name === 'foundation') revealFoundation();
     S.stage = name;
     document.querySelectorAll('.stage').forEach(b => b.classList.toggle('is-active', b.dataset.stage === name));
     $('panel-data').hidden = name !== 'data'; $('panel-train').hidden = name !== 'train'; $('panel-test').hidden = name !== 'test'; $('panel-foundation').hidden = name !== 'foundation';
@@ -1561,12 +1570,14 @@
   // ------------------------------------------------------------------ boot
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
+    try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
     $('question-select').innerHTML = Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map((t, i) => `<option value="${t.meta.task.id}">${i + 1} · ${esc(t.meta.task.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); renderBackboneOptions();
     loadTask(S.taskId);
+    if (S.foundationShown) revealFoundation();
     syncControls();
     resetModel();
     renderDataTrays(); renderScatter(); renderInspector();

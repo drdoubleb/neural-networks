@@ -142,6 +142,9 @@ style). The network never sees it; the page uses it to show which hidden units r
    per epoch: the contrastive loss on the batches and on 60 held-out nuclei, and *what the code is worth*: a single
    layer trained on the frozen code with 20 labelled cases per question, scored on 40 nuclei it never saw. See *A
    foundation model, in miniature*. The encoder then serves as the *code* input of stage 2 (see *The code as an input*).
+   The lecture introduces all this late, so the fourth stage, the code input and the *Labelled cases* control stay
+   hidden until recipe ⑪ or ⑫ (or key `4`, or the `#foundation` link) introduces them; once shown they stay for the
+   session, and the earlier stages are uncluttered until then.
 
 The **inspector** on the right follows the selected nucleus through the first three stages. Its *Evidence* view shows what the
 network is weighing: on pixels, a per-pixel overlay (orange pushes toward the positive class, blue away from it), computed
