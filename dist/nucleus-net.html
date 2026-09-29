@@ -310,7 +310,7 @@ ul.prose li + li { margin-top: 4px; }
 
 /* ---------- charts ---------- */
 .curves { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
-@media (min-width: 640px) { .curves { grid-template-columns: 1fr 1fr; } .curves.single { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 640px) { .curves { grid-template-columns: 1fr 1fr; } .curves.single { grid-template-columns: minmax(0, 1fr); max-width: 640px; } }
 .chart { position: relative; min-width: 0; }
 .chart svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart .title { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; display: flex; justify-content: space-between; gap: 8px; }
