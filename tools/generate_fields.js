@@ -8,8 +8,9 @@
  *   ip      inverted papilloma                       bland cells, below the membrane, in anastomosing cords       not invasive
  *   cis     carcinoma in situ                        atypical cells, confined above the membrane                  not invasive
  *   cisvbn  CIS extending into von Brunn nests       atypical cells, below the membrane, in round smooth nests    not invasive
- *   inv     invasive carcinoma                       atypical cells, below the membrane, in angulated jagged nests,
- *                                                    on some fields single cells shed into the stroma             INVASIVE
+ *   inv     invasive carcinoma                       atypical cells, below the membrane, in angulated nests that mostly
+ *                                                    grow down from the epithelium; on some fields single cells shed
+ *                                                    into the stroma                                              INVASIVE
  * The nuclei come from the atypia generator (tools/generate_nuclei.js), so their cytology is what the encoder learned
  * on; every nucleus of a field is a token for the model, the stromal spindle cells included, and the field keeps the
  * truth about each (atypical or bland, above or below the membrane, which nest) for the page to reveal afterwards.
@@ -38,7 +39,7 @@ const PATTERNS = [
   { key: 'cisvbn', name: 'Carcinoma in situ extending into von Brunn nests', short: 'CIS into nests', label: 0, atypical: true, below: 'round',
     cues: 'atypical cells · below the membrane · round smooth nests', blurb: 'Atypical cells above the membrane and below it, but the cells below fill von Brunn nests that keep their round, smooth outline. Atypical cells below the membrane are still not invasion when the architecture is that of a pre-existing nest.' },
   { key: 'inv', name: 'Invasive carcinoma', short: 'Invasive', label: 1, atypical: true, below: 'jagged',
-    cues: 'atypical cells · below the membrane · angulated jagged nests, sometimes single cells', blurb: 'Atypical cells above the membrane and below it, in angulated, jagged nests; on some fields single cells are shed into the stroma. Cytology, location and architecture together: the only invasive pattern.' },
+    cues: 'atypical cells · below the membrane · angulated nests growing down from the epithelium, sometimes single cells', blurb: 'Atypical cells above the membrane and below it, in angulated nests, tongues and branches that mostly grow down from the epithelium; on some fields single cells are shed into the stroma. Cytology, location and architecture together: the only invasive pattern.' },
 ];
 
 // ---- random numbers: one stream for the fields, the nucleus generator's own for the nuclei
@@ -92,7 +93,7 @@ function nestSigned(nest, p) {
     const rho = Math.hypot(ex, ey), theta = Math.atan2(ey, ex), boundary = 1 + nest.amp * Math.cos(nest.k * theta + nest.phase);
     return (rho - boundary) * Math.min(nest.rx, nest.ry);
   }
-  const d = polyDist(p, nest.outline); return inPolygon(p, nest.outline) ? -d : d; // jagged: the closed polygon
+  let best = Infinity; for (const poly of nest.outlines) { const d = polyDist(p, poly), sd = inPolygon(p, poly) ? -d : d; if (sd < best) best = sd; } return best; // jagged: the union of its closed ribbons
 }
 const membraneOf = f => x => f.ym0 + f.A1 * Math.sin(TAU * x / f.L1 + f.p1) + f.A2 * Math.sin(TAU * x / f.L2 + f.p2);
 
@@ -124,26 +125,59 @@ function makeField(P, id) {
     if (r >= 13) f.nuclei.push(Object.assign(sampleNucleus(atypical ? 1 : 0), { x: nest.cx + U(-1.5, 1.5), y: nest.cy + U(-1.5, 1.5), kind: 'nest', below: true, group: gid }));
     return true;
   };
-  const jaggedNest = gid => { // invasive: a cluster of atypical nuclei, and an angulated outline hugging them with pointed projections
-    const k = RI(5, 8), stretch = U(1, 1.8), B = Math.sqrt(0.95 * k * 150 / Math.PI / stretch), A = B * stretch, rot = U(0, Math.PI), R = A + 13, at = placeNest(R); if (!at) return false;
-    const pts = [];
-    for (let tries = 0; pts.length < k && tries < 300; tries++) {
-      const r = Math.sqrt(rand()), th = U(0, TAU), ex = A * r * Math.cos(th), ey = B * r * Math.sin(th), q = [at[0] + ex * Math.cos(rot) - ey * Math.sin(rot), at[1] + ex * Math.sin(rot) + ey * Math.cos(rot)];
-      if (q[1] > belowMembrane(q[0], 12) && q[1] < H - 10 && q[0] > 10 && q[0] < W - 10 && pts.every(o => dist(q, o) >= 12.5) && clear(q, 12.5)) pts.push(q);
+  // invasive: a chain of atypical nuclei that grows down from the underside of the epithelium (or, less often, lies free
+  // in the stroma), turning as it goes, with a side branch and stretches two cells wide; its outline is a ribbon hugging
+  // the nuclei, kinked where the chain turns and pointed at the tip, so the angulation is the nuclei themselves
+  // pressing on the border
+  const radiusOf = nn => (nn.a + nn.b) / 2;
+  const freeAt = (q, own) => q[0] >= 10 && q[0] <= W - 10 && q[1] <= H - 8 && q[1] >= ym(q[0]) + 6 && clear(q, 11) && own.every(o => dist(q, [o.x, o.y]) >= 11) && f.nests.every(o => nestSigned(o, q) < -1e9 || nestSigned(o, q) >= 7);
+  const growChain = (start, dir, count, own) => { // nuclei touching one another along a turning path; blocked, it tries other turns
+    const nodes = [start];
+    while (nodes.length < count) {
+      const prev = nodes[nodes.length - 1], nn = sampleNucleus(1), r = radiusOf(nn); let placed = false;
+      for (let t = 0; t < 6 && !placed; t++) {
+        const d = Math.max(-1.4, Math.min(1.4, dir + U(-0.6, 0.6))), step = prev.r + r - U(0.5, 2), q = [prev.x + step * Math.sin(d), prev.y + step * Math.cos(d)];
+        if (!freeAt(q, own.concat(nodes.slice(0, -1)))) continue;
+        nodes.push(Object.assign(nn, { x: q[0], y: q[1], r })); dir = d; placed = true;
+      }
+      if (!placed) break;
     }
-    if (pts.length < 4) return false;
-    const nuc = pts.map(q => Object.assign(sampleNucleus(1), { x: q[0], y: q[1], kind: 'nest', below: true, group: gid }));
-    const cen = [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length], hv = hull(pts.length >= 3 ? pts : pts.concat([[cen[0] + 1, cen[1] + 1]]));
-    const out = hv.map(v => { const n = nuc[pts.indexOf(v)], rr = (n ? Math.max(n.a, n.b) : 8) + 3.5, d = dist(v, cen) || 1; return [v[0] + (v[0] - cen[0]) / d * rr, v[1] + (v[1] - cen[1]) / d * rr]; });
-    const outline = []; let spikes = 0;
-    for (let i = 0; i < out.length; i++) {
-      const a = out[i], b = out[(i + 1) % out.length]; outline.push(a);
-      if (rand() < 0.5 || (i === out.length - 1 && spikes < 2)) { const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = dist(a, b) || 1, nx = (b[1] - a[1]) / d, ny = -(b[0] - a[0]) / d, len = U(7, 14), t = U(0.3, 0.7); outline.push([a[0] + (b[0] - a[0]) * t + nx * len, a[1] + (b[1] - a[1]) * t + ny * len]); spikes++; } // a pointed projection into the stroma
+    return nodes;
+  };
+  const tangent = (nodes, i) => { const a = nodes[Math.max(0, i - 1)], b = nodes[Math.min(nodes.length - 1, i + 1)], d = dist([a.x, a.y], [b.x, b.y]) || 1; return [(b.x - a.x) / d, (b.y - a.y) / d]; };
+  const ribbon = (nodes, headLen) => { // an offset point either side of every nucleus, wider beside a twin, a point at the tip
+    const Lp = [], Rp = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const p = nodes[i], [tx, ty] = tangent(nodes, i), nx = -ty, ny = tx, w = p.twin ? p.twin.r * 2 + 1 : 0, offL = p.r + U(0.8, 2.2) + (p.twin && p.twin.side === 1 ? w : 0), offR = p.r + U(0.8, 2.2) + (p.twin && p.twin.side === -1 ? w : 0);
+      Lp.push([p.x + nx * offL, p.y + ny * offL]); Rp.push([p.x - nx * offR, p.y - ny * offR]);
     }
-    outline.push(outline[0]);
-    f.nests.push({ kind: 'jagged', cx: cen[0], cy: cen[1], R, outline, group: gid });
-    f.nuclei.push(...nuc);
-    return true;
+    const [t0x, t0y] = tangent(nodes, 0), [t1x, t1y] = tangent(nodes, nodes.length - 1), first = nodes[0], last = nodes[nodes.length - 1];
+    const head = [first.x - t0x * (first.r + headLen), first.y - t0y * (first.r + headLen)], tip = [last.x + t1x * (last.r + 4), last.y + t1y * (last.r + 4)];
+    return [head, ...Lp, tip, ...Rp.reverse(), head];
+  };
+  const invasiveNest = (gid, connected, count, branch) => {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      let root = null, dir;
+      if (connected) { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(22, W - 22), y = ym(x) + r0 + 1; if (freeAt([x, y], [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-0.8, 0.8); } }
+      else { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(16, W - 16), y = U(0, H); if (y > ym(x) + 22 && y < H - 30 && freeAt([x, y], [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-1.2, 1.2); } }
+      if (!root) continue;
+      const main = growChain(root, dir, count, []);
+      if (main.length < 4) continue;
+      const chains = [main];
+      if (branch && main.length >= 5) { const k = RI(1, main.length - 3), [tx, ty] = tangent(main, k), base = Math.atan2(tx, ty), side = rand() < 0.5 ? -1 : 1, b = growChain(main[k], base + side * U(0.9, 1.4), 1 + RI(2, 4), main); if (b.length >= 3) { chains.push(b); main[k].branch = true; } }
+      const all = [].concat(...chains.map((c, i) => (i ? c.slice(1) : c))), twins = [];
+      for (const c of chains) for (let i = 1; i < c.length - 1; i++) { // a second nucleus beside some links, two cells wide there
+        const p = c[i]; if (p.branch || p.twin || rand() >= 0.45) continue;
+        const [tx, ty] = tangent(c, i), side = rand() < 0.5 ? -1 : 1, nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r - 1) * side, q = [p.x - ty * off, p.y + tx * off];
+        if (!freeAt(q, all.filter(o => o !== p).concat(twins))) continue;
+        twins.push(Object.assign(nn, { x: q[0], y: q[1], r })); p.twin = { side, r };
+      }
+      const outlines = chains.map((c, i) => ribbon(c, i ? 0 : connected ? 6 : 2)), every = all.concat(twins);
+      f.nests.push({ kind: 'jagged', cx: every.reduce((a, o) => a + o.x, 0) / every.length, cy: every.reduce((a, o) => a + o.y, 0) / every.length, R: Math.max(...[].concat(...outlines).map(q => dist(q, [root.x, root.y]))), outlines, connected, group: gid });
+      for (const o of every) { const { r, twin, branch: br, ...rest } = o; void r; void twin; void br; f.nuclei.push(Object.assign(rest, { kind: 'nest', below: true, group: gid })); }
+      return true;
+    }
+    return false;
   };
   const cords = () => { // inverted papilloma: cords of bland cells growing down from the membrane, some joined
     const nCords = RI(2, 3), paths = [], halfWidth = U(11, 13);
@@ -166,8 +200,10 @@ function makeField(P, id) {
   };
   if (P.below === 'round' || (P.below === 'round-sometimes' && rand() < 0.5)) { const n = RI(1, 2); for (let i = 0; i < n; i++) roundNest(P.key === 'cisvbn', i); }
   else if (P.below === 'cords') cords();
-  else if (P.below === 'jagged') {
-    const n = RI(1, 3); for (let i = 0; i < n; i++) jaggedNest(i);
+  else if (P.below === 'jagged') { // one nest, or two; most grow from the underside of the epithelium
+    const n = RI(1, 2); let placed = 0;
+    for (let i = 0; i < n; i++) if (invasiveNest(placed, i === 0 ? rand() < 0.7 : rand() < 0.4, i === 0 ? RI(6, 10) : RI(4, 6), i === 0 && rand() < 0.6)) placed++;
+    if (!placed && !invasiveNest(0, true, RI(6, 10), true)) throw new Error(`field ${id}: no invasive nest could be placed`);
     if (rand() < 0.5) for (let s = 0, tries = 0; s < RI(1, 3) && tries < 60; tries++) { // single cells shed into the stroma, on half the fields
       const p = [U(12, W - 12), U(0, H)]; if (p[1] < ym(p[0]) + 16 || p[1] > H - 8 || !clear(p, 17) || f.nests.some(n => nestSigned(n, p) < 9)) continue;
       f.nests.push({ kind: 'round', cx: p[0], cy: p[1], R: 10, rx: 10, ry: 9, rot: U(0, Math.PI), amp: 0.06, k: 3, phase: U(0, TAU), group: 10 + s, single: true });
@@ -201,7 +237,7 @@ function renderField(f) {
   }
   // nests: cytoplasm inside the outline, a fine darker outline
   for (const nest of f.nests) {
-    const pad = nest.kind === 'cords' ? nest.halfWidth + 3 : nest.R + 6, pts = nest.kind === 'cords' ? [].concat(...nest.paths) : nest.kind === 'jagged' ? nest.outline : [[nest.cx - nest.R, nest.cy - nest.R], [nest.cx + nest.R, nest.cy + nest.R]];
+    const pad = nest.kind === 'cords' ? nest.halfWidth + 3 : nest.kind === 'jagged' ? 4 : nest.R + 6, pts = nest.kind === 'cords' ? [].concat(...nest.paths) : nest.kind === 'jagged' ? [].concat(...nest.outlines) : [[nest.cx - nest.R, nest.cy - nest.R], [nest.cx + nest.R, nest.cy + nest.R]];
     const x0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p[0])) - pad)), x1 = Math.min(W - 1, Math.ceil(Math.max(...pts.map(p => p[0])) + pad)), y0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p[1])) - pad)), y1 = Math.min(H - 1, Math.ceil(Math.max(...pts.map(p => p[1])) + pad));
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
       const d = nestSigned(nest, [x + 0.5, y + 0.5]), c = soft(d), i = y * W + x;
@@ -258,7 +294,7 @@ const records = rendered.map(({ f, px }) => {
   return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, grainSeed: SEED * 7 + f.id, rows: f.rows,
     membrane: Array.from({ length: W / 8 + 1 }, (_, i) => Math.round(ym(Math.min(W, i * 8)) * 10) / 10), surface: Math.round(f.thickness * 10) / 10,
     nuclei: f.nuclei.map(n => [n.x, n.y, KINDS.indexOf(n.kind), n.label, SUBTYPES.indexOf(n.subtype), n.below ? 1 : 0, n.group == null ? -1 : n.group]), // [x, y, kind, atypical, subtype, below, nest]
-    nests: f.nests.map(n => n.kind === 'cords' ? { kind: 'cords', halfWidth: Math.round(n.halfWidth * 10) / 10, paths: n.paths.map(p => p.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : n.kind === 'jagged' ? { kind: 'jagged', outline: n.outline.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10]) } : { kind: n.single ? 'single' : 'round', cx: Math.round(n.cx * 10) / 10, cy: Math.round(n.cy * 10) / 10, rx: Math.round(n.rx * 10) / 10, ry: Math.round(n.ry * 10) / 10, rot: Math.round(n.rot * 100) / 100, amp: n.amp, k: n.k, phase: Math.round(n.phase * 100) / 100 }),
+    nests: f.nests.map(n => n.kind === 'cords' ? { kind: 'cords', halfWidth: Math.round(n.halfWidth * 10) / 10, paths: n.paths.map(p => p.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : n.kind === 'jagged' ? { kind: 'jagged', connected: !!n.connected, outlines: n.outlines.map(poly => poly.map(q => [Math.round(q[0] * 10) / 10, Math.round(q[1] * 10) / 10])) } : { kind: n.single ? 'single' : 'round', cx: Math.round(n.cx * 10) / 10, cy: Math.round(n.cy * 10) / 10, rx: Math.round(n.rx * 10) / 10, ry: Math.round(n.ry * 10) / 10, rot: Math.round(n.rot * 100) / 100, amp: n.amp, k: n.k, phase: Math.round(n.phase * 100) / 100 }),
     png: FL.encodePNGNode(W, H, px).toString('base64') };
 });
 const meta = { seed: SEED, w: W, h: H, size: SIZE, grain: FL.GRAIN, quantum: QUANTUM, kinds: KINDS, subtypes: SUBTYPES, nucleus: ['x', 'y', 'kind', 'atypical', 'subtype', 'below', 'nest'], question: 'Invasion?', short: 'Invasion', positions: true,
@@ -282,7 +318,7 @@ function contactSheet(file, truth) {
     const ym = membraneOf(f);
     for (let x = 0; x < cw; x++) put(x, Math.round(ym(x / scale) * scale), [42, 120, 214]); // the membrane in blue
     for (const nest of f.nests) { // nest outlines in green
-      const pts = nest.kind === 'cords' ? [].concat(...nest.paths) : nest.kind === 'jagged' ? nest.outline : [[nest.cx - nest.R, nest.cy - nest.R], [nest.cx + nest.R, nest.cy + nest.R]], pad = (nest.kind === 'cords' ? nest.halfWidth : nest.R) + 4;
+      const pts = nest.kind === 'cords' ? [].concat(...nest.paths) : nest.kind === 'jagged' ? [].concat(...nest.outlines) : [[nest.cx - nest.R, nest.cy - nest.R], [nest.cx + nest.R, nest.cy + nest.R]], pad = (nest.kind === 'cords' ? nest.halfWidth : nest.kind === 'jagged' ? 0 : nest.R) + 4;
       const bx0 = Math.max(0, Math.floor((Math.min(...pts.map(p => p[0])) - pad) * scale)), bx1 = Math.min(cw - 1, Math.ceil((Math.max(...pts.map(p => p[0])) + pad) * scale)), by0 = Math.max(0, Math.floor((Math.min(...pts.map(p => p[1])) - pad) * scale)), by1 = Math.min(ch - 1, Math.ceil((Math.max(...pts.map(p => p[1])) + pad) * scale));
       for (let y = by0; y <= by1; y++) for (let x = bx0; x <= bx1; x++) { const d = Math.abs(nestSigned(nest, [x / scale, y / scale])); if (d < 0.6) put(x, y, [40, 160, 90]); }
     }
@@ -298,5 +334,5 @@ const count = (arr, f) => arr.filter(f).length, mean = (arr, f) => arr.reduce((a
 console.log(`wrote ${meta.train} training and ${meta.test} test fields of ${W} × ${H} to ${OUT} (${(js.length / 1024).toFixed(0)} KB)`);
 for (const P of PATTERNS) {
   const fs_ = fields.filter(f => f.pattern === P.key);
-  console.log(`  ${P.key.padEnd(7)} ${String(fs_.length).padStart(3)} fields · nuclei ${Math.min(...fs_.map(f => f.nuclei.length))}–${Math.max(...fs_.map(f => f.nuclei.length))} (mean ${mean(fs_, f => f.nuclei.length).toFixed(1)}) · atypical ${mean(fs_, f => count(f.nuclei, n => n.label)).toFixed(1)} · below the membrane ${mean(fs_, f => count(f.nuclei, n => n.below)).toFixed(1)} (atypical below ${mean(fs_, f => count(f.nuclei, n => n.below && n.label)).toFixed(1)}) · nests ${mean(fs_, f => f.nests.filter(n => !n.single).length).toFixed(1)} · single cells on ${count(fs_, f => f.nests.some(n => n.single))}`);
+  console.log(`  ${P.key.padEnd(7)} ${String(fs_.length).padStart(3)} fields · nuclei ${Math.min(...fs_.map(f => f.nuclei.length))}–${Math.max(...fs_.map(f => f.nuclei.length))} (mean ${mean(fs_, f => f.nuclei.length).toFixed(1)}) · atypical ${mean(fs_, f => count(f.nuclei, n => n.label)).toFixed(1)} · below the membrane ${mean(fs_, f => count(f.nuclei, n => n.below)).toFixed(1)} (atypical below ${mean(fs_, f => count(f.nuclei, n => n.below && n.label)).toFixed(1)}) · nests ${mean(fs_, f => f.nests.filter(n => !n.single).length).toFixed(1)} · single cells on ${count(fs_, f => f.nests.some(n => n.single))}${P.key === 'inv' ? ` · nests from the epithelium ${count([].concat(...fs_.map(f => f.nests.filter(n => n.kind === 'jagged'))), n => n.connected)} of ${[].concat(...fs_.map(f => f.nests.filter(n => n.kind === 'jagged'))).length}` : ''}`);
 }

@@ -545,7 +545,7 @@ membrane, which nest. Invasion is the conjunction of three cues, and every patte
 | Inverted papilloma | bland | below | anastomosing cords | not invasive |
 | Carcinoma in situ | atypical | above only (normal von Brunn nests below on half the fields) | | not invasive |
 | CIS extending into von Brunn nests | atypical | below | round smooth nests | not invasive |
-| Invasive carcinoma | atypical | below | angulated jagged nests, single cells shed into the stroma on half the fields | **invasive** |
+| Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
 Fifty fields of each pattern. A field ships as a PNG without its pixel grain, in steps of four grey levels that the
 grain hides, and `js/fields.js` adds the grain back from the field's seed, in Node and in the browser alike, and cuts
@@ -556,9 +556,9 @@ layer on the code, trained on the training fields' nuclei and scored on the test
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, the nuclei of the test fields (spindle cells aside) | 71% | 87% |
-| The same probe trained on the slides' pool of lone nuclei instead | 87% on the pool's held-out nuclei, 50% on the fields' | 99% on the pool, 48% on the fields' |
-| Below vs above the membrane, from the code alone (majority: 72%) | 75% | 86% |
+| Atypical vs bland, the nuclei of the test fields (spindle cells aside) | 72% | 87% |
+| The same probe trained on the slides' pool of lone nuclei instead | 87% on the pool's held-out nuclei, 49% on the fields' | 99% on the pool, 46% on the fields' |
+| Below vs above the membrane, from the code alone (majority: 73%) | 78% | 87% |
 
 Two things follow. A crop from a field holds the edges of neighbours, the membrane or stroma, which the encoder never
 saw: the atypia signal survives, weaker with the small encoder, and a probe trained on lone nuclei does not transfer at
