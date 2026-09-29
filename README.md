@@ -513,6 +513,7 @@ encoder, crops masked to the nucleus:
 | Bag of codes | 100 | 100% | 87% | 50% | 7% | 10% | 25% |
 | With positions, no context | 120 | 100% | 94% | 90% | 20% | 0% | 88% |
 | Context, no positions | 966 | 100% | 88% | 73% | 27% | 7% | 18% |
+| **Full: positions and context** | 1,186 | 100% | 94% | 93% | 20% | 3% | 78% |
 | Full, two heads per layer | 1,876 | 100% | 95% | 93% | 17% | 3% | 76% |
 | Full, big encoder (code of 16) | 2,066 | 100% | 95% | 93% | 17% | 0% | 90% |
 
@@ -524,10 +525,9 @@ nuclei (95 to 99%). Three things to say in front of the table:
   because its invasion head can only weigh how atypical the field is: the other half look, as a bag, like CIS.
 - **Location does most of the work here, and its failure is the textbook one.** Positions lift the invasive fields
   found to 90%, and the fields that fool the model are exactly the CIS-into-von-Brunn-nests fields: atypical cells
-  below the membrane, in the one arrangement that is not invasion. The learned distance costs of the context stack
-  (1.6 to 2.4 per nucleus diameter in the first layer, 3.7 to 4.4 in the second) say that it reads immediate
-  neighbours; with distances but no positions it finds 73% of the invasive fields, so arrangement alone carries part
-  of the answer.
+  below the membrane, in the one arrangement that is not invasion. The full model's learned distance costs (1.1 to 1.8 per
+  nucleus diameter in the first layer, 2.0 to 2.5 in the second) say that it reads immediate neighbours; with
+  distances but no positions it finds 73% of the invasive fields, so arrangement alone carries part of the answer.
 - **The remaining confusion is the hardest mimic for people too.** With nuclear positions and codes alone, a round
   nest and an angulated one differ only in how their nuclei sit, and 17 to 20% of the CIS-into-nests test fields are
   still called invasive by the full models. Give the encoder the field around each nucleus (`--crop surroundings`) and
@@ -538,7 +538,8 @@ nuclei (95 to 99%). Three things to say in front of the table:
 **What the data taught.** With 40 training fields per pattern the full model fitted them to 100% and found 53% of the
 invasive test fields; stronger weight decay (55%) and augmentation on that set (50%) did not help, doubling the fields
 did (80%), and doubling with augmentation did more (90%). The shipped set is 80 per pattern, and the page will train
-with the same mirrored, jittered fields.
+with the same mirrored, jittered fields; on it the full model's test accuracy holds between 93 and 97% from epoch 20
+on, with the test loss flat, where on the small set it climbed from epoch 40.
 
 ## The data
 
