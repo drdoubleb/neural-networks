@@ -586,7 +586,10 @@ preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
 stroma with pale spindle cells beneath, and, in four of the five patterns, cells below the membrane. Round nests and
 invasive nests alike hang from the underside of the membrane three times in four and lie free in the stroma otherwise,
-so that depth does not tell them apart and only their shape does. The nuclei come
+so that depth does not tell them apart and only their shape does; in rings and chains alike the nuclei touch without
+overlapping, spaced by their own radii, so that the segmentation clips them alike (a probe on an earlier draw could tell
+an invasive nest's nucleus from a von Brunn nest's at 70% from the code alone, because the chains overlapped and the
+rings did not; now it cannot). The nuclei come
 from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a field, the spindle
 cells included, is a token for the model, with its truth kept for the page: atypical or bland, above or below the
 membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a real mimic:
@@ -612,10 +615,10 @@ crops with the field around the nucleus and for crops masked to the nucleus (`--
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 69% | 87% |
-| Atypical vs bland, crops masked to the nucleus | 90% | 92% |
-| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 49% · 81% | 46% · 84% |
-| Below vs above the membrane, from the code alone (majority: 72%): with surroundings · masked | 75% · 73% | 88% · 73% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 71% | 87% |
+| Atypical vs bland, crops masked to the nucleus | 92% | 95% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 50% · 83% | 47% · 88% |
+| Below vs above the membrane, from the code alone (majority: 73%): with surroundings · masked | 78% · 73% | 84% · 73% |
 
 A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
 nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
