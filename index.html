@@ -439,6 +439,15 @@
         </div>
       </div>
 
+      <div class="card" id="sl-unrolled-card">
+        <div class="card-head">
+          <h2>The whole model for this slide</h2>
+          <div class="actions-inline"><span class="small muted">the same scorer for every nucleus → softmax → weighted average → single layer</span><button type="button" class="btn" id="sl-walk" title="animate this slide through the model, step by step">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="sl-unrolled" width="800" height="570" aria-label="The whole slide model, unrolled: the twenty nuclei through the scorer, the softmax, the weighted average and the single layer"></canvas><div class="tip" id="sl-unrolled-tip" hidden></div></div></div>
+        <p class="small muted" id="sl-unrolled-note" style="margin-top:8px"></p>
+      </div>
+
       <div class="card" id="sl-scorer-card">
         <div class="card-head">
           <h2>How a nucleus is scored</h2>

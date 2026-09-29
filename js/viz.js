@@ -835,6 +835,172 @@ window.Viz = (function () {
     const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = true;
     pxs.forEach((px, i) => ctx.drawImage(imageToCanvas(px, size, tint), (i % cols) * cell, Math.floor(i / cols) * cell, cell, cell));
   }
+  // ---- the whole slide model, unrolled on one canvas: every nucleus of the slide through the same scorer, the softmax
+  // over the slide, the weighted average and the single layer, drawn like the other network diagrams.
+  // m = { nuclei: [{ px, h, s, a, pos }], D, size, tint, reveal, scorer (Net, or null for a plain average), head (Net),
+  //       fw (the slide model's forward result: s, a, z, head, fws), shown (the nucleus whose numbers the scorer shows),
+  //       hover ({ kind, i, d } or null), walk ({ stage: 'score'|'softmax'|'sum'|'head', k, t } or null),
+  //       positiveName, negativeName }
+  const UN_W = 800, UN_H = 570, UN_STAGES = ['score', 'softmax', 'sum', 'head'];
+  function layoutUnrolled(n, D) {
+    const pitch = 24, top = 50, bottom = top + n * pitch, mid = (top + bottom) / 2;
+    return { n, D, pitch, top, bottom, mid, rowY: i => top + pitch / 2 + i * pitch,
+      xIdx: 24, xThumb: 30, thumb: 20, xCode: 56, codeW: 47, codeH: 18, xRowEnd: 598,
+      box: { x: 180, y: mid - 122, w: 150, h: 244 }, xIn: 205, xUnit: 255, xOut: 310, inPitch: 24,
+      xScore: 372, rScore: 9, xScoreTxt: 386, band: { x: 424, w: 28 }, xBar: 462, barMax: 90, xPct: 590, xLines: 596,
+      sum: { x: 632, r: 14 }, xSummary: 700, rSummary: 11, summaryY: d => mid + (d - (D - 1) / 2) * 24, out: { x: 776, r: 16 } };
+  }
+  function roundedRect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  const pctText = a => (a >= 0.095 ? `${Math.round(a * 100)}%` : `${(a * 100).toFixed(1)}%`);
+  function drawSlideNetwork(canvas, m) {
+    const n = m.nuclei.length, D = m.D, L = layoutUnrolled(n, D), c = colors(), ctx = fitCanvas(canvas, UN_W, UN_H);
+    canvas._unrolled = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
+    const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const att = !!m.scorer, fw = m.fw, w = m.walk, at = w ? UN_STAGES.indexOf(w.stage) : 4; // 4: everything on screen
+    const scoredCount = !w || at > 0 ? n : w.k;                       // how many nuclei the scorer has done
+    const softmaxT = !w || at > 1 ? 1 : (at === 1 ? w.t : 0);        // the shares growing
+    const sumT = !w || at > 2 ? 1 : (at === 2 ? w.t : 0);            // the weighted lines and the summary
+    const headT = !w ? 1 : (at === 3 ? w.t : 0);                     // the single layer and the call
+    const hov = m.hover && m.hover.kind === 'nucleus' ? m.hover.i : null;
+    const cur = w && at === 0 ? Math.max(0, w.k - 1) : null;         // the nucleus being scored right now
+    const shown = cur != null ? cur : (hov != null ? hov : m.shown); // whose numbers the scorer displays
+    const hl = hov != null ? hov : cur;                              // the row drawn on top
+    const hovKind = m.hover ? m.hover.kind : null;
+    const A = att ? m.scorer.hidden[0] : 0, unitPitch = A <= 4 ? 40 : 200 / A;
+    ctx.clearRect(0, 0, UN_W, UN_H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, UN_W, UN_H);
+    ctx.imageSmoothingEnabled = false;
+    let maxA = 1e-9, maxH = 1e-9; for (const q of m.nuclei) { maxA = Math.max(maxA, q.a); for (const v of q.h) maxH = Math.max(maxH, Math.abs(v)); }
+
+    // captions; the stage the walk-through is on lights up
+    const caps = [
+      { text: `THE SLIDE · ${n} NUCLEI`, x: 12, align: 'left', stage: -1 },
+      { text: att ? `SCORER · USED ${n}×` : 'NO SCORER', x: L.box.x + L.box.w / 2, stage: 0 },
+      att ? { text: 'SCORES', x: L.xScore + 20, stage: 0 } : null,
+      { text: 'SHARES', x: 526, stage: 1 },
+      { text: 'WEIGHTED AVERAGE', x: 666, stage: 2 },
+      { text: 'CALL', x: L.out.x, stage: 3 },
+    ].filter(Boolean);
+    ctx.font = capFont; ctx.textBaseline = 'top';
+    for (const cap of caps) { ctx.fillStyle = w && at === cap.stage ? c.accent : c.ink3; ctx.textAlign = cap.align || 'center'; ctx.fillText(cap.text, cap.x, 10); }
+    ctx.font = mono; ctx.fillStyle = c.ink3; ctx.textAlign = 'center';
+    ctx.fillText(att ? `${D} → ${A} tanh → 1 score` : 'every nucleus weighs the same', L.box.x + L.box.w / 2, 26);
+    ctx.fillText(att ? 'of the attention · add up to 100%' : `of the attention · 1/${n} each`, 526, 26);
+    ctx.textAlign = 'right'; ctx.fillText('single layer', 794, 26);
+
+    // row highlights: the hovered nucleus (or the one being scored), and faintly the one whose numbers the scorer shows
+    for (let i = 0; i < n; i++) {
+      const strong = i === hl, faint = !strong && hl == null && !w && i === shown; if (!strong && !faint) continue;
+      ctx.fillStyle = rgbStr(c.rgb.accent, strong ? 0.12 : 0.05); roundedRect(ctx, 6, L.rowY(i) - L.pitch / 2 + 1, L.xRowEnd - 6, L.pitch - 2, 6); ctx.fill();
+    }
+    // lines into the scorer and out of it: thin, the highlighted nucleus on top in ink
+    const line = (x1, y1, x2, y2, strong) => { ctx.strokeStyle = strong ? c.ink : rgbStr(c.rgb.ink3, 0.28); ctx.lineWidth = strong ? 2 : 1; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
+    const order = []; for (let i = 0; i < n; i++) if (i !== hl) order.push(i); if (hl != null) order.push(hl);
+    for (const i of order) {
+      if (i >= scoredCount) continue;
+      const y = L.rowY(i), strong = i === hl;
+      line(L.xCode + L.codeW + 4, y, L.box.x, L.mid, strong);
+      if (att) line(L.xOut + 11, L.mid, L.xScore - L.rScore, y, strong); else line(L.box.x + L.box.w, L.mid, L.band.x, y, strong);
+    }
+    // the rows: index, thumbnail (framed by its share once the softmax has run), truth dot, code
+    for (let i = 0; i < n; i++) {
+      const y = L.rowY(i), q = m.nuclei[i], rel = q.a / maxA;
+      ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(i + 1), L.xIdx, y);
+      ctx.drawImage(imageToCanvas(q.px, m.size, m.tint), L.xThumb, y - L.thumb / 2, L.thumb, L.thumb);
+      if (softmaxT >= 1 && att) { const lw = 1 + 2 * rel; ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(L.xThumb + lw / 2, y - L.thumb / 2 + lw / 2, L.thumb - lw, L.thumb - lw); }
+      else { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(L.xThumb - 0.5, y - L.thumb / 2 - 0.5, L.thumb + 1, L.thumb + 1); }
+      if (i === hl) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(L.xThumb - 2, y - L.thumb / 2 - 2, L.thumb + 4, L.thumb + 4); }
+      if (m.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(L.xThumb + 4, y - L.thumb / 2 + 4, 3.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); }
+      codeStrip(ctx, c, L.xCode, y - L.codeH / 2, L.codeW, L.codeH, q.h, maxH);
+    }
+    // the scorer, once: the box, the little network with the shown nucleus's numbers, or the plain-average note
+    ctx.fillStyle = rgbStr(c.rgb.accent, w && at === 0 ? 0.11 : 0.05); roundedRect(ctx, L.box.x, L.box.y, L.box.w, L.box.h, 10); ctx.fill();
+    ctx.strokeStyle = rgbStr(c.rgb.accent, 0.35); ctx.lineWidth = 1; if (!att) ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(att ? `same weights for all ${n}` : 'plain average', L.box.x + L.box.w / 2, L.box.y + 7);
+    if (att) {
+      const sf = fw.fws ? fw.fws[shown] : m.scorer.forward(m.nuclei[shown].h);
+      const yIn = d => L.mid + (d - (D - 1) / 2) * L.inPitch, yU = j => L.mid + (j - (A - 1) / 2) * unitPitch;
+      const W0 = m.scorer.W[0], Wo = m.scorer.Wo; let m0 = 0, m1 = 0; for (const v of W0) m0 = Math.max(m0, Math.abs(v)); for (const v of Wo) m1 = Math.max(m1, Math.abs(v));
+      const n0 = Math.max(EDGE_FLOOR, m0), n1 = Math.max(EDGE_FLOOR, m1), es = [];
+      for (let j = 0; j < A; j++) {
+        for (let d = 0; d < D; d++) es.push({ w: W0[j * D + d], rel: Math.min(1, Math.abs(W0[j * D + d]) / n0), x1: L.xIn + 7, y1: yIn(d), x2: L.xUnit - 9, y2: yU(j) });
+        es.push({ w: Wo[j], rel: Math.min(1, Math.abs(Wo[j]) / n1), x1: L.xUnit + 9, y1: yU(j), x2: L.xOut - 11, y2: L.mid });
+      }
+      es.sort((a, b) => a.rel - b.rel);
+      for (const e of es) { ctx.strokeStyle = rgbStr(e.w < 0 ? c.rgb.regular : c.rgb.irregular, 0.15 + 0.85 * e.rel); ctx.lineWidth = 0.4 + 3 * e.rel; ctx.beginPath(); ctx.moveTo(e.x1, e.y1); ctx.lineTo(e.x2, e.y2); ctx.stroke(); }
+      for (let d = 0; d < D; d++) circleNode(ctx, L.xIn, yIn(d), 7, diverging(clamp(sf.a[0][d] / 2.5, -1, 1)), null);
+      for (let j = 0; j < A; j++) circleNode(ctx, L.xUnit, yU(j), 9, diverging(clamp(sf.a[1][j], -1, 1)), null);
+      circleNode(ctx, L.xOut, L.mid, 11, diverging(Math.tanh(sf.z / 2)), fmtSigned(sf.z, 1), mono8, hovKind === 'scorer');
+      ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText(`showing nucleus ${shown + 1}`, L.box.x + L.box.w / 2, L.box.y + L.box.h - 7);
+    } else {
+      ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('no scorer', L.box.x + L.box.w / 2, L.mid - 8); ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.fillText(`every nucleus 1/${n}`, L.box.x + L.box.w / 2, L.mid + 10);
+    }
+    // the scores
+    if (att) for (let i = 0; i < n; i++) {
+      const y = L.rowY(i), q = m.nuclei[i], on = i < scoredCount;
+      circleNode(ctx, L.xScore, y, L.rScore, on ? diverging(Math.tanh(q.s / 2)) : c.surface2, null, null, i === hl);
+      if (on) { ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(fmtSigned(q.s, 2), L.xScoreTxt, y); }
+    }
+    // the softmax band across all the rows: a score only means something next to the other nineteen
+    ctx.fillStyle = rgbStr(c.rgb.accent, 0.07 + (w && at === 1 ? 0.14 * Math.sin(Math.PI * w.t) : 0) + (hovKind === 'softmax' ? 0.06 : 0));
+    roundedRect(ctx, L.band.x, L.top - 6, L.band.w, L.bottom - L.top + 12, 8); ctx.fill(); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.35); ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.translate(L.band.x + L.band.w / 2, L.mid); ctx.rotate(-Math.PI / 2); ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(att ? `softmax over the ${n} scores` : 'no scorer: equal shares', 0, 0); ctx.restore();
+    // the shares
+    for (let i = 0; i < n; i++) {
+      const y = L.rowY(i), q = m.nuclei[i], rel = q.a / maxA, len = L.barMax * rel * softmaxT;
+      if (len > 0) { ctx.fillStyle = rgbStr(c.rgb.irregular, 0.25 + 0.75 * rel); ctx.fillRect(L.xBar, y - 7, Math.max(1, len), 14); }
+      if (softmaxT >= 1) { ctx.font = mono9; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(pctText(q.a), L.xPct, y); }
+    }
+    // the weighted lines into the sum, the biggest shares first during the walk-through, the highlighted one on top
+    const ranked = m.nuclei.map((q, i) => ({ i, rel: q.a / maxA })).sort((a, b) => b.rel - a.rel);
+    const visible = new Set(ranked.slice(0, sumT <= 0 ? 0 : (w && at === 2 ? Math.max(1, Math.ceil(w.t * n)) : n)).map(r => r.i));
+    const wScale = Math.min(1, maxA * 2.2); // twenty equal shares (a plain average) stay thin; a share near half the slide is thick
+    const sumLine = r => { const strong = r.i === hl; ctx.strokeStyle = strong ? c.ink : rgbStr(c.rgb.accent, 0.12 + 0.88 * r.rel); ctx.lineWidth = (0.6 + 5 * r.rel * wScale) * (strong ? 1.3 : 1); ctx.beginPath(); ctx.moveTo(L.xLines, L.rowY(r.i)); ctx.lineTo(L.sum.x - L.sum.r, L.mid); ctx.stroke(); };
+    for (const r of ranked.slice().reverse()) if (visible.has(r.i) && r.i !== hl) sumLine(r);
+    if (hl != null && visible.has(hl)) sumLine(ranked.find(r => r.i === hl));
+    circleNode(ctx, L.sum.x, L.mid, L.sum.r, sumT > 0 ? c.accentSoft : c.surface2, 'Σ', `600 13px "IBM Plex Sans", system-ui, sans-serif`, hovKind === 'sum');
+    ctx.font = mono9; { const lbl = 'share × code', lw = ctx.measureText(lbl).width; ctx.fillStyle = c.surface; ctx.fillRect(L.sum.x - lw / 2 - 3, L.mid + L.sum.r + 4, lw + 6, 13); } // legible over the lines
+    ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'top'; ctx.fillText('share × code', L.sum.x, L.mid + L.sum.r + 6);
+    // the summary, and the single layer on it
+    if (sumT > 0) for (let d = 0; d < D; d++) { ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.35); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L.sum.x + L.sum.r, L.mid); ctx.lineTo(L.xSummary - L.rSummary, L.summaryY(d)); ctx.stroke(); }
+    if (headT > 0) {
+      let mh = 0; for (const v of m.head.Wo) mh = Math.max(mh, Math.abs(v)); const nh = Math.max(EDGE_FLOOR, mh);
+      const hes = Array.from({ length: D }, (_, d) => ({ d, w: m.head.Wo[d], rel: Math.min(1, Math.abs(m.head.Wo[d]) / nh) })).sort((a, b) => a.rel - b.rel);
+      for (const e of hes) { ctx.strokeStyle = rgbStr(e.w < 0 ? c.rgb.regular : c.rgb.irregular, (0.15 + 0.85 * e.rel) * headT); ctx.lineWidth = 0.6 + 5.5 * Math.pow(e.rel, 0.9); ctx.beginPath(); ctx.moveTo(L.xSummary + L.rSummary, L.summaryY(e.d)); ctx.lineTo(L.out.x - L.out.r, L.mid); ctx.stroke(); }
+    }
+    for (let d = 0; d < D; d++) circleNode(ctx, L.xSummary, L.summaryY(d), L.rSummary, sumT >= 1 ? diverging(clamp(fw.z[d] / 2.5, -1, 1)) : c.surface2, sumT >= 1 ? fmtSigned(fw.z[d], 1) : null, mono8, hovKind === 'summary' && m.hover.d === d);
+    const p = fw.head.p, call = p >= 0.5;
+    circleNode(ctx, L.out.x, L.mid, L.out.r, headT >= 1 ? diverging((p - 0.5) * 2) : c.surface2, headT >= 1 ? p.toFixed(2) : '?', `600 12px "IBM Plex Mono", ui-monospace, monospace`, hovKind === 'output');
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText(`P(${m.positiveName}) = ${headT >= 1 ? p.toFixed(2) : '?'}`, 794, UN_H - 36);
+    if (headT >= 1) { ctx.font = capFont; ctx.fillStyle = call ? c.irregular : c.regular; ctx.fillText(String(call ? m.positiveName : m.negativeName).toUpperCase(), 794, UN_H - 22); }
+    // the footer: what is going on
+    let foot;
+    if (w) foot = ({ score: `scoring nucleus ${Math.min(n, Math.max(1, w.k))} of ${n} with the same scorer`, softmax: `softmax: the ${n} scores become shares that add up to 100%`, sum: 'adding up the codes, each weighted by its share', head: 'the single layer reads the summary and makes the call' })[w.stage];
+    else if (hov != null) foot = `nucleus ${hov + 1}: its code → its score → its share → its part of the summary`;
+    else foot = att ? `hover a nucleus to follow it through the model · the scorer shows nucleus ${shown + 1}, the most attention` : 'plain average: nothing can make one nucleus count more than another';
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(foot, 12, UN_H - 22);
+  }
+  // what is under a point of the unrolled diagram (canvas-relative CSS pixels): a nucleus row, the scorer, the softmax,
+  // the sum, a summary number or the output, with a tooltip text for everything but the nucleus (the app knows its truth)
+  function hitSlideNetwork(canvas, px, py, m) {
+    const L = canvas._unrolled; if (!L) return null;
+    const x = px * UN_W / canvas.clientWidth, y = py * UN_W / canvas.clientWidth, fw = m.fw, n = m.nuclei.length;
+    if (Math.hypot(x - L.out.x, y - L.mid) <= L.out.r + 4) return { kind: 'output', text: `P(${m.positiveName}) = ${fw.head.p.toFixed(3)} · score z = ${fmtSigned(fw.head.z, 2)} · bias ${fmtSigned(m.head.bo, 3)}` };
+    for (let d = 0; d < m.D; d++) if (Math.hypot(x - L.xSummary, y - L.summaryY(d)) <= L.rSummary + 4) return { kind: 'summary', d, text: `summary ${d + 1} = ${fmtSigned(fw.z[d], 2)} (Σ share × code ${d + 1}) · weight to the output ${fmtSigned(m.head.Wo[d], 3)}` };
+    if (Math.hypot(x - L.sum.x, y - L.mid) <= L.sum.r + 4) return { kind: 'sum', text: `Σ share × code over the ${n} nuclei: the slide’s summary, ${m.D} numbers` };
+    if (x >= L.box.x && x <= L.box.x + L.box.w && y >= L.box.y && y <= L.box.y + L.box.h) return { kind: 'scorer', text: m.scorer ? `the scorer: ${m.D} → ${m.scorer.hidden[0]} tanh → 1 score, the same weights for every nucleus · showing nucleus ${m.shown + 1}` : 'plain average: no scorer, every nucleus weighs the same' };
+    if (x >= L.band.x - 4 && x <= L.band.x + L.band.w + 4 && y >= L.top - 6 && y <= L.bottom + 6) return { kind: 'softmax', text: m.scorer ? `softmax: share = e^score ÷ Σ e^score over the ${n} nuclei, so the shares add up to 100% and a score only counts relative to the others` : `every nucleus gets 1/${n}` };
+    if ((x >= 6 && x <= L.xCode + L.codeW + 4) || (x >= L.xScore - L.rScore - 4 && x <= L.xRowEnd)) { const i = Math.floor((y - L.top) / L.pitch); if (y >= L.top && i >= 0 && i < n) return { kind: 'nucleus', i }; }
+    return null;
+  }
   // Lines over epochs for several named series. opt = { hist: [{ epoch, … }], keys: [{ key, color }], maxEpoch, pct,
   // baseline (a dashed reference level, with baselineLabel) }
   function drawSeries(svg, opt) {
@@ -1770,5 +1936,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
