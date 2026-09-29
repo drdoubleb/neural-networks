@@ -18,7 +18,7 @@
     foundationShown: false, // the fourth stage, the code input and the labelled-cases control appear once a recipe (or key 4, or #foundation) introduces them, and stay for the session
     slidesShown: false, // the fifth stage likewise (recipe ⑬, key 5, #slides)
     // 5 · Slides: attention over slides of nuclei with one label each
-    sl: { built: false, model: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
+    sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -33,7 +33,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones'];
+  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other'];
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -1129,9 +1129,14 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
+      if (k === '14') { // the focus question, with the context layer
+        showStage('slides');
+        S.sl.question = 'focus'; S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        slReset(`Recipe ${RECIPE_LABELS[14]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe ⑬ stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
+      }
       if (k === '13') { // the slides have their own stage and controls
         showStage('slides');
-        S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+        S.sl.question = 'atypia'; S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
         slReset(`Recipe ${RECIPE_LABELS[13]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
         return;
       }
@@ -1587,21 +1592,36 @@
   // the code input uses), an AttentionMIL scores the nuclei, a softmax over the slide turns the scores into weights,
   // the weighted average of the codes is the slide's summary and a single layer makes the call. Only the slide's label
   // trains it; the pool's truth about the nuclei is only ever used to show, afterwards, where the attention landed.
-  const SLC = { lr: 0.02, batch: 1 };
+  const SLC = { lr: 0.02, batch: 1, decay: 0.001, context: { dk: 8, ffn: 8, distanceBias: true, excludeSelf: true, costInit: 1.5 } }; // decay only with the context layer
   function slNote(msg) { $('sl-note').textContent = msg || ''; }
-  function slData() { return window.LECTURE_SLIDES || null; }
-  function slBuild() {
+  function slData() { const D = window.LECTURE_SLIDES; return D && D.questions ? D : null; }
+  function slBuild() { // the pool once; each question's slides on first use; the stage switched to the current question
     const L = S.sl, D = slData(); if (!D) return false;
-    L.meta = D.meta; L.size = D.meta.size; L.cols = 5;
-    L.pool = D.pool.map(p => { const px = NF.decodeBase64(p.px); return { id: p.id, label: p.label, subtype: p.subtype, px, ink: NF.toInk(px) }; });
-    const mk = s => ({ id: s.id, name: s.name, split: s.split, label: s.label, y: s.label ? 1 : 0, nuclei: s.nuclei.map(([id, t]) => { const p = L.pool[id]; return { id, t, label: p.label, subtype: p.subtype, px: t ? DS.dihedral(p.px, L.size, t) : p.px, ink: t ? DS.dihedral(p.ink, L.size, t) : p.ink }; }) });
-    L.train = D.train.map(mk); L.test = D.test.map(mk); L.all = [...L.train, ...L.test]; L.byId = new Map(L.all.map(s => [s.id, s]));
-    const pos = L.train.filter(s => s.label);
-    L.share = pos.reduce((a, s) => a + s.nuclei.filter(n => n.label).length / s.nuclei.length, 0) / pos.length; // what uniform attention gives the atypical nuclei
-    for (const [id, tray] of [['sl-train-tray', L.train], ['sl-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) el.appendChild(slThumb(s)); }
-    document.querySelectorAll('[data-slcls="0"]').forEach(el => { el.textContent = L.meta.classes[0].name; });
-    document.querySelectorAll('[data-slcls="1"]').forEach(el => { el.textContent = L.meta.classes[1].name; });
-    L.thumbs = new Map(L.all.map(s => [s.id, document.querySelector(`.thumb.slide[data-id="${s.id}"]`)]));
+    if (!L.pool) {
+      const meta0 = D.questions.atypia.meta; L.size = meta0.size; L.cols = meta0.cols || 5; L.perSlide = meta0.perSlide;
+      L.pool = D.pool.map(p => { const px = NF.decodeBase64(p.px); return { id: p.id, label: p.label, subtype: p.subtype, px, ink: NF.toInk(px) }; });
+      const cellOf = k => [k % L.cols, Math.floor(k / L.cols)];
+      L.dist = Array.from({ length: L.perSlide }, (_, i) => Float64Array.from({ length: L.perSlide }, (_, j) => { const [ax, ay] = cellOf(i), [bx, by] = cellOf(j); return Math.hypot(ax - bx, ay - by); })); // grid distances in cells, for the context layer
+      L.sets = {};
+    }
+    const q = L.question;
+    if (!L.sets[q]) {
+      const Q = D.questions[q], mk = s => ({ id: s.id, name: s.name, split: s.split, label: s.label, y: s.label ? 1 : 0, dist: L.dist, nuclei: s.nuclei.map(([id, t]) => { const p = L.pool[id]; return { id, t, label: p.label, subtype: p.subtype, px: t ? DS.dihedral(p.px, L.size, t) : p.px, ink: t ? DS.dihedral(p.ink, L.size, t) : p.ink }; }) });
+      const train = Q.train.map(mk), test = Q.test.map(mk), all = [...train, ...test], pos = train.filter(s => s.label);
+      L.sets[q] = { meta: Q.meta, train, test, all, byId: new Map(all.map(s => [s.id, s])), share: pos.reduce((a, s) => a + s.nuclei.filter(n => n.label).length / s.nuclei.length, 0) / pos.length }; // share: what uniform attention gives the atypical nuclei
+    }
+    if (L.loaded !== q) {
+      const set = L.sets[q]; L.meta = set.meta; L.train = set.train; L.test = set.test; L.all = set.all; L.byId = set.byId; L.share = set.share; L.loaded = q;
+      L.selected = null; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.encKey = null;
+      for (const [id, tray] of [['sl-train-tray', L.train], ['sl-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) el.appendChild(slThumb(s)); }
+      document.querySelectorAll('[data-slcls="0"]').forEach(el => { el.textContent = L.meta.classes[0].name; });
+      document.querySelectorAll('[data-slcls="1"]').forEach(el => { el.textContent = L.meta.classes[1].name; });
+      $('sl-train-label').textContent = `Training slides (${L.train.length})`; $('sl-test-label').textContent = `Test slides (${L.test.length}) · never trained on, scored as it goes`;
+      L.thumbs = new Map(L.all.map(s => [s.id, document.querySelector(`.thumb.slide[data-id="${s.id}"]`)]));
+      $('sl-blurb').innerHTML = `<strong>${esc(L.meta.question)}</strong> ${esc(L.meta.blurb)} ${q === 'focus'
+        ? 'The model of the first question, each nucleus scored on its own, stays at chance here by construction. Switch <em>context</em> on: one layer of self-attention lets every nucleus read the others before the scorer sees it, and the model learns how far to look. Train, then hover a nucleus to see whom it listens to.'
+        : 'Each nucleus becomes its <strong>code</strong> from the frozen foundation encoder; a small <strong>attention</strong> network gives every nucleus a score, a softmax over the slide turns the scores into weights that add up to one, the nuclei’s codes are averaged with those weights into one summary of the slide, and a single layer makes the call. The only teacher is the slide’s label, yet the attention learns which nuclei matter: tick <em>reveal</em> to see where it lands. Switch to a plain average and compare.'}`;
+    }
     L.built = true;
     return true;
   }
@@ -1618,18 +1638,18 @@
   function slEncode() {
     const L = S.sl, enc = codeEncoder();
     if (L.encKey === enc.key) return;
-    for (const s of L.all) for (const n of s.nuclei) n.code = enc.encode(n.ink);
+    for (const s of L.all) for (const n of s.nuclei) if (n.codeKey !== enc.key) { n.code = enc.encode(n.ink); n.codeKey = enc.key; }
     L.std = NN.fitStandardizer([].concat(...L.train.map(s => s.nuclei.map(n => n.code))), { perDimScale: true });
     for (const s of L.all) { for (const n of s.nuclei) n.h = L.std.apply(n.code); s.H = s.nuclei.map(n => n.h); s.pos = s.nuclei.map(n => !!n.label); }
     L.encKey = enc.key; L.D = enc.cl.code; L.encDescribe = enc.describe;
   }
   function slReset(reason) {
     const L = S.sl; slStop();
-    if (!L.built && !slBuild()) return;
+    if (!slBuild()) return;
     slEncode();
-    L.model = new NN.AttentionMIL({ inputSize: L.D, attentionUnits: L.units, attention: L.attention, seed: L.seed });
+    L.model = new NN.AttentionMIL({ inputSize: L.D, attentionUnits: L.units, attention: L.attention, context: L.context ? SLC.context : null, seed: L.seed });
     L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
-    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null;
+    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null;
     slRecordEpoch();
     slSyncControls(); slRender(true);
     if (reason) slNote(reason);
@@ -1642,7 +1662,7 @@
     const L = S.sl, n = L.train.length;
     if (L.ptr === 0) { const o = L.order; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(L.rng() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } }
     const idx = L.order.slice(L.ptr, L.ptr + SLC.batch);
-    L.model.trainBatch(idx.map(i => L.train[i]), L.lr, 0);
+    L.model.trainBatch(idx.map(i => L.train[i]), L.lr, L.context ? SLC.decay : 0);
     L.lastSlide = L.train[idx[idx.length - 1]].id;
     L.ptr += idx.length;
     let ended = false;
@@ -1676,13 +1696,16 @@
   }
   function slStepSlide() { const L = S.sl; slStop(); const ended = slStep(); slRender(true); slNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on slide ${L.byId.get(L.lastSlide).name} (${L.meta.classes[L.byId.get(L.lastSlide).label].name}): step ${L.ptr} of ${L.train.length}.`); }
   function slStepEpoch() { const L = S.sl; slStop(); do { slStep(); } while (L.ptr !== 0); slRender(true); slNote(`Epoch ${L.epoch} complete.`); }
-  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderSummary(); slRenderTrays(); }
+  function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderSummary(); slRenderTrays(); }
   function slFocus() { const L = S.sl; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
   function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
   function slSyncControls() {
     const L = S.sl;
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.att === '1') === L.attention));
+    document.querySelectorAll('#sl-question-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.q === L.question));
+    document.querySelectorAll('#sl-context-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.context));
+    $('sl-context-card').hidden = !L.context;
     $('sl-units').value = L.units; $('sl-units').disabled = !L.attention;
     $('sl-epochs').value = L.epochs; $('sl-epochs-val').textContent = L.epochs;
     $('sl-speed').value = sliderFromSpeed(L.speed); $('sl-speed-val').textContent = `${L.speed} epochs/s`;
@@ -1697,16 +1720,16 @@
     $('sl-status').innerHTML =
       `<span>architecture <b>${L.meta.perSlide} nuclei → code (${L.D} numbers each, from ${esc(L.encDescribe)}) → ${esc(m.describe())} → P</b></span>` +
       `<span>parameters <b>${m.parameterCount()}</b></span>` +
-      `<span>slides <b>${L.train.length}</b> training (${L.train.filter(s => s.label).length} with atypical cells) · <b>${L.test.length}</b> test</span>` +
+      `<span>slides <b>${L.train.length}</b> training (${L.train.filter(s => s.label).length} positive) · <b>${L.test.length}</b> test</span>` +
       `<span>epoch <b>${L.epoch}</b> / ${L.epochs}</span><span>slide <b>${L.ptr === 0 ? '–' : L.ptr}</b> / ${L.train.length}</span>` +
       `<span>loss <b>${last.loss.toFixed(3)}</b></span><span>slide accuracy <b>${pct(last.acc)}</b> training · <b>${pct(last.testAcc)}</b> test (peeking)</span>` +
       (L.attention ? `<span>attention on the atypical nuclei <b>${pct(last.mass)}</b> training · <b>${pct(last.testMass)}</b> test (uniform: ${pct(L.share)})</span>` : `<span>every nucleus weighs <b>${pct(1 / L.meta.perSlide)}</b> (plain average)</span>`);
     void cls;
   }
-  function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H) }; }
+  function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H, s.dist) }; }
   function slRenderSlide() {
     const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes;
-    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus });
+    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus, links: L.context && L.hoverNucleus != null && fw.ctx ? { from: L.hoverNucleus, weights: fw.ctx.A[L.hoverNucleus] } : null });
     const call = fw.p >= 0.5 ? 1 : 0, k = s.nuclei.filter(n => n.label).length;
     $('sl-slide-title').textContent = `Slide ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · label: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
     $('sl-call').innerHTML = `The model says <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b> → <span class="${call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[call].name)} ${call === s.label ? '✓' : '✗'}</span>${L.selected == null && L.lastSlide != null ? ' · the last slide trained on' : ''}. ${L.attention ? 'Frames and percentages are the attention weights.' : 'Plain average: every nucleus weighs the same.'}`;
@@ -1719,8 +1742,8 @@
   function slScorerModel() { // the attention network for one nucleus: the hovered one, or the one with the most attention
     const L = S.sl, { s, fw } = slFocusForward();
     let j = L.hoverNucleus; if (j == null) { j = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[j]) j = i; }
-    const n = s.nuclei[j], sf = fw.fws ? fw.fws[j] : L.model.scorer.forward(n.h);
-    return { j, n, m: { net: L.model.scorer, mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S CODE · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => `code ${i + 1}`), x: n.h, fw: sf, stage: 2, hover: L.hoverScorer,
+    const n = s.nuclei[j], tok = fw.T[j], sf = fw.fws ? fw.fws[j] : L.model.scorer.forward(tok);
+    return { j, n, m: { net: L.model.scorer, mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S CODE${L.context ? ', AFTER CONTEXT' : ''} · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => `code ${i + 1}`), x: tok, fw: sf, stage: 2, hover: L.hoverScorer,
       activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the slide\n→ ${pct(fw.a[j])} of the attention`, specimen: null, size: L.size, tint: S.tint } };
   }
   function slRenderScorer() {
@@ -1731,7 +1754,7 @@
   function subtypeWord(key) { return { enlarged: 'enlarged', hyperchromatic: 'hyperchromatic', irregular: 'irregular contour', coarse: 'coarse chromatin', combined: 'two or more traits', bland: 'bland' }[key] || key; }
   function slRenderSummary() {
     const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, D = L.D;
-    const plain = new Float64Array(D); for (const h of s.H) for (let d = 0; d < D; d++) plain[d] += h[d] / s.H.length;
+    const plain = new Float64Array(D); for (const h of fw.T) for (let d = 0; d < D; d++) plain[d] += h[d] / fw.T.length;
     const bars = code => { let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v)); return `<span class="code" title="${Array.from(code).map(v => v.toFixed(2)).join(', ')}">${Array.from(code).map(v => `<i class="${v < 0 ? 'neg' : 'pos'}" style="height:${Math.max(2, Math.round(Math.abs(v) / mx * 100))}%"></i>`).join('')}</span>`; };
     $('sl-summary').innerHTML = `<div class="v"><div class="lbl">${L.attention ? 'weighted average' : 'plain average'}</div>${bars(fw.z)}<div class="n">the summary</div></div>` + (L.attention ? `<div class="v"><div class="lbl">plain average</div>${bars(plain)}<div class="n">for comparison</div></div>` : '') +
       `<div class="txt"><div>Σ weight × code over the 20 nuclei gives ${D} numbers, the slide’s summary${L.attention ? '; with attention it leans towards the nuclei that weigh most, where a plain average lets 17 bland nuclei drown 3 atypical ones' : ''}.</div><div>Then a single layer on the summary: <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b>.</div></div>`;
@@ -1743,7 +1766,7 @@
   function slRenderUnrolled() {
     const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, n = s.nuclei.length;
     let top = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[top]) top = i;
-    const m = { nuclei: s.nuclei.map((q, i) => ({ px: q.px, h: q.h, s: fw.s[i], a: fw.a[i], pos: !!q.label })), D: L.D, size: L.size, tint: S.tint, reveal: L.reveal,
+    const m = { nuclei: s.nuclei.map((q, i) => ({ px: q.px, h: fw.T[i], s: fw.s[i], a: fw.a[i], pos: !!q.label })), D: L.D, tokenNote: L.context ? 'code, after context' : null, size: L.size, tint: S.tint, reveal: L.reveal,
       scorer: L.attention ? L.model.scorer : null, head: L.model.head, fw, shown: L.hoverNucleus != null ? L.hoverNucleus : top, hover: L.hoverUnrolled, walk: L.walk, positiveName: cls[1].name, negativeName: cls[0].name };
     const cv = $('sl-unrolled'); cv._model = m; Viz.drawSlideNetwork(cv, m);
     $('sl-unrolled-note').textContent = L.attention
@@ -1776,6 +1799,20 @@
     slRenderSlide(); slRenderUnrolled();
     requestAnimationFrame(slWalkTick);
   }
+  // who looks at whom: the context layer's attention (rows asking, columns answering), the hovered nucleus's token
+  // before and after context, and whom it listens to most
+  function slRenderContext() {
+    const L = S.sl; if (!L.context || !L.model || !L.model.context) return;
+    const { s, fw } = slFocusForward(), A = fw.ctx.A, n = s.nuclei.length, cost = fw.ctx.cost;
+    let j = L.hoverNucleus; if (j == null) { j = 0; for (let i = 1; i < n; i++) if (fw.a[i] > fw.a[j]) j = i; }
+    Viz.drawAttentionMap($('sl-attmap'), { A, thumbs: s.nuclei.map(q => q.px), size: L.size, tint: S.tint, hover: j, pair: L.hoverAtt, pos: s.pos, reveal: L.reveal });
+    $('sl-attmap-note').textContent = `Each row is one nucleus asking, each column one answering: how much of its listening goes to each of the other ${n - 1} (a row adds up to 100%; a nucleus does not listen to itself, its own code stays through the residual). The learned distance cost is ${cost.toFixed(2)} per cell: every extra cell of distance divides a nucleus’s weight by ${Math.exp(cost).toFixed(1)}, so ${cost > 2 ? 'the layer listens almost only to immediate neighbours' : cost > 0.8 ? 'near nuclei count more, but far ones still count' : 'distance hardly matters to it'}.`;
+    const row = Array.from(A[j], (w, k) => ({ k, w })).filter(e => e.k !== j).sort((a, b) => b.w - a.w), top = row.slice(0, 3);
+    const bars = code => { let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v)); return `<span class="code" title="${Array.from(code).map(v => v.toFixed(2)).join(', ')}">${Array.from(code).map(v => `<i class="${v < 0 ? 'neg' : 'pos'}" style="height:${Math.max(2, Math.round(Math.abs(v) / mx * 100))}%"></i>`).join('')}</span>`; };
+    const where = k => (s.dist[j][k] <= 1 ? 'a neighbour' : s.dist[j][k] < 1.5 ? 'diagonal' : `${s.dist[j][k].toFixed(1)} cells away`);
+    $('sl-context-focus').innerHTML = `<div class="v"><div class="lbl">nucleus ${j + 1} · code</div>${bars(s.H[j])}<div class="n">before context</div></div><div class="v"><div class="lbl">after context</div>${bars(fw.T[j])}<div class="n">what the scorer sees</div></div>` +
+      `<div class="txt"><div>Nucleus ${j + 1}${L.hoverNucleus == null ? ', the one with the most attention,' : ''} listens most to ${top.map(e => `nucleus ${e.k + 1} (${pct(e.w)}, ${where(e.k)})`).join(', ')}.</div><div>What it hears is added to its own code, so the scorer can weigh “atypical, with atypical neighbours” rather than “atypical” alone.</div></div>`;
+  }
   function slRenderCurves() {
     const L = S.sl, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
     Viz.drawCurves($('sl-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
@@ -1793,7 +1830,7 @@
   }
   function slRender(full) {
     const L = S.sl; if (!L.model) return;
-    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderSummary();
+    slRenderStatus(); slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderContext(); slRenderSummary();
     if (full) { slRenderCurves(); slRenderTrays(); }
     slSyncButtons();
   }
@@ -1815,7 +1852,7 @@
     $('sl-epochs').addEventListener('input', () => { S.sl.epochs = +$('sl-epochs').value; $('sl-epochs-val').textContent = S.sl.epochs; if (S.sl.model) { slRenderStatus(); slRenderCurves(); } });
     $('sl-speed').addEventListener('input', () => { S.sl.speed = speedFromSlider(+$('sl-speed').value); $('sl-speed-val').textContent = `${S.sl.speed} epochs/s`; });
     $('sl-seed').addEventListener('change', () => { S.sl.seed = Math.max(1, Math.round(+$('sl-seed').value) || 1); slReset(`Seed ${S.sl.seed} — fresh random weights.`); });
-    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } });
+    $('sl-reveal').addEventListener('change', () => { S.sl.reveal = $('sl-reveal').checked; if (S.sl.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } });
     $('sl-step-slide').addEventListener('click', slStepSlide);
     $('sl-step-epoch').addEventListener('click', slStepEpoch);
     $('sl-train').addEventListener('click', () => (S.sl.running ? slStop('Paused.') : slStart()));
@@ -1826,11 +1863,29 @@
     cv.addEventListener('mousemove', ev => {
       const L = S.sl; if (!L.model) return;
       const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
-      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); }
+      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
       if (i != null) { tip.hidden = false; tip.textContent = slNucleusTip(i); tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
       else tip.hidden = true;
     });
-    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } } });
+    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } } });
+    document.querySelectorAll('#sl-question-seg button').forEach(b => b.addEventListener('click', () => { const q = b.dataset.q; if (q === S.sl.question) return; S.sl.question = q; slReset(q === 'focus' ? 'The focus question: four atypical nuclei on every slide, a 2 × 2 block or scattered — fresh random weights. Without context this model cannot tell the classes apart; switch context on and train.' : 'The atypical-cells question — fresh random weights.'); }));
+    document.querySelectorAll('#sl-context-seg button').forEach(b => b.addEventListener('click', () => { const on = b.dataset.ctx === '1'; if (on === S.sl.context) return; S.sl.context = on; slReset(on ? 'Context on: one layer of self-attention lets every nucleus read the others before the pooling — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
+    const ca = $('sl-attmap'), ta = $('sl-attmap-tip');
+    ca.addEventListener('mousemove', ev => {
+      const L = S.sl; if (!L.model || !L.context || L.walk) return;
+      const r = ca.getBoundingClientRect(), hit = Viz.hitAttentionMap(ca, ev.clientX - r.left, ev.clientY - r.top);
+      const prevI = L.hoverNucleus, prevKey = L.hoverAtt ? `${L.hoverAtt.i}:${L.hoverAtt.j}` : '';
+      L.hoverAtt = hit; if (hit) L.hoverNucleus = hit.i;
+      if (hit && hit.i !== prevI) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
+      else if ((hit ? `${hit.i}:${hit.j}` : '') !== prevKey) slRenderContext();
+      if (hit) {
+        const { s, fw } = slFocusForward(), c = fw.ctx;
+        ta.hidden = false;
+        ta.textContent = hit.i === hit.j ? `nucleus ${hit.i + 1} does not listen to itself` : `nucleus ${hit.i + 1} listens to nucleus ${hit.j + 1}: ${pct(c.A[hit.i][hit.j])} · match ${Viz.fmtSigned(c.S[hit.i][hit.j] + c.cost * s.dist[hit.i][hit.j], 2)} − distance ${s.dist[hit.i][hit.j].toFixed(1)} × ${c.cost.toFixed(2)}`;
+        const half = ta.offsetWidth / 2 + 4; ta.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; ta.style.top = (ev.clientY - r.top) + 'px';
+      } else ta.hidden = true;
+    });
+    ca.addEventListener('mouseleave', () => { const L = S.sl; ta.hidden = true; if (L.hoverAtt || L.hoverNucleus != null) { L.hoverAtt = null; L.hoverNucleus = null; if (L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } } });
     // the unrolled diagram: hovering a nucleus row follows it everywhere; the other parts explain themselves
     const cu = $('sl-unrolled'), tu = $('sl-unrolled-tip'), hitKey = h => (h ? `${h.kind}:${h.i == null ? '' : h.i}:${h.d == null ? '' : h.d}` : '');
     cu.addEventListener('mousemove', ev => {
@@ -1838,11 +1893,11 @@
       const r = cu.getBoundingClientRect(), hit = Viz.hitSlideNetwork(cu, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverUnrolled;
       const ni = hit && hit.kind === 'nucleus' ? hit.i : null;
       L.hoverUnrolled = hit;
-      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); }
+      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); }
       else if (hitKey(prev) !== hitKey(hit)) slRenderUnrolled();
       if (hit) { tu.hidden = false; tu.textContent = hit.kind === 'nucleus' ? slNucleusTip(hit.i) : hit.text; const half = tu.offsetWidth / 2 + 4; tu.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tu.style.top = (ev.clientY - r.top) + 'px'; } // kept inside the (scrollable) wrapper else tu.hidden = true;
     });
-    cu.addEventListener('mouseleave', () => { const L = S.sl; tu.hidden = true; const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); } });
+    cu.addEventListener('mouseleave', () => { const L = S.sl; tu.hidden = true; const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); } });
     $('sl-walk').addEventListener('click', () => (S.sl.walk ? slWalkStop() : slWalkStart()));
     for (const [cvId, tipId, key, render] of [['sl-scorer', 'sl-scorer-tip', 'hoverScorer', slRenderScorer], ['sl-head', 'sl-head-tip', 'hoverHead', slRenderSummary]]) {
       const c2 = $(cvId), t2 = $(tipId);

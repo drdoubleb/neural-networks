@@ -792,7 +792,41 @@ window.Viz = (function () {
       ctx.fillText(`${q.a >= 0.095 ? Math.round(q.a * 100) : (q.a * 100).toFixed(1)}%`, x + cell / 2, y + cell + 2);
       if (opt.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(x + 9, y + 9, 5.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1.5; ctx.stroke(); }
     });
+    if (opt.links) { // who the hovered nucleus listens to: a line to each, thicker with the weight
+      const { from, weights } = opt.links, centre = k => [pad + (k % cols) * (cell + gap) + cell / 2, pad + Math.floor(k / cols) * rowH + cell / 2];
+      let mw = 1e-9; weights.forEach((w, j) => { if (j !== from) mw = Math.max(mw, w); });
+      const [x0, y0] = centre(from);
+      weights.forEach((w, j) => { if (j === from || w < 0.04 * mw) return; const rel = w / mw, [x1, y1] = centre(j); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.3 + 0.7 * rel); ctx.lineWidth = 1 + 6 * rel; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
+      ctx.fillStyle = c.accent; ctx.beginPath(); ctx.arc(x0, y0, 6, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 2; ctx.stroke();
+    }
     canvas._slideLayout = { cols, cell, gap, pad, rowH, W, n };
+  }
+  // ---- who looks at whom: the context layer's attention between the nuclei of a slide, rows asking, columns answering
+  // opt = { A (n × n, each row adds up to 1), thumbs, size, tint, hover (the asking nucleus outlined), pair ({ i, j }
+  // outlined), pos, reveal }
+  function drawAttentionMap(canvas, opt) {
+    const N = opt.A.length, cell = 16, m0 = 24, W = m0 + N * cell + 2, H = W;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
+    let mx = 1e-9; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) if (i !== j) mx = Math.max(mx, opt.A[i][j]);
+    for (let i = 0; i < N; i++) {
+      const img = imageToCanvas(opt.thumbs[i], opt.size, opt.tint);
+      ctx.drawImage(img, m0 + i * cell + 1, 2, cell - 2, cell - 2); ctx.drawImage(img, 2, m0 + i * cell + 1, cell - 2, cell - 2);
+      if (opt.reveal) { ctx.fillStyle = opt.pos[i] ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(m0 + i * cell + 4, 5, 2.5, 0, 2 * Math.PI); ctx.fill(); ctx.beginPath(); ctx.arc(5, m0 + i * cell + 4, 2.5, 0, 2 * Math.PI); ctx.fill(); }
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x = m0 + j * cell, y = m0 + i * cell;
+      if (i === j) { ctx.fillStyle = c.surface2; ctx.fillRect(x, y, cell - 1, cell - 1); continue; }
+      ctx.fillStyle = sequential(opt.A[i][j] / mx); ctx.fillRect(x, y, cell - 1, cell - 1);
+    }
+    if (opt.hover != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(m0 - 0.5, m0 + opt.hover * cell - 0.5, N * cell, cell); }
+    if (opt.pair && opt.pair.i !== opt.pair.j) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(m0 + opt.pair.j * cell - 1, m0 + opt.pair.i * cell - 1, cell + 1, cell + 1); }
+    canvas._attLayout = { N, cell, m0, W };
+  }
+  function hitAttentionMap(canvas, px, py) {
+    const L = canvas._attLayout; if (!L) return null;
+    const x = px * L.W / canvas.clientWidth, y = py * L.W / canvas.clientWidth, j = Math.floor((x - L.m0) / L.cell), i = Math.floor((y - L.m0) / L.cell);
+    return i < 0 || j < 0 || i >= L.N || j >= L.N ? null : { i, j };
   }
   // which nucleus of a drawn slide is under a point (canvas-relative CSS pixels), or null
   function hitSlide(canvas, px, py) {
@@ -890,6 +924,7 @@ window.Viz = (function () {
     ctx.fillText(att ? `${D} → ${A} tanh → 1 score` : 'every nucleus weighs the same', L.box.x + L.box.w / 2, 26);
     ctx.fillText(att ? 'of the attention · add up to 100%' : `of the attention · 1/${n} each`, 526, 26);
     ctx.textAlign = 'right'; ctx.fillText('single layer', 794, 26);
+    if (m.tokenNote) { ctx.textAlign = 'left'; ctx.fillText(m.tokenNote, 12, 26); }
 
     // row highlights: the hovered nucleus (or the one being scored), and faintly the one whose numbers the scorer shows
     for (let i = 0; i < n; i++) {
@@ -1936,5 +1971,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
