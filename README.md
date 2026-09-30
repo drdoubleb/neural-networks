@@ -574,11 +574,19 @@ others. *Specimens* shows a field at 3× with its pattern, its two labels and th
 sees. *Train* trains the field model live: the two attention heads' weights are drawn as rings on the same field side
 by side (what the CIS head weighs, what the invasion head weighs), each with its call and, under *Reveal*, dots on
 the nuclei it is judged against; hover a nucleus for its two weights and, with context on, the lines to the nuclei it
-listens to in either layer, or every link at once; the mimic table below is scored on the test fields after every
-epoch, and the curves show the loss, the invasion accuracy and the invasion head's attention on the atypical nuclei
-below the membrane. The controls are the ablations of the table above: *its code* or *code + position* for every
-nucleus, context *none* or *nuclei look at each other*, and the crop *masked to the nucleus* or *with its
-surroundings*, the leak. *Test* classifies the held-out fields one at a time, both calls with both heads' attention,
+listens to in either layer, or every link at once. The model's diagrams follow, as for the slides: *Who looks at
+whom*, the attention map of either context layer (what the layer uses, or the match alone, or the distance alone)
+with the hovered nucleus's token before and after the layer; *How a nucleus decides where to look*, its query against
+every other nucleus's key, the distance cost, the softmax and the message it hears, with a walk-through; *The whole
+model for this field*, every nucleus through the chosen head's scorer, the softmax, the weighted average and the
+single layer, with a walk-through, drawn with thin rows so that a field's fifty nuclei fit; *How a nucleus is scored*
+and *The field's summary, and the call*, the chosen head's scorer and single layer with the shown nucleus's numbers.
+A cursor over a viewer or a diagram keeps the field it found there while training runs, so that what it points at
+stays put. The mimic table is scored on the test fields after every epoch, and the curves show the loss, the invasion
+accuracy and the invasion head's attention on the atypical nuclei below the membrane. The controls are the ablations
+of the table above: *its code* or *code + position* for every nucleus, context *none* or *nuclei look at each other*,
+and the crop *masked to the nucleus* or *with its surroundings*, the leak. *Test* classifies the held-out fields one
+at a time, both calls with both heads' attention,
 and keeps the mimic table of the fields classified so far. The fields (5.7 MB) are not part of the page's load: they
 are fetched the first time the question is opened, from the page's own folder or, in a copy of the page that has no
 folder, from a mirror of the repository or the published page; decoding the 450 fields and encoding their 17,593 nuclei takes about fifteen seconds,

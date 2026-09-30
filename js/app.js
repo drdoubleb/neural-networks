@@ -19,7 +19,7 @@
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
-    fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '' },
+    fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -2132,7 +2132,7 @@
       const [raw, seg] = decoded[i], px = NFL.withGrain(raw, f.grainSeed, meta.grain);
       const nuclei = f.nuclei.map(n => ({ x: n[K.x], y: n[K.y], kind: meta.kinds[n[K.kind]], atypical: !!n[K.atypical], subtype: meta.subtypes[n[K.subtype]], below: !!n[K.below], nest: n[K.nest] }));
       const dist = nuclei.map(a => Float64Array.from(nuclei, b => Math.hypot(a.x - b.x, a.y - b.y) / FD.unit)), xy = nuclei.map(n => [n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]);
-      return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, cis: fdCisOf(f), px, seg, grainSeed: f.grainSeed, membrane: f.membrane, nests: f.nests, nuclei, dist, xy, y: [fdCisOf(f), f.label], pos: [nuclei.map(n => n.atypical), nuclei.map(n => n.atypical && n.below)], codes: {} };
+      return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, cis: fdCisOf(f), px, seg, grainSeed: f.grainSeed, membrane: f.membrane, nests: f.nests, nuclei, dist, xy, y: [fdCisOf(f), f.label], pos: [nuclei.map(n => n.atypical), nuclei.map(n => n.atypical && n.below)], codes: {}, crops: {} };
     };
     L.all = all.map(mk); L.train = L.all.filter(s => s.split === 'train'); L.test = L.all.filter(s => s.split === 'test'); L.byId = new Map(L.all.map(s => [s.id, s]));
     L.nNuclei = L.all.reduce((a, s) => a + s.nuclei.length, 0);
@@ -2164,15 +2164,16 @@
       for (let i = 0; i < L.all.length; i++) {
         const s = L.all[i];
         if (!s.codes[key]) {
-          const codes = s.nuclei.map((n, j) => { const c = L.crop === 'nucleus' ? NFL.cropMasked(s.px, s.seg, L.w, L.h, n.x, n.y, L.size, j, s.grainSeed) : NFL.crop(s.px, L.w, L.h, n.x, n.y, L.size); const ink = new Float32Array(c.length); for (let q = 0; q < c.length; q++) ink[q] = 1 - c[q] / 255; return enc.encode(ink); });
-          s.codes[key] = codes;
+          const crops = s.nuclei.map((n, j) => (L.crop === 'nucleus' ? NFL.cropMasked(s.px, s.seg, L.w, L.h, n.x, n.y, L.size, j, s.grainSeed) : NFL.crop(s.px, L.w, L.h, n.x, n.y, L.size)));
+          s.codes[key] = crops.map(c => { const ink = new Float32Array(c.length); for (let q = 0; q < c.length; q++) ink[q] = 1 - c[q] / 255; return enc.encode(ink); });
+          s.crops[L.crop] = crops; // the crops as the model saw them, for the diagrams
         }
         done += s.nuclei.length;
         if (i % 12 === 11) { progress(`Encoding the nuclei${L.crop === 'nucleus' ? ', each masked to itself' : ', each with its surroundings'}: ${done.toLocaleString()} of ${L.nNuclei.toLocaleString()}…`); await fdYield(); }
         if (L.encoding && L.encoding.key !== key) throw new Error('superseded'); // the crop or the encoder changed meanwhile
       }
       L.std = NN.fitStandardizer([].concat(...L.train.map(s => s.codes[key])), { perDimScale: true });
-      for (const s of L.all) s.Hcode = s.codes[key].map(c => L.std.apply(c));
+      for (const s of L.all) { s.Hcode = s.codes[key].map(c => L.std.apply(c)); s.nuclei.forEach((n, j) => { n.px = s.crops[L.crop][j]; }); }
       L.encKey = key; L.encDescribe = enc.describe; L.codeD = enc.cl.code;
       progress(`Encoded ${L.nNuclei.toLocaleString()} nuclei in ${((performance.now() - t0) / 1000).toFixed(1)} s.`);
     })();
@@ -2207,7 +2208,7 @@
     fdTokens();
     L.model = new NN.AttentionMIL(fdModelConfig());
     L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
-    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastField = null; L.hoverNucleus = null; L.pinned = null;
+    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastField = null; L.hoverNucleus = null; L.pinned = null; L.frozen = null; L.hoverAtt = null; L.hoverDecide = null; L.hoverUnrolled = null;
     L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
     fdRecordEpoch();
     fdSyncControls(); fdRenderAll();
@@ -2241,7 +2242,7 @@
     L.running = true; L.lastTime = performance.now(); L.debt = 0; L.lastRender = 0; fdSyncButtons();
     requestAnimationFrame(fdTick);
   }
-  function fdStop(msg) { const L = S.fd; L.running = false; fdSyncButtons(); if (msg) fdNote(msg); }
+  function fdStop(msg) { const L = S.fd; L.running = false; if (L.walk) fdWalkStop(); if (L.dwalk) fdDecideWalkStop(); fdSyncButtons(); if (msg) fdNote(msg); }
   function fdFinish() {
     const L = S.fd, last = L.hist[L.hist.length - 1], rates = fdMimicRates(L.testEval);
     fdStop(`Finished ${L.epochs} epochs on the fields' two labels alone. On the test fields: CIS right ${pct(last.testAccCis)}, invasion right ${pct(last.testAcc)}; ${pct(rates.inv[1])} of the invasive fields found, ${pct(rates.cisvbn[1])} of the CIS-into-nests fields called invasive. The invasion head puts ${pct(last.testMass)} of its attention on the atypical nuclei below the membrane of an invasive test field (uniform: ${pct(L.share[1])}).`);
@@ -2258,13 +2259,16 @@
       if (ended) break; // an epoch's evaluation is work enough for one frame
     }
     if (L.debt > spe) L.debt = spe;
-    if (did && (ended || now - L.lastRender >= 120)) { fdRender(ended); L.lastRender = now; }
+    if (did && (ended || now - L.lastRender >= 120)) { try { fdRender(ended); } catch (e) { console.error(e); } L.lastRender = now; }
     if (L.running) requestAnimationFrame(fdTick);
   }
   function fdStepField() { const L = S.fd; if (!L.model) return; fdStop(); const ended = fdStep(); fdRender(true); const s = L.byId.get(L.lastField); fdNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on field ${s.name} (${fdPattern(s).name}): step ${L.ptr} of ${L.train.length}.`); }
   function fdStepEpoch() { const L = S.fd; if (!L.model) return; fdStop(); do { fdStep(); } while (L.ptr !== 0); fdRender(true); fdNote(`Epoch ${L.epoch} complete.`); }
   function fdSelect(id) { const L = S.fd; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; L.pinned = null; fdRenderFocus(); fdRenderTrays(); }
-  function fdFocus() { const L = S.fd; return (L.selected != null && L.byId.get(L.selected)) || (L.lastField != null && L.byId.get(L.lastField)) || L.train[0]; }
+  function fdFocus() { const L = S.fd; return (L.selected != null && L.byId.get(L.selected)) || (L.frozen != null && L.byId.get(L.frozen)) || (L.lastField != null && L.byId.get(L.lastField)) || L.train[0]; }
+  // while training runs, the field on screen is the last one trained on and changes with every step; a cursor over a
+  // viewer or a diagram keeps the field it found there until it leaves, so what it points at stays put
+  function fdFreeze(on) { const L = S.fd; if (on) { if (L.frozen == null && L.selected == null && L.built) L.frozen = fdFocus().id; } else if (L.frozen != null) { L.frozen = null; if (L.model && L.running) fdRenderFocus(); } }
   function fdNeighbour(step) { const L = S.fd, cur = fdFocus(), i = L.all.indexOf(cur); fdSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function fdSyncButtons() { const L = S.fd; $('fd-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
   function fdSyncControls() {
@@ -2273,7 +2277,10 @@
     document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.ctx));
     document.querySelectorAll('#fd-crop-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.crop === L.crop));
     document.querySelectorAll('#fd-links-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.links === '1') === L.linksAll));
-    document.querySelectorAll('#fd-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
+    document.querySelectorAll('#fd-layer-seg button, #fd-ctx-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
+    document.querySelectorAll('#fd-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
+    document.querySelectorAll('#fd-attview-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.attView));
+    $('fd-context-card').hidden = !L.ctx; $('fd-decide-card').hidden = !L.ctx;
     $('fd-links-ctl').hidden = !L.ctx; $('fd-links-min').value = Math.round(L.linksMin * 100); $('fd-links-min-val').textContent = pct(L.linksMin); $('fd-links-min').disabled = !L.linksAll;
     $('fd-epochs').value = L.epochs; $('fd-epochs-val').textContent = L.epochs;
     $('fd-speed').value = sliderFromSpeed(L.speed); $('fd-speed-val').textContent = `${L.speed} epochs/s`;
@@ -2293,14 +2300,13 @@
       `<span>attention on the culprits <b>${pct(last.massCis)}</b> CIS head · <b>${pct(last.mass)}</b> invasion head (test fields; uniform: ${pct(L.share[0])} · ${pct(L.share[1])})</span>`;
   }
   function fdFocusForward() { const L = S.fd, s = fdFocus(); return { s, fw: L.model.forward(s.H, s.dist, s.xy) }; }
-  function fdShown(fw, k) { const L = S.fd; if (L.hoverNucleus != null) return L.hoverNucleus; if (L.pinned != null) return L.pinned; const a = fw.outs[k].a; let j = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; }
-  function fdContextView(fw) { const L = S.fd; return L.ctx && fw && fw.ctxs && fw.ctxs.length ? fw.ctxs[Math.min(L.layer, fw.ctxs.length - 1)].A : null; }
+  function fdShown(fw, k) { const L = S.fd, a = fw.outs[k].a; if (L.hoverNucleus != null && L.hoverNucleus < a.length) return L.hoverNucleus; if (L.pinned != null && L.pinned < a.length) return L.pinned; let j = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; }
+  function fdContextView(fw) { const L = S.fd; return L.ctx && fw && fw.ctxs && fw.ctxs.length ? fdAttentionView(fw) : null; }
   function fdCallText(s, o, k) { const yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS', call = o.p >= 0.5 ? 1 : 0, truth = s.y[k]; return `The ${FD.names[k]} head says <b>P(${yes}) = ${o.p.toFixed(2)}</b> → <span class="${call === truth ? 'good-text' : 'bad-text'}">${call ? yes : no} ${call === truth ? '✓' : '✗'}</span> · truth: ${truth ? yes : no}.`; }
-  function fdDrawPair(ids, s, fw, tips) { // the two viewers of one field, one per head
-    const L = S.fd, view = fdContextView(fw), from = L.hoverNucleus != null ? L.hoverNucleus : L.pinned;
-    ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map((n, i) => ({ x: n.x, y: n.y, a: fw ? fw.outs[k].a[i] : 0, pos: s.pos[k][i] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: !fw,
-      hover: L.hoverNucleus, pinned: view ? L.pinned : null, links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null }));
-    void tips;
+  function fdDrawPair(ids, s, fw) { // the two viewers of one field, one per head
+    const L = S.fd, n = s.nuclei.length, view = fdContextView(fw), ok = i => (i != null && i < n ? i : null), hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned);
+    ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map((q, i) => ({ x: q.x, y: q.y, a: fw ? fw.outs[k].a[i] : 0, pos: s.pos[k][i] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: !fw,
+      hover, pinned: view ? pinned : null, links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null }));
   }
   function fdRenderField() {
     const L = S.fd, { s, fw } = fdFocusForward(), P = fdPattern(s);
@@ -2310,7 +2316,7 @@
     $('fd-field-note').textContent = `Rings are the attention weights, thicker and stronger with the weight; the two heads read the same nuclei and weigh them differently. ${L.reveal ? `Dots mark the nuclei each head is judged against: the atypical nuclei for the CIS head, the atypical nuclei below the membrane for the invasion head; the blue line is the basement membrane and the green outlines the nests.` : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a nucleus for its two weights${L.ctx ? ' and whom it listens to' : ''}${L.selected == null && L.lastField != null ? ' · the last field trained on' : ''}.`;
     if (L.ctx) $('fd-links-note').textContent = (L.linksAll ? `Every link of the ${L.layer ? 'second' : 'first'} context layer above ${pct(L.linksMin)}: a link is wide at the end that listens. Hover a nucleus to lift its links out; click it to keep it.` : `Lines from the hovered nucleus to the nuclei it listens to in the ${L.layer ? 'second' : 'first'} context layer, thicker with the share. Click a nucleus to keep it as the one the lines follow.`) + (L.model.layers.length ? ` The learned distance cost is ${L.model.layers.map((c, l) => `${Math.log1p(Math.exp(c.beta[0])).toFixed(2)} in layer ${l + 1}`).join(', ')} per nucleus diameter: every extra diameter divides a nucleus’s weight by ${Math.exp(Math.log1p(Math.exp(L.model.layers[Math.min(L.layer, L.model.layers.length - 1)].beta[0]))).toFixed(1)}.` : '');
   }
-  function fdNucleusTip(s, fw, i) { const L = S.fd, n = s.nuclei[i], where = n.kind === 'stroma' ? 'stromal cell' : n.below ? 'below the membrane' : 'in the epithelium'; return `nucleus ${i + 1} · ${where} · CIS head ${pct(fw.outs[0].a[i])} · invasion head ${pct(fw.outs[1].a[i])}${L.reveal ? ` · ${n.kind === 'stroma' ? 'stroma' : n.atypical ? `atypical (${subtypeWord(n.subtype)})` : 'bland'}` : ''}`; }
+  function fdNucleusTip(s, fw, i) { const L = S.fd, n = s.nuclei[i]; if (!n) return ''; const where = n.kind === 'stroma' ? 'stromal cell' : n.below ? 'below the membrane' : 'in the epithelium'; return `nucleus ${i + 1} · ${where} · CIS head ${pct(fw.outs[0].a[i])} · invasion head ${pct(fw.outs[1].a[i])}${L.reveal ? ` · ${n.kind === 'stroma' ? 'stroma' : n.atypical ? `atypical (${subtypeWord(n.subtype)})` : 'bland'}` : ''}`; }
   // the mimic table: the test fields of each pattern, how often called CIS and called invasive
   function fdMimicRates(ev, ids) {
     const L = S.fd, out = {};
@@ -2346,10 +2352,10 @@
       el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name} · CIS ${callC ? 'yes' : 'no'} (P ${pc.toFixed(2)}) ${callC === s.y[0] ? '✓' : '✗'} · invasive ${callI ? 'yes' : 'no'} (P ${pi.toFixed(2)}) ${callI === s.y[1] ? '✓' : '✗'}`;
     }));
   }
-  function fdRenderFocus() { fdRenderField(); }
+  function fdRenderFocus(light) { fdRenderField(); fdRenderUnrolled(); if (light) return; fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
   function fdRender(full) {
     const L = S.fd; if (!L.model) return;
-    fdRenderStatus(); fdRenderFocus();
+    fdRenderStatus(); fdRenderFocus(!full && L.running);
     if (full) { fdRenderMimicCard(); fdRenderCurves(); fdRenderTrays(); }
     fdSyncButtons();
   }
@@ -2433,8 +2439,189 @@
     }
     for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), f = L.byId.get(id), right = !!rr && rr.call[0] === f.y[0] && rr.call[1] === f.y[1]; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call[1] === 0); el.classList.toggle('call-1', !!rr && rr.call[1] === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
   }
-  function bindFields() {
+  // ---- the model diagrams: the whole model for one head, unrolled; that head's scorer and single layer; the context
+  // layers' attention map with the hovered nucleus's token before and after; one nucleus's decision taken apart
+  const fdHeadName = k => (k ? 'invasion' : 'CIS');
+  function fdShownWord() { const L = S.fd; return L.hoverNucleus != null ? '' : L.pinned != null ? ', pinned,' : `, the one with the most of the ${fdHeadName(L.head)} head’s attention,`; }
+  const fdBars = code => { let mx = 1e-9; for (const v of code) mx = Math.max(mx, Math.abs(v)); return `<span class="code" title="${Array.from(code).map(v => v.toFixed(2)).join(', ')}">${Array.from(code).map(v => `<i class="${v < 0 ? 'neg' : 'pos'}" style="height:${Math.max(2, Math.round(Math.abs(v) / mx * 100))}%"></i>`).join('')}</span>`; };
+  function fdRenderUnrolled() {
+    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], n = s.nuclei.length, yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS';
+    const m = { setName: 'THE FIELD', nuclei: s.nuclei.map((q, i) => ({ px: q.px, h: fw.T[i], s: o.s[i], a: o.a[i], pos: s.pos[k][i] })), D: L.D, tokenNote: `${L.pos ? 'code + position' : 'code'}${L.ctx ? ', after context' : ''}`, size: L.size, tint: S.tint, reveal: L.reveal,
+      scorer: L.model.scorers[k], head: L.model.heads[k], fw: { s: o.s, a: o.a, z: o.z, head: o.head, fws: o.fws }, shown: fdShown(fw, k), hover: L.hoverUnrolled, walk: L.walk, positiveName: yes, negativeName: no };
+    const cv = $('fd-unrolled'); cv._model = m; Viz.drawSlideNetwork(cv, m);
+    $('fd-unrolled-note').textContent = `The ${fdHeadName(k)} head, left to right: the ${n} nuclei of this field, each as its token of ${L.D} numbers (${m.tokenNote}); one scorer, the same weights for all of them, gives each a score; the softmax compares the ${n} scores and turns them into shares that add up to 100%; the tokens are added up, each weighted by its share, into the ${L.D}-number summary; a single layer on the summary makes the call. The other head does the same over the same tokens with its own scorer and single layer. Hover a nucleus to follow it through the model.`;
+  }
+  // the walk-through: the field on screen goes through one head step by step, one nucleus at a time
+  function fdWalkStart() {
+    const L = S.fd; if (!L.model) return; fdStop(); fdDecideWalkStop();
+    L.walk = { stage: 'score', k: 0, t: 0, t0: performance.now() }; L.hoverUnrolled = null;
+    fdSyncWalk(); requestAnimationFrame(fdWalkTick);
+  }
+  function fdWalkStop() { const L = S.fd; if (!L.walk) return; L.walk = null; L.walkNucleus = null; fdSyncWalk(); if (L.model) { fdRenderField(); fdRenderUnrolled(); } }
+  function fdSyncWalk() { $('fd-walk').textContent = S.fd.walk ? '■ Stop' : '▶ Walk through'; }
+  function fdWalkTick(now) {
+    const L = S.fd, w = L.walk; if (!w) return;
+    const el = now - w.t0, n = fdFocus().nuclei.length, per = Math.min(SL_WALK.score, 2400 / n), next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
+    if (w.stage === 'score') { w.k = Math.min(n, Math.floor(el / per) + 1); L.walkNucleus = w.k - 1; if (el >= n * per + SL_WALK.pause) { L.walkNucleus = null; next('softmax'); } }
+    else if (w.stage === 'softmax') { w.t = Math.min(1, el / SL_WALK.softmax); if (el >= SL_WALK.softmax + SL_WALK.pause) next('sum'); }
+    else if (w.stage === 'sum') { w.t = Math.min(1, el / SL_WALK.sum); if (el >= SL_WALK.sum + SL_WALK.pause) next('head'); }
+    else if (w.stage === 'head') {
+      w.t = Math.min(1, el / SL_WALK.head);
+      if (el >= SL_WALK.head + SL_WALK.pause) {
+        const { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], call = o.p >= 0.5 ? 1 : 0, yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS'; fdWalkStop();
+        fdNote(`Field ${s.name} through the ${fdHeadName(k)} head: every nucleus scored by the same scorer, softmax, weighted sum, then the single layer: P(${yes}) = ${o.p.toFixed(2)} → ${call ? yes : no} ${call === s.y[k] ? '✓' : '✗'}.`);
+        return;
+      }
+    }
+    fdRenderField(); fdRenderUnrolled();
+    requestAnimationFrame(fdWalkTick);
+  }
+  function fdScorerModel() { // the attention network of the chosen head for one nucleus: the hovered one, else the pinned one, else the one with the most attention
+    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], j = fdShown(fw, k), n = s.nuclei[j], tok = fw.T[j], sf = o.fws ? o.fws[j] : L.model.scorers[k].forward(tok);
+    return { j, n, m: { net: L.model.scorers[k], mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S TOKEN${L.ctx ? ', AFTER CONTEXT' : ''} · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => (L.pos && i >= L.codeD ? (i === L.codeD ? 'position x' : 'position y') : `code ${i + 1}`)), x: tok, fw: sf, stage: 2, hover: L.hoverScorer,
+      activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the field\n→ ${pct(o.a[j])} of the ${fdHeadName(k)} head’s attention`, specimen: null, size: L.size, tint: S.tint } };
+  }
+  function fdRenderScorer() {
+    const L = S.fd, { j, n, m } = fdScorerModel(), cv = $('fd-scorer'); cv._model = m; Viz.drawNetwork(cv, m);
+    $('fd-scorer-title').textContent = `How a nucleus is scored by the ${fdHeadName(L.head)} head`;
+    $('fd-scorer-note').textContent = `${L.hoverNucleus == null && L.pinned == null ? `The nucleus with the most of the ${fdHeadName(L.head)} head’s attention on this field` : `Nucleus ${j + 1} of this field${L.hoverNucleus == null ? ', pinned' : ''}`}${L.reveal ? ` (${n.kind === 'stroma' ? 'a stromal cell' : n.atypical ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'}, ${n.kind === 'stroma' ? 'in the stroma' : n.below ? 'below the membrane' : 'in the epithelium'})` : ''}. Every nucleus of the field goes through this same little network; the softmax then compares the ${fdFocus().nuclei.length} scores, so a score only counts relative to the others. The CIS head’s scorer learns to fire on atypia wherever it sits; the invasion head’s on atypia below the membrane and, through the context, on atypia arranged like an invasive nest.`;
+  }
+  function fdRenderSummary() {
+    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], D = L.D, yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS';
+    const plain = new Float64Array(D); for (const h of fw.T) for (let d = 0; d < D; d++) plain[d] += h[d] / fw.T.length;
+    $('fd-summary-title').textContent = `The field’s summary for the ${fdHeadName(k)} head, and its call`;
+    $('fd-summary').innerHTML = `<div class="v"><div class="lbl">weighted average</div>${fdBars(o.z)}<div class="n">the summary</div></div><div class="v"><div class="lbl">plain average</div>${fdBars(plain)}<div class="n">for comparison</div></div>` +
+      `<div class="txt"><div>Σ weight × token over the ${s.nuclei.length} nuclei gives ${D} numbers, the field’s summary for this head; it leans towards the nuclei that weigh most, where a plain average lets the bland majority drown them.</div><div>Then a single layer on the summary: <b>P(${yes}) = ${o.p.toFixed(2)}</b>.</div></div>`;
+    const cv = $('fd-head'), m = { net: L.model.heads[k], mode: 'features', inputCaption: `INPUT · THE FIELD’S SUMMARY · ${D} NUMBERS`, featureNames: Array.from({ length: D }, (_, i) => `summary ${i + 1}`), x: o.z, fw: o.head, stage: 2, hover: L.hoverHead, activation: 'relu', activationLabel: 'ReLU', positiveName: yes, negativeName: no, specimen: null, size: L.size, tint: S.tint };
+    cv._model = m; Viz.drawNetwork(cv, m);
+  }
+  // the context: the chosen layer's attention as the map shows it (what the layer uses, or the match alone, or the distance alone)
+  function fdLayerFw(fw) { const L = S.fd; return fw.ctxs[Math.min(L.layer, fw.ctxs.length - 1)]; }
+  function fdLayer() { const L = S.fd; return L.model.layers[Math.min(L.layer, L.model.layers.length - 1)]; }
+  function fdAttentionView(fw) { const L = S.fd, c = fdLayerFw(fw); if (L.attView === 'both') return c.A; const ex = fdLayer().explain(c); return L.attView === 'match' ? ex.matchOnly : ex.distOnly; }
+  function fdRenderContext() {
+    const L = S.fd; if (!L.ctx || !L.model || !L.model.layers.length) return;
+    const { s, fw } = fdFocusForward(), c = fdLayerFw(fw), A = fdAttentionView(fw), n = s.nuclei.length, cost = c.cost, j = L.dwalk ? L.dwalk.i : fdShown(fw, L.head), last = L.layer + 1 >= L.model.layers.length;
+    const pair = L.hoverAtt || (L.hoverDecide && L.hoverDecide.j != null ? { i: j, j: L.hoverDecide.j } : null);
+    Viz.drawAttentionMap($('fd-attmap'), { A, thumbs: s.nuclei.map(q => q.px), size: L.size, tint: S.tint, hover: j, pair, pos: s.pos[0], reveal: L.reveal });
+    const per = Math.exp(cost).toFixed(1), costWord = cost > 2 ? 'a nucleus listens almost only to the nuclei touching it' : cost > 0.8 ? 'near nuclei count more, but far ones still count' : 'distance hardly matters to it';
+    $('fd-attmap-note').textContent = L.attView === 'match'
+      ? `Layer ${L.layer + 1}, match only: the shares the softmax would give from query · key alone, as if distance cost nothing. This is the part of the decision that reads what a nucleus looks like: the nuclei whose keys fit a query get the listening, wherever they sit in the field. Switch back to see what the distance cost (${cost.toFixed(2)} per nucleus diameter) does to it.`
+      : L.attView === 'distance'
+        ? `Layer ${L.layer + 1}, distance only: the shares from the learned distance cost alone, as if every nucleus looked the same; each nucleus diameter of distance divides a nucleus’s weight by ${per}, so ${costWord}. This is the part of the decision that reads where a nucleus is. The layer uses both: match minus distance cost, then the softmax.`
+        : `Layer ${L.layer + 1}. Each row is one nucleus asking, each column one answering: how much of its listening goes to each of the other ${n - 1} (a row adds up to 100%; a nucleus does not listen to itself, its own token stays through the residual). The learned distance cost is ${cost.toFixed(2)} per nucleus diameter: every extra diameter divides a nucleus’s weight by ${per}, so ${costWord}.`;
+    const row = Array.from(A[j], (w, k) => ({ k, w })).filter(e => e.k !== j).sort((a, b) => b.w - a.w), top = row.slice(0, 3);
+    const where = k => { const d = s.dist[j][k]; return d <= 1.3 ? 'touching' : `${d.toFixed(1)} diameters away`; };
+    $('fd-context-focus').innerHTML = `<div class="v"><div class="lbl">nucleus ${j + 1} · token</div>${fdBars(c.X[j])}<div class="n">${L.layer ? 'into layer 2' : 'before context'}</div></div><div class="v"><div class="lbl">after layer ${L.layer + 1}</div>${fdBars(c.Y[j])}<div class="n">${last ? 'what the heads see' : 'into the next layer'}</div></div>` +
+      `<div class="txt"><div>Nucleus ${j + 1}${fdShownWord()} listens most to ${top.map(e => `nucleus ${e.k + 1} (${pct(e.w)}, ${where(e.k)})`).join(', ')}${L.attView === 'both' ? '' : ` (from the ${L.attView} alone)`}.</div><div>What it hears is added to its own token, so the heads can weigh “atypical, below the membrane, packed with atypical neighbours on every side” rather than “atypical” alone.</div></div>`;
+  }
+  function fdRenderDecide() {
+    const L = S.fd; if (!L.ctx || !L.model || !L.model.layers.length) return;
+    const { s, fw } = fdFocusForward(), ctx = fdLayerFw(fw), cl = fdLayer(), ex = cl.explain(ctx), n = s.nuclei.length, i = L.dwalk ? L.dwalk.i : fdShown(fw, L.head), cost = ctx.cost;
+    const m = { asker: i, nuclei: s.nuclei.map(q => ({ px: q.px, pos: q.atypical })), X: ctx.X, Q: ctx.Q, K: ctx.K, V: ctx.V, cost, match: ex.match[i], costs: ex.cost[i], shares: ctx.A[i], C: ctx.C[i], heard: Float64Array.from(ctx.Xp[i], (v, d) => v - ctx.X[i][d]), after: ctx.Xp[i], final: ctx.Y[i],
+      D: L.D, dk: cl.dk, ffn: cl.F, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverDecide, walk: L.dwalk };
+    const cv = $('fd-decide'); cv._model = m; Viz.drawDecision(cv, m);
+    $('fd-decide-title').textContent = `How nucleus ${i + 1} decides where to look, in layer ${L.layer + 1}`;
+    const row = Array.from(ctx.A[i], (w, k) => ({ k, w })).filter(e => e.k !== i).sort((a, b) => b.w - a.w), best = row[0], bestMatch = row.slice().sort((a, b) => ex.match[i][b.k] - ex.match[i][a.k])[0];
+    $('fd-decide-note').textContent = `Nucleus ${i + 1}${fdShownWord()} turns its token into a query; each of the other ${n - 1} turns its token into a key and a value, with the same three weight maps. Query × key, ${cl.dk} products added up, is the match: how well that nucleus fits what nucleus ${i + 1} is looking for (best match: nucleus ${bestMatch.k + 1}, ${Viz.fmtSigned(ex.match[i][bestMatch.k], 2)}). The learned distance cost, ${cost.toFixed(2)} per nucleus diameter, is taken off; the softmax over the ${n - 1} turns the results into shares (most to nucleus ${best.k + 1}, ${pct(best.w)}); the values are added up with those shares into the message it hears, which is added to its own token and passed through the feed-forward step.`;
+  }
+  function fdDecideRowTip(m, j) { const L = S.fd, s = fdFocus(), d = s.dist[m.asker][j], where = d <= 1.3 ? 'touching' : `${d.toFixed(1)} diameters away`, q = s.nuclei[j]; return `nucleus ${j + 1} · ${where} · match ${Viz.fmtSigned(m.match[j], 2)} − ${m.costs[j].toFixed(2)} = ${Viz.fmtSigned(m.match[j] - m.costs[j], 2)} → ${pct(m.shares[j])} of what nucleus ${m.asker + 1} hears${L.reveal ? ` · ${q.kind === 'stroma' ? 'stroma' : q.atypical ? 'atypical' : 'bland'}${q.kind === 'stroma' ? '' : q.below ? ', below the membrane' : ', in the epithelium'}` : ''}`; }
+  function fdDecideWalkStart() {
+    const L = S.fd; if (!L.model || !L.ctx) return; fdStop(); fdWalkStop();
+    const { fw } = fdFocusForward();
+    L.dwalk = { stage: 'query', k: 0, t: 0, t0: performance.now(), i: fdShown(fw, L.head) }; L.hoverDecide = null; L.walkNucleus = L.dwalk.i;
+    fdSyncDecideWalk(); fdRenderField(); fdRenderContext(); requestAnimationFrame(fdDecideTick);
+  }
+  function fdDecideWalkStop() { const L = S.fd; if (!L.dwalk) return; L.dwalk = null; L.walkNucleus = null; fdSyncDecideWalk(); if (L.model) { fdRenderField(); fdRenderContext(); fdRenderDecide(); } }
+  function fdSyncDecideWalk() { $('fd-decide-walk').textContent = S.fd.dwalk ? '■ Stop' : '▶ Walk through'; }
+  function fdDecideTick(now) {
+    const L = S.fd, w = L.dwalk; if (!w) return;
+    const el = now - w.t0, n = fdFocus().nuclei.length, perKey = Math.min(DE_WALK.keys, 1200 / n), perMatch = Math.min(DE_WALK.match, 2400 / n), next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
+    const timed = (dur, after) => { w.t = Math.min(1, el / dur); if (el >= dur + DE_WALK.pause) next(after); };
+    if (w.stage === 'query') timed(DE_WALK.query, 'keys');
+    else if (w.stage === 'keys') { w.k = Math.min(n, Math.floor(el / perKey) + 1); if (el >= n * perKey + DE_WALK.pause) next('match'); }
+    else if (w.stage === 'match') { w.k = Math.min(n, Math.floor(el / perMatch) + 1); if (el >= n * perMatch + DE_WALK.pause) next('distance'); }
+    else if (w.stage === 'distance') timed(DE_WALK.distance, 'softmax');
+    else if (w.stage === 'softmax') timed(DE_WALK.softmax, 'message');
+    else if (w.stage === 'message') timed(DE_WALK.message, 'add');
+    else if (w.stage === 'add') {
+      w.t = Math.min(1, el / DE_WALK.add);
+      if (el >= DE_WALK.add + DE_WALK.pause) {
+        const i = w.i, { fw } = fdFocusForward(), row = Array.from(fdLayerFw(fw).A[i], (v, k) => ({ k, v })).filter(e => e.k !== i).sort((a, b) => b.v - a.v).slice(0, 2);
+        fdDecideWalkStop(); fdNote(`Nucleus ${i + 1} through layer ${L.layer + 1}: query against every key, minus the distance cost, softmax; it listens most to ${row.map(e => `nucleus ${e.k + 1} (${pct(e.v)})`).join(' and ')}, and what it hears is added to its own token before the heads see it.`);
+        return;
+      }
+    }
+    fdRenderDecide();
+    requestAnimationFrame(fdDecideTick);
+  }
+  function bindFieldCards() {
     const L = S.fd;
+    document.querySelectorAll('#fd-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; fdWalkStop(); fdSyncControls(); if (L.model) fdRenderFocus(); }));
+    document.querySelectorAll('#fd-ctx-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; fdDecideWalkStop(); fdSyncControls(); if (L.model) fdRenderFocus(); }));
+    document.querySelectorAll('#fd-attview-seg button').forEach(b => b.addEventListener('click', () => { L.attView = b.dataset.view; fdSyncControls(); if (L.model) { fdRenderField(); fdRenderContext(); } }));
+    const pin = i => { if (i == null || !L.ctx) return; L.pinned = L.pinned === i ? null : i; fdDecideWalkStop(); fdRenderFocus(); fdNote(L.pinned == null ? 'Unpinned: the cards follow the hovered nucleus, else the one with the most attention.' : `Nucleus ${i + 1} pinned: the cards follow it until you click it again.`); };
+    const ca = $('fd-attmap'), ta = $('fd-attmap-tip');
+    ca.addEventListener('mouseenter', () => fdFreeze(true));
+    ca.addEventListener('mousemove', ev => {
+      if (!L.model || !L.ctx || L.walk) return;
+      const r = ca.getBoundingClientRect(), hit = Viz.hitAttentionMap(ca, ev.clientX - r.left, ev.clientY - r.top);
+      const prevI = L.hoverNucleus, prevKey = L.hoverAtt ? `${L.hoverAtt.i}:${L.hoverAtt.j}` : '';
+      L.hoverAtt = hit; if (hit) L.hoverNucleus = hit.i;
+      if (hit && hit.i !== prevI) fdRenderFocus();
+      else if ((hit ? `${hit.i}:${hit.j}` : '') !== prevKey) fdRenderContext();
+      if (hit) {
+        const { s, fw } = fdFocusForward(), c = fdLayerFw(fw), ex = fdLayer().explain(c), view = fdAttentionView(fw);
+        ta.hidden = false;
+        ta.textContent = hit.i === hit.j ? `nucleus ${hit.i + 1} does not listen to itself` : `nucleus ${hit.i + 1} listens to nucleus ${hit.j + 1}: ${pct(view[hit.i][hit.j])}${L.attView === 'both' ? '' : ` from the ${L.attView} alone (${pct(c.A[hit.i][hit.j])} in fact)`} · match ${Viz.fmtSigned(ex.match[hit.i][hit.j], 2)} − distance ${s.dist[hit.i][hit.j].toFixed(1)} × ${c.cost.toFixed(2)} · click to pin the row`;
+        const half = ta.offsetWidth / 2 + 4; ta.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; ta.style.top = (ev.clientY - r.top) + 'px';
+      } else ta.hidden = true;
+    });
+    ca.addEventListener('mouseleave', () => { ta.hidden = true; fdFreeze(false); if (L.hoverAtt || L.hoverNucleus != null) { L.hoverAtt = null; L.hoverNucleus = null; if (L.model) fdRenderFocus(); } });
+    ca.addEventListener('click', ev => { if (!L.model || !L.ctx) return; const r = ca.getBoundingClientRect(), hit = Viz.hitAttentionMap(ca, ev.clientX - r.left, ev.clientY - r.top); if (hit) pin(hit.i); });
+    // the decision card: hovering a row outlines the pair on the map; the numbers explain themselves
+    const cd = $('fd-decide'), td = $('fd-decide-tip'), rowOf = h => (h && h.j != null ? h.j : null), keyOf = h => (h ? `${h.kind}:${h.j == null ? '' : h.j}:${h.d == null ? '' : h.d}` : '');
+    cd.addEventListener('mouseenter', () => fdFreeze(true));
+    cd.addEventListener('mousemove', ev => {
+      const m = cd._model; if (!m || L.dwalk) return;
+      const r = cd.getBoundingClientRect(), hit = Viz.hitDecision(cd, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverDecide;
+      L.hoverDecide = hit;
+      if (keyOf(prev) !== keyOf(hit)) { fdRenderDecide(); if (rowOf(prev) !== rowOf(hit)) fdRenderContext(); }
+      if (hit) { td.hidden = false; td.textContent = hit.kind === 'asker' ? fdNucleusTip(fdFocus(), fdFocusForward().fw, m.asker) : hit.kind === 'row' ? fdDecideRowTip(m, hit.j) : hit.text; const half = td.offsetWidth / 2 + 4; td.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; td.style.top = (ev.clientY - r.top) + 'px'; }
+      else td.hidden = true;
+    });
+    cd.addEventListener('mouseleave', () => { td.hidden = true; fdFreeze(false); if (L.hoverDecide) { L.hoverDecide = null; if (L.model) { fdRenderDecide(); fdRenderContext(); } } });
+    $('fd-decide-walk').addEventListener('click', () => (L.dwalk ? fdDecideWalkStop() : fdDecideWalkStart()));
+    // the unrolled diagram: hovering a nucleus row follows it everywhere; the other parts explain themselves
+    const cu = $('fd-unrolled'), tu = $('fd-unrolled-tip'), hitKey = h => (h ? `${h.kind}:${h.i == null ? '' : h.i}:${h.d == null ? '' : h.d}` : '');
+    cu.addEventListener('mouseenter', () => fdFreeze(true));
+    cu.addEventListener('mousemove', ev => {
+      const m = cu._model; if (!m || L.walk) return;
+      const r = cu.getBoundingClientRect(), hit = Viz.hitSlideNetwork(cu, ev.clientX - r.left, ev.clientY - r.top, m), prev = L.hoverUnrolled;
+      const ni = hit && hit.kind === 'nucleus' ? hit.i : null;
+      L.hoverUnrolled = hit;
+      if (ni !== L.hoverNucleus) { L.hoverNucleus = ni; fdRenderFocus(); }
+      else if (hitKey(prev) !== hitKey(hit)) fdRenderUnrolled();
+      if (hit) { tu.hidden = false; tu.textContent = hit.kind === 'nucleus' ? fdNucleusTip(fdFocus(), fdFocusForward().fw, hit.i) : hit.text; const half = tu.offsetWidth / 2 + 4; tu.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tu.style.top = (ev.clientY - r.top) + 'px'; }
+      else tu.hidden = true;
+    });
+    cu.addEventListener('mouseleave', () => { tu.hidden = true; fdFreeze(false); const had = L.hoverNucleus != null || L.hoverUnrolled; L.hoverUnrolled = null; L.hoverNucleus = null; if (had && L.model) fdRenderFocus(); });
+    $('fd-walk').addEventListener('click', () => (L.walk ? fdWalkStop() : fdWalkStart()));
+    for (const [cvId, tipId, key, render] of [['fd-scorer', 'fd-scorer-tip', 'hoverScorer', fdRenderScorer], ['fd-head', 'fd-head-tip', 'hoverHead', fdRenderSummary]]) {
+      const c2 = $(cvId), t2 = $(tipId);
+      c2.addEventListener('mouseenter', () => fdFreeze(true));
+      c2.addEventListener('mousemove', ev => {
+        const m = c2._model; if (!m) return;
+        const r = c2.getBoundingClientRect(), hit = Viz.hitNetwork(c2, ev.clientX - r.left, ev.clientY - r.top, m), prev = L[key];
+        L[key] = hit;
+        if (hit) { t2.hidden = false; t2.textContent = hit.text; t2.style.left = (ev.clientX - r.left) + 'px'; t2.style.top = (ev.clientY - r.top) + 'px'; } else t2.hidden = true;
+        if ((prev && prev.ref) !== (hit && hit.ref)) render();
+      });
+      c2.addEventListener('mouseleave', () => { L[key] = null; t2.hidden = true; fdFreeze(false); if (L.model) render(); });
+    }
+  }
+  function bindFields() {
+    const L = S.fd; bindFieldCards();
     document.querySelectorAll('#fd-pos-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.pos === '1'; if (v === L.pos) return; L.pos = v; fdReset(v ? 'Every nucleus now carries its position with its code — fresh random weights.' : 'The codes alone: the model no longer knows where a nucleus sits — fresh random weights.'); }));
     document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.ctx === '1'; if (v === L.ctx) return; L.ctx = v; fdReset(v ? 'Context on: two layers of self-attention let every nucleus read the others before the heads see it — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
     document.querySelectorAll('#fd-crop-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.crop; if (v === L.crop) return; L.crop = v; fdSyncControls(); fdReset(v === 'nucleus' ? 'Crops masked to the nucleus: the code carries cytology and nothing else — fresh random weights.' : 'Crops with their surroundings: the field around the nucleus reaches the code, and with it its location and the outline of its nest — fresh random weights.'); }));
@@ -2450,11 +2637,12 @@
     $('fd-reset').addEventListener('click', () => fdReset('Weights re-initialised from the seed.'));
     $('fd-prev').addEventListener('click', () => fdNeighbour(-1)); $('fd-next').addEventListener('click', () => fdNeighbour(1));
     document.querySelectorAll('#fd-links-seg button').forEach(b => b.addEventListener('click', () => { L.linksAll = b.dataset.links === '1'; fdSyncControls(); if (L.model) fdRenderField(); }));
-    document.querySelectorAll('#fd-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; fdSyncControls(); if (L.model) fdRenderField(); }));
+    document.querySelectorAll('#fd-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; fdDecideWalkStop(); fdSyncControls(); if (L.model) fdRenderFocus(); }));
     $('fd-links-min').addEventListener('input', () => { L.linksMin = +$('fd-links-min').value / 100; $('fd-links-min-val').textContent = pct(L.linksMin); if (L.model) fdRenderField(); });
     // hovering either viewer follows the nucleus on both; a click keeps it
     for (const [cvId, tipId] of [['fd-canvas-cis', 'fd-tip-cis'], ['fd-canvas-inv', 'fd-tip-inv']]) {
       const cv = $(cvId), tip = $(tipId);
+      cv.addEventListener('mouseenter', () => fdFreeze(true));
       cv.addEventListener('mousemove', ev => {
         if (!L.model) return;
         const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top);
@@ -2462,7 +2650,7 @@
         if (i != null) { const { s, fw } = fdFocusForward(); tip.hidden = false; tip.textContent = fdNucleusTip(s, fw, i); const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
         else tip.hidden = true;
       });
-      cv.addEventListener('mouseleave', () => { tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) fdRenderFocus(); } });
+      cv.addEventListener('mouseleave', () => { tip.hidden = true; fdFreeze(false); if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) fdRenderFocus(); } });
       cv.addEventListener('click', ev => { if (!L.model || !L.ctx) return; const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top); if (i == null) return; L.pinned = L.pinned === i ? null : i; fdRenderFocus(); fdNote(L.pinned == null ? 'Unpinned: the lines follow the hovered nucleus.' : `Nucleus ${i + 1} pinned: the lines follow it until you click it again.`); });
     }
     const dc = $('fd-data-canvas'), dt = $('fd-data-tip');

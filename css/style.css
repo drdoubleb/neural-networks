@@ -488,3 +488,6 @@ details.fold > ul { margin-top: 8px; }
 .fd-mimic td.num, .fd-mimic th.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
 .fd-mimic td.good { color: var(--good-text); } .fd-mimic td.bad { color: var(--bad); }
 .fd-mimic .truth { color: var(--ink-3); font-size: 12px; white-space: nowrap; }
+.fd-ctx { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+.fd-ctx > div { min-width: 0; }
+@media (min-width: 1100px) { .fd-ctx { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } }

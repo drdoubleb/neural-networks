@@ -974,12 +974,12 @@ window.Viz = (function () {
   //       hover ({ kind, i, d } or null), walk ({ stage: 'score'|'softmax'|'sum'|'head', k, t } or null),
   //       positiveName, negativeName }
   const UN_W = 800, UN_H = 570, UN_STAGES = ['score', 'softmax', 'sum', 'head'];
-  function layoutUnrolled(n, D) {
-    const pitch = 24, top = 50, bottom = top + n * pitch, mid = (top + bottom) / 2;
-    return { n, D, pitch, top, bottom, mid, rowY: i => top + pitch / 2 + i * pitch,
-      xIdx: 24, xThumb: 30, thumb: 20, xCode: 56, codeW: 47, codeH: 18, xRowEnd: 598,
+  function layoutUnrolled(n, D) { // twenty nuclei get a comfortable row each; a field of fifty gets thin rows, and the diagram grows only when even those do not fit
+    const pitch = n <= 20 ? 24 : Math.max(8, Math.floor(470 / n)), small = pitch < 16, top = 50, bottom = top + n * pitch, mid = (top + bottom) / 2, H = Math.max(UN_H, bottom + 70);
+    return { n, D, pitch, small, top, bottom, mid, H, rowY: i => top + pitch / 2 + i * pitch,
+      xIdx: 24, xThumb: 30, thumb: small ? Math.max(6, pitch - 2) : 20, xCode: 56, codeW: 47, codeH: small ? Math.max(5, pitch - 3) : 18, xRowEnd: 598, rScore: small ? Math.max(3, pitch / 2 - 1) : 9, barH: small ? Math.max(3, pitch - 3) : 14,
       box: { x: 180, y: mid - 122, w: 150, h: 244 }, xIn: 205, xUnit: 255, xOut: 310, inPitch: 24,
-      xScore: 372, rScore: 9, xScoreTxt: 386, band: { x: 424, w: 28 }, xBar: 462, barMax: 90, xPct: 590, xLines: 596,
+      xScore: 372, xScoreTxt: 386, band: { x: 424, w: 28 }, xBar: 462, barMax: 90, xPct: 590, xLines: 596,
       sum: { x: 632, r: 14 }, xSummary: 700, rSummary: 11, summaryY: d => mid + (d - (D - 1) / 2) * 24, out: { x: 776, r: 16 } };
   }
   function roundedRect(ctx, x, y, w, h, r) {
@@ -988,7 +988,7 @@ window.Viz = (function () {
   }
   const pctText = a => (a >= 0.095 ? `${Math.round(a * 100)}%` : `${(a * 100).toFixed(1)}%`);
   function drawSlideNetwork(canvas, m) {
-    const n = m.nuclei.length, D = m.D, L = layoutUnrolled(n, D), c = colors(), ctx = fitCanvas(canvas, UN_W, UN_H);
+    const n = m.nuclei.length, D = m.D, L = layoutUnrolled(n, D), c = colors(), ctx = fitCanvas(canvas, UN_W, L.H);
     canvas._unrolled = L;
     const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`;
     const mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
@@ -1003,13 +1003,14 @@ window.Viz = (function () {
     const hl = hov != null ? hov : cur;                              // the row drawn on top
     const hovKind = m.hover ? m.hover.kind : null;
     const A = att ? m.scorer.hidden[0] : 0, unitPitch = A <= 4 ? 40 : 200 / A;
-    ctx.clearRect(0, 0, UN_W, UN_H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, UN_W, UN_H);
+    ctx.clearRect(0, 0, UN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, UN_W, L.H);
     ctx.imageSmoothingEnabled = false;
+    const monoRow = L.small ? mono8 : mono9; // the rows' numbers, smaller when the rows are thin
     let maxA = 1e-9, maxH = 1e-9; for (const q of m.nuclei) { maxA = Math.max(maxA, q.a); for (const v of q.h) maxH = Math.max(maxH, Math.abs(v)); }
 
     // captions; the stage the walk-through is on lights up
     const caps = [
-      { text: `THE SLIDE · ${n} NUCLEI`, x: 12, align: 'left', stage: -1 },
+      { text: `${m.setName || 'THE SLIDE'} · ${n} NUCLEI`, x: 12, align: 'left', stage: -1 },
       { text: att ? `SCORER · USED ${n}×` : 'NO SCORER', x: L.box.x + L.box.w / 2, stage: 0 },
       att ? { text: 'SCORES', x: L.xScore + 20, stage: 0 } : null,
       { text: 'SHARES', x: 526, stage: 1 },
@@ -1022,7 +1023,7 @@ window.Viz = (function () {
     ctx.fillText(att ? `${D} → ${A} tanh → 1 score` : 'every nucleus weighs the same', L.box.x + L.box.w / 2, 26);
     ctx.fillText(att ? 'of the attention · add up to 100%' : `of the attention · 1/${n} each`, 526, 26);
     ctx.textAlign = 'right'; ctx.fillText('single layer', 794, 26);
-    if (m.tokenNote) { ctx.textAlign = 'left'; ctx.fillText(m.tokenNote, 12, 26); }
+    if (m.tokenNote) { ctx.font = mono9; ctx.textAlign = 'left'; ctx.fillText(m.tokenNote, 12, 28); ctx.font = mono; }
 
     // row highlights: the hovered nucleus (or the one being scored), and faintly the one whose numbers the scorer shows
     for (let i = 0; i < n; i++) {
@@ -1041,12 +1042,12 @@ window.Viz = (function () {
     // the rows: index, thumbnail (framed by its share once the softmax has run), truth dot, code
     for (let i = 0; i < n; i++) {
       const y = L.rowY(i), q = m.nuclei[i], rel = q.a / maxA;
-      ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(i + 1), L.xIdx, y);
+      ctx.font = monoRow; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(String(i + 1), L.xIdx, y);
       ctx.drawImage(imageToCanvas(q.px, m.size, m.tint), L.xThumb, y - L.thumb / 2, L.thumb, L.thumb);
       if (softmaxT >= 1 && att) { const lw = 1 + 2 * rel; ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.15 + 0.85 * rel); ctx.lineWidth = lw; ctx.strokeRect(L.xThumb + lw / 2, y - L.thumb / 2 + lw / 2, L.thumb - lw, L.thumb - lw); }
       else { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(L.xThumb - 0.5, y - L.thumb / 2 - 0.5, L.thumb + 1, L.thumb + 1); }
       if (i === hl) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(L.xThumb - 2, y - L.thumb / 2 - 2, L.thumb + 4, L.thumb + 4); }
-      if (m.reveal) { ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(L.xThumb + 4, y - L.thumb / 2 + 4, 3.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); }
+      if (m.reveal) { const rd = L.small ? 2.5 : 3.5; ctx.fillStyle = q.pos ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(L.xThumb + (L.small ? L.thumb / 2 : 4), y - L.thumb / 2 + (L.small ? L.thumb / 2 : 4), rd, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); }
       codeStrip(ctx, c, L.xCode, y - L.codeH / 2, L.codeW, L.codeH, q.h, maxH);
     }
     // the scorer, once: the box, the little network with the shown nucleus's numbers, or the plain-average note
@@ -1078,7 +1079,7 @@ window.Viz = (function () {
     if (att) for (let i = 0; i < n; i++) {
       const y = L.rowY(i), q = m.nuclei[i], on = i < scoredCount;
       circleNode(ctx, L.xScore, y, L.rScore, on ? diverging(Math.tanh(q.s / 2)) : c.surface2, null, null, i === hl);
-      if (on) { ctx.font = mono9; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(fmtSigned(q.s, 2), L.xScoreTxt, y); }
+      if (on && (!L.small || i === hl)) { ctx.font = monoRow; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(fmtSigned(q.s, 2), L.xScoreTxt, y); }
     }
     // the softmax band across all the rows: a score only means something next to the other nineteen
     ctx.fillStyle = rgbStr(c.rgb.accent, 0.07 + (w && at === 1 ? 0.14 * Math.sin(Math.PI * w.t) : 0) + (hovKind === 'softmax' ? 0.06 : 0));
@@ -1088,8 +1089,8 @@ window.Viz = (function () {
     // the shares
     for (let i = 0; i < n; i++) {
       const y = L.rowY(i), q = m.nuclei[i], rel = q.a / maxA, len = L.barMax * rel * softmaxT;
-      if (len > 0) { ctx.fillStyle = rgbStr(c.rgb.irregular, 0.25 + 0.75 * rel); ctx.fillRect(L.xBar, y - 7, Math.max(1, len), 14); }
-      if (softmaxT >= 1) { ctx.font = mono9; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(pctText(q.a), L.xPct, y); }
+      if (len > 0) { ctx.fillStyle = rgbStr(c.rgb.irregular, 0.25 + 0.75 * rel); ctx.fillRect(L.xBar, y - L.barH / 2, Math.max(1, len), L.barH); }
+      if (softmaxT >= 1 && (!L.small || rel >= 0.3 || i === hl)) { ctx.font = monoRow; ctx.fillStyle = rel > 0.5 ? c.irregular : c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.fillText(pctText(q.a), L.xPct, y); }
     }
     // the weighted lines into the sum, the biggest shares first during the walk-through, the highlighted one on top
     const ranked = m.nuclei.map((q, i) => ({ i, rel: q.a / maxA })).sort((a, b) => b.rel - a.rel);
@@ -1112,14 +1113,14 @@ window.Viz = (function () {
     const p = fw.head.p, call = p >= 0.5;
     circleNode(ctx, L.out.x, L.mid, L.out.r, headT >= 1 ? diverging((p - 0.5) * 2) : c.surface2, headT >= 1 ? p.toFixed(2) : '?', `600 12px "IBM Plex Mono", ui-monospace, monospace`, hovKind === 'output');
     ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
-    ctx.fillText(`P(${m.positiveName}) = ${headT >= 1 ? p.toFixed(2) : '?'}`, 794, UN_H - 36);
-    if (headT >= 1) { ctx.font = capFont; ctx.fillStyle = call ? c.irregular : c.regular; ctx.fillText(String(call ? m.positiveName : m.negativeName).toUpperCase(), 794, UN_H - 22); }
+    ctx.fillText(`P(${m.positiveName}) = ${headT >= 1 ? p.toFixed(2) : '?'}`, 794, L.H - 36);
+    if (headT >= 1) { ctx.font = capFont; ctx.fillStyle = call ? c.irregular : c.regular; ctx.fillText(String(call ? m.positiveName : m.negativeName).toUpperCase(), 794, L.H - 22); }
     // the footer: what is going on
     let foot;
     if (w) foot = ({ score: `scoring nucleus ${Math.min(n, Math.max(1, w.k))} of ${n} with the same scorer`, softmax: `softmax: the ${n} scores become shares that add up to 100%`, sum: 'adding up the codes, each weighted by its share', head: 'the single layer reads the summary and makes the call' })[w.stage];
     else if (hov != null) foot = `nucleus ${hov + 1}: its code → its score → its share → its part of the summary`;
     else foot = att ? `hover a nucleus to follow it through the model · the scorer shows nucleus ${shown + 1}, the most attention` : 'plain average: nothing can make one nucleus count more than another';
-    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(foot, 12, UN_H - 22);
+    ctx.font = mono9; ctx.fillStyle = c.ink3; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(foot, 12, L.H - 22);
   }
   // what is under a point of the unrolled diagram (canvas-relative CSS pixels): a nucleus row, the scorer, the softmax,
   // the sum, a summary number or the output, with a tooltip text for everything but the nucleus (the app knows its truth)
