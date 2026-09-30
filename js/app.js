@@ -18,6 +18,8 @@
     foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe ⑪/⑫ introduces them, and stay for the session
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
+    // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
+    fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '' },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -32,7 +34,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other'];
+  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question'];
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -74,6 +76,7 @@
     { id: 'foundation', title: 'Foundation: a code from 100 unlabelled nuclei', world: 'foundation' },
     { id: 'slides-atypia', title: 'Slides: atypical cells?', world: 'slides', q: 'atypia' },
     { id: 'slides-focus', title: 'Slides: a focus of atypical cells?', world: 'slides', q: 'focus' },
+    { id: 'fields', title: 'Fields: is it invasive?', world: 'fields' },
   ];
   const onClassic = step => S.world === 'classic' && S.stage === step;
   function selectQuestion(id) {
@@ -165,7 +168,7 @@
   }
   function renderBackboneOptions() {
     const opts = backbones().map(b => `<option value="${esc(b.id)}">shipped: ${esc(b.nuclei.toLocaleString())} nuclei, ${esc(b.conv.K)} filters, code of ${esc(b.code)}${b.note ? ` (${esc(b.note)})` : ''}</option>`).join('') + '<option value="page">pretrained in the Foundation question</option>';
-    $('backbone').innerHTML = opts; $('sl-backbone').innerHTML = opts;
+    $('backbone').innerHTML = opts; $('sl-backbone').innerHTML = opts; $('fd-backbone').innerHTML = opts;
     S.backbone = defaultBackbone();
   }
   // the label a training case carries (wrong for the mislabelled ones when label noise is on), and whether it is wrong
@@ -1147,6 +1150,11 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
+      if (k === '15') { // the fields question: the full model
+        S.fd.pos = true; S.fd.ctx = true; S.fd.crop = 'nucleus'; S.fd.epochs = 60; S.fd.speed = 8; S.fd.seed = 1; S.fd.reveal = false;
+        selectQuestion('fields'); showStage('train');
+        fdReset(`Recipe ${RECIPE_LABELS[15]}: 400 fields of bladder, five patterns, two labels each and no nucleus ever labelled. Press Train and watch the mimic table: cytology alone gets the first three rows, positions add the membrane, and the context is what tells a round nest from an angulated one. Then switch a cue off and train again.`); return;
+      }
       if (k === '14') { // the focus question, with the context layer
         S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
         selectQuestion('slides-focus'); showStage('train');
@@ -1227,12 +1235,12 @@
       if (P && ev.key === 'ArrowRight') { ev.preventDefault(); P.next(); return; }
       if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
-      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else S.sl.running ? slStop('Paused.') : slStart(); }
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); }
+      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else S.sl.running ? slStop('Paused.') : slStart(); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); }
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && onClassic('train')) teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
-    window.addEventListener('resize', () => { if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); if (S.world === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } if (S.world === 'slides') slRenderAll(); });
+    window.addEventListener('resize', () => { if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); if (S.world === 'foundation' && S.fm.cl) { fmRenderLineup(); fmRenderGraph(); fmRenderViews(); fmRenderBatch(); } if (S.world === 'slides') slRenderAll(); if (S.world === 'fields') fdRenderAll(); });
     // playback controls in both strips: previous step, pause/play, next step, speed
     for (const key of ['lesson', 'test']) {
       const P = () => (key === 'lesson' ? (S.lesson && S.lesson.player) : (S.test.animating && S.test.player)) || null;
@@ -1250,7 +1258,7 @@
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
     if (onClassic('train')) { renderTrainGraph(); renderProfile(true); } if (onClassic('test')) renderTestGraph();
-    fmRepaint(); slRepaint();
+    fmRepaint(); slRepaint(); fdRepaint();
     renderInspector();
   }
   // the lecture introduces the foundation model late, so its stage and controls stay out of the way until then
@@ -1258,7 +1266,7 @@
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
     applyVisibility();
   }
-  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test' };
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test' };
   function showStage(name) {
     if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
@@ -1269,6 +1277,7 @@
     document.querySelector('.inspector').hidden = wide; document.querySelector('.bench').classList.toggle('no-inspector', wide); // only the blood counts and the nuclei have a specimen inspector
     if (!(w === 'foundation' && name === 'train')) fmStop();
     if (!(w === 'slides' && name === 'train')) slStop();
+    if (!(w === 'fields' && name === 'train')) fdStop();
     if (w !== 'classic' || name === 'test') stopTraining();
     if (w === 'classic') {
       if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
@@ -1284,7 +1293,8 @@
         if (S.net.conv && !$('test-note').textContent) $('test-note').textContent = 'Classify next walks through the convolution (about 50 s): the mean nucleus is subtracted, filter 1 scans the difference slowly with its arithmetic shown, the other filters follow together, map 1 is pooled block by block and the other maps follow, then the pooled maps are stacked and laid over each hidden unit’s weight map and summed, and the units feed the output. Press N or click the diagram to skip ahead; space pauses, ← → step.';
       }
       } else if (w === 'foundation') { if (name === 'data') fmEnterData(); else if (name === 'train') fmEnter(); else fmEnterTest(); }
-    else { if (name === 'data') slEnterData(); else if (name === 'train') slEnter(); else slEnterTest(); }
+    else if (w === 'slides') { if (name === 'data') slEnterData(); else if (name === 'train') slEnter(); else slEnterTest(); }
+    else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
     try { history.replaceState(null, '', '#' + (w === 'classic' ? name : `${S.questionId}/${name}`)); } catch (e) { /* ignore */ }
   }
 
@@ -2085,6 +2095,387 @@
     }
   }
 
+  // ------------------------------------------------------------------ the Fields question: is it invasive?
+  // 450 strips of bladder (400 training, 50 held out), five patterns, two labels each: carcinoma in situ? invasion?
+  // Every nucleus of a field is a token (the frozen encoder's code for its crop, masked to the nucleus by the field's
+  // segmentation, plus its position), two layers of self-attention let the nuclei look at each other, and two attention
+  // heads over the same tokens answer the two questions. The fields (5.7 MB) load on demand, the first time the
+  // question is opened, from the page's data folder or, failing that, from the published page.
+  const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'], names: ['CIS', 'invasion'],
+    sources: ['data/fields/fields_data.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/fields/fields_data.js', 'https://drdoubleb.github.io/neural-networks/data/fields/fields_data.js'] }; // the page's own folder, then a mirror of the repository, then the published page
+  const NFL = window.NucleusFields;
+  function fdNote(msg) { $('fd-note').textContent = msg || ''; }
+  function fdData() { const D = window.LECTURE_FIELDS; return D && D.meta ? D : null; }
+  const fdCisOf = f => (FD.cisPatterns.includes(f.pattern) ? 1 : 0);
+  const fdPattern = f => S.fd.meta.patterns.find(p => p.key === f.pattern);
+  // the fields' file, fetched once, from the first source that answers
+  function fdLoad() {
+    const L = S.fd; if (fdData()) return Promise.resolve(fdData());
+    if (L.loading) return L.loading;
+    L.loading = new Promise((resolve, reject) => {
+      const tryUrl = k => { if (k >= FD.sources.length) { reject(new Error('no source answered')); return; } const el = document.createElement('script'); el.src = FD.sources[k]; el.onload = () => (fdData() ? resolve(fdData()) : tryUrl(k + 1)); el.onerror = () => tryUrl(k + 1); document.head.appendChild(el); };
+      tryUrl(0);
+    });
+    return L.loading;
+  }
+  const fdYield = () => new Promise(r => setTimeout(r, 0));
+  // the fields as the page keeps them: the pixels with their grain, the segmentation, every nucleus with its truth,
+  // the distances between the nuclei in nucleus diameters; the thumbnails and the pattern table
+  async function fdBuild(progress) {
+    const L = S.fd; if (L.built) return true;
+    const D = await fdLoad(), meta = D.meta, K = meta.nucleus.reduce((o, k, i) => Object.assign(o, { [k]: i }), {});
+    L.meta = meta; L.w = meta.w; L.h = meta.h; L.size = meta.size;
+    const all = D.train.concat(D.test);
+    progress(`Decoding the ${all.length} fields…`);
+    const decoded = await Promise.all(all.map(f => Promise.all([NFL.decodePNGBrowser(f.png, meta.w, meta.h), NFL.decodePNGBrowser(f.seg, meta.w, meta.h)])));
+    const mk = (f, i) => {
+      const [raw, seg] = decoded[i], px = NFL.withGrain(raw, f.grainSeed, meta.grain);
+      const nuclei = f.nuclei.map(n => ({ x: n[K.x], y: n[K.y], kind: meta.kinds[n[K.kind]], atypical: !!n[K.atypical], subtype: meta.subtypes[n[K.subtype]], below: !!n[K.below], nest: n[K.nest] }));
+      const dist = nuclei.map(a => Float64Array.from(nuclei, b => Math.hypot(a.x - b.x, a.y - b.y) / FD.unit)), xy = nuclei.map(n => [n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]);
+      return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, cis: fdCisOf(f), px, seg, grainSeed: f.grainSeed, membrane: f.membrane, nests: f.nests, nuclei, dist, xy, y: [fdCisOf(f), f.label], pos: [nuclei.map(n => n.atypical), nuclei.map(n => n.atypical && n.below)], codes: {} };
+    };
+    L.all = all.map(mk); L.train = L.all.filter(s => s.split === 'train'); L.test = L.all.filter(s => s.split === 'test'); L.byId = new Map(L.all.map(s => [s.id, s]));
+    L.nNuclei = L.all.reduce((a, s) => a + s.nuclei.length, 0);
+    L.share = [0, 1].map(k => { const pos = L.train.filter(s => s.y[k]); return pos.reduce((a, s) => a + s.pos[k].filter(Boolean).length / s.nuclei.length, 0) / pos.length; }); // what uniform attention gives each head's nuclei
+    L.thumbs = new Map(); L.trayFor = {};
+    for (const [id, tray] of [['fd-train-tray', L.train], ['fd-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) { const b = fdThumb(s, fdSelect); el.appendChild(b); L.thumbs.set(s.id, b); } }
+    $('fd-train-label').textContent = `Training fields (${L.train.length}: ${meta.patterns.map(p => `${L.train.filter(s => s.pattern === p.key).length} ${p.short.toLowerCase()}`).join(', ')})`;
+    $('fd-test-label').textContent = `Test fields (${L.test.length}) · never trained on, scored as it goes`;
+    $('fd-blurb').innerHTML = `<strong>${esc(meta.question)}</strong> ${esc(meta.blurb)} Every nucleus becomes its <strong>code</strong> from the frozen foundation encoder, for a crop masked to the nucleus by the field’s segmentation (cytology and nothing else), plus its <strong>position</strong>; two layers of self-attention let the nuclei look at each other, each with a learned cost per nucleus diameter of distance; then <strong>two attention heads</strong> over the same nuclei, one per question, each with its own scorer, weighted average and single layer. Only the field’s two labels train it. Switch a cue off and watch the mimic table: which pattern fools a model that lacks it.`;
+    L.built = true;
+    return true;
+  }
+  function fdThumb(s, onClick) {
+    const L = S.fd, b = document.createElement('button'); b.type = 'button'; b.className = 'thumb field'; b.dataset.id = s.id; b.title = `${s.name} · ${fdPattern(s).name}`;
+    const cv = document.createElement('canvas'); b.appendChild(cv); Viz.renderFieldThumb(cv, s.px, L.w, L.h, S.tint, s.tiles || (s.tiles = {}));
+    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = '✗'; b.appendChild(badge);
+    b.addEventListener('click', () => onClick(s.id));
+    return b;
+  }
+  function fdRepaint() { const L = S.fd; if (!L.built) return; for (const map of [L.thumbs, L.dataThumbs, L.testThumbs]) if (map) for (const [id, el] of map) { const s = L.byId.get(id); if (s) Viz.renderFieldThumb(el.querySelector('canvas'), s.px, L.w, L.h, S.tint, s.tiles || (s.tiles = {})); } fdRenderAll(); }
+  // every nucleus of every field through the frozen encoder, for the crop mode in force, in chunks so the page keeps
+  // breathing; then standardised on the training fields' nuclei
+  async function fdEncode(progress) {
+    const L = S.fd, enc = codeEncoder(), key = `${L.crop}|${enc.key}`;
+    if (L.encKey === key) return;
+    if (L.encoding && L.encoding.key === key) return L.encoding.promise;
+    const run = (async () => {
+      const t0 = performance.now(); let done = 0;
+      for (let i = 0; i < L.all.length; i++) {
+        const s = L.all[i];
+        if (!s.codes[key]) {
+          const codes = s.nuclei.map((n, j) => { const c = L.crop === 'nucleus' ? NFL.cropMasked(s.px, s.seg, L.w, L.h, n.x, n.y, L.size, j, s.grainSeed) : NFL.crop(s.px, L.w, L.h, n.x, n.y, L.size); const ink = new Float32Array(c.length); for (let q = 0; q < c.length; q++) ink[q] = 1 - c[q] / 255; return enc.encode(ink); });
+          s.codes[key] = codes;
+        }
+        done += s.nuclei.length;
+        if (i % 12 === 11) { progress(`Encoding the nuclei${L.crop === 'nucleus' ? ', each masked to itself' : ', each with its surroundings'}: ${done.toLocaleString()} of ${L.nNuclei.toLocaleString()}…`); await fdYield(); }
+        if (L.encoding && L.encoding.key !== key) throw new Error('superseded'); // the crop or the encoder changed meanwhile
+      }
+      L.std = NN.fitStandardizer([].concat(...L.train.map(s => s.codes[key])), { perDimScale: true });
+      for (const s of L.all) s.Hcode = s.codes[key].map(c => L.std.apply(c));
+      L.encKey = key; L.encDescribe = enc.describe; L.codeD = enc.cl.code;
+      progress(`Encoded ${L.nNuclei.toLocaleString()} nuclei in ${((performance.now() - t0) / 1000).toFixed(1)} s.`);
+    })();
+    L.encoding = { key, promise: run };
+    try { await run; } finally { if (L.encoding && L.encoding.key === key) L.encoding = null; }
+  }
+  function fdTokens() { // the tokens the model sees: the standardised code, with the position when the model is given one
+    const L = S.fd; if (L.tokKey === `${L.encKey}|${L.pos}`) return;
+    for (const s of L.all) s.H = L.pos ? s.Hcode.map((c, i) => Float64Array.from([...c, s.xy[i][0], s.xy[i][1]])) : s.Hcode;
+    L.D = L.codeD + (L.pos ? 2 : 0); L.tokKey = `${L.encKey}|${L.pos}`;
+  }
+  // everything the question needs, once: the file, the fields, the codes; the callers render when it resolves
+  function fdReady() {
+    const L = S.fd; if (L.built && L.encKey === `${L.crop}|${codeEncoder().key}`) return Promise.resolve(true);
+    if (L.readying) return L.readying;
+    const progress = msg => { L.progress = msg; for (const id of ['fd-note', 'fd-data-note', 'fd-test-note']) { const el = $(id); if (el) el.textContent = msg; } };
+    L.readying = (async () => {
+      try {
+        if (!fdData()) progress('Loading the fields (5.7 MB)…');
+        await fdBuild(progress); await fdEncode(progress);
+        progress(''); // the notes are the panels' own again
+        return true;
+      } catch (e) { if (e.message !== 'superseded') progress(`The fields did not load: ${e.message}`); return false; }
+      finally { L.readying = null; }
+    })();
+    return L.readying;
+  }
+  function fdModelConfig() { const L = S.fd; return { inputSize: L.D, attentionUnits: L.units, outputs: 2, clip: L.clip, context: L.ctx ? { dk: FD.dk, ffn: FD.ffn, heads: FD.heads, layers: FD.layers, distanceBias: true, excludeSelf: true, costInit: FD.costInit } : null, seed: L.seed }; }
+  function fdReset(reason) {
+    const L = S.fd; fdStop();
+    if (!L.built || L.encKey !== `${L.crop}|${codeEncoder().key}`) { fdReady().then(ok => { if (ok && S.world === 'fields') fdReset(reason); }); return; }
+    fdTokens();
+    L.model = new NN.AttentionMIL(fdModelConfig());
+    L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
+    L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastField = null; L.hoverNucleus = null; L.pinned = null;
+    L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
+    fdRecordEpoch();
+    fdSyncControls(); fdRenderAll();
+    if (reason) fdNote(reason);
+  }
+  function fdModelKey() { const L = S.fd; return `${L.encKey}|${L.pos}|${L.ctx}`; }
+  function fdRecordEpoch() {
+    const L = S.fd; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test);
+    const tr = L.trainEval.outputs, te = L.testEval.outputs;
+    L.hist.push({ epoch: L.epoch, loss: tr[0].loss + tr[1].loss, testLoss: te[0].loss + te[1].loss, acc: tr[1].accuracy, testAcc: te[1].accuracy, accCis: tr[0].accuracy, testAccCis: te[0].accuracy, mass: tr[1].culpritMass, testMass: te[1].culpritMass, massCis: tr[0].culpritMass, testMassCis: te[0].culpritMass });
+  }
+  // a training field seen in a mirror half the time, its positions jittered by about a pixel (only with positions)
+  function fdAugmented(sl) {
+    const L = S.fd, D = L.D, rng = L.rng, flip = rng() < 0.5 ? -1 : 1, g = () => NFL.gaussianFrom(rng);
+    const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + FD.jitter * g(); o[D - 1] = h[D - 1] + FD.jitter * g(); return o; });
+    return Object.assign({}, sl, { H });
+  }
+  function fdStep() { // one gradient step on the next training field of the epoch's order
+    const L = S.fd, n = L.train.length;
+    if (L.ptr === 0) { const o = L.order; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(L.rng() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } }
+    const i = L.order[L.ptr], s = L.train[i];
+    L.model.trainBatch([L.pos ? fdAugmented(s) : s], L.lr, L.decay);
+    L.lastField = s.id; L.ptr++;
+    let ended = false;
+    if (L.ptr >= n) { L.ptr = 0; L.epoch++; fdRecordEpoch(); ended = true; }
+    return ended;
+  }
+  function fdStart() {
+    const L = S.fd; if (!L.model) return;
+    if (L.epoch >= L.epochs) { fdNote(`Already at ${L.epochs} epochs. Raise the epoch count, or reset to train again.`); return; }
+    L.running = true; L.lastTime = performance.now(); L.debt = 0; L.lastRender = 0; fdSyncButtons();
+    requestAnimationFrame(fdTick);
+  }
+  function fdStop(msg) { const L = S.fd; L.running = false; fdSyncButtons(); if (msg) fdNote(msg); }
+  function fdFinish() {
+    const L = S.fd, last = L.hist[L.hist.length - 1], rates = fdMimicRates(L.testEval);
+    fdStop(`Finished ${L.epochs} epochs on the fields' two labels alone. On the test fields: CIS right ${pct(last.testAccCis)}, invasion right ${pct(last.testAcc)}; ${pct(rates.inv[1])} of the invasive fields found, ${pct(rates.cisvbn[1])} of the CIS-into-nests fields called invasive. The invasion head puts ${pct(last.testMass)} of its attention on the atypical nuclei below the membrane of an invasive test field (uniform: ${pct(L.share[1])}).`);
+  }
+  function fdTick(now) {
+    const L = S.fd; if (!L.running) return;
+    const dt = Math.min(0.1, (now - L.lastTime) / 1000); L.lastTime = now;
+    const spe = L.train.length;
+    L.debt += dt * L.speed * spe;
+    const t0 = performance.now(); let did = false, ended = false;
+    while (L.debt >= 1 && performance.now() - t0 < 24) {
+      ended = fdStep() || ended; L.debt -= 1; did = true;
+      if (L.ptr === 0 && L.epoch >= L.epochs) { fdFinish(); break; }
+      if (ended) break; // an epoch's evaluation is work enough for one frame
+    }
+    if (L.debt > spe) L.debt = spe;
+    if (did && (ended || now - L.lastRender >= 120)) { fdRender(ended); L.lastRender = now; }
+    if (L.running) requestAnimationFrame(fdTick);
+  }
+  function fdStepField() { const L = S.fd; if (!L.model) return; fdStop(); const ended = fdStep(); fdRender(true); const s = L.byId.get(L.lastField); fdNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on field ${s.name} (${fdPattern(s).name}): step ${L.ptr} of ${L.train.length}.`); }
+  function fdStepEpoch() { const L = S.fd; if (!L.model) return; fdStop(); do { fdStep(); } while (L.ptr !== 0); fdRender(true); fdNote(`Epoch ${L.epoch} complete.`); }
+  function fdSelect(id) { const L = S.fd; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; L.pinned = null; fdRenderFocus(); fdRenderTrays(); }
+  function fdFocus() { const L = S.fd; return (L.selected != null && L.byId.get(L.selected)) || (L.lastField != null && L.byId.get(L.lastField)) || L.train[0]; }
+  function fdNeighbour(step) { const L = S.fd, cur = fdFocus(), i = L.all.indexOf(cur); fdSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function fdSyncButtons() { const L = S.fd; $('fd-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
+  function fdSyncControls() {
+    const L = S.fd;
+    document.querySelectorAll('#fd-pos-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.pos === '1') === L.pos));
+    document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.ctx));
+    document.querySelectorAll('#fd-crop-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.crop === L.crop));
+    document.querySelectorAll('#fd-links-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.links === '1') === L.linksAll));
+    document.querySelectorAll('#fd-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
+    $('fd-links-ctl').hidden = !L.ctx; $('fd-links-min').value = Math.round(L.linksMin * 100); $('fd-links-min-val').textContent = pct(L.linksMin); $('fd-links-min').disabled = !L.linksAll;
+    $('fd-epochs').value = L.epochs; $('fd-epochs-val').textContent = L.epochs;
+    $('fd-speed').value = sliderFromSpeed(L.speed); $('fd-speed-val').textContent = `${L.speed} epochs/s`;
+    $('fd-seed').value = L.seed; for (const id of ['fd-reveal', 'fd-data-reveal', 'fd-test-reveal']) $(id).checked = L.reveal;
+    $('fd-backbone').value = S.backbone;
+    fdSyncButtons();
+  }
+  // ---- rendering
+  const fdModelWord = () => { const L = S.fd; return L.pos && L.ctx ? 'positions and context' : L.pos ? 'codes with positions, no context' : L.ctx ? 'context without positions' : 'a bag of codes: no positions, no context'; };
+  function fdRenderStatus() {
+    const L = S.fd, last = L.hist[L.hist.length - 1], m = L.model;
+    $('fd-status').innerHTML =
+      `<span>architecture <b>every nucleus → code (${L.codeD} numbers, from ${esc(L.encDescribe)})${L.pos ? ' + its position' : ''} → ${esc(m.describe())}</b></span>` +
+      `<span>parameters <b>${m.parameterCount()}</b></span><span>model <b>${fdModelWord()}</b> · crops <b>${L.crop === 'nucleus' ? 'masked to the nucleus' : 'with the surroundings'}</b></span>` +
+      `<span>fields <b>${L.train.length}</b> training · <b>${L.test.length}</b> test</span><span>epoch <b>${L.epoch}</b> / ${L.epochs}</span><span>field <b>${L.ptr === 0 ? '–' : L.ptr}</b> / ${L.train.length}</span>` +
+      `<span>loss <b>${last.loss.toFixed(3)}</b></span><span>CIS right <b>${pct(last.accCis)}</b> training · <b>${pct(last.testAccCis)}</b> test</span><span>invasion right <b>${pct(last.acc)}</b> training · <b>${pct(last.testAcc)}</b> test (peeking)</span>` +
+      `<span>attention on the culprits <b>${pct(last.massCis)}</b> CIS head · <b>${pct(last.mass)}</b> invasion head (test fields; uniform: ${pct(L.share[0])} · ${pct(L.share[1])})</span>`;
+  }
+  function fdFocusForward() { const L = S.fd, s = fdFocus(); return { s, fw: L.model.forward(s.H, s.dist, s.xy) }; }
+  function fdShown(fw, k) { const L = S.fd; if (L.hoverNucleus != null) return L.hoverNucleus; if (L.pinned != null) return L.pinned; const a = fw.outs[k].a; let j = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; }
+  function fdContextView(fw) { const L = S.fd; return L.ctx && fw && fw.ctxs && fw.ctxs.length ? fw.ctxs[Math.min(L.layer, fw.ctxs.length - 1)].A : null; }
+  function fdCallText(s, o, k) { const yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS', call = o.p >= 0.5 ? 1 : 0, truth = s.y[k]; return `The ${FD.names[k]} head says <b>P(${yes}) = ${o.p.toFixed(2)}</b> → <span class="${call === truth ? 'good-text' : 'bad-text'}">${call ? yes : no} ${call === truth ? '✓' : '✗'}</span> · truth: ${truth ? yes : no}.`; }
+  function fdDrawPair(ids, s, fw, tips) { // the two viewers of one field, one per head
+    const L = S.fd, view = fdContextView(fw), from = L.hoverNucleus != null ? L.hoverNucleus : L.pinned;
+    ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map((n, i) => ({ x: n.x, y: n.y, a: fw ? fw.outs[k].a[i] : 0, pos: s.pos[k][i] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: !fw,
+      hover: L.hoverNucleus, pinned: view ? L.pinned : null, links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null }));
+    void tips;
+  }
+  function fdRenderField() {
+    const L = S.fd, { s, fw } = fdFocusForward(), P = fdPattern(s);
+    fdDrawPair(['fd-canvas-cis', 'fd-canvas-inv'], s, fw);
+    $('fd-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${P.name}`;
+    $('fd-call-cis').innerHTML = fdCallText(s, fw.outs[0], 0); $('fd-call-inv').innerHTML = fdCallText(s, fw.outs[1], 1);
+    $('fd-field-note').textContent = `Rings are the attention weights, thicker and stronger with the weight; the two heads read the same nuclei and weigh them differently. ${L.reveal ? `Dots mark the nuclei each head is judged against: the atypical nuclei for the CIS head, the atypical nuclei below the membrane for the invasion head; the blue line is the basement membrane and the green outlines the nests.` : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a nucleus for its two weights${L.ctx ? ' and whom it listens to' : ''}${L.selected == null && L.lastField != null ? ' · the last field trained on' : ''}.`;
+    if (L.ctx) $('fd-links-note').textContent = (L.linksAll ? `Every link of the ${L.layer ? 'second' : 'first'} context layer above ${pct(L.linksMin)}: a link is wide at the end that listens. Hover a nucleus to lift its links out; click it to keep it.` : `Lines from the hovered nucleus to the nuclei it listens to in the ${L.layer ? 'second' : 'first'} context layer, thicker with the share. Click a nucleus to keep it as the one the lines follow.`) + (L.model.layers.length ? ` The learned distance cost is ${L.model.layers.map((c, l) => `${Math.log1p(Math.exp(c.beta[0])).toFixed(2)} in layer ${l + 1}`).join(', ')} per nucleus diameter: every extra diameter divides a nucleus’s weight by ${Math.exp(Math.log1p(Math.exp(L.model.layers[Math.min(L.layer, L.model.layers.length - 1)].beta[0]))).toFixed(1)}.` : '');
+  }
+  function fdNucleusTip(s, fw, i) { const L = S.fd, n = s.nuclei[i], where = n.kind === 'stroma' ? 'stromal cell' : n.below ? 'below the membrane' : 'in the epithelium'; return `nucleus ${i + 1} · ${where} · CIS head ${pct(fw.outs[0].a[i])} · invasion head ${pct(fw.outs[1].a[i])}${L.reveal ? ` · ${n.kind === 'stroma' ? 'stroma' : n.atypical ? `atypical (${subtypeWord(n.subtype)})` : 'bland'}` : ''}`; }
+  // the mimic table: the test fields of each pattern, how often called CIS and called invasive
+  function fdMimicRates(ev, ids) {
+    const L = S.fd, out = {};
+    for (const P of L.meta.patterns) {
+      const idx = L.test.map((s, i) => (s.pattern === P.key && (!ids || ids.has(s.id)) ? i : -1)).filter(i => i >= 0);
+      out[P.key] = [0, 1].map(k => (idx.length ? idx.filter(i => ev.outputs[k].probs[i] >= 0.5).length / idx.length : null)); out[P.key].n = idx.length;
+    }
+    return out;
+  }
+  function fdRenderMimic(el, ev, ids, focusKey) {
+    const L = S.fd, rates = fdMimicRates(ev, ids), cell = (r, truth) => (r == null ? '<td class="num">–</td>' : `<td class="num ${Math.round(r * 100) === (truth ? 100 : 0) ? 'good' : (truth ? r < 0.5 : r >= 0.5) ? 'bad' : ''}">${pct(r)}</td>`);
+    el.innerHTML = `<table><thead><tr><th>pattern</th><th>cues</th><th class="num">fields</th><th class="num">called CIS</th><th class="num">called invasive</th><th>truth</th></tr></thead><tbody>` +
+      L.meta.patterns.map(P => { const r = rates[P.key], cis = FD.cisPatterns.includes(P.key) ? 1 : 0; return `<tr${P.key === focusKey ? ' class="current"' : ''}><td>${esc(P.name)}</td><td>${esc(P.cues)}</td><td class="num">${r.n}</td>${cell(r[0], cis)}${cell(r[1], P.label)}<td class="truth">CIS ${cis ? 'yes' : 'no'} · invasive ${P.label ? 'yes' : 'no'}</td></tr>`; }).join('') + '</tbody></table>';
+  }
+  function fdRenderMimicCard() {
+    const L = S.fd; fdRenderMimic($('fd-mimic'), L.testEval, null, fdFocus().pattern);
+    const r = fdMimicRates(L.testEval);
+    $('fd-mimic-note').textContent = `Every model gets the top two rows right by cytology alone. The last three rows are the point: ${r.cisvbn[1] == null ? '' : `${pct(r.cisvbn[1])} of the CIS-into-von-Brunn-nests fields are called invasive, atypical cells below the membrane in the one arrangement that is not invasion, and ${pct(r.inv[1])} of the invasive fields are found. `}A model without positions cannot tell above from below; one without context cannot tell a round nest from an angulated one; the full model reads all three cues.`;
+  }
+  function fdRenderCurves() {
+    const L = S.fd, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
+    Viz.drawCurves($('fd-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
+    Viz.drawCurves($('fd-acc'), { history: L.hist, key: 'acc', showTest: true, maxEpoch: L.epochs });
+    Viz.drawSeries($('fd-mass'), { hist: L.hist, keys: [{ key: 'mass', color: c.accent }, { key: 'testMass', color: testCol, dash: true }], maxEpoch: L.epochs, pct: true, baseline: L.share[1], baselineLabel: 'uniform' });
+    $('fd-loss-now').textContent = `${last.loss.toFixed(3)} · test ${last.testLoss.toFixed(3)}`; $('fd-acc-now').textContent = `${pct(last.acc)} · test ${pct(last.testAcc)}`; $('fd-mass-now').textContent = `${pct(last.mass)} · test ${pct(last.testMass)}`;
+    $('fd-curves-note').textContent = `The loss is the sum of the two questions’ cross-entropies. CIS is right on ${pct(last.testAccCis)} of the test fields (the codes alone carry cytology); invasion is the hard one. The test curves peek at the held-out fields as the model trains, which is how one sees it overfit: 400 fields are few, and the test loss turns up after some 40 epochs while the training loss keeps falling.`;
+  }
+  function fdRenderTrays() {
+    const L = S.fd, focus = fdFocus();
+    [['train', L.train, L.trainEval], ['test', L.test, L.testEval]].forEach(([split, fields, ev]) => fields.forEach((s, k) => {
+      const el = L.thumbs.get(s.id), pc = ev.outputs[0].probs[k], pi = ev.outputs[1].probs[k], callC = pc >= 0.5 ? 1 : 0, callI = pi >= 0.5 ? 1 : 0, wrong = callC !== s.y[0] || callI !== s.y[1];
+      el.className = `thumb field call-${callI}${wrong ? ' wrong' : ''}${focus === s ? ' selected' : ''}${L.lastField === s.id && split === 'train' ? ' in-batch' : ''}`;
+      el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name} · CIS ${callC ? 'yes' : 'no'} (P ${pc.toFixed(2)}) ${callC === s.y[0] ? '✓' : '✗'} · invasive ${callI ? 'yes' : 'no'} (P ${pi.toFixed(2)}) ${callI === s.y[1] ? '✓' : '✗'}`;
+    }));
+  }
+  function fdRenderFocus() { fdRenderField(); }
+  function fdRender(full) {
+    const L = S.fd; if (!L.model) return;
+    fdRenderStatus(); fdRenderFocus();
+    if (full) { fdRenderMimicCard(); fdRenderCurves(); fdRenderTrays(); }
+    fdSyncButtons();
+  }
+  function fdRenderAll() { const L = S.fd; if (S.world !== 'fields' || !L.built) return; if (S.stage === 'data') fdRenderData(); else if (S.stage === 'test') fdRenderTest(); else if (L.model) fdRender(true); }
+  function fdEnter() {
+    const L = S.fd;
+    fdReady().then(ok => {
+      if (!ok || S.world !== 'fields' || S.stage !== 'train') return;
+      if (!L.model || L.modelKey !== fdModelKey()) fdReset(L.model ? 'The input changed — fresh random weights.' : 'Untrained: the attention weights are near uniform and both calls are guesses. Step a field to watch one gradient step, or press Train and watch the mimic table and the curves.');
+      else { fdTokens(); fdRender(true); }
+    });
+    if (!L.built) fdNote(L.progress || 'Loading the fields…');
+  }
+  // ---- the other two steps: Specimens (the fields with their patterns and labels) and Test (the held-out fields, one at a time)
+  function fdSetReveal(v) { S.fd.reveal = v; for (const id of ['fd-reveal', 'fd-data-reveal', 'fd-test-reveal']) $(id).checked = v; fdRenderAll(); }
+  function fdTrays(kind, onClick) {
+    const L = S.fd; if (L.trayFor[kind]) return; L.trayFor[kind] = true;
+    const map = new Map(), fill = (id, tray) => { const el = $(id); el.innerHTML = ''; for (const s of tray) { const b = fdThumb(s, onClick); el.appendChild(b); map.set(s.id, b); } };
+    if (kind === 'data') { fill('fd-data-train-tray', L.train); fill('fd-data-test-tray', L.test); L.dataThumbs = map; $('fd-data-train-label').textContent = `Training fields (${L.train.length})`; $('fd-data-test-label').textContent = `Test fields (${L.test.length}) · held out`; }
+    else { fill('fd-test-results', L.test); L.testThumbs = map; $('fd-test-count').textContent = `${L.test.length} fields`; }
+  }
+  function fdEnterData() { const L = S.fd; fdReady().then(ok => { if (ok && S.world === 'fields' && S.stage === 'data') fdRenderData(); }); if (!L.built) $('fd-data-note').textContent = L.progress || 'Loading the fields…'; }
+  function fdDataSelect(id) { S.fd.dataSelected = id; fdRenderData(); }
+  function fdDataNeighbour(step) { const L = S.fd, i = L.all.findIndex(s => s.id === L.dataSelected); fdDataSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function fdRenderData() {
+    const L = S.fd; if (!L.built) return; fdTrays('data', fdDataSelect); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id;
+    const s = L.byId.get(L.dataSelected) || L.train[0], P = fdPattern(s), meta = L.meta, nBelow = s.nuclei.filter(n => n.atypical && n.below).length, nAt = s.nuclei.filter(n => n.atypical).length;
+    $('fd-data-title').textContent = `Fields of bladder: ${meta.question.toLowerCase().replace('?', '')}?`; $('fd-data-sub').textContent = `${L.train.length} training and ${L.test.length} test fields of ${meta.w} × ${meta.h} px · five patterns · two labels per field`;
+    $('fd-data-blurb').textContent = `${meta.blurb} Every nucleus of a field, the spindle cells of the stroma included, is a token for the model; nobody labels the nuclei, and the model never sees the membrane, the nests or which nuclei are atypical, only the field’s two labels: carcinoma in situ, yes or no; invasive, yes or no.`;
+    $('fd-data-note').textContent = '';
+    fdRenderDataCanvas();
+    $('fd-data-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${P.name}`;
+    $('fd-data-caption').innerHTML = `<b>${esc(P.name)}</b> · ${esc(P.cues)}. ${esc(P.blurb)} Labels: <b>CIS ${s.y[0] ? 'yes' : 'no'}</b> · <b>invasive ${s.y[1] ? 'yes' : 'no'}</b>. ${s.nuclei.length} nuclei${L.reveal ? `, ${nAt} atypical, ${nBelow} of them below the membrane` : ''}. Click a field below, or step through them.`;
+    $('fd-patterns').innerHTML = `<table><thead><tr><th>pattern</th><th>cytology</th><th>location</th><th>architecture</th><th>CIS</th><th>invasive</th></tr></thead><tbody>` + meta.patterns.map(Q => { const cues = Q.cues.split(' · '); return `<tr${Q.key === s.pattern ? ' class="current"' : ''}><td>${esc(Q.name)}</td><td>${esc(cues[0])}</td><td>${esc(cues[1] || '')}</td><td>${esc(cues[2] || '')}</td><td>${FD.cisPatterns.includes(Q.key) ? 'yes' : 'no'}</td><td>${Q.label ? '<b>yes</b>' : 'no'}</td></tr>`; }).join('') + '</tbody></table>';
+    for (const [id, el] of L.dataThumbs) { const f = L.byId.get(id); el.classList.toggle('selected', id === L.dataSelected); el.classList.toggle('call-1', !!f.label); el.classList.toggle('call-0', !f.label); }
+  }
+  function fdRenderDataCanvas() { const L = S.fd, s = L.byId.get(L.dataSelected) || L.train[0]; Viz.drawField($('fd-data-canvas'), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, nuclei: s.nuclei.map(n => ({ x: n.x, y: n.y, a: 0, pos: n.atypical })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: true, hover: L.dataHover }); }
+  function fdEnterTest() { const L = S.fd; fdReady().then(ok => { if (!ok || S.world !== 'fields' || S.stage !== 'test') return; if (!L.model || L.modelKey !== fdModelKey()) fdReset(); else fdTokens(); fdTrays('test', fdTestSelect); fdRenderTest(); }); if (!L.built) $('fd-test-note').textContent = L.progress || 'Loading the fields…'; }
+  function fdTestClear() { const L = S.fd; L.trial = { next: 0, results: new Map() }; L.testSelected = null; fdRenderTest(); }
+  function fdClassifyNext(quiet) {
+    const L = S.fd, T = L.trial; if (!L.model || T.next >= L.test.length) return false;
+    const s = L.test[T.next++], fw = L.model.forward(s.H, s.dist, s.xy);
+    T.results.set(s.id, { p: fw.outs.map(o => o.p), call: fw.outs.map(o => (o.p >= 0.5 ? 1 : 0)), a: fw.outs.map(o => o.a), fw }); L.testSelected = s.id;
+    if (!quiet) fdRenderTest();
+    return true;
+  }
+  function fdClassifyAll() { const L = S.fd; if (!L.model) return; const go = () => { if (fdClassifyNext(false) && S.world === 'fields' && S.stage === 'test') setTimeout(go, reducedMotion ? 0 : 120); }; go(); }
+  function fdTestSelect(id) { const L = S.fd; if (!L.trial.results.has(id)) return; L.testSelected = id; fdRenderTest(); }
+  function fdTestStats() {
+    const L = S.fd; let n = 0, cisRight = 0, invRight = 0, tp = 0, nInv = 0, mimicClear = 0, nMimic = 0;
+    for (const [id, r] of L.trial.results) { const s = L.byId.get(id); n++; if (r.call[0] === s.y[0]) cisRight++; if (r.call[1] === s.y[1]) invRight++; if (s.y[1]) { nInv++; if (r.call[1]) tp++; } if (s.pattern === 'cisvbn') { nMimic++; if (!r.call[1]) mimicClear++; } }
+    return { n, cisRight, invRight, tp, nInv, mimicClear, nMimic };
+  }
+  function fdRenderTest() {
+    const L = S.fd; if (!L.built || !L.model) return; fdTrays('test', fdTestSelect);
+    const T = L.trial, st = fdTestStats();
+    $('fd-stat-n').textContent = `${st.n} / ${L.test.length}`;
+    $('fd-stat-cis').textContent = st.n ? pct(st.cisRight / st.n) : '–'; $('fd-stat-cis-sub').textContent = st.n ? `${st.cisRight} of ${st.n} right` : 'no calls yet';
+    $('fd-stat-inv').textContent = st.n ? pct(st.invRight / st.n) : '–'; $('fd-stat-inv-sub').textContent = st.n ? `${st.invRight} of ${st.n} right` : 'no calls yet';
+    $('fd-stat-sens').textContent = st.nInv ? pct(st.tp / st.nInv) : '–'; $('fd-stat-sens-sub').textContent = st.nInv ? `${st.tp} of ${st.nInv} invasive fields` : 'none seen yet';
+    $('fd-stat-mimic').textContent = st.nMimic ? pct(st.mimicClear / st.nMimic) : '–'; $('fd-stat-mimic-sub').textContent = st.nMimic ? `${st.mimicClear} of ${st.nMimic} CIS-into-nests fields not called invasive` : 'no CIS-into-nests field yet';
+    const done = T.next >= L.test.length;
+    $('fd-classify-next').disabled = done; $('fd-classify-all').disabled = done;
+    $('fd-classify-next').textContent = done ? `All ${L.test.length} classified` : `Classify next field (${T.next + 1} of ${L.test.length})`;
+    $('fd-classify-all').textContent = `Classify all ${L.test.length}`;
+    $('fd-test-warning').hidden = !(L.model && L.model.steps === 0);
+    const ev = { outputs: [0, 1].map(k => ({ probs: L.test.map(s => { const r = T.results.get(s.id); return r ? r.p[k] : null; }) })) };
+    fdRenderMimic($('fd-test-mimic'), ev, new Set(T.results.keys()), L.testSelected != null ? L.byId.get(L.testSelected).pattern : null);
+    const s = L.testSelected != null ? L.byId.get(L.testSelected) : null, r = s ? T.results.get(s.id) : null;
+    if (s && r) {
+      fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s, r.fw);
+      $('fd-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`;
+      $('fd-test-call-cis').innerHTML = fdCallText(s, r.fw.outs[0], 0); $('fd-test-call-inv').innerHTML = fdCallText(s, r.fw.outs[1], 1);
+      $('fd-test-field-note').textContent = `${fdPattern(s).blurb} ${L.reveal ? 'The dots mark the nuclei each head is judged against; a call for the right reason lands the attention on them.' : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'}`;
+    } else {
+      const s0 = L.test[Math.min(T.next, L.test.length - 1)];
+      fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s0, null);
+      $('fd-test-field-title').textContent = `Field ${s0.name} · test · next up`;
+      $('fd-test-call-cis').textContent = 'Press Classify next field: the model reads every nucleus and makes both calls, and the truth is shown after.'; $('fd-test-call-inv').textContent = '';
+      $('fd-test-field-note').textContent = '';
+    }
+    for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), f = L.byId.get(id), right = !!rr && rr.call[0] === f.y[0] && rr.call[1] === f.y[1]; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call[1] === 0); el.classList.toggle('call-1', !!rr && rr.call[1] === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
+  }
+  function bindFields() {
+    const L = S.fd;
+    document.querySelectorAll('#fd-pos-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.pos === '1'; if (v === L.pos) return; L.pos = v; fdReset(v ? 'Every nucleus now carries its position with its code — fresh random weights.' : 'The codes alone: the model no longer knows where a nucleus sits — fresh random weights.'); }));
+    document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.ctx === '1'; if (v === L.ctx) return; L.ctx = v; fdReset(v ? 'Context on: two layers of self-attention let every nucleus read the others before the heads see it — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
+    document.querySelectorAll('#fd-crop-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.crop; if (v === L.crop) return; L.crop = v; fdSyncControls(); fdReset(v === 'nucleus' ? 'Crops masked to the nucleus: the code carries cytology and nothing else — fresh random weights.' : 'Crops with their surroundings: the field around the nucleus reaches the code, and with it its location and the outline of its nest — fresh random weights.'); }));
+    $('fd-backbone').addEventListener('change', () => { S.backbone = $('fd-backbone').value; fdReset(`The code now comes from ${codeEncoder().describe} — fresh random weights.`); });
+    $('fd-epochs').addEventListener('input', () => { L.epochs = +$('fd-epochs').value; $('fd-epochs-val').textContent = L.epochs; if (L.model) { fdRenderStatus(); fdRenderCurves(); } });
+    $('fd-speed').addEventListener('input', () => { L.speed = speedFromSlider(+$('fd-speed').value); $('fd-speed-val').textContent = `${L.speed} epochs/s`; });
+    $('fd-seed').addEventListener('change', () => { L.seed = Math.max(1, Math.round(+$('fd-seed').value) || 1); fdReset(`Seed ${L.seed} — fresh random weights.`); });
+    for (const id of ['fd-reveal', 'fd-data-reveal', 'fd-test-reveal']) $(id).addEventListener('change', ev => fdSetReveal(ev.target.checked));
+    $('fd-data-prev').addEventListener('click', () => fdDataNeighbour(-1)); $('fd-data-next').addEventListener('click', () => fdDataNeighbour(1));
+    $('fd-classify-next').addEventListener('click', () => fdClassifyNext()); $('fd-classify-all').addEventListener('click', fdClassifyAll); $('fd-test-clear').addEventListener('click', fdTestClear);
+    $('fd-step-field').addEventListener('click', fdStepField); $('fd-step-epoch').addEventListener('click', fdStepEpoch);
+    $('fd-train').addEventListener('click', () => (L.running ? fdStop('Paused.') : fdStart()));
+    $('fd-reset').addEventListener('click', () => fdReset('Weights re-initialised from the seed.'));
+    $('fd-prev').addEventListener('click', () => fdNeighbour(-1)); $('fd-next').addEventListener('click', () => fdNeighbour(1));
+    document.querySelectorAll('#fd-links-seg button').forEach(b => b.addEventListener('click', () => { L.linksAll = b.dataset.links === '1'; fdSyncControls(); if (L.model) fdRenderField(); }));
+    document.querySelectorAll('#fd-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; fdSyncControls(); if (L.model) fdRenderField(); }));
+    $('fd-links-min').addEventListener('input', () => { L.linksMin = +$('fd-links-min').value / 100; $('fd-links-min-val').textContent = pct(L.linksMin); if (L.model) fdRenderField(); });
+    // hovering either viewer follows the nucleus on both; a click keeps it
+    for (const [cvId, tipId] of [['fd-canvas-cis', 'fd-tip-cis'], ['fd-canvas-inv', 'fd-tip-inv']]) {
+      const cv = $(cvId), tip = $(tipId);
+      cv.addEventListener('mousemove', ev => {
+        if (!L.model) return;
+        const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top);
+        if (i !== L.hoverNucleus) { L.hoverNucleus = i; fdRenderFocus(); }
+        if (i != null) { const { s, fw } = fdFocusForward(); tip.hidden = false; tip.textContent = fdNucleusTip(s, fw, i); const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
+        else tip.hidden = true;
+      });
+      cv.addEventListener('mouseleave', () => { tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) fdRenderFocus(); } });
+      cv.addEventListener('click', ev => { if (!L.model || !L.ctx) return; const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top); if (i == null) return; L.pinned = L.pinned === i ? null : i; fdRenderFocus(); fdNote(L.pinned == null ? 'Unpinned: the lines follow the hovered nucleus.' : `Nucleus ${i + 1} pinned: the lines follow it until you click it again.`); });
+    }
+    const dc = $('fd-data-canvas'), dt = $('fd-data-tip');
+    dc.addEventListener('mousemove', ev => {
+      if (!L.built) return; const s = L.byId.get(L.dataSelected); if (!s) return;
+      const r = dc.getBoundingClientRect(), i = Viz.hitField(dc, ev.clientX - r.left, ev.clientY - r.top);
+      if (i !== L.dataHover) { L.dataHover = i; fdRenderDataCanvas(); }
+      if (i != null) { const n = s.nuclei[i]; dt.hidden = false; dt.textContent = `nucleus ${i + 1} · ${n.kind === 'stroma' ? 'stromal spindle cell' : n.below ? 'below the membrane' : 'in the epithelium'}${L.reveal ? ` · ${n.kind === 'stroma' ? '' : n.atypical ? `atypical (${subtypeWord(n.subtype)})` : 'bland'}` : ''}`; const half = dt.offsetWidth / 2 + 4; dt.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; dt.style.top = (ev.clientY - r.top) + 'px'; }
+      else dt.hidden = true;
+    });
+    dc.addEventListener('mouseleave', () => { dt.hidden = true; if (L.dataHover != null) { L.dataHover = null; if (L.built) fdRenderDataCanvas(); } });
+  }
+
   // ------------------------------------------------------------------ boot
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
@@ -2094,7 +2485,7 @@
     const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); bindSlides(); renderBackboneOptions();
+    bindControls(); bindFoundation(); bindSlides(); bindFields(); renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();

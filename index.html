@@ -615,6 +615,157 @@
         <div class="tray slides" id="sl-test-results"></div>
       </div>
     </section>
+
+    <!-- ============================ FIELDS · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-fd-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="fd-data-title">Fields of bladder: is it invasive?</h2>
+          <span class="small muted" id="fd-data-sub"></span>
+        </div>
+        <p class="prose small" id="fd-data-blurb"></p>
+        <div class="bar-row" style="margin-top:8px">
+          <div class="ctl check"><input type="checkbox" id="fd-data-reveal"><label for="fd-data-reveal" class="plainlabel">Reveal the membrane, the nests and which nuclei are atypical (the model never sees this)</label></div>
+        </div>
+        <div class="note" id="fd-data-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="fd-data-field-title">The field</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="fd-data-prev" title="the previous field">◀ previous</button><button type="button" class="btn" id="fd-data-next" title="the next field">next ▶</button></div>
+        </div>
+        <div class="fd-two">
+          <div><div class="net-wrap"><canvas id="fd-data-canvas" width="528" height="384" aria-label="The field: urothelium on its basement membrane, stroma beneath, cells below the membrane"></canvas><div class="tip" id="fd-data-tip" hidden></div></div><p class="small" id="fd-data-caption" style="margin-top:8px"></p></div>
+          <div><p class="small muted" style="margin:0 0 8px">Invasion is the conjunction of three cues, and every pattern that lacks one is a real mimic:</p><div class="fd-patterns" id="fd-patterns"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The fields</h2><div class="legend"><span><span class="swatch ring"></span>not invasive</span><span><span class="swatch ring pos"></span>invasive</span></div></div>
+        <p class="small muted" style="margin:0 0 8px" id="fd-data-train-label">Training fields</p>
+        <div class="tray fields" id="fd-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="fd-data-test-label">Test fields · held out</p>
+        <div class="tray fields" id="fd-data-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ FIELDS · 2 · TRAIN ============================ -->
+    <section class="stage-panel" id="panel-fields" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Fields: two calls from one field</h2>
+          <span class="small muted">cytology · location · arrangement · two attention heads, one per question</span>
+        </div>
+        <p class="prose small" id="fd-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">Each nucleus</span><div class="seg" id="fd-pos-seg"><button type="button" data-pos="0" title="the code of the nucleus alone">its code</button><button type="button" data-pos="1" class="is-active" title="the code, and where the nucleus sits in the field">code + position</button></div></div>
+          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="fd-ctx-seg"><button type="button" data-ctx="0">none</button><button type="button" data-ctx="1" class="is-active" title="two layers of self-attention before the pooling, each with a learned distance cost">nuclei look at each other</button></div></div>
+          <div class="ctl"><span class="lbl">Crop</span><div class="seg" id="fd-crop-seg"><button type="button" data-crop="nucleus" class="is-active" title="every crop masked to its nucleus by the segmentation: cytology and nothing else">masked to the nucleus</button><button type="button" data-crop="surroundings" title="the field around the nucleus stays in the crop, and leaks location and the nest’s outline into the code">with its surroundings</button></div></div>
+          <div class="ctl"><label for="fd-backbone">Code from</label><select id="fd-backbone"></select></div>
+          <div class="ctl slim"><label for="fd-epochs">Epochs <span class="val" id="fd-epochs-val">60</span></label><input type="range" id="fd-epochs" min="10" max="200" step="10" value="60"></div>
+          <div class="ctl slim"><label for="fd-speed">Speed <span class="val" id="fd-speed-val"></span></label><input type="range" id="fd-speed" min="0" max="100" step="1" value="60"></div>
+          <div class="ctl slim"><label for="fd-seed">Random seed</label><input type="number" id="fd-seed" min="1" max="9999" value="1"></div>
+          <div class="ctl check"><input type="checkbox" id="fd-reveal"><label for="fd-reveal" class="plainlabel">Reveal the membrane, the nests and the atypical nuclei</label></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="fd-step-field" title="one gradient step on the next training field">Step field</button>
+            <button type="button" class="btn" id="fd-step-epoch" title="one pass through the 400 training fields">Step epoch</button>
+            <button type="button" class="btn primary big" id="fd-train" title="run the remaining epochs (space)">▶ Train</button>
+            <button type="button" class="btn" id="fd-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+          </div>
+        </div>
+        <div class="status" id="fd-status"></div>
+        <div class="note" id="fd-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 id="fd-field-title">The field</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="fd-prev" title="the previous field">◀ previous</button><button type="button" class="btn" id="fd-next" title="the next field">next ▶</button></div>
+        </div>
+        <div class="fd-heads">
+          <div><h3 id="fd-head-cis">What the CIS head weighs</h3><div class="net-wrap"><canvas id="fd-canvas-cis" width="352" height="256" aria-label="The field with the CIS head’s attention weights"></canvas><div class="tip" id="fd-tip-cis" hidden></div></div><p class="small" id="fd-call-cis" style="margin-top:8px"></p></div>
+          <div><h3 id="fd-head-inv">What the invasion head weighs</h3><div class="net-wrap"><canvas id="fd-canvas-inv" width="352" height="256" aria-label="The field with the invasion head’s attention weights"></canvas><div class="tip" id="fd-tip-inv" hidden></div></div><p class="small" id="fd-call-inv" style="margin-top:8px"></p></div>
+        </div>
+        <p class="small muted" id="fd-field-note" style="margin-top:8px"></p>
+        <div class="bar-row" id="fd-links-ctl" hidden style="margin-top:10px">
+          <div class="ctl"><span class="lbl">Links</span><div class="seg small" id="fd-links-seg"><button type="button" data-links="0" class="is-active" title="lines from the hovered (or pinned) nucleus to the nuclei it listens to">one nucleus</button><button type="button" data-links="1" title="every pair at once, a link wide at the end that listens">every nucleus</button></div></div>
+          <div class="ctl slim"><label for="fd-links-min">Links above <span class="val" id="fd-links-min-val">10%</span></label><input type="range" id="fd-links-min" min="0" max="40" step="1" value="10"></div>
+          <div class="ctl"><span class="lbl">Layer</span><div class="seg small" id="fd-layer-seg"><button type="button" data-layer="0" class="is-active" title="the first layer of self-attention">first</button><button type="button" data-layer="1" title="the second layer, which reads what the first one wrote">second</button></div></div>
+        </div>
+        <p class="small muted" id="fd-links-note" style="margin-top:6px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>The mimic table</h2><span class="small muted">the test fields of each pattern: how often called CIS, how often called invasive · scored as the model trains, never trained on</span></div>
+        <div class="fd-mimic" id="fd-mimic"></div>
+        <p class="small muted" id="fd-mimic-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Learning curves</h2>
+          <div class="legend"><span><span class="line"></span>training fields</span><span><span class="line test"></span>test fields (peeking)</span><span><span class="line chance"></span>uniform attention</span></div>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Loss (both questions) per epoch</span><span class="now" id="fd-loss-now"></span></div><svg id="fd-loss" role="img" aria-label="Loss per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Invasion right per epoch</span><span class="now" id="fd-acc-now"></span></div><svg id="fd-acc" role="img" aria-label="Invasion accuracy per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Invasion head’s attention on the atypical nuclei below the membrane</span><span class="now" id="fd-mass-now"></span></div><svg id="fd-mass" role="img" aria-label="Share of the invasion head’s attention on the atypical nuclei below the membrane per epoch"></svg></div>
+        </div>
+        <p class="small muted" style="margin-top:8px" id="fd-curves-note"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>The fields</h2><div class="legend"><span><span class="swatch ring"></span>called not invasive</span><span><span class="swatch ring pos"></span>called invasive</span><span><span class="swatch badge">✗</span>a call wrong</span><span><span class="swatch batch"></span>last trained on</span></div></div>
+        <p class="small muted" style="margin:0 0 8px" id="fd-train-label">Training fields</p>
+        <div class="tray fields" id="fd-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="fd-test-label">Test fields · never trained on, scored as it goes</p>
+        <div class="tray fields" id="fd-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ FIELDS · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-fd-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="fd-classify-next">Classify next field</button>
+            <button type="button" class="btn" id="fd-classify-all">Classify all</button>
+            <button type="button" class="btn" id="fd-test-clear">Clear</button>
+          </div>
+          <div class="ctl check"><input type="checkbox" id="fd-test-reveal"><label for="fd-test-reveal" class="plainlabel">Reveal the membrane, the nests and the atypical nuclei</label></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">classified</span><b id="fd-stat-n">0 / 50</b><small>held-out fields</small></div>
+            <div class="metric"><span class="lbl">CIS right</span><b id="fd-stat-cis">–</b><small id="fd-stat-cis-sub"></small></div>
+            <div class="metric"><span class="lbl">invasion right</span><b id="fd-stat-inv">–</b><small id="fd-stat-inv-sub"></small></div>
+            <div class="metric"><span class="lbl">invasive found</span><b id="fd-stat-sens">–</b><small id="fd-stat-sens-sub"></small></div>
+            <div class="metric"><span class="lbl">mimics cleared</span><b id="fd-stat-mimic">–</b><small id="fd-stat-mimic-sub"></small></div>
+          </div>
+        </div>
+        <p class="note" id="fd-test-warning" hidden>The model has not trained yet — these calls will be as good as a coin toss, which is itself worth seeing.</p>
+        <div class="note" id="fd-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="fd-test-field-title">The field under test</h2>
+          <span class="small muted">held-out fields go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
+        </div>
+        <div class="fd-heads">
+          <div><h3>What the CIS head weighed</h3><canvas id="fd-test-canvas-cis" width="352" height="256" aria-label="The field under test with the CIS head’s attention"></canvas><p class="small" id="fd-test-call-cis" style="margin-top:8px"></p></div>
+          <div><h3>What the invasion head weighed</h3><canvas id="fd-test-canvas-inv" width="352" height="256" aria-label="The field under test with the invasion head’s attention"></canvas><p class="small" id="fd-test-call-inv" style="margin-top:8px"></p></div>
+        </div>
+        <p class="small muted" id="fd-test-field-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The mimic table so far</h2><span class="small muted">the classified test fields of each pattern</span></div>
+        <div class="fd-mimic" id="fd-test-mimic"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Test fields · <span id="fd-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch ring"></span>called not invasive</span><span><span class="swatch ring pos"></span>called invasive</span><span><span class="swatch badge" style="background:var(--good)">✓</span>both calls right</span><span><span class="swatch badge">✗</span>a call wrong</span></div>
+        </div>
+        <div class="tray fields" id="fd-test-results"></div>
+      </div>
+    </section>
   </div>
 
   <!-- ============================ INSPECTOR ============================ -->
@@ -677,6 +828,7 @@
 <script src="data/foundation/backbones.js"></script>
 <script src="data/slides/slides_data.js"></script>
 <script src="js/features.js"></script>
+<script src="js/fields.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>

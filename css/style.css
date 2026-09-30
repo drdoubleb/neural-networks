@@ -467,3 +467,24 @@ details.fold > ul { margin-top: 8px; }
 @media (max-width: 1500px) { .tagline { display: none; } .brand { flex: 0 1 auto; } .mh-select select { max-width: 250px; } }
 .confusion.small { grid-template-columns: auto 62px 62px; }
 .confusion.small .hd { font-size: 9px; line-height: 1.15; }
+
+/* ---- the fields of the invasion question: the field viewers, the two heads side by side, the trays and the tables */
+.fd-two { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+.fd-two > div { min-width: 0; }
+@media (min-width: 960px) { .fd-two { grid-template-columns: 528px minmax(0, 1fr); align-items: start; } }
+.fd-heads { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
+.fd-heads > div { min-width: 0; }
+.fd-heads h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
+@media (min-width: 900px) { .fd-heads { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.fd-heads canvas, #fd-data-canvas { width: 100%; height: auto; display: block; border-radius: 6px; }
+.tray.fields { grid-template-columns: repeat(auto-fill, 94px); gap: 8px; }
+.thumb.field { width: 94px; height: 70px; }
+.thumb.field canvas { image-rendering: auto; }
+.fd-patterns table, .fd-mimic table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fd-patterns th, .fd-mimic th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); font-weight: 600; }
+.fd-patterns td, .fd-mimic td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+.fd-patterns td:first-child, .fd-mimic td:first-child { color: var(--ink); font-weight: 600; }
+.fd-patterns tr.current td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.fd-mimic td.num, .fd-mimic th.num { font-family: var(--font-mono); text-align: right; white-space: nowrap; }
+.fd-mimic td.good { color: var(--good-text); } .fd-mimic td.bad { color: var(--bad); }
+.fd-mimic .truth { color: var(--ink-3); font-size: 12px; white-space: nowrap; }

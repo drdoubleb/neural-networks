@@ -889,6 +889,84 @@ window.Viz = (function () {
     const ctx = canvas.getContext('2d'); ctx.imageSmoothingEnabled = true;
     pxs.forEach((px, i) => ctx.drawImage(imageToCanvas(px, size, tint), (i % cols) * cell, Math.floor(i / cols) * cell, cell, cell));
   }
+  // ---- a tissue field of the invasion question: the H&E-tinted field with the attention weights of one head drawn
+  // as a ring on every nucleus, thicker and stronger with the weight; with reveal, the basement membrane, the nests'
+  // outlines and a dot on every atypical nucleus (what the model never sees); the hovered nucleus outlined, the pinned
+  // one dashed; links from one nucleus to the nuclei it listens to, or every link at once.
+  // opt = { px (w × h grey levels), w, h, scale, tint, nuclei: [{ x, y, a, pos }], hover, pinned, reveal, membrane
+  //         (heights every 8 px), nests, plain (no model: no rings), links: { from, weights }, allLinks: { A, min, hover } }
+  const fieldScratch = document.createElement('canvas');
+  function fieldToCanvas(px, w, h, tint) {
+    fieldScratch.width = w; fieldScratch.height = h;
+    const ctx = fieldScratch.getContext('2d'), im = ctx.createImageData(w, h);
+    for (let i = 0; i < px.length; i++) { const c = pixelRgb(px[i], tint); im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = 255; }
+    ctx.putImageData(im, 0, 0);
+    return fieldScratch;
+  }
+  function nestOutline(ctx, nest, k) { // a nest's outline as the generator defined it: a wobbly ellipse, the union of ribbons, or cords of a given width
+    if (nest.kind === 'round') {
+      const ca = Math.cos(nest.rot || 0), sa = Math.sin(nest.rot || 0);
+      ctx.beginPath();
+      for (let t = 0; t <= 72; t++) { const th = t / 72 * 2 * Math.PI, r = 1 + (nest.amp || 0) * Math.cos((nest.k || 2) * th + (nest.phase || 0)), xr = Math.cos(th) * r * nest.rx, yr = Math.sin(th) * r * nest.ry, x = nest.cx + xr * ca - yr * sa, y = nest.cy + xr * sa + yr * ca; if (t) ctx.lineTo(x * k, y * k); else ctx.moveTo(x * k, y * k); }
+      ctx.closePath(); ctx.stroke();
+    } else if (nest.kind === 'jagged') { for (const poly of nest.outlines) { ctx.beginPath(); poly.forEach((p, i) => (i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k))); ctx.closePath(); ctx.stroke(); } }
+    else if (nest.kind === 'cords') { ctx.save(); ctx.lineWidth = nest.halfWidth * 2 * k; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.globalAlpha *= 0.35; for (const path of nest.paths) { ctx.beginPath(); path.forEach((p, i) => (i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k))); ctx.stroke(); } ctx.restore(); }
+  }
+  function drawField(canvas, opt) {
+    const k = opt.scale || 2, W = opt.w * k, H = opt.h * k, n = opt.nuclei.length, R = 8.5 * k;
+    const ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(fieldToCanvas(opt.px, opt.w, opt.h, opt.tint), 0, 0, W, H);
+    ctx.imageSmoothingEnabled = true;
+    if (opt.reveal) { // the truth, as on the contact sheet: the membrane in blue, the nests in green, the atypical nuclei dotted
+      if (opt.membrane) { ctx.strokeStyle = 'rgba(42,120,214,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); opt.membrane.forEach((y, i) => (i ? ctx.lineTo(i * 8 * k, y * k) : ctx.moveTo(0, y * k))); ctx.stroke(); }
+      if (opt.nests) { ctx.strokeStyle = 'rgba(16,150,90,0.9)'; ctx.lineWidth = 1.5; for (const nest of opt.nests) nestOutline(ctx, nest, k); }
+    }
+    let mx = 1e-9; for (const q of opt.nuclei) mx = Math.max(mx, q.a);
+    const centre = i => [opt.nuclei[i].x * k, opt.nuclei[i].y * k];
+    if (!opt.plain) opt.nuclei.forEach((q, i) => { // the attention rings
+      const rel = q.a / mx, [x, y] = centre(i);
+      if (rel > 0.5) { ctx.fillStyle = rgbStr(c.rgb.irregular, 0.08 + 0.22 * rel); ctx.beginPath(); ctx.arc(x, y, R, 0, 2 * Math.PI); ctx.fill(); }
+      ctx.strokeStyle = rgbStr(c.rgb.irregular, 0.1 + 0.8 * rel); ctx.lineWidth = 0.8 + 3 * rel; ctx.beginPath(); ctx.arc(x, y, R, 0, 2 * Math.PI); ctx.stroke();
+    });
+    if (opt.reveal) opt.nuclei.forEach((q, i) => { if (!q.pos) return; const [x, y] = centre(i); ctx.fillStyle = c.irregular; ctx.beginPath(); ctx.arc(x, y, 2.2 * k / 2 + 1.5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 1; ctx.stroke(); });
+    if (opt.allLinks) { // every pair at once, the weakest first so the strong links end up on top
+      const { A, min, hover } = opt.allLinks, width = a => 1 + 16 * Math.min(0.6, a), pairs = [];
+      for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) { const ai = A[i][j] >= min ? A[i][j] : 0, aj = A[j][i] >= min ? A[j][i] : 0; if (ai || aj) pairs.push({ i, j, ai, aj, top: Math.max(ai, aj) }); }
+      pairs.sort((a, b) => a.top - b.top);
+      for (const q of pairs) {
+        const [xa, ya] = centre(q.i), [xb, yb] = centre(q.j), len = Math.hypot(xb - xa, yb - ya) || 1, nx = -(yb - ya) / len, ny = (xb - xa) / len, wa = (q.ai ? width(q.ai) : 0) / 2, wb = (q.aj ? width(q.aj) : 0) / 2;
+        const near = hover == null || q.i === hover || q.j === hover;
+        ctx.fillStyle = rgbStr(c.rgb.accent, (0.3 + 0.6 * Math.min(1, q.top / 0.5)) * (near ? 1 : 0.15));
+        ctx.beginPath(); ctx.moveTo(xa + nx * wa, ya + ny * wa); ctx.lineTo(xb + nx * wb, yb + ny * wb); ctx.lineTo(xb - nx * wb, yb - ny * wb); ctx.lineTo(xa - nx * wa, ya - ny * wa); ctx.closePath(); ctx.fill();
+      }
+    }
+    if (opt.links) { // whom one nucleus listens to: a line to each, thicker with the weight
+      const { from, weights } = opt.links; let mw = 1e-9; weights.forEach((w, j) => { if (j !== from) mw = Math.max(mw, w); });
+      const [x0, y0] = centre(from);
+      weights.forEach((w, j) => { if (j === from || w < 0.04 * mw) return; const rel = w / mw, [x1, y1] = centre(j); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.3 + 0.7 * rel); ctx.lineWidth = 1 + 5 * rel; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
+      ctx.fillStyle = c.accent; ctx.beginPath(); ctx.arc(x0, y0, 5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 2; ctx.stroke();
+    }
+    if (opt.pinned != null && opt.pinned < n) { const [x, y] = centre(opt.pinned); ctx.setLineDash([4, 3]); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]); }
+    if (opt.hover != null && opt.hover < n) { const [x, y] = centre(opt.hover); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 2, 0, 2 * Math.PI); ctx.stroke(); }
+    canvas._fieldLayout = { k, W, R, xy: opt.nuclei.map((q, i) => centre(i)) };
+  }
+  // which nucleus of a drawn field is under a point (canvas-relative CSS pixels), or null
+  function hitField(canvas, px, py) {
+    const L = canvas._fieldLayout; if (!L) return null;
+    const x = px * L.W / canvas.clientWidth, y = py * L.W / canvas.clientWidth; let best = null, bd = (L.R + 3) * (L.R + 3);
+    L.xy.forEach(([cx, cy], i) => { const d = (cx - x) * (cx - x) + (cy - y) * (cy - y); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
+  // a field as a small tile for the trays, at half size
+  function renderFieldThumb(canvas, px, w, h, tint, cache) { // cache: an object that keeps the tile for this tint, so other trays copy it
+    const W = Math.round(w / 2), H = Math.round(h / 2), key = tint ? 'he' : 'grey';
+    if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
+    const ctx = canvas.getContext('2d');
+    if (cache && cache[key]) { ctx.drawImage(cache[key], 0, 0); return; }
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(fieldToCanvas(px, w, h, tint), 0, 0, W, H);
+    if (cache) { const tile = document.createElement('canvas'); tile.width = W; tile.height = H; tile.getContext('2d').drawImage(canvas, 0, 0); cache[key] = tile; }
+  }
   // ---- the whole slide model, unrolled on one canvas: every nucleus of the slide through the same scorer, the softmax
   // over the slide, the weighted average and the single layer, drawn like the other network diagrams.
   // m = { nuclei: [{ px, h, s, a, pos }], D, size, tint, reveal, scorer (Net, or null for a plain average), head (Net),
@@ -2151,5 +2229,5 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
 })();
