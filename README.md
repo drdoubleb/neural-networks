@@ -691,6 +691,37 @@ segment-then-encode pipeline produces, the atypia signal comes back, a lone-nucl
 to the majority rate: the code carries cytology and nothing else, which is what makes the cues separable by
 construction. The field model uses masked crops; the surroundings stay available as a switch, to show the leak.
 
+`tools/generate_reports.js` (no dependencies) writes the corpus of the small language model, the question in
+preparation: 908 synthetic bladder biopsy reports, 800 for training, 100 held out and 8 more held out of training
+altogether, to `data/reports/reports_data.js` (1 MB), with a sheet of 21 of them, one or more of every class, in
+`data/reports/sample_reports.md`. Every report is written from a hidden case: the surface urothelium (normal,
+reactive atypia, atypia or denuded), nests below the basement membrane (absent, benign, or atypical with rounded or
+irregular contours and with or without desmoplasia), muscularis propria (not identified, present or involved) and
+inflammation, which bears on nothing and is there so that the attention can be seen ignoring it. A document is the
+findings block, one line per finding as an image analyser might report it, then the report proper in a sign-out's
+order with the diagnosis last: specimen, clinical history, gross, microscopic and diagnosis. The diagnosis follows
+from the findings by a fixed rule, in fixed wording; the microscopic description says only what the block holds,
+each finding in one of several phrasings and the absence of nests often unmentioned; site, procedure, history and
+the gross are drawn at random and mean nothing. The queue is benign-heavy, as a real one is, so that a model asked
+for a diagnosis without evidence lands on *benign urothelium*:
+
+| Surface | Nests below the membrane | Diagnosis | Share |
+|---|---|---|---|
+| normal | absent, or present without atypia | Benign urothelium | 33% |
+| reactive atypia | absent, or present without atypia | Benign urothelium with reactive changes | 12% |
+| denuded | absent, or present without atypia | Denuded urothelium, no diagnostic abnormality in the material present | 5% |
+| atypia | absent, or present without atypia | Urothelial carcinoma in situ | 15% |
+| atypia or denuded | atypical, rounded, no desmoplasia (carcinoma in situ involving von Brunn nests) | Urothelial carcinoma in situ | 10% |
+| atypia or denuded | atypical, irregular, desmoplasia | Urothelial carcinoma, invasive into lamina propria (into muscularis propria when involved), with associated carcinoma in situ when the surface shows atypia | 20% |
+| atypia | atypical, contours and desmoplasia discordant | Urothelial carcinoma in situ with foci suspicious for invasion | 5% |
+| normal | atypical, irregular, desmoplasia | Urothelial carcinoma, invasive into lamina propria | held out |
+
+A line on the muscularis propria closes every diagnosis. Reactive atypia puts the word *atypia* into benign reports,
+so a model has to read the qualifier the way it has to read a *no*; the discordant cases teach it to hedge, and a
+corpus without them will show what a model trained only on confident text does with the same findings; the last
+row, invasion under a normal surface, is real, rare and never trained on, to ask whether the model learned the
+findings or the templates. A report is 84 to 180 word tokens, 130 on average, over a vocabulary of 278.
+
 ## Code map
 
 ```
@@ -705,6 +736,7 @@ js/app.js                  state, task switch, training loop, the three steps of
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
 data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
+data/reports/reports_data.js the reports of the language-model question in preparation: 908 synthetic bladder biopsy reports with their hidden cases, written by tools/generate_reports.js; sample_reports.md beside it is a sheet of 21 for reading
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -713,6 +745,7 @@ tools/check_foundation.js  the foundation model's pretraining and what its code 
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
 tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
 tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
+tools/generate_reports.js  make the reports: a findings block and a sign-out written from a hidden case by a fixed rule, several phrasings per finding
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
