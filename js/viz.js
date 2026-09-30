@@ -943,12 +943,12 @@ window.Viz = (function () {
     }
     if (opt.links) { // whom one nucleus listens to: a line to each, thicker with the weight
       const { from, weights } = opt.links; let mw = 1e-9; weights.forEach((w, j) => { if (j !== from) mw = Math.max(mw, w); });
-      const [x0, y0] = centre(from);
-      weights.forEach((w, j) => { if (j === from || w < 0.04 * mw) return; const rel = w / mw, [x1, y1] = centre(j); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.3 + 0.7 * rel); ctx.lineWidth = 1 + 5 * rel; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
+      const [x0, y0] = from >= 0 && from < n ? centre(from) : [NaN, NaN];
+      weights.forEach((w, j) => { if (j === from || j >= n || w < 0.04 * mw || Number.isNaN(x0)) return; const rel = w / mw, [x1, y1] = centre(j); ctx.strokeStyle = rgbStr(c.rgb.accent, 0.3 + 0.7 * rel); ctx.lineWidth = 1 + 5 * rel; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); });
       ctx.fillStyle = c.accent; ctx.beginPath(); ctx.arc(x0, y0, 5, 0, 2 * Math.PI); ctx.fill(); ctx.strokeStyle = c.surface; ctx.lineWidth = 2; ctx.stroke();
     }
-    if (opt.pinned != null && opt.pinned < n) { const [x, y] = centre(opt.pinned); ctx.setLineDash([4, 3]); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]); }
-    if (opt.hover != null && opt.hover < n) { const [x, y] = centre(opt.hover); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 2, 0, 2 * Math.PI); ctx.stroke(); }
+    if (opt.pinned != null && opt.pinned >= 0 && opt.pinned < n) { const [x, y] = centre(opt.pinned); ctx.setLineDash([4, 3]); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]); }
+    if (opt.hover != null && opt.hover >= 0 && opt.hover < n) { const [x, y] = centre(opt.hover); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 2, 0, 2 * Math.PI); ctx.stroke(); }
     canvas._fieldLayout = { k, W, R, xy: opt.nuclei.map((q, i) => centre(i)) };
   }
   // which nucleus of a drawn field is under a point (canvas-relative CSS pixels), or null

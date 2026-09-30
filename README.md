@@ -586,7 +586,8 @@ stays put. The mimic table is scored on the test fields after every epoch, and t
 accuracy and the invasion head's attention on the atypical nuclei below the membrane. The controls are the ablations
 of the table above: *its code* or *code + position* for every nucleus, context *none* or *nuclei look at each other*,
 and the crop *masked to the nucleus* or *with its surroundings*, the leak. *Test* classifies the held-out fields one
-at a time, both calls with both heads' attention,
+at a time, both calls with both heads' attention and, once a field is called, the same diagram cards for it (the
+call taken apart, with the weights as they are),
 and keeps the mimic table of the fields classified so far. The fields (5.7 MB) are not part of the page's load: they
 are fetched the first time the question is opened, from the page's own folder or, in a copy of the page that has no
 folder, from a mirror of the repository or the published page; decoding the 450 fields and encoding their 17,593 nuclei takes about fifteen seconds,

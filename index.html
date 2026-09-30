@@ -695,6 +695,7 @@
       </div>
 
 
+      <div id="fd-cards">
       <div class="card" id="fd-context-card" hidden>
         <div class="card-head">
           <h2>Who looks at whom</h2>
@@ -748,8 +749,9 @@
         <div class="fm-selected" id="fd-summary"></div>
         <div class="net-wrap"><canvas id="fd-head" width="800" height="440" aria-label="The classifier of one head on the field's summary"></canvas><div class="tip" id="fd-head-tip" hidden></div></div>
       </div>
+      </div>
 
-      <div class="card">
+      <div class="card" id="fd-mimic-card">
         <div class="card-head"><h2>The mimic table</h2><span class="small muted">the test fields of each pattern: how often called CIS, how often called invasive · scored as the model trains, never trained on</span></div>
         <div class="fd-mimic" id="fd-mimic"></div>
         <p class="small muted" id="fd-mimic-note" style="margin-top:8px"></p>
@@ -804,12 +806,12 @@
           <span class="small muted">held-out fields go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
         <div class="fd-heads">
-          <div><h3>What the CIS head weighed</h3><canvas id="fd-test-canvas-cis" width="352" height="256" aria-label="The field under test with the CIS head’s attention"></canvas><p class="small" id="fd-test-call-cis" style="margin-top:8px"></p></div>
-          <div><h3>What the invasion head weighed</h3><canvas id="fd-test-canvas-inv" width="352" height="256" aria-label="The field under test with the invasion head’s attention"></canvas><p class="small" id="fd-test-call-inv" style="margin-top:8px"></p></div>
+          <div><h3>What the CIS head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-cis" width="352" height="256" aria-label="The field under test with the CIS head’s attention"></canvas><div class="tip" id="fd-test-tip-cis" hidden></div></div><p class="small" id="fd-test-call-cis" style="margin-top:8px"></p></div>
+          <div><h3>What the invasion head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-inv" width="352" height="256" aria-label="The field under test with the invasion head’s attention"></canvas><div class="tip" id="fd-test-tip-inv" hidden></div></div><p class="small" id="fd-test-call-inv" style="margin-top:8px"></p></div>
         </div>
         <p class="small muted" id="fd-test-field-note" style="margin-top:8px"></p>
       </div>
-      <div class="card">
+      <div class="card" id="fd-test-mimic-card">
         <div class="card-head"><h2>The mimic table so far</h2><span class="small muted">the classified test fields of each pattern</span></div>
         <div class="fd-mimic" id="fd-test-mimic"></div>
       </div>
