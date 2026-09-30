@@ -2265,7 +2265,15 @@
   function fdStepField() { const L = S.fd; if (!L.model) return; fdStop(); const ended = fdStep(); fdRender(true); const s = L.byId.get(L.lastField); fdNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on field ${s.name} (${fdPattern(s).name}): step ${L.ptr} of ${L.train.length}.`); }
   function fdStepEpoch() { const L = S.fd; if (!L.model) return; fdStop(); do { fdStep(); } while (L.ptr !== 0); fdRender(true); fdNote(`Epoch ${L.epoch} complete.`); }
   function fdSelect(id) { const L = S.fd; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; L.pinned = null; fdRenderFocus(); fdRenderTrays(); }
-  function fdFocus() { const L = S.fd; return (L.selected != null && L.byId.get(L.selected)) || (L.frozen != null && L.byId.get(L.frozen)) || (L.lastField != null && L.byId.get(L.lastField)) || L.train[0]; }
+  const fdOnTest = () => S.world === 'fields' && S.stage === 'test';
+  function fdTestResult() { const L = S.fd; return L.testSelected != null ? L.trial.results.get(L.testSelected) : null; } // the call already made for the field under test, if any
+  function fdFocus() { const L = S.fd; if (fdOnTest()) return (L.testSelected != null && L.byId.get(L.testSelected)) || L.test[Math.min(L.trial.next, L.test.length - 1)]; return (L.selected != null && L.byId.get(L.selected)) || (L.frozen != null && L.byId.get(L.frozen)) || (L.lastField != null && L.byId.get(L.lastField)) || L.train[0]; }
+  // the diagram cards live in the Train step and move to the Test step with the field under test (once it is classified)
+  function fdPlaceCards() {
+    const cards = $('fd-cards'), onTest = fdOnTest(), before = $(onTest ? 'fd-test-mimic-card' : 'fd-mimic-card');
+    if (cards.nextElementSibling !== before) before.parentNode.insertBefore(cards, before);
+    cards.hidden = onTest && !fdTestResult();
+  }
   // while training runs, the field on screen is the last one trained on and changes with every step; a cursor over a
   // viewer or a diagram keeps the field it found there until it leaves, so what it points at stays put
   function fdFreeze(on) { const L = S.fd; if (on) { if (L.frozen == null && L.selected == null && L.built) L.frozen = fdFocus().id; } else if (L.frozen != null) { L.frozen = null; if (L.model && L.running) fdRenderFocus(); } }
@@ -2299,17 +2307,19 @@
       `<span>loss <b>${last.loss.toFixed(3)}</b></span><span>CIS right <b>${pct(last.accCis)}</b> training · <b>${pct(last.testAccCis)}</b> test</span><span>invasion right <b>${pct(last.acc)}</b> training · <b>${pct(last.testAcc)}</b> test (peeking)</span>` +
       `<span>attention on the culprits <b>${pct(last.massCis)}</b> CIS head · <b>${pct(last.mass)}</b> invasion head (test fields; uniform: ${pct(L.share[0])} · ${pct(L.share[1])})</span>`;
   }
-  function fdFocusForward() { const L = S.fd, s = fdFocus(); return { s, fw: L.model.forward(s.H, s.dist, s.xy) }; }
+  function fdFocusForward() { const L = S.fd, s = fdFocus(), r = fdOnTest() ? fdTestResult() : null; return { s, fw: r ? r.fw : L.model.forward(s.H, s.dist, s.xy) }; } // on the Test step, the call as it was made
   function fdShown(fw, k) { const L = S.fd, a = fw.outs[k].a; if (L.hoverNucleus != null && L.hoverNucleus < a.length) return L.hoverNucleus; if (L.pinned != null && L.pinned < a.length) return L.pinned; let j = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; }
   function fdContextView(fw) { const L = S.fd; return L.ctx && fw && fw.ctxs && fw.ctxs.length ? fdAttentionView(fw) : null; }
   function fdCallText(s, o, k) { const yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS', call = o.p >= 0.5 ? 1 : 0, truth = s.y[k]; return `The ${FD.names[k]} head says <b>P(${yes}) = ${o.p.toFixed(2)}</b> → <span class="${call === truth ? 'good-text' : 'bad-text'}">${call ? yes : no} ${call === truth ? '✓' : '✗'}</span> · truth: ${truth ? yes : no}.`; }
   function fdDrawPair(ids, s, fw) { // the two viewers of one field, one per head
-    const L = S.fd, n = s.nuclei.length, view = fdContextView(fw), ok = i => (i != null && i < n ? i : null), hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned);
+    const L = S.fd, n = s.nuclei.length, view = fdContextView(fw), ok = i => (i != null && i >= 0 && i < n ? i : null), hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned);
     ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map((q, i) => ({ x: q.x, y: q.y, a: fw ? fw.outs[k].a[i] : 0, pos: s.pos[k][i] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: !fw,
       hover, pinned: view ? pinned : null, links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null }));
   }
   function fdRenderField() {
-    const L = S.fd, { s, fw } = fdFocusForward(), P = fdPattern(s);
+    const L = S.fd;
+    if (fdOnTest()) { const r = fdTestResult(), s = fdFocus(); fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s, r ? r.fw : null); return; } // the viewers of the Test step: the call as it was made, or the next field plain
+    const { s, fw } = fdFocusForward(), P = fdPattern(s);
     fdDrawPair(['fd-canvas-cis', 'fd-canvas-inv'], s, fw);
     $('fd-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${P.name}`;
     $('fd-call-cis').innerHTML = fdCallText(s, fw.outs[0], 0); $('fd-call-inv').innerHTML = fdCallText(s, fw.outs[1], 1);
@@ -2352,7 +2362,8 @@
       el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name} · CIS ${callC ? 'yes' : 'no'} (P ${pc.toFixed(2)}) ${callC === s.y[0] ? '✓' : '✗'} · invasive ${callI ? 'yes' : 'no'} (P ${pi.toFixed(2)}) ${callI === s.y[1] ? '✓' : '✗'}`;
     }));
   }
-  function fdRenderFocus(light) { fdRenderField(); fdRenderUnrolled(); if (light) return; fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
+  function fdRenderCards() { fdRenderUnrolled(); fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
+  function fdRenderFocus(light) { fdRenderField(); if (fdOnTest()) { if (fdTestResult()) fdRenderCards(); return; } fdRenderUnrolled(); if (light) return; fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
   function fdRender(full) {
     const L = S.fd; if (!L.model) return;
     fdRenderStatus(); fdRenderFocus(!full && L.running);
@@ -2364,6 +2375,7 @@
     const L = S.fd;
     fdReady().then(ok => {
       if (!ok || S.world !== 'fields' || S.stage !== 'train') return;
+      fdPlaceCards();
       if (!L.model || L.modelKey !== fdModelKey()) fdReset(L.model ? 'The input changed — fresh random weights.' : 'Untrained: the attention weights are near uniform and both calls are guesses. Step a field to watch one gradient step, or press Train and watch the mimic table and the curves.');
       else { fdTokens(); fdRender(true); }
     });
@@ -2425,11 +2437,13 @@
     const ev = { outputs: [0, 1].map(k => ({ probs: L.test.map(s => { const r = T.results.get(s.id); return r ? r.p[k] : null; }) })) };
     fdRenderMimic($('fd-test-mimic'), ev, new Set(T.results.keys()), L.testSelected != null ? L.byId.get(L.testSelected).pattern : null);
     const s = L.testSelected != null ? L.byId.get(L.testSelected) : null, r = s ? T.results.get(s.id) : null;
+    fdPlaceCards();
     if (s && r) {
       fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s, r.fw);
+      fdRenderCards();
       $('fd-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`;
       $('fd-test-call-cis').innerHTML = fdCallText(s, r.fw.outs[0], 0); $('fd-test-call-inv').innerHTML = fdCallText(s, r.fw.outs[1], 1);
-      $('fd-test-field-note').textContent = `${fdPattern(s).blurb} ${L.reveal ? 'The dots mark the nuclei each head is judged against; a call for the right reason lands the attention on them.' : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'}`;
+      $('fd-test-field-note').textContent = `${fdPattern(s).blurb} ${L.reveal ? 'The dots mark the nuclei each head is judged against; a call for the right reason lands the attention on them.' : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a nucleus for its two weights; the cards below take this call apart, as they did while training.`;
     } else {
       const s0 = L.test[Math.min(T.next, L.test.length - 1)];
       fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s0, null);
@@ -2461,7 +2475,7 @@
   function fdSyncWalk() { $('fd-walk').textContent = S.fd.walk ? '■ Stop' : '▶ Walk through'; }
   function fdWalkTick(now) {
     const L = S.fd, w = L.walk; if (!w) return;
-    const el = now - w.t0, n = fdFocus().nuclei.length, per = Math.min(SL_WALK.score, 2400 / n), next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
+    const el = Math.max(0, now - w.t0), n = fdFocus().nuclei.length, per = Math.min(SL_WALK.score, 2400 / n), next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
     if (w.stage === 'score') { w.k = Math.min(n, Math.floor(el / per) + 1); L.walkNucleus = w.k - 1; if (el >= n * per + SL_WALK.pause) { L.walkNucleus = null; next('softmax'); } }
     else if (w.stage === 'softmax') { w.t = Math.min(1, el / SL_WALK.softmax); if (el >= SL_WALK.softmax + SL_WALK.pause) next('sum'); }
     else if (w.stage === 'sum') { w.t = Math.min(1, el / SL_WALK.sum); if (el >= SL_WALK.sum + SL_WALK.pause) next('head'); }
@@ -2536,7 +2550,7 @@
   function fdSyncDecideWalk() { $('fd-decide-walk').textContent = S.fd.dwalk ? '■ Stop' : '▶ Walk through'; }
   function fdDecideTick(now) {
     const L = S.fd, w = L.dwalk; if (!w) return;
-    const el = now - w.t0, n = fdFocus().nuclei.length, perKey = Math.min(DE_WALK.keys, 1200 / n), perMatch = Math.min(DE_WALK.match, 2400 / n), next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
+    const el = Math.max(0, now - w.t0), n = fdFocus().nuclei.length, perKey = Math.min(DE_WALK.keys, 1200 / n), perMatch = Math.min(DE_WALK.match, 2400 / n), next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
     const timed = (dur, after) => { w.t = Math.min(1, el / dur); if (el >= dur + DE_WALK.pause) next(after); };
     if (w.stage === 'query') timed(DE_WALK.query, 'keys');
     else if (w.stage === 'keys') { w.k = Math.min(n, Math.floor(el / perKey) + 1); if (el >= n * perKey + DE_WALK.pause) next('match'); }
@@ -2640,11 +2654,11 @@
     document.querySelectorAll('#fd-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; fdDecideWalkStop(); fdSyncControls(); if (L.model) fdRenderFocus(); }));
     $('fd-links-min').addEventListener('input', () => { L.linksMin = +$('fd-links-min').value / 100; $('fd-links-min-val').textContent = pct(L.linksMin); if (L.model) fdRenderField(); });
     // hovering either viewer follows the nucleus on both; a click keeps it
-    for (const [cvId, tipId] of [['fd-canvas-cis', 'fd-tip-cis'], ['fd-canvas-inv', 'fd-tip-inv']]) {
+    for (const [cvId, tipId] of [['fd-canvas-cis', 'fd-tip-cis'], ['fd-canvas-inv', 'fd-tip-inv'], ['fd-test-canvas-cis', 'fd-test-tip-cis'], ['fd-test-canvas-inv', 'fd-test-tip-inv']]) {
       const cv = $(cvId), tip = $(tipId);
       cv.addEventListener('mouseenter', () => fdFreeze(true));
       cv.addEventListener('mousemove', ev => {
-        if (!L.model) return;
+        if (!L.model || (fdOnTest() && !fdTestResult())) return;
         const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top);
         if (i !== L.hoverNucleus) { L.hoverNucleus = i; fdRenderFocus(); }
         if (i != null) { const { s, fw } = fdFocusForward(); tip.hidden = false; tip.textContent = fdNucleusTip(s, fw, i); const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
