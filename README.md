@@ -161,7 +161,9 @@ loss, slide accuracy and the share of a positive slide's attention landing on it
 switch shows what the attention buys. The second slides question, *a focus of atypical cells?*, has the same nuclei in
 both classes and only their arrangement differs; a *context* switch adds one layer of self-attention, and a *Who looks
 at whom* card draws it. *Test* walks through the held-out slides one at a time, like Test for any other question: the
-call, the truth, the attention on that slide and a running tally. See *Slides: one label for twenty nuclei*.
+call, the truth, the attention on that slide and a running tally, and, once a slide is called, the same diagram cards
+for it (the call taken apart, with the weights as they are); hover a nucleus on the slide under test to follow it
+through them. See *Slides: one label for twenty nuclei*.
 
 The **inspector** on the right follows the selected nucleus through the three steps of a blood count or nucleus question. Its *Evidence* view shows what the
 network is weighing: on pixels, a per-pixel overlay (orange pushes toward the positive class, blue away from it), computed

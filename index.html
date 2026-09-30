@@ -465,6 +465,7 @@
         </div>
       </div>
 
+      <div id="sl-cards">
       <div class="card" id="sl-context-card" hidden>
         <div class="card-head">
           <h2>Who looks at whom</h2>
@@ -518,8 +519,9 @@
         <div class="fm-selected" id="sl-summary"></div>
         <div class="net-wrap"><canvas id="sl-head" width="800" height="440" aria-label="The classifier on the slide's summary"></canvas><div class="tip" id="sl-head-tip" hidden></div></div>
       </div>
+      </div>
 
-      <div class="card">
+      <div class="card" id="sl-curves-card">
         <div class="card-head">
           <h2>Learning curves</h2>
           <div class="legend"><span><span class="line"></span>training slides</span><span><span class="line test"></span>test slides (peeking)</span><span><span class="line chance"></span>uniform attention</span></div>
@@ -603,11 +605,11 @@
           <span class="small muted">held-out slides go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
         <div class="sl-two">
-          <div><canvas id="sl-test-canvas" width="372" height="354" aria-label="The slide under test with its attention weights"></canvas><p class="small" id="sl-test-call" style="margin-top:8px"></p></div>
+          <div><div class="net-wrap"><canvas id="sl-test-canvas" width="372" height="354" aria-label="The slide under test with its attention weights"></canvas><div class="tip" id="sl-test-tip" hidden></div></div><p class="small" id="sl-test-call" style="margin-top:8px"></p></div>
           <div><div class="sl-rank-wrap"><canvas id="sl-test-rank" width="800" height="116" aria-label="The nuclei of the slide under test ranked by attention"></canvas></div><p class="small muted" style="margin-top:8px" id="sl-test-rank-note"></p></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="sl-test-results-card">
         <div class="card-head">
           <h2>Test slides · <span id="sl-test-count"></span></h2>
           <div class="legend"><span><span class="swatch ring"></span><span data-slcalled="0"></span></span><span><span class="swatch ring pos"></span><span data-slcalled="1"></span></span><span><span class="swatch badge" style="background:var(--good)">✓</span>correct</span><span><span class="swatch badge">✗</span>wrong</span></div>
