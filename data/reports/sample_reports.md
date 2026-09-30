@@ -1,6 +1,6 @@
 # Sample reports
 
-21 generated reports, of every class, with the hidden case above each one. Regenerate with `node tools/generate_reports.js`. Corpus: 800 training, 100 test and 8 held-out reports; 84–180 tokens each (mean 130); vocabulary 277 tokens.
+21 generated reports, of every class, with the hidden case above each one. Regenerate with `node tools/generate_reports.js`. Corpus: 800 training, 100 test and 8 held-out reports; 94–179 tokens each (mean 133); vocabulary 277 tokens.
 
 ## R004 · Benign urothelium
 
@@ -10,7 +10,10 @@
 FINDINGS
 surface urothelium: normal
 nests below basement membrane: absent
-muscularis propria: not identified
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: absent
 inflammation: marked
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Gross hematuria.
@@ -27,7 +30,10 @@ DIAGNOSIS: Benign urothelium. Muscularis propria not identified.
 FINDINGS
 surface urothelium: normal
 nests below basement membrane: absent
-muscularis propria: present, not involved
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: present
 inflammation: none
 SPECIMEN: Bladder, anterior wall, cold cup biopsy.
 CLINICAL: Hematuria.
@@ -44,7 +50,10 @@ DIAGNOSIS: Benign urothelium. Muscularis propria present, not involved.
 FINDINGS
 surface urothelium: normal
 nests below basement membrane: absent
-muscularis propria: present, not involved
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: present
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Hematuria.
@@ -59,12 +68,12 @@ DIAGNOSIS: Benign urothelium. Muscularis propria present, not involved.
 
 ```
 FINDINGS
-surface urothelium: reactive atypia
+surface urothelium: reactive
 nests below basement membrane: present
 atypia in nests: absent
 nest contours: rounded
 stromal reaction: none
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Hematuria.
@@ -79,12 +88,12 @@ DIAGNOSIS: Benign urothelium with reactive changes. Muscularis propria not ident
 
 ```
 FINDINGS
-surface urothelium: reactive atypia
+surface urothelium: reactive
 nests below basement membrane: present
 atypia in nests: absent
 nest contours: rounded
 stromal reaction: none
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: none
 SPECIMEN: Bladder, right lateral wall, cold cup biopsy.
 CLINICAL: Surveillance, history of urothelial carcinoma.
@@ -104,7 +113,7 @@ nests below basement membrane: present
 atypia in nests: absent
 nest contours: rounded
 stromal reaction: none
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, biopsy.
 CLINICAL: Surveillance following intravesical therapy.
@@ -121,7 +130,10 @@ DIAGNOSIS: Denuded urothelium, no diagnostic abnormality in the material present
 FINDINGS
 surface urothelium: denuded
 nests below basement membrane: absent
-muscularis propria: not identified
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: absent
 inflammation: none
 SPECIMEN: Bladder, dome, cold cup biopsy.
 CLINICAL: Microscopic hematuria.
@@ -138,7 +150,10 @@ DIAGNOSIS: Denuded urothelium, no diagnostic abnormality in the material present
 FINDINGS
 surface urothelium: atypia
 nests below basement membrane: absent
-muscularis propria: present, not involved
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: present
 inflammation: none
 SPECIMEN: Bladder, trigone, cold cup biopsy.
 CLINICAL: Gross hematuria.
@@ -155,7 +170,10 @@ DIAGNOSIS: Urothelial carcinoma in situ. Muscularis propria present, not involve
 FINDINGS
 surface urothelium: atypia
 nests below basement membrane: absent
-muscularis propria: not identified
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: absent
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -172,7 +190,10 @@ DIAGNOSIS: Urothelial carcinoma in situ. Muscularis propria not identified.
 FINDINGS
 surface urothelium: atypia
 nests below basement membrane: absent
-muscularis propria: present, not involved
+atypia in nests: none
+nest contours: none
+stromal reaction: none
+muscularis propria: present
 inflammation: none
 SPECIMEN: Bladder, right lateral wall, biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -192,7 +213,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: rounded
 stromal reaction: none
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: none
 SPECIMEN: Bladder, bladder neck, biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -212,7 +233,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: rounded
 stromal reaction: none
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: marked
 SPECIMEN: Bladder, anterior wall, biopsy.
 CLINICAL: Gross hematuria.
@@ -232,7 +253,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: rounded
 stromal reaction: none
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: marked
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Abnormal urine cytology.
@@ -252,7 +273,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: mild
 SPECIMEN: Bladder, right lateral wall, cold cup biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -272,7 +293,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: present, involved
+muscularis propria: involved
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, biopsy.
 CLINICAL: Gross hematuria.
@@ -292,7 +313,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: none
 SPECIMEN: Bladder, dome, cold cup biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -312,7 +333,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: marked
 SPECIMEN: Bladder, dome, cold cup biopsy.
 CLINICAL: Irritative voiding symptoms.
@@ -332,7 +353,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: none
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: mild
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Surveillance following intravesical therapy.
@@ -352,7 +373,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: none
-muscularis propria: not identified
+muscularis propria: absent
 inflammation: mild
 SPECIMEN: Bladder, posterior wall, cold cup biopsy.
 CLINICAL: Microscopic hematuria.
@@ -372,7 +393,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: present, involved
+muscularis propria: involved
 inflammation: none
 SPECIMEN: Bladder, bladder neck, cold cup biopsy.
 CLINICAL: Hematuria.
@@ -392,7 +413,7 @@ nests below basement membrane: present
 atypia in nests: present
 nest contours: irregular
 stromal reaction: desmoplasia
-muscularis propria: present, not involved
+muscularis propria: present
 inflammation: mild
 SPECIMEN: Bladder, dome, biopsy.
 CLINICAL: Surveillance, history of urothelial carcinoma.

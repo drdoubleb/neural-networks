@@ -698,7 +698,9 @@ altogether, to `data/reports/reports_data.js` (1 MB), with a sheet of 21 of them
 reactive atypia, atypia or denuded), nests below the basement membrane (absent, benign, or atypical with rounded or
 irregular contours and with or without desmoplasia), muscularis propria (not identified, present or involved) and
 inflammation, which bears on nothing and is there so that the attention can be seen ignoring it. A document is the
-findings block, one line per finding as an image analyser might report it, then the report proper in a sign-out's
+findings block, one line per finding as an image analyser might report it, every line always there with a one-word
+value (the three nest lines read *none* when there are no nests) so that every value sits at the same place in
+every report, then the report proper in a sign-out's
 order with the diagnosis last: specimen, clinical history, gross, microscopic and diagnosis. The diagnosis follows
 from the findings by a fixed rule, in fixed wording; the microscopic description says only what the block holds,
 each finding in one of several phrasings and the absence of nests often unmentioned; site, procedure, history and
@@ -720,7 +722,7 @@ A line on the muscularis propria closes every diagnosis. Reactive atypia puts th
 so a model has to read the qualifier the way it has to read a *no*; the discordant cases teach it to hedge, and a
 corpus without them will show what a model trained only on confident text does with the same findings; the last
 row, invasion under a normal surface, is real, rare and never trained on, to ask whether the model learned the
-findings or the templates. A report is 84 to 180 word tokens, 130 on average, over a vocabulary of 277.
+findings or the templates. A report is 94 to 179 word tokens, 133 on average, over a vocabulary of 277.
 
 ## Code map
 

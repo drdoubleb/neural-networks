@@ -71,12 +71,20 @@ function diagnose(c) {
   return { dx, mp, text: `${dx} ${mp}` };
 }
 
-// ---- the findings block: what an image analyser would report, one line per finding
+// ---- the findings block: what an image analyser would report, one line per finding, every line always there with a
+// one-word value, so that every value sits at the same place in every report (the three nest lines read none when
+// there are no nests)
 function findings(c) {
-  const lines = [`surface urothelium: ${{ normal: 'normal', reactive: 'reactive atypia', atypia: 'atypia', denuded: 'denuded' }[c.surface]}`, `nests below basement membrane: ${c.nests === 'absent' ? 'absent' : 'present'}`];
-  if (c.nests !== 'absent') lines.push(`atypia in nests: ${c.nests === 'atypical' ? 'present' : 'absent'}`, `nest contours: ${c.contours}`, `stromal reaction: ${c.desmoplasia ? 'desmoplasia' : 'none'}`);
-  lines.push(`muscularis propria: ${{ ni: 'not identified', present: 'present, not involved', involved: 'present, involved' }[c.mp]}`, `inflammation: ${c.inflammation}`);
-  return lines;
+  const present = c.nests !== 'absent';
+  return [
+    `surface urothelium: ${c.surface}`,
+    `nests below basement membrane: ${present ? 'present' : 'absent'}`,
+    `atypia in nests: ${!present ? 'none' : c.nests === 'atypical' ? 'present' : 'absent'}`,
+    `nest contours: ${present ? c.contours : 'none'}`,
+    `stromal reaction: ${present && c.desmoplasia ? 'desmoplasia' : 'none'}`,
+    `muscularis propria: ${{ ni: 'absent', present: 'present', involved: 'involved' }[c.mp]}`,
+    `inflammation: ${c.inflammation}`,
+  ];
 }
 
 // ---- the prose: several phrasings per finding, the microscopic section says nothing the block does not hold
@@ -200,12 +208,12 @@ const meta = {
   question: 'Reports: write the report from the findings?',
   blurb: 'Every document is a findings block, as an image analyser might report it, followed by the report: specimen, clinical history, gross, microscopic description and, last, the diagnosis. The diagnosis follows from the findings by a fixed rule; the microscopic section says only what the block holds, in one of several phrasings.',
   findings: [
-    { key: 'surface', line: 'surface urothelium', states: ['normal', 'reactive atypia', 'atypia', 'denuded'] },
+    { key: 'surface', line: 'surface urothelium', states: ['normal', 'reactive', 'atypia', 'denuded'] },
     { key: 'nests', line: 'nests below basement membrane', states: ['absent', 'present'] },
-    { key: 'atypiaInNests', line: 'atypia in nests', states: ['absent', 'present'], when: 'nests present' },
-    { key: 'contours', line: 'nest contours', states: ['rounded', 'irregular'], when: 'nests present' },
-    { key: 'desmoplasia', line: 'stromal reaction', states: ['none', 'desmoplasia'], when: 'nests present' },
-    { key: 'mp', line: 'muscularis propria', states: ['not identified', 'present, not involved', 'present, involved'] },
+    { key: 'atypiaInNests', line: 'atypia in nests', states: ['none', 'absent', 'present'], note: 'none when there are no nests' },
+    { key: 'contours', line: 'nest contours', states: ['none', 'rounded', 'irregular'], note: 'none when there are no nests' },
+    { key: 'desmoplasia', line: 'stromal reaction', states: ['none', 'desmoplasia'] },
+    { key: 'mp', line: 'muscularis propria', states: ['absent', 'present', 'involved'] },
     { key: 'inflammation', line: 'inflammation', states: ['none', 'mild', 'marked'], note: 'bears on nothing' },
   ],
   classes: CLASSES.map(({ key, share, name }) => ({ key, share, name })).concat([{ key: HELD.key, share: 0, name: HELD.name, held: true }]),
