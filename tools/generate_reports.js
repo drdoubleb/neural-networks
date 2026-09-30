@@ -137,7 +137,7 @@ const P = {
   },
   mp: {
     ni: ['Muscularis propria is not identified.', 'No muscularis propria is present in the biopsy.', 'The biopsy does not include muscularis propria.'],
-    presentBenign: ['Muscularis propria is present.', 'Bundles of muscularis propria are included.', 'Muscularis propria is present and unremarkable.'],
+    presentBenign: ['Muscularis propria is present.', 'Bundles of muscularis propria are present.', 'Muscularis propria is present and unremarkable.'],
     presentTumor: ['Muscularis propria is present and uninvolved.', 'Bundles of muscularis propria are present and free of tumor.', 'Muscularis propria is present; it is not involved.'],
     involved: ['Nests of tumor extend between bundles of muscularis propria.', 'Muscularis propria is present and is infiltrated by tumor.', 'Tumor invades the muscularis propria.'],
   },

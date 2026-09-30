@@ -1,6 +1,6 @@
 # Sample reports
 
-21 generated reports, of every class, with the hidden case above each one. Regenerate with `node tools/generate_reports.js`. Corpus: 800 training, 100 test and 8 held-out reports; 84–180 tokens each (mean 130); vocabulary 278 tokens.
+21 generated reports, of every class, with the hidden case above each one. Regenerate with `node tools/generate_reports.js`. Corpus: 800 training, 100 test and 8 held-out reports; 84–180 tokens each (mean 130); vocabulary 277 tokens.
 
 ## R004 · Benign urothelium
 
@@ -49,7 +49,7 @@ inflammation: mild
 SPECIMEN: Bladder, left lateral wall, cold cup biopsy.
 CLINICAL: Hematuria.
 GROSS: Six tan-pink tissue fragments, 0.2 to 0.4 cm, entirely submitted in two cassettes.
-MICROSCOPIC: The urothelium is of normal thickness, with orderly maturation and no cytologic atypia. Bundles of muscularis propria are included. There is mild chronic inflammation in the lamina propria.
+MICROSCOPIC: The urothelium is of normal thickness, with orderly maturation and no cytologic atypia. Bundles of muscularis propria are present. There is mild chronic inflammation in the lamina propria.
 DIAGNOSIS: Benign urothelium. Muscularis propria present, not involved.
 ```
 

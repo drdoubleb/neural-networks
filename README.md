@@ -720,7 +720,7 @@ A line on the muscularis propria closes every diagnosis. Reactive atypia puts th
 so a model has to read the qualifier the way it has to read a *no*; the discordant cases teach it to hedge, and a
 corpus without them will show what a model trained only on confident text does with the same findings; the last
 row, invasion under a normal surface, is real, rare and never trained on, to ask whether the model learned the
-findings or the templates. A report is 84 to 180 word tokens, 130 on average, over a vocabulary of 278.
+findings or the templates. A report is 84 to 180 word tokens, 130 on average, over a vocabulary of 277.
 
 ## Code map
 
