@@ -694,6 +694,61 @@
         <p class="small muted" id="fd-links-note" style="margin-top:6px"></p>
       </div>
 
+
+      <div class="card" id="fd-context-card" hidden>
+        <div class="card-head">
+          <h2>Who looks at whom</h2>
+          <span class="small muted">two layers of self-attention: every nucleus asks the others, with a learned cost per nucleus diameter of distance, and adds what it hears to its own code before the heads see it</span>
+        </div>
+        <div class="fd-ctx">
+          <div>
+            <div class="actions-inline" style="margin:0 0 8px"><span class="small muted">layer</span><div class="seg small" id="fd-ctx-layer-seg"><button type="button" data-layer="0" class="is-active">first</button><button type="button" data-layer="1">second</button></div><span class="small muted">shares from</span><div class="seg small" id="fd-attview-seg"><button type="button" data-view="both" class="is-active" title="what the layer uses: query · key minus the distance cost, then the softmax">match − distance</button><button type="button" data-view="match" title="what the softmax would give from query · key alone">match only</button><button type="button" data-view="distance" title="what the softmax would give from the distance cost alone">distance only</button></div></div>
+            <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-attmap" width="826" height="826" aria-label="The attention between the nuclei of the field: rows ask, columns answer"></canvas><div class="tip" id="fd-attmap-tip" hidden></div></div></div>
+            <p class="small muted" id="fd-attmap-note" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <div class="fm-selected" id="fd-context-focus"></div>
+            <p class="small muted" id="fd-context-note" style="margin-top:8px">Hover a nucleus on the field, a row of the map or a row of the card below, or click one on the field or the map to pin it: the lines on the field show whom it listens to, and the card below takes its decision apart. A nucleus in a solid nest has three neighbours a diameter away and one in the middle surrounded on every side; a nucleus in an angulated nest has two or three and an open side. That, and where the membrane runs, is what reaches the heads.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="fd-decide-card" hidden>
+        <div class="card-head">
+          <h2 id="fd-decide-title">How a nucleus decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">query · key → match − distance cost → softmax → shares → Σ share × value → added to its own code</span><button type="button" class="btn" id="fd-decide-walk" title="animate this nucleus’s decision, step by step">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-decide" width="800" height="636" aria-label="How one nucleus decides where to look: its query against every other nucleus’s key, the distance cost, the softmax, the values weighted into the message it hears, added to its own code"></canvas><div class="tip" id="fd-decide-tip" hidden></div></div></div>
+        <p class="small muted" id="fd-decide-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" id="fd-unrolled-card">
+        <div class="card-head">
+          <h2>The whole model for this field</h2>
+          <div class="actions-inline"><span class="small muted">head</span><div class="seg small" id="fd-head-seg"><button type="button" data-head="0" title="the head that answers: carcinoma in situ?">CIS</button><button type="button" data-head="1" class="is-active" title="the head that answers: invasion?">invasion</button></div><span class="small muted">the same scorer for every nucleus → softmax → weighted average → single layer</span><button type="button" class="btn" id="fd-walk" title="animate this field through the model, step by step">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-unrolled" width="800" height="570" aria-label="The whole field model, unrolled: every nucleus through the scorer, the softmax, the weighted average and the single layer of one head"></canvas><div class="tip" id="fd-unrolled-tip" hidden></div></div></div>
+        <p class="small muted" id="fd-unrolled-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" id="fd-scorer-card">
+        <div class="card-head">
+          <h2 id="fd-scorer-title">How a nucleus is scored</h2>
+          <span class="small muted" id="fd-scorer-sub">the attention network of this head, the same for every nucleus: its token → tanh units → one score · a softmax over the field turns the scores into weights</span>
+        </div>
+        <div class="net-wrap"><canvas id="fd-scorer" width="800" height="440" aria-label="The attention network of one head for one nucleus"></canvas><div class="tip" id="fd-scorer-tip" hidden></div></div>
+        <p class="small muted" id="fd-scorer-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 id="fd-summary-title">The field’s summary, and the call</h2>
+          <span class="small muted">the nuclei’s tokens averaged with this head’s attention weights, then a single layer on the summary</span>
+        </div>
+        <div class="fm-selected" id="fd-summary"></div>
+        <div class="net-wrap"><canvas id="fd-head" width="800" height="440" aria-label="The classifier of one head on the field's summary"></canvas><div class="tip" id="fd-head-tip" hidden></div></div>
+      </div>
+
       <div class="card">
         <div class="card-head"><h2>The mimic table</h2><span class="small muted">the test fields of each pattern: how often called CIS, how often called invasive · scored as the model trains, never trained on</span></div>
         <div class="fd-mimic" id="fd-mimic"></div>
