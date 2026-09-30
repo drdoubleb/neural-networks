@@ -2101,20 +2101,20 @@
   // segmentation, plus its position), two layers of self-attention let the nuclei look at each other, and two attention
   // heads over the same tokens answer the two questions. The fields (5.7 MB) load on demand, the first time the
   // question is opened, from the page's data folder or, failing that, from the published page.
-  const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'],
-    fallback: 'https://drdoubleb.github.io/neural-networks/data/fields/fields_data.js', names: ['CIS', 'invasion'] };
+  const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'], names: ['CIS', 'invasion'],
+    sources: ['data/fields/fields_data.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/fields/fields_data.js', 'https://drdoubleb.github.io/neural-networks/data/fields/fields_data.js'] }; // the page's own folder, then a mirror of the repository, then the published page
   const NFL = window.NucleusFields;
   function fdNote(msg) { $('fd-note').textContent = msg || ''; }
   function fdData() { const D = window.LECTURE_FIELDS; return D && D.meta ? D : null; }
   const fdCisOf = f => (FD.cisPatterns.includes(f.pattern) ? 1 : 0);
   const fdPattern = f => S.fd.meta.patterns.find(p => p.key === f.pattern);
-  // the fields' file, fetched once: the page's own copy, else the published page's
+  // the fields' file, fetched once, from the first source that answers
   function fdLoad() {
     const L = S.fd; if (fdData()) return Promise.resolve(fdData());
     if (L.loading) return L.loading;
     L.loading = new Promise((resolve, reject) => {
-      const tryUrl = (url, next) => { const el = document.createElement('script'); el.src = url; el.onload = () => (fdData() ? resolve(fdData()) : next ? next() : reject(new Error('no fields in the file'))); el.onerror = () => (next ? next() : reject(new Error(`could not load ${url}`))); document.head.appendChild(el); };
-      tryUrl('data/fields/fields_data.js', () => tryUrl(FD.fallback, null));
+      const tryUrl = k => { if (k >= FD.sources.length) { reject(new Error('no source answered')); return; } const el = document.createElement('script'); el.src = FD.sources[k]; el.onload = () => (fdData() ? resolve(fdData()) : tryUrl(k + 1)); el.onerror = () => tryUrl(k + 1); document.head.appendChild(el); };
+      tryUrl(0);
     });
     return L.loading;
   }

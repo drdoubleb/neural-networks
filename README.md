@@ -581,7 +581,7 @@ nucleus, context *none* or *nuclei look at each other*, and the crop *masked to 
 surroundings*, the leak. *Test* classifies the held-out fields one at a time, both calls with both heads' attention,
 and keeps the mimic table of the fields classified so far. The fields (5.7 MB) are not part of the page's load: they
 are fetched the first time the question is opened, from the page's own folder or, in a copy of the page that has no
-folder, from the published page; decoding the 450 fields and encoding their 17,593 nuclei takes about fifteen seconds,
+folder, from a mirror of the repository or the published page; decoding the 450 fields and encoding their 17,593 nuclei takes about fifteen seconds,
 with the count shown as it goes. The single-file build inlines the fields (`tools/build_single_file.js`, or
 `--no-fields` to leave them out).
 
