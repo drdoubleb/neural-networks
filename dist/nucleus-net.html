@@ -1901,9 +1901,13 @@ window.LECTURE_SLIDES = {"pool":[{"label":0,"subtype":"bland","px":"5eTm6ejs6/Hu
   // layer classifies the summary. Trained on the slide's label(s) only, each scorer learns where to look. With attention
   // off the weights are uniform: a plain average. scorer, head, context and the top-level fields of forward() and
   // evaluate() are the first output's (and the first layer's), so a one-output model reads as before.
+  // the squared norm of a gradient accumulator, and the accumulator scaled: every Float64Array in it, in an array of
+  // them, or a bare number (the dense net's output bias); a net's 'delta' slots are not weights and are left alone
+  function gradientNorm2(g) { let s = 0; for (const key of Object.keys(g)) { if (key === 'delta') continue; const v = g[key]; if (v instanceof Float64Array) { for (const x of v) s += x * x; } else if (Array.isArray(v)) { for (const a of v) for (const x of a) s += x * x; } else if (typeof v === 'number') s += v * v; } return s; }
+  function scaleGradient(g, f) { for (const key of Object.keys(g)) { if (key === 'delta') continue; const v = g[key]; if (v instanceof Float64Array) { for (let i = 0; i < v.length; i++) v[i] *= f; } else if (Array.isArray(v)) { for (const a of v) for (let i = 0; i < a.length; i++) a[i] *= f; } else if (typeof v === 'number') g[key] = v * f; } }
   class AttentionMIL {
-    constructor({ inputSize, attentionUnits = 4, attention = true, context = null, outputs = 1, seed = 1 }) {
-      this.D = inputSize; this.A = attentionUnits; this.attention = attention; this.seed = seed; this.K = outputs;
+    constructor({ inputSize, attentionUnits = 4, attention = true, context = null, outputs = 1, clip = 0, seed = 1 }) {
+      this.D = inputSize; this.A = attentionUnits; this.attention = attention; this.seed = seed; this.K = outputs; this.clip = clip; // clip > 0: a step's mean gradient is scaled down to this norm when it is larger (a guard against the rare exploding step)
       const nl = context ? (context.layers || 1) : 0;
       this.layers = Array.from({ length: nl }, (_, l) => new ContextLayer({ inputSize, dk: context.dk || 8, ffn: context.ffn == null ? 8 : context.ffn, heads: context.heads || 1, distanceBias: !!context.distanceBias, excludeSelf: !!context.excludeSelf, costInit: context.costInit || 0, relative: !!context.relative, seed: seed + 2 + l }));
       this.context = this.layers[0] || null;
@@ -1954,7 +1958,9 @@ window.LECTURE_SLIDES = {"pool":[{"label":0,"subtype":"bland","px":"5eTm6ejs6/Hu
         });
         if (dT) { let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, gcs[l]); } // back through the stack
       }
-      const k = slides.length;
+      const k = slides.length, all = ghs.concat(this.attention ? gss : [], gcs);
+      this.lastGradientNorm = Math.sqrt(all.reduce((a, g) => a + gradientNorm2(g), 0)) / k; // the norm of the step's mean gradient, over every weight
+      if (this.clip > 0 && this.lastGradientNorm > this.clip) for (const g of all) scaleGradient(g, this.clip / this.lastGradientNorm);
       this.heads.forEach((h, i) => h.applyGradient(ghs[i], k, lr, l2)); if (this.attention) this.scorers.forEach((s, i) => s.applyGradient(gss[i], k, lr, l2)); this.layers.forEach((c, i) => c.applyGradient(gcs[i], k, lr, l2));
       this.steps++;
       return loss / k;

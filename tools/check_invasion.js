@@ -15,7 +15,7 @@
  * table: how often the test fields of each pattern are called CIS and called invasive.
  *   node tools/check_invasion.js [--models bag,pos,ctx,full] [--layers 2] [--heads 1] [--seeds 3] [--epochs 150]
  *                                [--lr 0.02] [--decay 0.001] [--units 4] [--dk 8] [--ffn 8] [--cost 1.5] [--big] [--curve]
- *                                [--crop nucleus|surroundings] [--no-augment] [--data path/to/fields_data.js] [--relpos]
+ *                                [--crop nucleus|surroundings] [--no-augment] [--data path/to/fields_data.js] [--relpos] [--clip 0]
  * --relpos: every head's message also carries where the nuclei it listened to lie, relative to the listener
  * --crop nucleus (the default) masks every crop to its nucleus with the field's segmentation, so the code carries
  * cytology alone and location and arrangement have to come from the positions and the context; surroundings leaves
@@ -30,7 +30,7 @@ const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.inde
 const num = (k, d) => +arg(k, d);
 const models = arg('--models', 'bag,pos,ctx,full').split(','), layers = num('--layers', 2), heads = num('--heads', 1), nSeeds = num('--seeds', 3), epochs = num('--epochs', 150);
 const lr = num('--lr', 0.02), decay = num('--decay', 0.001), units = num('--units', 4), dk = num('--dk', 8), ffn = num('--ffn', 8), costInit = num('--cost', 1.5), big = process.argv.includes('--big'), curve = process.argv.includes('--curve'), cropMode = arg('--crop', 'nucleus');
-const relative = process.argv.includes('--relpos'), augment = !process.argv.includes('--no-augment'), dataFile = arg('--data', path.join(__dirname, '..', 'data', 'fields', 'fields_data.js')); // mirrored fields and jittered positions while training unless --no-augment; --data: another fields file
+const relative = process.argv.includes('--relpos'), augment = !process.argv.includes('--no-augment'), dataFile = arg('--data', path.join(__dirname, '..', 'data', 'fields', 'fields_data.js')), clip = num('--clip', 0); // mirrored fields and jittered positions while training unless --no-augment; --data: another fields file; --clip: the largest gradient norm a step may take (0: no clipping)
 const UNIT = 16; // distances in nucleus diameters, so a cost per unit compares with the slides' cost per cell
 const window = {};
 for (const f of [dataFile, path.join(__dirname, '..', 'data', 'foundation', 'backbones.js')]) new Function('window', fs.readFileSync(f, 'utf8'))(window);
@@ -65,7 +65,7 @@ function augmented(sl, D, rng) {
   return Object.assign({}, sl, { H, xy: H.map(h => [h[D - 2], h[D - 1]]) }); // the relative offsets follow the mirrored, jittered positions
 }
 function run(P, M, seed) {
-  const mil = new AttentionMIL({ inputSize: P.D, attentionUnits: units, outputs: 2, context: M.ctx ? { dk, ffn, heads, layers, distanceBias: true, excludeSelf: true, costInit, relative } : null, seed });
+  const mil = new AttentionMIL({ inputSize: P.D, attentionUnits: units, outputs: 2, clip, context: M.ctx ? { dk, ffn, heads, layers, distanceBias: true, excludeSelf: true, costInit, relative } : null, seed });
   const rng = mulberry32(seed * 31 + 7), order = P.train.map((_, i) => i), hist = [];
   const rec = e => { const tr = mil.evaluate(P.train), te = mil.evaluate(P.test); hist.push({ e, tr, te }); };
   rec(0);
