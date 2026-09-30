@@ -72,5 +72,37 @@
     if (/^Benign/.test(dx)) return 'benign';
     return 'other';
   }
-  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, classOf, START, END, UNK, NL, SECTIONS, HEADERS };
+  // the findings block as a form: the seven lines, their keys and their states, in the order of the block
+  const FINDINGS = [
+    { key: 'surface', line: 'surface urothelium', states: ['normal', 'reactive', 'atypia', 'denuded'] },
+    { key: 'nests', line: 'nests below basement membrane', states: ['absent', 'present'] },
+    { key: 'atypia', line: 'atypia in nests', states: ['none', 'absent', 'present'] },
+    { key: 'contours', line: 'nest contours', states: ['none', 'rounded', 'irregular'] },
+    { key: 'stromal', line: 'stromal reaction', states: ['none', 'desmoplasia'] },
+    { key: 'mp', line: 'muscularis propria', states: ['absent', 'present', 'involved'] },
+    { key: 'inflammation', line: 'inflammation', states: ['none', 'mild', 'marked'] },
+  ];
+  // the block's text from a findings object { surface, nests, atypia, contours, stromal, mp, inflammation }
+  function blockOf(f) { return 'FINDINGS\n' + FINDINGS.map(l => `${l.line}: ${f[l.key]}`).join('\n'); }
+  // the findings read back from a block's tokens (the first 40 of a report), or null
+  function findingsOf(words) {
+    const f = {}; let i = 0;
+    for (const l of FINDINGS) { const at = words.indexOf(l.line.split(' ')[0], i); if (at < 0) return null; const colon = words.indexOf(':', at); if (colon < 0) return null; f[l.key] = words[colon + 1]; i = colon + 1; if (!l.states.includes(f[l.key])) return null; }
+    return f;
+  }
+  // the rule the generator followed, for any findings: the diagnosis sentence and the muscularis propria line
+  function ruleOf(f) {
+    const at = f.nests === 'present' && f.atypia === 'present', inv = at && f.contours === 'irregular' && f.stromal === 'desmoplasia', cisn = at && f.contours === 'rounded' && f.stromal === 'none', disc = at && !inv && !cisn;
+    let dx;
+    if (disc) dx = 'Urothelial carcinoma in situ with foci suspicious for invasion.';
+    else if (inv) dx = `Urothelial carcinoma, invasive into ${f.mp === 'involved' ? 'muscularis propria' : 'lamina propria'}${f.surface === 'atypia' ? ', with associated carcinoma in situ' : ''}.`;
+    else if (cisn || f.surface === 'atypia') dx = 'Urothelial carcinoma in situ.';
+    else if (f.surface === 'reactive') dx = 'Benign urothelium with reactive changes.';
+    else if (f.surface === 'denuded') dx = 'Denuded urothelium, no diagnostic abnormality in the material present.';
+    else dx = 'Benign urothelium.';
+    const mp = f.mp === 'absent' ? 'Muscularis propria not identified.' : f.mp === 'present' ? 'Muscularis propria present, not involved.' : 'Muscularis propria present and involved.';
+    return { dx, mp, text: `${dx} ${mp}` };
+  }
+  const CLASS_NAMES = { benign: 'benign', reactive: 'reactive', denuded: 'denuded', cis: 'CIS', suspicious: 'suspicious', invasive: 'invasive', 'invasive-mp': 'invasive, MP', other: 'other', none: 'none' };
+  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, classOf, blockOf, findingsOf, ruleOf, FINDINGS, CLASS_NAMES, START, END, UNK, NL, SECTIONS, HEADERS };
 });
