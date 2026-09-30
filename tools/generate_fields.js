@@ -101,7 +101,7 @@ const membraneOf = f => x => f.ym0 + f.A1 * Math.sin(TAU * x / f.L1 + f.p1) + f.
 
 // ---- one field: the membrane, the epithelium, what lies below, the stroma
 function makeField(P, id) {
-  const f = { id, pattern: P.key, label: P.label, ym0: U(46, 58), A1: U(1.5, 3.5), L1: U(90, 170), p1: U(0, TAU), A2: U(0.5, 1.5), L2: U(28, 55), p2: U(0, TAU), nuclei: [], nests: [] };
+  const f = { id, pattern: P.key, label: P.label, ym0: U(46, 54), A1: U(1.5, 3.5), L1: U(90, 170), p1: U(0, TAU), A2: U(0.5, 1.5), L2: U(28, 55), p2: U(0, TAU), nuclei: [], nests: [] };
   const ym = membraneOf(f), rows = rand() < 0.5 ? 2 : 3, pitch = U(15, 17), spacing = U(17, 20);
   f.rows = rows; f.thickness = 9 + (rows - 1) * pitch + 12; // the surface is this far above the membrane
   const ys = x => ym(x) - f.thickness;
@@ -116,27 +116,29 @@ function makeField(P, id) {
   const clear = (p, min) => taken().every(q => dist(p, q) >= min);
   const belowMembrane = (x, margin) => ym(x) + margin;
   // nests below the membrane, placed where they do not overlap
-  const nestFits = (cx, cy, R, margin) => cy - R >= belowMembrane(cx, margin) && cy + R <= H - 3 && cx - R >= 3 && cx + R <= W - 3 && f.nests.every(n => dist([cx, cy], [n.cx, n.cy]) >= R + n.R + 8);
+  const nestFits = (cx, cy, R, margin) => cy - R >= belowMembrane(cx, margin) && cy + R <= H + 2 && cx - R >= 3 && cx + R <= W - 3 && f.nests.every(n => dist([cx, cy], [n.cx, n.cy]) >= R + n.R + 8);
   // a round nest hangs from the underside of the membrane three times in four, as the invasive nests do, so that depth
-  // alone does not tell the two apart; otherwise it lies free in the stroma
-  function placeNest(R, attached) { for (let t = 0; t < 40; t++) { const cx = U(R + 4, W - R - 4), cy = attached ? belowMembrane(cx, 0) + R + U(0.5, 3) : U(belowMembrane(cx, 12) + R, H - 3 - R); if (nestFits(cx, cy, R, attached ? 0 : 12)) return [cx, cy]; } return null; }
-  const roundNest = (atypical, gid) => { // a ring of nuclei touching one another (never overlapping, like the chains), one in the middle when there is room; a ring that does not fit tries again with one nucleus fewer
-    const attached = rand() < 0.75; let ring, steps, ringR, rMax, R, at = null;
-    for (let k = RI(5, 7); k >= 4 && !at; k--) {
-      ring = Array.from({ length: k }, () => sampleNucleus(atypical ? 1 : 0)); const gaps = ring.map(() => U(0.3, 1.5));
-      steps = ring.map((n, i) => radiusOf(n) + radiusOf(ring[(i + 1) % k]) + gaps[i]); ringR = steps.reduce((a, b) => a + b, 0) / TAU; rMax = Math.max(...ring.map(radiusOf));
+  // alone does not tell the two apart; otherwise it lies free in the stroma (its outline may run two pixels past the
+  // bottom edge, its nuclei never: a solid nest of atypical nuclei is 60 to 70 px across in a field 128 px high)
+  function placeNest(R, attached) { for (let t = 0; t < 80; t++) { const cx = U(R + 4, W - R - 4), cy = attached ? belowMembrane(cx, 0) + R + U(0.5, 1.5) : U(belowMembrane(cx, 8) + R, H + 2 - R); if (nestFits(cx, cy, R, attached ? 0 : 8)) return [cx, cy]; } return null; }
+  const roundNest = (atypical, gid) => { // a solid nest: a ring of nuclei around one in the middle (the smallest of the draw), none overlapping (like the chains); a ring that does not fit tries again with one nucleus fewer, then with a fresh draw
+    const attached = rand() < 0.75; let ring, mid, steps, ringR, rMax, R, at = null;
+    for (let pass = 0; pass < 3 && !at; pass++) for (let k = RI(5, 7); k >= 4 && !at; k--) {
+      const drawn = Array.from({ length: k + 1 }, () => sampleNucleus(atypical ? 1 : 0)).sort((a, b) => radiusOf(a) - radiusOf(b)); mid = drawn[0]; ring = drawn.slice(1); const gaps = ring.map(() => U(0.3, 1.5));
+      steps = ring.map((n, i) => radiusOf(n) + radiusOf(ring[(i + 1) % k]) + gaps[i]); rMax = Math.max(...ring.map(radiusOf));
+      ringR = Math.max(steps.reduce((a, b) => a + b, 0) / TAU, rMax + radiusOf(mid) + 1); // wide enough for the nucleus in the middle
       R = ringR + rMax + 2.5; at = placeNest(R, attached);
     }
     if (!at) return false;
     const nest = { kind: 'round', cx: at[0], cy: at[1], R, rx: R, ry: R * U(0.92, 1), rot: U(0, Math.PI), amp: U(0, 0.02), k: RI(2, 3), phase: U(0, TAU), group: gid, connected: attached };
     f.nests.push(nest);
-    let ang = U(0, TAU);
-    ring.forEach((n, i) => { f.nuclei.push(Object.assign(n, { x: nest.cx + ringR * Math.cos(ang), y: nest.cy + ringR * Math.sin(ang) * nest.ry / nest.rx, kind: 'nest', below: true, group: gid })); ang += steps[i] / ringR; });
-    const mid = sampleNucleus(atypical ? 1 : 0); if (ringR - rMax - radiusOf(mid) >= 0.5) f.nuclei.push(Object.assign(mid, { x: nest.cx + U(-1, 1), y: nest.cy + U(-1, 1), kind: 'nest', below: true, group: gid }));
+    let ang = U(0, TAU); const scale = TAU / (steps.reduce((a, b) => a + b, 0) / ringR); // the ring's nuclei spread evenly around a wider ring
+    ring.forEach((n, i) => { f.nuclei.push(Object.assign(n, { x: nest.cx + ringR * Math.cos(ang), y: nest.cy + ringR * Math.sin(ang) * nest.ry / nest.rx, kind: 'nest', below: true, group: gid })); ang += steps[i] / ringR * scale; });
+    f.nuclei.push(Object.assign(mid, { x: nest.cx + U(-1, 1), y: nest.cy + U(-1, 1), kind: 'nest', below: true, group: gid }));
     return true;
   };
   // invasive: a chain of atypical nuclei that grows down from the underside of the epithelium (or, less often, lies free
-  // in the stroma), turning as it goes, with a side branch and stretches two cells wide; its outline is a ribbon hugging
+  // in the stroma), turning as it goes, mostly single file, now and then a side branch or a stretch two cells wide; its outline is a ribbon hugging
   // the nuclei, kinked where the chain turns and pointed at the tip, so the angulation is the nuclei themselves
   // pressing on the border
   const freeAt = (q, own) => q[0] >= 10 && q[0] <= W - 10 && q[1] <= H - 8 && q[1] >= ym(q[0]) + 6 && clear(q, 11) && own.every(o => dist(q, [o.x, o.y]) >= 11) && f.nests.every(o => nestSigned(o, q) < -1e9 || nestSigned(o, q) >= 7);
@@ -176,7 +178,7 @@ function makeField(P, id) {
       if (branch && main.length >= 5) { const k = RI(1, main.length - 3), [tx, ty] = tangent(main, k), base = Math.atan2(tx, ty), side = rand() < 0.5 ? -1 : 1, b = growChain(main[k], base + side * U(0.9, 1.4), 1 + RI(2, 4), main); if (b.length >= 3) { chains.push(b); main[k].branch = true; } }
       const all = [].concat(...chains.map((c, i) => (i ? c.slice(1) : c))), twins = [];
       for (const c of chains) for (let i = 1; i < c.length - 1; i++) { // a second nucleus beside some links, two cells wide there
-        const p = c[i]; if (p.branch || p.twin || rand() >= 0.45) continue;
+        const p = c[i]; if (p.branch || p.twin || rand() >= 0.15) continue;
         const [tx, ty] = tangent(c, i), side = rand() < 0.5 ? -1 : 1, nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r + U(0.3, 1.5)) * side, q = [p.x - ty * off, p.y + tx * off];
         if (!freeAt(q, all.filter(o => o !== p).concat(twins))) continue;
         twins.push(Object.assign(nn, { x: q[0], y: q[1], r })); p.twin = { side, r };
@@ -207,11 +209,15 @@ function makeField(P, id) {
     }
     return true;
   };
-  if (P.below === 'round' || (P.below === 'round-sometimes' && rand() < 0.5)) { const n = RI(1, 2); for (let i = 0; i < n; i++) roundNest(P.key === 'cisvbn', i); }
+  if (P.below === 'round' || (P.below === 'round-sometimes' && rand() < 0.5)) { // one nest, or two (a second one on a tenth of the CIS-into-nests fields, so that they hold about as many atypical nuclei below the membrane as the invasive fields)
+    const n = P.key === 'cisvbn' ? (rand() < 0.1 ? 2 : 1) : RI(1, 2); let placed = 0;
+    for (let i = 0; i < n; i++) if (roundNest(P.key === 'cisvbn', i)) placed++;
+    if (!placed) throw new Error(`field ${id}: no round nest could be placed`);
+  }
   else if (P.below === 'cords') cords();
   else if (P.below === 'jagged') { // one nest, or two; most grow from the underside of the epithelium
     const n = RI(1, 2); let placed = 0;
-    for (let i = 0; i < n; i++) if (invasiveNest(placed, i === 0 ? rand() < 0.7 : rand() < 0.4, i === 0 ? RI(6, 10) : RI(4, 6), i === 0 && rand() < 0.6)) placed++;
+    for (let i = 0; i < n; i++) if (invasiveNest(placed, i === 0 ? rand() < 0.62 : rand() < 0.4, i === 0 ? RI(6, 10) : RI(4, 6), i === 0 && rand() < 0.3)) placed++;
     if (!placed && !invasiveNest(0, true, RI(6, 10), true)) throw new Error(`field ${id}: no invasive nest could be placed`);
     if (rand() < 0.5) for (let s = 0, tries = 0; s < RI(1, 3) && tries < 60; tries++) { // single cells shed into the stroma, on half the fields
       const p = [U(12, W - 12), U(0, H)]; if (p[1] < ym(p[0]) + 16 || p[1] > H - 8 || !clear(p, 17) || f.nests.some(n => nestSigned(n, p) < 9)) continue;
