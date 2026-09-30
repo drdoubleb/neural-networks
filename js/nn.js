@@ -6,7 +6,9 @@
  * The output is P(positive class). Trained with mini-batch gradient descent on binary cross-entropy,
  * with optional weight decay. Two miniature foundation models reuse the same pieces, an encoder being a Net without
  * its output (the convolution, then a dense layer to a short code), both trained without labels: Contrastive makes two
- * views of the same nucleus land on the same code, AutoEncoder rebuilds the pixels from the code.
+ * views of the same nucleus land on the same code, AutoEncoder rebuilds the pixels from the code. AttentionMIL is
+ * attention over a slide of nuclei with one label, with ContextLayer, one layer of self-attention, letting the nuclei
+ * look at each other; LanguageModel stacks causal context layers over the words of a report and predicts the next.
  * Works in the browser (window.TinyNet) and in Node (module.exports).
  */
 (function (root, factory) {
@@ -383,13 +385,13 @@
   // discounted by a learned amount per unit of distance, so the layer can prefer near neighbours.
   const softplus = x => (x > 30 ? x : Math.log1p(Math.exp(x)));
   class ContextLayer {
-    constructor({ inputSize, dk = 8, ffn = 8, heads = 1, distanceBias = false, excludeSelf = false, costInit = 0, relative = false, seed = 1 }) {
-      this.D = inputSize; this.dk = dk; this.H = heads; this.F = ffn; this.distanceBias = distanceBias; this.excludeSelf = excludeSelf; this.relative = relative; this.seed = seed;
+    constructor({ inputSize, dk = 8, ffn = 8, heads = 1, distanceBias = false, excludeSelf = false, causal = false, costInit = 0, relative = false, seed = 1 }) {
+      this.D = inputSize; this.dk = dk; this.H = heads; this.F = ffn; this.distanceBias = distanceBias; this.excludeSelf = excludeSelf; this.causal = causal; this.relative = relative; this.seed = seed; // causal: a token reads itself and the tokens before it, never the ones after (a language model)
       const rnd = mulberry32(seed * 104729 + 3), u = s => (rnd() * 2 - 1) * s, mk = (n, s) => Float64Array.from({ length: n }, () => u(s)), D = inputSize, HD = heads * dk, HM = heads * (dk + (relative ? 2 : 0));
       this.Wq = mk(HD * D, 0.3); this.bq = new Float64Array(HD); this.Wk = mk(HD * D, 0.3); this.bk = new Float64Array(HD);
       this.Wv = mk(HD * D, 0.3); this.bv = new Float64Array(HD); this.Wo = mk(D * HM, 0.1); this.bo = new Float64Array(D); // small: the layer starts close to doing nothing
       this.W1 = mk(ffn * D, 0.3); this.b1 = new Float64Array(ffn); this.W2 = mk(D * ffn, 0.1); this.b2 = new Float64Array(D);
-      this.beta = new Float64Array(heads).fill(costInit > 0 ? Math.log(Math.expm1(costInit)) : 0); // softplus(beta) is each head's cost per unit of distance, when distanceBias is on
+      this.beta = Float64Array.from({ length: heads }, (_, h) => { const c = Array.isArray(costInit) ? costInit[h] : costInit; return c > 0 ? Math.log(Math.expm1(c)) : -8; }); // softplus(beta) is each head's cost per unit of distance, when distanceBias is on (one value, or one per head; 0 starts the cost at nothing, softplus(−8), and lets it grow)
     }
     // X: the slide's tokens (rows of D numbers); dist: n × n distances between them (only with the distance bias).
     // With several heads, every head has its own query, key and value maps and its own distance cost, and their
@@ -397,7 +399,7 @@
     // layer shows); Sh, Ah and costs hold every head's. With relative on, every head's message also carries where the
     // nuclei it listened to lie, relative to the listener (the weighted mean offset, from xy: n × 2 positions).
     forward(X, dist, xy) {
-      const n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1; // a nucleus reads the others, not itself (its own vector is the residual)
+      const n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1, causal = this.causal; // a nucleus reads the others, not itself (its own vector is the residual); a token reads itself and what came before
       const rel = this.relative && !!xy, mw = dk + (rel ? 2 : 0), HM = H * mw;
       const costs = Array.from(this.beta, b => (this.distanceBias ? softplus(b) : 0));
       const lin = (W, bias, out) => X.map(x => { const o = new Float64Array(out); for (let j = 0; j < out; j++) { let s = bias[j]; const off = j * D; for (let i = 0; i < D; i++) s += W[off + i] * x[i]; o[j] = s; } return o; });
@@ -406,7 +408,7 @@
         const S = [], A = [], b = costs[h], o = h * dk;
         for (let i = 0; i < n; i++) {
           const si = new Float64Array(n), ai = new Float64Array(n); let mx = -Infinity;
-          for (let j = 0; j < n; j++) { let v = 0; for (let d = 0; d < dk; d++) v += Q[i][o + d] * K[j][o + d]; si[j] = mask && j === i ? -Infinity : v * sc - (b ? b * dist[i][j] : 0); mx = Math.max(mx, si[j]); }
+          for (let j = 0; j < n; j++) { if ((mask && j === i) || (causal && j > i)) { si[j] = -Infinity; continue; } let v = 0; for (let d = 0; d < dk; d++) v += Q[i][o + d] * K[j][o + d]; si[j] = v * sc - (b ? b * dist[i][j] : 0); mx = Math.max(mx, si[j]); }
           let Z = 0; for (let j = 0; j < n; j++) { ai[j] = Math.exp(si[j] - mx); Z += ai[j]; }
           for (let j = 0; j < n; j++) ai[j] /= Z;
           S.push(si); A.push(ai);
@@ -424,15 +426,15 @@
     // alone (each row over the other nuclei, like the real attention); both = the shares actually used. Nothing here
     // changes the layer.
     explain(fw, h = 0) {
-      const { Q, K, dist } = fw, cost = fw.costs[h], n = Q.length, dk = this.dk, o = h * dk, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1;
+      const { Q, K, dist } = fw, cost = fw.costs[h], n = Q.length, dk = this.dk, o = h * dk, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf && n > 1, hidden = (i, j) => (mask && j === i) || (this.causal && j > i);
       const soft = row => { let mx = -Infinity; for (const v of row) mx = Math.max(mx, v); const e = Float64Array.from(row, v => Math.exp(v - mx)); let Z = 0; for (const v of e) Z += v; for (let j = 0; j < n; j++) e[j] /= Z; return e; };
       const match = [], costs = [], matchOnly = [], distOnly = [];
       for (let i = 0; i < n; i++) {
         const m = new Float64Array(n), ct = new Float64Array(n);
         for (let j = 0; j < n; j++) { let v = 0; for (let d = 0; d < dk; d++) v += Q[i][o + d] * K[j][o + d]; m[j] = v * sc; ct[j] = cost && dist ? cost * dist[i][j] : 0; }
         match.push(m); costs.push(ct);
-        matchOnly.push(soft(Float64Array.from(m, (v, j) => (mask && j === i ? -Infinity : v))));
-        distOnly.push(soft(Float64Array.from(ct, (v, j) => (mask && j === i ? -Infinity : -v))));
+        matchOnly.push(soft(Float64Array.from(m, (v, j) => (hidden(i, j) ? -Infinity : v))));
+        distOnly.push(soft(Float64Array.from(ct, (v, j) => (hidden(i, j) ? -Infinity : -v))));
       }
       return { match, cost: costs, matchOnly, distOnly, both: fw.Ah[h] };
     }
@@ -473,7 +475,109 @@
       if (this.distanceBias) for (let h = 0; h < this.H; h++) this.beta[h] -= lr * g.beta[h] / k;
     }
     parameterCount() { const HD = this.H * this.dk, HM = this.H * (this.dk + (this.relative ? 2 : 0)); return 3 * (HD * this.D + HD) + this.D * HM + this.D + this.F * this.D + this.F + this.D * this.F + this.D + (this.distanceBias ? this.H : 0); }
-    describe() { return `self-attention over the ${this.excludeSelf ? 'other ' : ''}nuclei (${this.H > 1 ? `${this.H} heads, each ` : ''}query · key of ${this.dk}${this.distanceBias ? ' − a learned distance cost' : ''}, values${this.relative ? ' and where they lie, relative,' : ''} added back) + ${this.F} tanh feed-forward`; }
+    describe() { return `self-attention over the ${this.causal ? 'tokens so far' : `${this.excludeSelf ? 'other ' : ''}nuclei`} (${this.H > 1 ? `${this.H} heads, each ` : ''}query · key of ${this.dk}${this.distanceBias ? ' − a learned distance cost' : ''}, values${this.relative ? ' and where they lie, relative,' : ''} added back) + ${this.F} tanh feed-forward`; }
+  }
+
+  // ---------------------------------------------------------------------------- a small language model
+  // Tokens (ids into a vocabulary) → embeddings (a learned vector per word, plus a learned vector per position when
+  // positions > 0) → L causal context layers (every token reads itself and the tokens before it; each head has a
+  // learned cost per token of distance back, so the layers know how far back a token is without position vectors)
+  // → a linear layer to a score per word → softmax → P(next token). Trained to predict every next token of a document
+  // (cross-entropy, each position weighted, so that the loss can be kept to the report and off a prompt), with weight
+  // decay on the matrices, a clip on the gradient norm, and plain gradient descent or Adam.
+  class LanguageModel {
+    constructor({ vocabSize, dim = 32, layers = 2, heads = 2, dk = 8, ffn = 32, costInit = 0.1, positions = 0, clip = 1, optimizer = 'adam', seed = 1 }) {
+      this.V = vocabSize; this.D = dim; this.H = heads; this.dk = dk; this.F = ffn; this.P = positions; this.clip = clip; this.optimizer = optimizer; this.seed = seed;
+      const rnd = mulberry32(seed * 7919 + 5), u = s => (rnd() * 2 - 1) * s, mk = (n, s) => Float64Array.from({ length: n }, () => u(s));
+      this.E = mk(vocabSize * dim, 0.5); this.Pos = positions ? mk(positions * dim, 0.2) : null;
+      const costs = Array.isArray(costInit) ? costInit : Array.from({ length: heads }, (_, h) => costInit / Math.pow(2, h)); // like ALiBi: a slope per head, halving from head to head, or one per head given
+      this.costs = costs; this.layers = Array.from({ length: layers }, (_, l) => new ContextLayer({ inputSize: dim, dk, ffn, heads, distanceBias: costs.some(c => c > 0), excludeSelf: false, causal: true, costInit: costs, seed: seed + 2 + l })); // no cost at all when every head starts at 0: the layers then know nothing of distance
+      this.Wout = mk(vocabSize * dim, 0.3); this.bout = new Float64Array(vocabSize);
+      this.steps = 0; this.adam = null; this._dist = {};
+    }
+    distances(n) { let d = this._dist[n]; if (!d) { d = Array.from({ length: n }, (_, i) => Float64Array.from({ length: n }, (_, j) => Math.abs(i - j))); this._dist[n] = d; } return d; } // tokens apart
+    embed(tokens) { const D = this.D; return tokens.map((t, i) => { const x = new Float64Array(D), off = t * D, po = this.Pos && i < this.P ? i * D : -1; for (let d = 0; d < D; d++) x[d] = this.E[off + d] + (po >= 0 ? this.Pos[po + d] : 0); return x; }); }
+    // tokens: ids. Returns the embeddings (X), every layer's forward (ctxs), the final vectors (T) and, per position,
+    // the scores and the probabilities of the next token.
+    forward(tokens) {
+      const D = this.D, V = this.V, X = this.embed(tokens), dist = this.distances(tokens.length), ctxs = []; let T = X;
+      for (const layer of this.layers) { const c = layer.forward(T, dist); ctxs.push(c); T = c.Y; }
+      const logits = T.map(t => { const z = new Float64Array(V); for (let v = 0; v < V; v++) { let s = this.bout[v]; const off = v * D; for (let d = 0; d < D; d++) s += this.Wout[off + d] * t[d]; z[v] = s; } return z; });
+      const probs = logits.map(z => { let mx = -Infinity; for (const v of z) mx = Math.max(mx, v); const p = Float64Array.from(z, v => Math.exp(v - mx)); let Z = 0; for (const v of p) Z += v; for (let v = 0; v < V; v++) p[v] /= Z; return p; });
+      return { tokens, X, dist, ctxs, T, logits, probs };
+    }
+    // the loss of a document: the mean cross-entropy of its next tokens; weights[i] weighs the prediction made at
+    // position i (of token i + 1), default 1; also every position's own loss
+    loss(fw, weights) { const n = fw.tokens.length, per = new Float64Array(Math.max(0, n - 1)); let s = 0, w = 0; for (let i = 0; i + 1 < n; i++) { per[i] = -Math.log(fw.probs[i][fw.tokens[i + 1]] + EPS); const wi = weights ? weights[i] : 1; if (wi) { s += wi * per[i]; w += wi; } } return { loss: w ? s / w : 0, per }; }
+    newGradient() { const z = a => new Float64Array(a.length); return { E: z(this.E), Pos: this.Pos ? z(this.Pos) : null, Wout: z(this.Wout), bout: z(this.bout), layers: this.layers.map(c => c.newGradient()) }; }
+    // one step on a batch of documents [tokens] or [{ tokens, weights }]; returns their mean loss before the step
+    trainBatch(docs, lr, l2 = 0) {
+      const g = this.newGradient(), D = this.D, V = this.V; let loss = 0;
+      for (const doc of docs) {
+        const tokens = doc.tokens || doc, weights = doc.weights || null, n = tokens.length; if (n < 2) continue;
+        let wsum = 0; for (let i = 0; i + 1 < n; i++) wsum += weights ? weights[i] : 1; if (!wsum) continue;
+        const fw = this.forward(tokens); loss += this.loss(fw, weights).loss;
+        const dT = fw.T.map(() => new Float64Array(D));
+        for (let i = 0; i + 1 < n; i++) { // the softmax over the vocabulary, into the output layer and the final vectors
+          const wi = (weights ? weights[i] : 1) / wsum; if (!wi) continue;
+          const p = fw.probs[i], t = tokens[i + 1], h = fw.T[i], dh = dT[i];
+          for (let v = 0; v < V; v++) { const dl = wi * (p[v] - (v === t ? 1 : 0)); if (!dl) continue; g.bout[v] += dl; const off = v * D; for (let d = 0; d < D; d++) { g.Wout[off + d] += dl * h[d]; dh[d] += dl * this.Wout[off + d]; } }
+        }
+        let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, g.layers[l]); // back through the stack
+        for (let i = 0; i < n; i++) { const off = tokens[i] * D, po = this.Pos && i < this.P ? i * D : -1; for (let e = 0; e < D; e++) { g.E[off + e] += d[i][e]; if (po >= 0) g.Pos[po + e] += d[i][e]; } } // into the embeddings
+      }
+      const k = docs.length, own = [g.E, g.Wout, g.bout].concat(g.Pos ? [g.Pos] : []);
+      let n2 = 0; for (const a of own) for (const x of a) n2 += x * x; for (const gl of g.layers) n2 += gradientNorm2(gl);
+      this.lastGradientNorm = Math.sqrt(n2) / k;
+      if (this.clip > 0 && this.lastGradientNorm > this.clip) { const f = this.clip / this.lastGradientNorm; for (const a of own) for (let i = 0; i < a.length; i++) a[i] *= f; for (const gl of g.layers) scaleGradient(gl, f); }
+      if (this.optimizer === 'adam') this.adamStep(g, k, lr, l2);
+      else { const step = (p, gp, decay) => { for (let i = 0; i < p.length; i++) p[i] -= lr * (gp[i] / k + (decay ? l2 * p[i] : 0)); }; step(this.E, g.E, 1); if (this.Pos) step(this.Pos, g.Pos, 1); step(this.Wout, g.Wout, 1); step(this.bout, g.bout); this.layers.forEach((c, l) => c.applyGradient(g.layers[l], k, lr, l2)); }
+      this.steps++;
+      return loss / k;
+    }
+    // Adam: every weight gets its own step size, from running means of its gradient and of its square
+    adamStep(g, k, lr, l2) {
+      const st = this.adam || (this.adam = { t: 0, m: this.newGradient(), v: this.newGradient() }), b1 = 0.9, b2 = 0.999; st.t++;
+      const c1 = 1 - Math.pow(b1, st.t), c2 = 1 - Math.pow(b2, st.t);
+      const step = (p, gp, m, v, decay) => { for (let i = 0; i < p.length; i++) { const gi = gp[i] / k + (decay ? l2 * p[i] : 0); m[i] = b1 * m[i] + (1 - b1) * gi; v[i] = b2 * v[i] + (1 - b2) * gi * gi; p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + 1e-8); } };
+      step(this.E, g.E, st.m.E, st.v.E, 1); if (this.Pos) step(this.Pos, g.Pos, st.m.Pos, st.v.Pos, 1); step(this.Wout, g.Wout, st.m.Wout, st.v.Wout, 1); step(this.bout, g.bout, st.m.bout, st.v.bout, 0);
+      this.layers.forEach((c, l) => { const gl = g.layers[l], ml = st.m.layers[l], vl = st.v.layers[l]; for (const key of Object.keys(gl)) step(c[key], gl[key], ml[key], vl[key], key[0] === 'W' ? 1 : 0); });
+    }
+    // docs: [tokens] or [{ tokens, weights }]; the mean loss, the next-token accuracy, and every document's per-position losses
+    evaluate(docs) {
+      let loss = 0, correct = 0, count = 0; const per = [];
+      for (const doc of docs) { const tokens = doc.tokens || doc, fw = this.forward(tokens), l = this.loss(fw, doc.weights || null); loss += l.loss; per.push(l.per); for (let i = 0; i + 1 < tokens.length; i++) { const p = fw.probs[i]; let best = 0; for (let v = 1; v < this.V; v++) if (p[v] > p[best]) best = v; if (best === tokens[i + 1]) correct++; count++; } }
+      return { loss: docs.length ? loss / docs.length : 0, accuracy: count ? correct / count : 0, per };
+    }
+    // continue a prefix: the most probable next token each time (temperature 0), or a draw from the probabilities
+    // sharpened or flattened by the temperature; stops at the stop token or after maxTokens. Returns the new tokens
+    // and, per step, the probabilities it chose from.
+    generate(prefix, { maxTokens = 80, temperature = 0, rng = Math.random, stop = null } = {}) {
+      const tokens = prefix.slice(), steps = [];
+      while (steps.length < maxTokens) {
+        const fw = this.forward(tokens), i = tokens.length - 1, p = fw.probs[i]; let next;
+        if (temperature <= 0) { next = 0; for (let v = 1; v < this.V; v++) if (p[v] > p[next]) next = v; }
+        else { const z = fw.logits[i]; let mx = -Infinity; for (const v of z) mx = Math.max(mx, v / temperature); const e = Float64Array.from(z, v => Math.exp(v / temperature - mx)); let Z = 0; for (const v of e) Z += v; let r = rng() * Z; next = this.V - 1; for (let v = 0; v < this.V; v++) { r -= e[v]; if (r <= 0) { next = v; break; } } }
+        steps.push({ token: next, p }); tokens.push(next);
+        if (next === stop) break;
+      }
+      return { tokens: tokens.slice(prefix.length), steps };
+    }
+    parameterCount() { return this.E.length + (this.Pos ? this.Pos.length : 0) + this.Wout.length + this.bout.length + this.layers.reduce((a, c) => a + c.parameterCount(), 0); }
+    describe() { return `${this.V} words → embedding of ${this.D}${this.P ? ' + position' : ''} → ${this.layers.length} × ${this.layers[0] ? this.layers[0].describe() : ''} → single layer → softmax over the ${this.V} words`; }
+    // the weights as plain numbers, to ship a trained model, and a model back from them
+    toJSON(meta) {
+      const r = v => Array.from(v, q => +q.toPrecision(5));
+      return Object.assign({}, meta || {}, { vocabSize: this.V, dim: this.D, layers: this.layers.length, heads: this.H, dk: this.dk, ffn: this.F, positions: this.P, costs: this.costs, clip: this.clip, optimizer: this.optimizer, steps: this.steps,
+        E: r(this.E), Pos: this.Pos ? r(this.Pos) : null, Wout: r(this.Wout), bout: r(this.bout), layerWeights: this.layers.map(c => ({ Wq: r(c.Wq), bq: r(c.bq), Wk: r(c.Wk), bk: r(c.bk), Wv: r(c.Wv), bv: r(c.bv), Wo: r(c.Wo), bo: r(c.bo), W1: r(c.W1), b1: r(c.b1), W2: r(c.W2), b2: r(c.b2), beta: r(c.beta) })) });
+    }
+    static fromJSON(o) {
+      const lm = new LanguageModel({ vocabSize: o.vocabSize, dim: o.dim, layers: o.layers, heads: o.heads, dk: o.dk, ffn: o.ffn, costInit: o.costs, positions: o.positions, clip: o.clip, optimizer: o.optimizer, seed: 1 });
+      lm.E.set(o.E); if (o.Pos && lm.Pos) lm.Pos.set(o.Pos); lm.Wout.set(o.Wout); lm.bout.set(o.bout);
+      o.layerWeights.forEach((w, l) => { const c = lm.layers[l]; for (const k of Object.keys(w)) c[k].set(w[k]); });
+      lm.steps = o.steps || 0; lm.meta = o;
+      return lm;
+    }
   }
 
   // ---------------------------------------------------------------------------- attention over a slide
@@ -716,5 +820,22 @@
     mil.layers.forEach((c, l) => { for (let h = 0; h < c.H; h++) { const o = c.beta[h]; c.beta[h] = o + eps; const lp = lossAt(); c.beta[h] = o - eps; const lm = lossAt(); c.beta[h] = o; cmp((lp - lm) / (2 * eps), aBeta[l][h]); } });
     return { worst, checked };
   }
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField };
+  // the language model: embeddings, positions, both causal layers and the output layer, against finite differences
+  function gradientCheckLM({ positions = 4 } = {}) {
+    const lm = new LanguageModel({ vocabSize: 6, dim: 4, layers: 2, heads: 2, dk: 3, ffn: 3, costInit: 0.3, positions, clip: 0, optimizer: 'sgd', seed: 7 });
+    lm.layers[0].beta.set([0.4, -0.2]); lm.layers[1].beta.set([0.1, 0.6]);
+    const docs = [{ tokens: [0, 3, 1, 4, 2], weights: [1, 0.5, 1, 1] }, { tokens: [5, 2, 2, 1] }], eps = 1e-5;
+    const lossAt = () => docs.reduce((a, d) => a + lm.loss(lm.forward(d.tokens), d.weights || null).loss, 0) / docs.length;
+    const params = [lm.E, lm.Wout, lm.bout].concat(lm.Pos ? [lm.Pos] : [], ...lm.layers.map(c => [c.Wq, c.bq, c.Wk, c.bk, c.Wv, c.bv, c.Wo, c.bo, c.W1, c.b1, c.W2, c.b2]));
+    const before = params.map(p => Float64Array.from(p)), betas = lm.layers.map(c => Float64Array.from(c.beta));
+    lm.trainBatch(docs, 1);
+    const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j])), aBeta = lm.layers.map((c, l) => betas[l].map((v, h) => v - c.beta[h]));
+    params.forEach((p, i) => p.set(before[i])); lm.layers.forEach((c, l) => c.beta.set(betas[l]));
+    let worst = 0, checked = 0;
+    const cmp = (num, an) => { if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - an) / (Math.abs(num) + Math.abs(an))); } };
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) { const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm2 = lossAt(); p[i] = o; cmp((lp - lm2) / (2 * eps), analytic[pi][i]); } });
+    lm.layers.forEach((c, l) => { for (let h = 0; h < c.H; h++) { const o = c.beta[h]; c.beta[h] = o + eps; const lp = lossAt(); c.beta[h] = o - eps; const lm2 = lossAt(); c.beta[h] = o; cmp((lp - lm2) / (2 * eps), aBeta[l][h]); } });
+    return { worst, checked };
+  }
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
 });
