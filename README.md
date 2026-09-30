@@ -596,6 +596,95 @@ folder, from a mirror of the repository or the published page; decoding the 450 
 with the count shown as it goes. The single-file build inlines the fields (`tools/build_single_file.js`, or
 `--no-fields` to leave them out).
 
+## Reports: a small language model
+
+The question in preparation, after the fields: a small language model that writes a bladder biopsy report from an
+image analyser's findings. Its corpus is described under *The data*: 908 synthetic reports written from hidden cases
+by a fixed rule, each a findings block of seven lines followed by the report in a sign-out's order, specimen,
+clinical history, gross, microscopic description and, last, the diagnosis.
+
+**The model.** `LanguageModel` in `js/nn.js` is the context layer of the slides and fields questions turned into a
+language model. Every word of a report is a token, from a vocabulary of 281 built on the training reports (the
+corpus's words, numbers and punctuation, the newline, and three specials for start, end and unknown; `js/reports.js`
+tokenises, encodes and puts the text back together). A token becomes a learned vector of 48 numbers plus a learned
+vector for its position, and goes through two *causal* context layers: the same self-attention as before (two heads,
+each a query · key of 12, values added back through a residual, a 48-unit tanh feed-forward), except that a token
+reads itself and the tokens before it, never the ones after, and each head's learned distance cost is a cost per
+token of distance back, the position bias of ALiBi, one head starting at 0.05 per token and the other at nearly
+nothing. A single layer then scores every word and a softmax gives P(next token). It is trained to predict every next
+token of every training report (cross-entropy) with Adam, a learning rate of 0.005, batches of 8 reports, weight decay
+0.0001 and the gradient clipped to norm 1, for 30 epochs: 55,725 parameters, gradient-checked to 5 × 10⁻⁶ like the
+other models (`gradientCheckLM`). To write, it continues a prefix one token at a time, the most probable word or a
+draw at a temperature. `tools/check_reports.js` trains it in Node and takes its measures; the trained model of seed 1
+ships as `data/reports/lm_weights.js` (`window.REPORT_LM`, with its vocabulary), the way the foundation encoders do.
+
+**Fluency first, grounding last.** The test loss by section as the model trains, and the diagnosis it writes when
+given the findings block alone (it then writes the whole report itself; the share of the first 25 test reports whose
+diagnosis class comes out right):
+
+| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right from the block alone |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | |
+| 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | |
+| 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% |
+| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 80% |
+| 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% |
+| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (96% of all 100) |
+
+The specimen, clinical and gross losses are a floor set by the draws (which wall, which history, how many fragments:
+nothing in the report predicts them); the findings block is easy from the start (fixed lines, one value each); the
+microscopic section's loss falls as the model learns the phrasings; and the diagnosis, measured with the pathologist's
+description in front of it, is near certain from epoch 10. But when the model has to write the description itself,
+its diagnosis is right for barely half the reports at epoch 5, when its reports already read as fluently as they ever
+will, and reaches 96% only at the end. Reading a finding forty to a hundred tokens back changes the loss by a few
+hundredths of a nat per token, against the phrasing the model has to guess at every token, so the loss curve is flat
+long before the model is grounded: fluency is learned first, grounding last, and the loss cannot tell them apart.
+
+**What it does with the test reports** (seed 1, the shipped model; the same recipe from seeds 2 and 3 gives 91% and
+97% with the prefix, 91% and 75% from the block, the third over-hedging, and both write *Benign urothelium* for all
+eight held-out reports: three random starts, three different models, which is a lesson in itself):
+
+| | Given everything up to DIAGNOSIS: | Given the findings block alone |
+|---|---|---|
+| Diagnosis sentence exact | 97% | 96% |
+| Whole diagnosis line exact, muscularis propria included | 97% | 96% |
+| Errors | invasive written as invasive into muscularis propria 2, suspicious as CIS 1 | suspicious written as CIS 4 |
+| The held-out combination, invasion under a normal surface (8 reports) | invasion called on all 8, but each with the *associated carcinoma in situ* it always saw beside invasion | invasion called on 7 of 8, the same way |
+
+The hedged cases are the hard ones, as they should be: the discordant findings differ from carcinoma in situ in von
+Brunn nests by one line. The held-out combination is the question the corpus was built to ask. This model reads the
+nests line, calls invasion, and adds the carcinoma in situ that came with every invasion it was trained on; the
+smaller models below write *Benign urothelium* for all eight, having learned that a normal surface means benign,
+because in their training it always did. Given nothing at all, the start token alone, the model writes a whole case,
+findings block included: the most probable one is benign, and forty drawn at temperature 1 follow the base rates it
+learned (21 benign, 11 carcinoma in situ, 4 reactive, 4 invasive), which is what a model does when the evidence is
+missing: it answers from the prior, fluently. Where the
+diagnosis tokens look, in the second layer: 17% of their attention on the findings block, of which the nests line 8%
+and the muscularis propria line 4% and the inflammation line 1%, 37% on the microscopic description, 41% on the
+diagnosis itself: the diagnosis reads the description the model wrote more than the block, and the block lines it
+reads are the ones that decide.
+
+**What the data taught.** Two heads of 32 numbers per token, the size of the slides' context, trained for 15 epochs
+with the distance cost starting at 0.1 per token: fluent reports (test loss 0.19, 92% of next tokens right) and the
+right diagnosis from the block for 32% of the test reports. The cost is the reason: at a tenth of a nat per token, a
+line of the block a hundred tokens back is invisible, and the costs grew during training, since most of what a
+next-token model needs is near. With the cost started near zero it stayed there (14%), and with no cost at all the
+model had no notion of distance (11%). Learned position vectors are what made the block readable, since every
+finding then sits at a known place (40% at 15 epochs, 76% at 30, 84% with a learning rate of 0.01; the block was
+made fixed-format for this, every line always there with a one-word value, where lines that came and went had shifted
+the positions from report to report). Four heads of 32 numbers reached 73% at 15 epochs; 48 numbers per token, the
+shipped model, 96% at 30. Trained on 200 reports instead of 800 the same 32-number model reaches 69% and its test
+loss stays at 0.23 against 0.16: the data-size lesson again. Trained without the hedged reports it never hedges: on
+the five discordant test cases it writes invasion four times and carcinoma in situ once, in the confident wording it
+was trained on. Plain gradient descent trains it too, more slowly (test loss 0.27 after 15 epochs against 0.19 with
+Adam). Reproduce with `node tools/check_reports.js --dim 48 --ffn 48 --dk 12 --lr 0.005 --cost 0.05,0.003
+--positions 200 --epochs 30` (the shipped model; `--save` writes it), and the ablations with `--dim 32 --ffn 32 --dk 8`,
+`--cost 0.1`, `--cost 0`, `--positions 0`, `--epochs 15`, `--lr 0.01`, `--heads 4`, `--docs 200`, `--no-hedge`,
+`--opt sgd --lr 0.3`; `--curve` prints every epoch and `--ground 25` measures the grounding every fifth. A run takes
+20 to 40 s per epoch and about four minutes for the measures after training.
+
+The page for this question follows; the model, its tokens and the corpus are in place.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -691,13 +780,47 @@ segment-then-encode pipeline produces, the atypia signal comes back, a lone-nucl
 to the majority rate: the code carries cytology and nothing else, which is what makes the cues separable by
 construction. The field model uses masked crops; the surroundings stay available as a switch, to show the leak.
 
+`tools/generate_reports.js` (no dependencies) writes the corpus of the small language model, the question in
+preparation: 908 synthetic bladder biopsy reports, 800 for training, 100 held out and 8 more held out of training
+altogether, to `data/reports/reports_data.js` (1 MB), with a sheet of 21 of them, one or more of every class, in
+`data/reports/sample_reports.md`. Every report is written from a hidden case: the surface urothelium (normal,
+reactive atypia, atypia or denuded), nests below the basement membrane (absent, benign, or atypical with rounded or
+irregular contours and with or without desmoplasia), muscularis propria (not identified, present or involved) and
+inflammation, which bears on nothing and is there so that the attention can be seen ignoring it. A document is the
+findings block, one line per finding as an image analyser might report it, every line always there with a one-word
+value (the three nest lines read *none* when there are no nests) so that every value sits at the same place in
+every report, then the report proper in a sign-out's
+order with the diagnosis last: specimen, clinical history, gross, microscopic and diagnosis. The diagnosis follows
+from the findings by a fixed rule, in fixed wording; the microscopic description says only what the block holds,
+each finding in one of several phrasings and the absence of nests often unmentioned; site, procedure, history and
+the gross are drawn at random and mean nothing. The queue is benign-heavy, as a real one is, so that a model asked
+for a diagnosis without evidence lands on *benign urothelium*:
+
+| Surface | Nests below the membrane | Diagnosis | Share |
+|---|---|---|---|
+| normal | absent, or present without atypia | Benign urothelium | 33% |
+| reactive atypia | absent, or present without atypia | Benign urothelium with reactive changes | 12% |
+| denuded | absent, or present without atypia | Denuded urothelium, no diagnostic abnormality in the material present | 5% |
+| atypia | absent, or present without atypia | Urothelial carcinoma in situ | 15% |
+| atypia or denuded | atypical, rounded, no desmoplasia (carcinoma in situ involving von Brunn nests) | Urothelial carcinoma in situ | 10% |
+| atypia or denuded | atypical, irregular, desmoplasia | Urothelial carcinoma, invasive into lamina propria (into muscularis propria when involved), with associated carcinoma in situ when the surface shows atypia | 20% |
+| atypia | atypical, contours and desmoplasia discordant | Urothelial carcinoma in situ with foci suspicious for invasion | 5% |
+| normal | atypical, irregular, desmoplasia | Urothelial carcinoma, invasive into lamina propria | held out |
+
+A line on the muscularis propria closes every diagnosis. Reactive atypia puts the word *atypia* into benign reports,
+so a model has to read the qualifier the way it has to read a *no*; the discordant cases teach it to hedge, and a
+corpus without them will show what a model trained only on confident text does with the same findings; the last
+row, invasion under a normal surface, is real, rare and never trained on, to ask whether the model learned the
+findings or the templates. A report is 94 to 179 word tokens, 133 on average, over a vocabulary of 277.
+
 ## Code map
 
 ```
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation (browser + Node)
+js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
@@ -705,6 +828,8 @@ js/app.js                  state, task switch, training loop, the three steps of
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
 data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
+data/reports/reports_data.js the reports of the language-model question in preparation: 908 synthetic bladder biopsy reports with their hidden cases, written by tools/generate_reports.js; sample_reports.md beside it is a sheet of 21 for reading
+data/reports/lm_weights.js  the trained report model with its vocabulary (seed 1 of the shipped configuration), written by tools/check_reports.js --save
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -713,6 +838,8 @@ tools/check_foundation.js  the foundation model's pretraining and what its code 
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
 tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
 tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
+tools/generate_reports.js  make the reports: a findings block and a sign-out written from a hidden case by a fixed rule, several phrasings per finding
+tools/check_reports.js     train the report language model and take its measures: loss by section, the diagnosis from the prefix and from the block alone, the held-out combination, what it writes from nothing, where the diagnosis looks
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
