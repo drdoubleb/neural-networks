@@ -15,7 +15,8 @@
  * table: how often the test fields of each pattern are called CIS and called invasive.
  *   node tools/check_invasion.js [--models bag,pos,ctx,full] [--layers 2] [--heads 1] [--seeds 3] [--epochs 150]
  *                                [--lr 0.02] [--decay 0.001] [--units 4] [--dk 8] [--ffn 8] [--cost 1.5] [--big] [--curve]
- *                                [--crop nucleus|surroundings] [--no-augment] [--data path/to/fields_data.js]
+ *                                [--crop nucleus|surroundings] [--no-augment] [--data path/to/fields_data.js] [--relpos] [--clip 0]
+ * --relpos: every head's message also carries where the nuclei it listened to lie, relative to the listener
  * --crop nucleus (the default) masks every crop to its nucleus with the field's segmentation, so the code carries
  * cytology alone and location and arrangement have to come from the positions and the context; surroundings leaves
  * the field around the nucleus in the crop, which leaks both.
@@ -29,7 +30,7 @@ const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.inde
 const num = (k, d) => +arg(k, d);
 const models = arg('--models', 'bag,pos,ctx,full').split(','), layers = num('--layers', 2), heads = num('--heads', 1), nSeeds = num('--seeds', 3), epochs = num('--epochs', 150);
 const lr = num('--lr', 0.02), decay = num('--decay', 0.001), units = num('--units', 4), dk = num('--dk', 8), ffn = num('--ffn', 8), costInit = num('--cost', 1.5), big = process.argv.includes('--big'), curve = process.argv.includes('--curve'), cropMode = arg('--crop', 'nucleus');
-const augment = !process.argv.includes('--no-augment'), dataFile = arg('--data', path.join(__dirname, '..', 'data', 'fields', 'fields_data.js')); // mirrored fields and jittered positions while training unless --no-augment; --data: another fields file
+const relative = process.argv.includes('--relpos'), augment = !process.argv.includes('--no-augment'), dataFile = arg('--data', path.join(__dirname, '..', 'data', 'fields', 'fields_data.js')), clip = num('--clip', 0); // mirrored fields and jittered positions while training unless --no-augment; --data: another fields file; --clip: the largest gradient norm a step may take (0: no clipping)
 const UNIT = 16; // distances in nucleus diameters, so a cost per unit compares with the slides' cost per cell
 const window = {};
 for (const f of [dataFile, path.join(__dirname, '..', 'data', 'foundation', 'backbones.js')]) new Function('window', fs.readFileSync(f, 'utf8'))(window);
@@ -46,7 +47,7 @@ function prepare(withPos) {
   const std = fitStandardizer([].concat(...[...trainMap.values()].map(ns => ns.map(n => n.code))), { perDimScale: true });
   const mk = (f, ns) => ({
     H: ns.map(n => { const c = std.apply(n.code); return withPos ? Float64Array.from([...c, n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]) : c; }),
-    dist: ns.map(a => Float64Array.from(ns, b => Math.hypot(a.x - b.x, a.y - b.y) / UNIT)),
+    dist: ns.map(a => Float64Array.from(ns, b => Math.hypot(a.x - b.x, a.y - b.y) / UNIT)), xy: ns.map(n => [n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]),
     y: [cisOf(f), f.label], pos: [ns.map(n => !!n.atypical), ns.map(n => !!(n.atypical && n.below))], pattern: f.pattern, name: f.name });
   return { train: [...trainMap].map(([f, ns]) => mk(f, ns)), test: [...testMap].map(([f, ns]) => mk(f, ns)), D: cl.code + (withPos ? 2 : 0), withPos };
 }
@@ -60,16 +61,17 @@ const MODELS = {
 // distances, another field for the position inputs (nothing changes for a model without positions)
 function augmented(sl, D, rng) {
   const flip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  return Object.assign({}, sl, { H: sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = h[D - 1] + 0.015 * g(); return o; }) });
+  const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = h[D - 1] + 0.015 * g(); return o; });
+  return Object.assign({}, sl, { H, xy: H.map(h => [h[D - 2], h[D - 1]]) }); // the relative offsets follow the mirrored, jittered positions
 }
 function run(P, M, seed) {
-  const mil = new AttentionMIL({ inputSize: P.D, attentionUnits: units, outputs: 2, context: M.ctx ? { dk, ffn, heads, layers, distanceBias: true, excludeSelf: true, costInit } : null, seed });
+  const mil = new AttentionMIL({ inputSize: P.D, attentionUnits: units, outputs: 2, clip, context: M.ctx ? { dk, ffn, heads, layers, distanceBias: true, excludeSelf: true, costInit, relative } : null, seed });
   const rng = mulberry32(seed * 31 + 7), order = P.train.map((_, i) => i), hist = [];
   const rec = e => { const tr = mil.evaluate(P.train), te = mil.evaluate(P.test); hist.push({ e, tr, te }); };
   rec(0);
   for (let e = 1; e <= epochs; e++) {
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-    for (const i of order) mil.trainBatch([augment && P.withPos ? augmented(P.train[i], P.D, rng) : P.train[i]], lr, decay);
+    for (const i of order) mil.trainBatch([augment && P.withPos ? augmented(P.train[i], P.D, rng) : P.train[i]], lr, decay); // without positions the fields stay as they are (a mirror changes no distance)
     if (curve ? (e % 10 === 0 || e === epochs) : e === epochs) rec(e);
   }
   return { mil, hist };
