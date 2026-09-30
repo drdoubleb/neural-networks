@@ -137,18 +137,19 @@ function makeField(P, id) {
     f.nuclei.push(Object.assign(mid, { x: nest.cx + U(-1, 1), y: nest.cy + U(-1, 1), kind: 'nest', below: true, group: gid }));
     return true;
   };
-  // invasive: a chain of atypical nuclei that grows down from the underside of the epithelium (or, less often, lies free
-  // in the stroma), turning as it goes, mostly single file, now and then a side branch or a stretch two cells wide; its outline is a ribbon hugging
-  // the nuclei, kinked where the chain turns and pointed at the tip, so the angulation is the nuclei themselves
-  // pressing on the border
-  const freeAt = (q, own) => q[0] >= 10 && q[0] <= W - 10 && q[1] <= H - 8 && q[1] >= ym(q[0]) + 6 && clear(q, 11) && own.every(o => dist(q, [o.x, o.y]) >= 11) && f.nests.every(o => nestSigned(o, q) < -1e9 || nestSigned(o, q) >= 7);
-  const growChain = (start, dir, count, own) => { // nuclei touching one another along a turning path; blocked, it tries other turns
+  // invasive: a spine of atypical nuclei that grows down from the underside of the epithelium (or, less often, lies free
+  // in the stroma), bending gently as it goes, with a second row of nuclei packed beside it on most links (a third
+  // across now and then), so that the nest is two cells wide and tapers to a single nucleus at the tip; a side branch on
+  // some. Its outline is stretched over the outermost nuclei like a membrane, straight between them, kinked where the
+  // spine bends and pointed at the tip, so the angulation is the nuclei themselves pressing on the border
+  const freeAt = (q, r, own) => q[0] >= 10 && q[0] <= W - 10 && q[1] <= H - 8 && q[1] >= ym(q[0]) + 6 && f.nuclei.every(n => dist(q, [n.x, n.y]) >= r + radiusOf(n) + 0.3) && own.every(o => dist(q, [o.x, o.y]) >= r + o.r + 0.3) && f.nests.every(o => nestSigned(o, q) < -1e9 || nestSigned(o, q) >= 7); // room for a nucleus of radius r: touching at most, never overlapping
+  const growChain = (start, dir, count, own) => { // nuclei touching one another along a gently bending path; blocked, it tries other turns
     const nodes = [start];
     while (nodes.length < count) {
       const prev = nodes[nodes.length - 1], nn = sampleNucleus(1), r = radiusOf(nn); let placed = false;
       for (let t = 0; t < 6 && !placed; t++) {
-        const d = Math.max(-1.4, Math.min(1.4, dir + U(-0.6, 0.6))), step = prev.r + r + U(0.3, 1.5), q = [prev.x + step * Math.sin(d), prev.y + step * Math.cos(d)];
-        if (!freeAt(q, own.concat(nodes.slice(0, -1)))) continue;
+        const d = Math.max(-1.15, Math.min(1.15, dir + U(-0.4, 0.4))), step = prev.r + r + U(0.35, 1.2), q = [prev.x + step * Math.sin(d), prev.y + step * Math.cos(d)];
+        if (!freeAt(q, r, own.concat(nodes))) continue;
         nodes.push(Object.assign(nn, { x: q[0], y: q[1], r })); dir = d; placed = true;
       }
       if (!placed) break;
@@ -156,11 +157,12 @@ function makeField(P, id) {
     return nodes;
   };
   const tangent = (nodes, i) => { const a = nodes[Math.max(0, i - 1)], b = nodes[Math.min(nodes.length - 1, i + 1)], d = dist([a.x, a.y], [b.x, b.y]) || 1; return [(b.x - a.x) / d, (b.y - a.y) / d]; };
-  const ribbon = (nodes, headLen) => { // an offset point either side of every nucleus, wider beside a twin, a point at the tip
-    const Lp = [], Rp = [];
+  const ribbon = (nodes, headLen) => { // an offset point either side of every spine nucleus, out past the row beside it, each offset stretched to its neighbours' so the sides run straight over the nuclei instead of dipping between them; a point at the tip
+    const Lp = [], Rp = [], side = sd => nodes.map(p => p.r + U(0.4, 2.0) + (p.rows || []).filter(t => t.side === sd).reduce((a, t) => a + t.r * 2 + 0.6, 0));
+    const stretch = off => off.map((o, i) => Math.max(o, i ? off[i - 1] - 1 : 0, i < off.length - 1 ? off[i + 1] - 1 : 0)), offsL = stretch(side(1)), offsR = stretch(side(-1));
     for (let i = 0; i < nodes.length; i++) {
-      const p = nodes[i], [tx, ty] = tangent(nodes, i), nx = -ty, ny = tx, w = p.twin ? p.twin.r * 2 + 1 : 0, offL = p.r + U(0.8, 2.2) + (p.twin && p.twin.side === 1 ? w : 0), offR = p.r + U(0.8, 2.2) + (p.twin && p.twin.side === -1 ? w : 0);
-      Lp.push([p.x + nx * offL, p.y + ny * offL]); Rp.push([p.x - nx * offR, p.y - ny * offR]);
+      const p = nodes[i], [tx, ty] = tangent(nodes, i), nx = -ty, ny = tx;
+      Lp.push([p.x + nx * offsL[i], p.y + ny * offsL[i]]); Rp.push([p.x - nx * offsR[i], p.y - ny * offsR[i]]);
     }
     const [t0x, t0y] = tangent(nodes, 0), [t1x, t1y] = tangent(nodes, nodes.length - 1), first = nodes[0], last = nodes[nodes.length - 1];
     const head = [first.x - t0x * (first.r + headLen), first.y - t0y * (first.r + headLen)], tip = [last.x + t1x * (last.r + 4), last.y + t1y * (last.r + 4)];
@@ -169,23 +171,28 @@ function makeField(P, id) {
   const invasiveNest = (gid, connected, count, branch) => {
     for (let attempt = 0; attempt < 8; attempt++) {
       let root = null, dir;
-      if (connected) { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(22, W - 22), y = ym(x) + r0 + 1; if (freeAt([x, y], [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-0.8, 0.8); } }
-      else { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(16, W - 16), y = U(0, H); if (y > ym(x) + 22 && y < H - 30 && freeAt([x, y], [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-1.2, 1.2); } }
+      if (connected) { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(22, W - 22), y = ym(x) + r0 + 1; if (freeAt([x, y], r0, [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-0.7, 0.7); } }
+      else { const n0 = sampleNucleus(1), r0 = radiusOf(n0), x = U(16, W - 16), y = U(0, H); if (y > ym(x) + 22 && y < H - 30 && freeAt([x, y], r0, [])) { root = Object.assign(n0, { x, y, r: r0 }); dir = U(-1.1, 1.1); } }
       if (!root) continue;
       const main = growChain(root, dir, count, []);
-      if (main.length < 4) continue;
+      if (main.length < 3) continue;
       const chains = [main];
-      if (branch && main.length >= 5) { const k = RI(1, main.length - 3), [tx, ty] = tangent(main, k), base = Math.atan2(tx, ty), side = rand() < 0.5 ? -1 : 1, b = growChain(main[k], base + side * U(0.9, 1.4), 1 + RI(2, 4), main); if (b.length >= 3) { chains.push(b); main[k].branch = true; } }
+      if (branch && main.length >= 4) { const k = RI(1, main.length - 3), [tx, ty] = tangent(main, k), base = Math.atan2(tx, ty), side = rand() < 0.5 ? -1 : 1, b = growChain(main[k], base + side * U(0.9, 1.4), 1 + RI(2, 3), main); if (b.length >= 3) { chains.push(b); main[k].branch = true; } }
       const all = [].concat(...chains.map((c, i) => (i ? c.slice(1) : c))), twins = [];
-      for (const c of chains) for (let i = 1; i < c.length - 1; i++) { // a second nucleus beside some links, two cells wide there
-        const p = c[i]; if (p.branch || p.twin || rand() >= 0.15) continue;
-        const [tx, ty] = tangent(c, i), side = rand() < 0.5 ? -1 : 1, nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r + U(0.3, 1.5)) * side, q = [p.x - ty * off, p.y + tx * off];
-        if (!freeAt(q, all.filter(o => o !== p).concat(twins))) continue;
-        twins.push(Object.assign(nn, { x: q[0], y: q[1], r })); p.twin = { side, r };
+      const wide = U(0.55, 0.9); let side = rand() < 0.5 ? -1 : 1; // the second row lies on one side for a stretch, then switches; how much of the spine it covers varies from nest to nest
+      for (const c of chains) for (let i = 0; i < c.length - 1; i++) { // a nucleus packed beside every link but the tip, mostly; a third across now and then
+        const p = c[i]; if (p.branch) continue;
+        if (rand() < 0.2) side = -side;
+        const sides = rand() < wide ? [side] : []; if (rand() < 0.2) sides.push(-side);
+        for (const sd of sides) {
+          const [tx, ty] = tangent(c, i), nn = sampleNucleus(1), r = radiusOf(nn), off = (p.r + r + U(0.35, 1.2)) * sd, along = U(-0.4, 0.4) * (p.r + r), q = [p.x - ty * off + tx * along, p.y + tx * off + ty * along];
+          if (!freeAt(q, r, all.concat(twins))) continue;
+          twins.push(Object.assign(nn, { x: q[0], y: q[1], r })); (p.rows || (p.rows = [])).push({ side: sd, r });
+        }
       }
       const outlines = chains.map((c, i) => ribbon(c, i ? 0 : connected ? 6 : 2)), every = all.concat(twins);
       f.nests.push({ kind: 'jagged', cx: every.reduce((a, o) => a + o.x, 0) / every.length, cy: every.reduce((a, o) => a + o.y, 0) / every.length, R: Math.max(...[].concat(...outlines).map(q => dist(q, [root.x, root.y]))), outlines, connected, group: gid });
-      for (const o of every) { const { r, twin, branch: br, ...rest } = o; void r; void twin; void br; f.nuclei.push(Object.assign(rest, { kind: 'nest', below: true, group: gid })); }
+      for (const o of every) { const { r, rows, branch: br, ...rest } = o; void r; void rows; void br; f.nuclei.push(Object.assign(rest, { kind: 'nest', below: true, group: gid })); }
       return true;
     }
     return false;
@@ -217,8 +224,8 @@ function makeField(P, id) {
   else if (P.below === 'cords') cords();
   else if (P.below === 'jagged') { // one nest, or two; most grow from the underside of the epithelium
     const n = RI(1, 2); let placed = 0;
-    for (let i = 0; i < n; i++) if (invasiveNest(placed, i === 0 ? rand() < 0.62 : rand() < 0.4, i === 0 ? RI(6, 10) : RI(4, 6), i === 0 && rand() < 0.3)) placed++;
-    if (!placed && !invasiveNest(0, true, RI(6, 10), true)) throw new Error(`field ${id}: no invasive nest could be placed`);
+    for (let i = 0; i < n; i++) if (invasiveNest(placed, i === 0 ? rand() < 0.62 : rand() < 0.4, i === 0 ? RI(4, 7) : RI(3, 5), i === 0 && rand() < 0.3)) placed++;
+    if (!placed && !invasiveNest(0, true, RI(4, 7), true)) throw new Error(`field ${id}: no invasive nest could be placed`);
     if (rand() < 0.5) for (let s = 0, tries = 0; s < RI(1, 3) && tries < 60; tries++) { // single cells shed into the stroma, on half the fields
       const p = [U(12, W - 12), U(0, H)]; if (p[1] < ym(p[0]) + 16 || p[1] > H - 8 || !clear(p, 17) || f.nests.some(n => nestSigned(n, p) < 9)) continue;
       f.nests.push({ kind: 'round', cx: p[0], cy: p[1], R: 10, rx: 10, ry: 9, rot: U(0, Math.PI), amp: 0.06, k: 3, phase: U(0, TAU), group: 10 + s, single: true });
