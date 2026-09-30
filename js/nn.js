@@ -468,6 +468,27 @@
       back(dQ, this.Wq, g.Wq, g.bq); back(dK, this.Wk, g.Wk, g.bk); back(dV, this.Wv, g.Wv, g.bv);
       return dX;
     }
+    // one token at position i, with the layer's cache of the keys and values of the tokens before it (a language model
+    // writing): its output vector and each head's attention over the tokens so far; its key and value join the cache
+    forwardOne(x, cache, i) {
+      const D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), mask = this.excludeSelf;
+      const costs = Array.from(this.beta, b => (this.distanceBias ? softplus(b) : 0));
+      const lin = (W, bias, out) => { const o = new Float64Array(out); for (let j = 0; j < out; j++) { let s = bias[j]; const off = j * D; for (let d = 0; d < D; d++) s += W[off + d] * x[d]; o[j] = s; } return o; };
+      const q = lin(this.Wq, this.bq, HD), k = lin(this.Wk, this.bk, HD), v = lin(this.Wv, this.bv, HD);
+      cache.K.push(k); cache.V.push(v);
+      const n = cache.K.length, A = [], c = new Float64Array(HD);
+      for (let h = 0; h < H; h++) {
+        const o = h * dk, b = costs[h], si = new Float64Array(n); let mx = -Infinity;
+        for (let j = 0; j < n; j++) { if (mask && j === i) { si[j] = -Infinity; continue; } let sv = 0; const kj = cache.K[j]; for (let d = 0; d < dk; d++) sv += q[o + d] * kj[o + d]; si[j] = sv * sc - (b ? b * (i - j) : 0); mx = Math.max(mx, si[j]); }
+        let Z = 0; for (let j = 0; j < n; j++) { si[j] = Math.exp(si[j] - mx); Z += si[j]; }
+        for (let j = 0; j < n; j++) { si[j] /= Z; if (si[j]) { const vj = cache.V[j]; for (let d = 0; d < dk; d++) c[o + d] += si[j] * vj[o + d]; } }
+        A.push(si);
+      }
+      const xp = Float64Array.from(x); for (let d = 0; d < D; d++) { let sv = this.bo[d]; const off = d * HD; for (let e = 0; e < HD; e++) sv += this.Wo[off + e] * c[e]; xp[d] += sv; }
+      const u = new Float64Array(F); for (let f = 0; f < F; f++) { let sv = this.b1[f]; const off = f * D; for (let d = 0; d < D; d++) sv += this.W1[off + d] * xp[d]; u[f] = Math.tanh(sv); }
+      const y = Float64Array.from(xp); for (let d = 0; d < D; d++) { let sv = this.b2[d]; const off = d * F; for (let f = 0; f < F; f++) sv += this.W2[off + f] * u[f]; y[d] += sv; }
+      return { y, A };
+    }
     applyGradient(g, k, lr, l2 = 0) {
       const step = (p, gp, decay) => { for (let i = 0; i < p.length; i++) p[i] -= lr * (gp[i] / k + (decay ? l2 * p[i] : 0)); };
       step(this.Wq, g.Wq, 1); step(this.bq, g.bq); step(this.Wk, g.Wk, 1); step(this.bk, g.bk); step(this.Wv, g.Wv, 1); step(this.bv, g.bv);
@@ -549,19 +570,33 @@
       for (const doc of docs) { const tokens = doc.tokens || doc, fw = this.forward(tokens), l = this.loss(fw, doc.weights || null); loss += l.loss; per.push(l.per); for (let i = 0; i + 1 < tokens.length; i++) { const p = fw.probs[i]; let best = 0; for (let v = 1; v < this.V; v++) if (p[v] > p[best]) best = v; if (best === tokens[i + 1]) correct++; count++; } }
       return { loss: docs.length ? loss / docs.length : 0, accuracy: count ? correct / count : 0, per };
     }
-    // continue a prefix: the most probable next token each time (temperature 0), or a draw from the probabilities
-    // sharpened or flattened by the temperature; stops at the stop token or after maxTokens. Returns the new tokens
-    // and, per step, the probabilities it chose from.
+    // writing, one token at a time: a state holds every layer's keys and values for the tokens so far, so that each
+    // new token costs one token's work rather than a pass over the whole text. genState runs a prefix through; genPush
+    // adds one token and leaves the next token's probabilities on the state; genNext chooses the next token, the most
+    // probable (temperature 0) or a draw from the probabilities sharpened or flattened by the temperature, and pushes it
+    genState(prefix) { const st = { tokens: [], caches: this.layers.map(() => ({ K: [], V: [] })), logits: null, probs: null, A: null }; for (const t of prefix) this.genPush(st, t); return st; }
+    genPush(st, token) {
+      const D = this.D, V = this.V, i = st.tokens.length, x = new Float64Array(D), off = token * D, po = this.Pos && i < this.P ? i * D : -1;
+      for (let d = 0; d < D; d++) x[d] = this.E[off + d] + (po >= 0 ? this.Pos[po + d] : 0);
+      let h = x; const A = [];
+      this.layers.forEach((c, l) => { const o = c.forwardOne(h, st.caches[l], i); h = o.y; A.push(o.A); });
+      const z = new Float64Array(V); for (let v = 0; v < V; v++) { let sv = this.bout[v]; const o2 = v * D; for (let d = 0; d < D; d++) sv += this.Wout[o2 + d] * h[d]; z[v] = sv; }
+      let mx = -Infinity; for (const v of z) mx = Math.max(mx, v); const p = Float64Array.from(z, v => Math.exp(v - mx)); let Z = 0; for (const v of p) Z += v; for (let v = 0; v < V; v++) p[v] /= Z;
+      st.tokens.push(token); st.logits = z; st.probs = p; st.A = A;
+      return p;
+    }
+    genNext(st, { temperature = 0, rng = Math.random } = {}) {
+      const p = st.probs, V = this.V; let next;
+      if (temperature <= 0) { next = 0; for (let v = 1; v < V; v++) if (p[v] > p[next]) next = v; }
+      else { const z = st.logits; let mx = -Infinity; for (const v of z) mx = Math.max(mx, v / temperature); const e = Float64Array.from(z, v => Math.exp(v / temperature - mx)); let Z = 0; for (const v of e) Z += v; let r = rng() * Z; next = V - 1; for (let v = 0; v < V; v++) { r -= e[v]; if (r <= 0) { next = v; break; } } }
+      this.genPush(st, next);
+      return { token: next, probs: p };
+    }
+    // continue a prefix until the stop token or maxTokens: the new tokens and, per step, the probabilities chosen from
     generate(prefix, { maxTokens = 80, temperature = 0, rng = Math.random, stop = null } = {}) {
-      const tokens = prefix.slice(), steps = [];
-      while (steps.length < maxTokens) {
-        const fw = this.forward(tokens), i = tokens.length - 1, p = fw.probs[i]; let next;
-        if (temperature <= 0) { next = 0; for (let v = 1; v < this.V; v++) if (p[v] > p[next]) next = v; }
-        else { const z = fw.logits[i]; let mx = -Infinity; for (const v of z) mx = Math.max(mx, v / temperature); const e = Float64Array.from(z, v => Math.exp(v / temperature - mx)); let Z = 0; for (const v of e) Z += v; let r = rng() * Z; next = this.V - 1; for (let v = 0; v < this.V; v++) { r -= e[v]; if (r <= 0) { next = v; break; } } }
-        steps.push({ token: next, p }); tokens.push(next);
-        if (next === stop) break;
-      }
-      return { tokens: tokens.slice(prefix.length), steps };
+      const st = this.genState(prefix), steps = [];
+      while (steps.length < maxTokens) { const { token, probs } = this.genNext(st, { temperature, rng }); steps.push({ token, p: probs }); if (token === stop) break; }
+      return { tokens: st.tokens.slice(prefix.length), steps };
     }
     parameterCount() { return this.E.length + (this.Pos ? this.Pos.length : 0) + this.Wout.length + this.bout.length + this.layers.reduce((a, c) => a + c.parameterCount(), 0); }
     describe() { return `${this.V} words → embedding of ${this.D}${this.P ? ' + position' : ''} → ${this.layers.length} × ${this.layers[0] ? this.layers[0].describe() : ''} → single layer → softmax over the ${this.V} words`; }

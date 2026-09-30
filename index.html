@@ -827,6 +827,164 @@
     </section>
   </div>
 
+  <!-- ============================ REPORTS · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-rp-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="rp-data-title">Reports</h2>
+          <span class="small muted" id="rp-data-sub"></span>
+        </div>
+        <p class="prose small" id="rp-data-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl check"><input type="checkbox" id="rp-data-reveal"><label for="rp-data-reveal" class="plainlabel">Reveal the hidden case and the rule (the model only ever sees the words)</label></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="rp-data-report-title">The report</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="rp-data-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-data-next" title="the next report">next ▶</button></div>
+        </div>
+        <div class="rp-two">
+          <div><div class="rp-text" id="rp-data-text"></div></div>
+          <div><div class="rp-case" id="rp-data-case"></div><p class="small muted" id="rp-data-note" style="margin-top:8px"></p></div>
+        </div>
+      </div>
+      <div class="card" id="rp-rule-card" hidden>
+        <div class="card-head"><h2>The rule the diagnosis follows</h2><span class="small muted">what the generator did with the findings; the model has to find it in the words</span></div>
+        <div class="rp-rule" id="rp-rule"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The reports</h2>
+          <div class="legend"><span><span class="swatch ring"></span>benign, reactive or denuded</span><span><span class="swatch ring pos"></span>carcinoma in situ, or suspicious</span><span><span class="swatch ring inv"></span>invasive</span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px" id="rp-data-train-label">Training reports</p>
+        <div class="tray reports" id="rp-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="rp-data-test-label">Test reports · held out</p>
+        <div class="tray reports" id="rp-data-test-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="rp-data-held-label">Never trained on · invasion under a normal surface</p>
+        <div class="tray reports" id="rp-data-held-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ REPORTS · 2 · TRAIN ============================ -->
+    <section class="stage-panel" id="panel-reports" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Reports: a small language model</h2>
+          <span class="small muted">every word predicted from the words before it · the only teacher is the next word</span>
+        </div>
+        <p class="prose small" id="rp-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">Per token</span><div class="seg" id="rp-dim-seg"><button type="button" data-dim="32" title="a vector of 32 numbers per word, the size of the slides' context">32 numbers</button><button type="button" data-dim="48" class="is-active" title="48 numbers per word, the shipped model's size">48 numbers</button></div></div>
+          <div class="ctl"><span class="lbl">Positions</span><div class="seg" id="rp-pos-seg"><button type="button" data-pos="1" class="is-active" title="a learned vector per position, added to the word's">learned</button><button type="button" data-pos="0" title="no position vectors: the layers know how far back a word is only through their distance cost">none</button></div></div>
+          <div class="ctl slim"><label for="rp-epochs">Epochs <span class="val" id="rp-epochs-val">10</span></label><input type="range" id="rp-epochs" min="1" max="30" step="1" value="10"></div>
+          <div class="ctl slim"><label for="rp-lr">Learning rate <span class="val" id="rp-lr-val">0.005</span></label><input type="range" id="rp-lr" min="0" max="100" step="1" value="50"></div>
+          <div class="ctl slim"><label for="rp-seed">Random seed</label><input type="number" id="rp-seed" min="1" max="9999" value="1"></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="rp-step-report" title="one gradient step on the next batch of training reports">Step batch</button>
+            <button type="button" class="btn" id="rp-step-epoch" title="one pass through the 800 training reports (about half a minute)">Step epoch</button>
+            <button type="button" class="btn primary big" id="rp-train" title="run the remaining epochs (space)">▶ Train</button>
+            <button type="button" class="btn" id="rp-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="rp-load" title="the same model after 30 epochs in Node: the weights that ship with the page">Load the trained model</button>
+          </div>
+        </div>
+        <div class="status" id="rp-status"></div>
+        <div class="note" id="rp-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 id="rp-report-title">The report</h2>
+          <div class="actions-inline"><span class="small muted">who reads whom · layer</span><div class="seg small" id="rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div><span class="small muted">head</span><div class="seg small" id="rp-head-seg"><button type="button" data-head="-1" class="is-active" title="both heads averaged">both</button><button type="button" data-head="0">near</button><button type="button" data-head="1">far</button></div><button type="button" class="btn" id="rp-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-next" title="the next report">next ▶</button></div>
+        </div>
+        <div class="rp-two">
+          <div><div class="rp-text" id="rp-text"></div><p class="small muted" id="rp-text-note" style="margin-top:8px"></p></div>
+          <div><div class="rp-next" id="rp-nextword"></div><p class="small muted" id="rp-next-note" style="margin-top:8px"></p></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Learning curves</h2>
+          <div class="legend" id="rp-legend"></div>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Loss per epoch by section, test reports</span><span class="now" id="rp-loss-now"></span></div><svg id="rp-loss" role="img" aria-label="Loss per epoch by section"></svg></div>
+          <div class="chart"><div class="title"><span>Next word right per epoch</span><span class="now" id="rp-acc-now"></span></div><svg id="rp-acc" role="img" aria-label="Next-word accuracy per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Diagnosis right from the findings alone</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings alone, per epoch"></svg></div>
+        </div>
+        <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The reports</h2>
+          <div class="legend"><span><span class="swatch ring"></span>benign, reactive or denuded</span><span><span class="swatch ring pos"></span>carcinoma in situ, or suspicious</span><span><span class="swatch ring inv"></span>invasive</span><span><span class="swatch batch"></span>the last batch trained on</span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px" id="rp-train-label">Training reports</p>
+        <div class="tray reports" id="rp-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="rp-test-label">Test reports · never trained on</p>
+        <div class="tray reports" id="rp-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ REPORTS · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-rp-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="rp-write" title="the model writes the report for the findings shown, one word at a time (N)">Write the report</button>
+            <button type="button" class="btn" id="rp-next-case" title="the next held-out case's findings, into the form">Next case</button>
+            <button type="button" class="btn" id="rp-write-all" title="write every remaining case without the animation">Write all</button>
+            <button type="button" class="btn" id="rp-test-clear">Clear</button>
+          </div>
+          <div class="ctl"><span class="lbl">Cases</span><div class="seg small" id="rp-cases-seg"><button type="button" data-cases="test" class="is-active" title="the 100 held-out reports">test reports</button><button type="button" data-cases="held" title="the 8 reports with invasion under a normal surface, a combination the training set never held">never trained on</button></div></div>
+          <div class="ctl slim"><label for="rp-temp">Temperature <span class="val" id="rp-temp-val">0</span></label><input type="range" id="rp-temp" min="0" max="150" step="5" value="0"></div>
+          <div class="ctl slim"><label for="rp-pace">Pace <span class="val" id="rp-pace-val">8 words/s</span></label><input type="range" id="rp-pace" min="1" max="60" step="1" value="8"></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">written</span><b id="rp-stat-n">0 / 100</b><small>held-out cases</small></div>
+            <div class="metric"><span class="lbl">diagnosis right</span><b id="rp-stat-dx">–</b><small id="rp-stat-dx-sub"></small></div>
+            <div class="metric"><span class="lbl">diagnosis line exact</span><b id="rp-stat-exact">–</b><small id="rp-stat-exact-sub"></small></div>
+          </div>
+        </div>
+        <p class="note" id="rp-test-warning" hidden>The model has not trained: it will write noise, which is itself worth a look. Load the trained model on the Train step, or train it there.</p>
+        <div class="note" id="rp-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="rp-test-title">The findings go in, the report comes out</h2>
+          <span class="small muted">the analyser's findings are the prompt · the model writes the rest one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
+        </div>
+        <div class="rp-two">
+          <div>
+            <h3>The findings</h3>
+            <div class="rp-form" id="rp-form"></div>
+            <div class="ctl check" style="margin-top:10px"><input type="checkbox" id="rp-noblock"><label for="rp-noblock" class="plainlabel">No findings at all: the model writes the whole case from nothing</label></div>
+            <p class="small muted" id="rp-form-note" style="margin-top:8px">Change a finding and write again: the report follows the findings, right or wrong. Flip the surface to normal with invasive nests and see what it does with a combination it never saw.</p>
+          </div>
+          <div>
+            <h3 id="rp-test-report-head">The report</h3>
+            <div class="rp-text" id="rp-test-text"></div>
+            <p class="small" id="rp-test-call" style="margin-top:8px"></p>
+            <div class="rp-next" id="rp-test-nextword"></div>
+          </div>
+        </div>
+        <div class="rp-truth" id="rp-truth" hidden></div>
+      </div>
+      <div class="card" id="rp-evidence-card" hidden>
+        <div class="card-head"><h2>Where the diagnosis looked</h2><span class="small muted">the attention of the diagnosis words in the second layer, both heads averaged: on each line of the findings, and on each section of the report</span></div>
+        <div class="rp-evidence" id="rp-evidence"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Cases · <span id="rp-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch badge" style="background:var(--good)">✓</span>diagnosis right</span><span><span class="swatch badge">✗</span>wrong</span></div>
+        </div>
+        <div class="tray reports" id="rp-test-results"></div>
+      </div>
+    </section>
+
   <!-- ============================ INSPECTOR ============================ -->
   <aside class="inspector" aria-label="Specimen inspector">
     <div class="card">
@@ -877,7 +1035,7 @@
 </main>
 
 <footer>
-  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch steps, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; every question has the same three steps, specimens, train and test; the foundation question pretrains a miniature foundation model on 100 nuclei without labels, and the slides questions train attention over slides of twenty nuclei with one label each, with one layer of self-attention on the way. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
+  <p>Nucleus Net is a teaching toy: a small network with hand-written backpropagation — optional convolution, up to two dense hidden layers — trained in your browser on synthetic blood counts and nuclei. Keys: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> switch steps, <kbd>space</kbd> trains or pauses, <kbd>N</kbd> classifies the next test case; during a walk-through <kbd>space</kbd> pauses and <kbd>←</kbd> <kbd>→</kbd> step. Every nucleus comes as two scans, ours and another lab’s with a weaker stain, for the lab-difference and shortcut-learning points; every question has the same three steps, specimens, train and test; the foundation question pretrains a miniature foundation model on 100 nuclei without labels, the slides questions train attention over slides of twenty nuclei with one label each, with one layer of self-attention on the way, and the reports question trains a small language model that writes a biopsy report from an analyser's findings. Regenerate the cases with <code>node tools/generate_cbc.js</code> and <code>node tools/generate_nuclei.js</code>.</p>
 </footer>
 
 <script src="data/leukemia/patients_data.js"></script>
@@ -886,8 +1044,11 @@
 <script src="data/irregularity/nuclei_data.js"></script>
 <script src="data/foundation/backbones.js"></script>
 <script src="data/slides/slides_data.js"></script>
+<script src="data/reports/reports_data.js"></script>
+<script src="data/reports/lm_weights.js"></script>
 <script src="js/features.js"></script>
 <script src="js/fields.js"></script>
+<script src="js/reports.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>

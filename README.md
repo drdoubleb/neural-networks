@@ -45,9 +45,9 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists eight questions: a blood count, three nucleus questions, the foundation model, two questions asked
-of slides, and the fields of bladder. Whatever the question, the nav has the same three steps, and a lecture recipe simply selects a question and
-its settings.
+The masthead lists nine questions: a blood count, three nucleus questions, the foundation model, two questions asked
+of slides, the fields of bladder, and the reports a small language model writes from an analyser's findings. Whatever
+the question, the nav has the same three steps, and a lecture recipe simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
@@ -171,7 +171,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the fifteen recipe buttons
+## The lecture arc: the sixteen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -615,7 +615,7 @@ nothing. A single layer then scores every word and a softmax gives P(next token)
 token of every training report (cross-entropy) with Adam, a learning rate of 0.005, batches of 8 reports, weight decay
 0.0001 and the gradient clipped to norm 1, for 30 epochs: 55,725 parameters, gradient-checked to 5 × 10⁻⁶ like the
 other models (`gradientCheckLM`). To write, it continues a prefix one token at a time, the most probable word or a
-draw at a temperature. `tools/check_reports.js` trains it in Node and takes its measures; the trained model of seed 1
+draw at a temperature, with a cache of every layer's keys and values so that each new word costs one word's work. `tools/check_reports.js` trains it in Node and takes its measures; the trained model of seed 1
 ships as `data/reports/lm_weights.js` (`window.REPORT_LM`, with its vocabulary), the way the foundation encoders do.
 
 **Fluency first, grounding last.** The test loss by section as the model trains, and the diagnosis it writes when
@@ -683,7 +683,27 @@ Adam). Reproduce with `node tools/check_reports.js --dim 48 --ffn 48 --dk 12 --l
 `--opt sgd --lr 0.3`; `--curve` prints every epoch and `--ground 25` measures the grounding every fifth. A run takes
 20 to 40 s per epoch and about four minutes for the measures after training.
 
-The page for this question follows; the model, its tokens and the corpus are in place.
+**On the page.** The question *Reports: write the report from the findings?* (recipe ⑯, `#reports/train`) has the
+same three steps as the others. *Specimens* shows a report with its sections, and under *Reveal* the hidden case
+behind it and the rule table, with the training, test and never-trained-on reports as cards coloured by diagnosis.
+*Train* trains the model live, in batches of four reports so that the page stays responsive (an epoch is about half
+a minute; 48 or 32 numbers per token, position vectors on or off, the epochs, the learning rate and the seed as
+controls, and *Load the trained model* for the shipped weights at any time). The report on screen is coloured word
+by word by the probability the model gave each word given the words before, green when it expected it and red when
+it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words it
+read light up on the report, in the layer and head chosen, the deeper the underline the more it listened; click a
+word to keep it. The curves are the test loss per epoch by section, the share of next words right, and, from the
+first epoch, the diagnosis the model writes from the findings alone on eight test reports, measured a few words per
+frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
+seven lines, *Write the report* makes the model write the rest one word at a time at the chosen pace, each word
+coloured by the probability it was chosen with and the bars showing what it chose from, and the rule's answer, and
+the generator's own report, appear after; the tally counts the diagnoses right and the diagnosis lines exact; the
+form can be edited, in which case the rule's answer for the edited findings is the truth; a checkbox gives the model
+nothing at all, so that it writes findings and all from what it learned; a temperature slider replaces the most
+probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; and
+a card shows where the diagnosis words looked, their attention in the second layer by line of the findings and by
+section. Hovering a written word shows what the model chose from at that step and whom it read. The corpus (1 MB)
+and the trained model (0.5 MB) load with the page.
 
 ## The data
 
