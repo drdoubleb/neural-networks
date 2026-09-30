@@ -619,46 +619,51 @@ draw at a temperature, with a cache of every layer's keys and values so that eac
 ships as `data/reports/lm_weights.js` (`window.REPORT_LM`, with its vocabulary), the way the foundation encoders do.
 
 **Fluency first, grounding last.** The test loss by section as the model trains, and the diagnosis it writes when
-given the findings block alone (it then writes the whole report itself; the share of the first 25 test reports whose
-diagnosis class comes out right):
+given the findings with the specimen, the clinical history and the gross, as they come with a case (it then writes
+the microscopic description and the diagnosis itself; the share of the first 25 test reports whose diagnosis class
+comes out right):
 
-| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right from the block alone |
+| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right, the description written by the model |
 |---|---|---|---|---|---|---|---|---|
 | 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | |
 | 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | |
 | 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% |
-| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 80% |
+| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 72% |
 | 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% |
-| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (96% of all 100) |
+| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (97% of all 100) |
 
 The specimen, clinical and gross losses are a floor set by the draws (which wall, which history, how many fragments:
 nothing in the report predicts them); the findings block is easy from the start (fixed lines, one value each); the
 microscopic section's loss falls as the model learns the phrasings; and the diagnosis, measured with the pathologist's
 description in front of it, is near certain from epoch 10. But when the model has to write the description itself,
 its diagnosis is right for barely half the reports at epoch 5, when its reports already read as fluently as they ever
-will, and reaches 96% only at the end. Reading a finding forty to a hundred tokens back changes the loss by a few
+will, and reaches 97% only at the end. Reading a finding forty to a hundred tokens back changes the loss by a few
 hundredths of a nat per token, against the phrasing the model has to guess at every token, so the loss curve is flat
 long before the model is grounded: fluency is learned first, grounding last, and the loss cannot tell them apart.
 
-**What it does with the test reports** (seed 1, the shipped model; the same recipe from seeds 2 and 3 gives 91% and
-97% with the prefix, 91% and 75% from the block, the third over-hedging, and both write *Benign urothelium* for all
-eight held-out reports: three random starts, three different models, which is a lesson in itself):
+**What it does with the test reports** (seed 1, the shipped model; three prompts: everything up to DIAGNOSIS:, so
+that only the diagnosis is written; the findings with the specimen, the clinical history and the gross, as they come
+with a case, so that the description and the diagnosis are written, which is what the page's Test step asks; and the
+findings block alone, so that the whole report is written, requisition and all. The same recipe from seeds 2 and 3
+gives 91% and 97% with the prefix, 91% and 75% from the block, the third over-hedging, and both write *Benign
+urothelium* for all eight held-out reports: three random starts, three different models, which is a lesson in
+itself):
 
-| | Given everything up to DIAGNOSIS: | Given the findings block alone |
-|---|---|---|
-| Diagnosis sentence exact | 97% | 96% |
-| Whole diagnosis line exact, muscularis propria included | 97% | 96% |
-| Errors | invasive written as invasive into muscularis propria 2, suspicious as CIS 1 | suspicious written as CIS 4 |
-| The held-out combination, invasion under a normal surface (8 reports) | invasion called on all 8, but each with the *associated carcinoma in situ* it always saw beside invasion | invasion called on 7 of 8, the same way |
+| | Given everything up to DIAGNOSIS: | Given the findings and the requisition | Given the findings block alone |
+|---|---|---|---|
+| Diagnosis sentence exact | 97% | 97% | 96% |
+| Whole diagnosis line exact, muscularis propria included | 97% | 97% | 96% |
+| Errors | invasive written as invasive into muscularis propria 2, suspicious as CIS 1 | suspicious written as invasive 2, as CIS 1 | suspicious written as CIS 4 |
+| The held-out combination, invasion under a normal surface (8 reports) | invasion called on all 8, but each with the *associated carcinoma in situ* it always saw beside invasion | invasion called on 6 of 8, the same way, two of them into the muscularis propria | invasion called on 7 of 8, the same way |
 
 The hedged cases are the hard ones, as they should be: the discordant findings differ from carcinoma in situ in von
 Brunn nests by one line. The held-out combination is the question the corpus was built to ask. This model reads the
 nests line, calls invasion, and adds the carcinoma in situ that came with every invasion it was trained on; the
 smaller models below write *Benign urothelium* for all eight, having learned that a normal surface means benign,
 because in their training it always did. Given nothing at all, the start token alone, the model writes a whole case,
-findings block included: the most probable one is benign, and forty drawn at temperature 1 follow the base rates it
-learned (21 benign, 11 carcinoma in situ, 4 reactive, 4 invasive), which is what a model does when the evidence is
-missing: it answers from the prior, fluently. Where the
+findings block and requisition included: the most probable one is benign, and forty drawn at temperature 1 follow
+the base rates it learned (20 benign, 11 carcinoma in situ, 4 reactive, 3 invasive), which is what a model does when
+the evidence is missing: it answers from the prior, fluently. Where the
 diagnosis tokens look, in the second layer: 17% of their attention on the findings block, of which the nests line 8%
 and the muscularis propria line 4% and the inflammation line 1%, 37% on the microscopic description, 41% on the
 diagnosis itself: the diagnosis reads the description the model wrote more than the block, and the block lines it
@@ -678,10 +683,12 @@ loss stays at 0.23 against 0.16: the data-size lesson again. Trained without the
 the five discordant test cases it writes invasion four times and carcinoma in situ once, in the confident wording it
 was trained on. Plain gradient descent trains it too, more slowly (test loss 0.27 after 15 epochs against 0.19 with
 Adam). Reproduce with `node tools/check_reports.js --dim 48 --ffn 48 --dk 12 --lr 0.005 --cost 0.05,0.003
---positions 200 --epochs 30` (the shipped model; `--save` writes it), and the ablations with `--dim 32 --ffn 32 --dk 8`,
+--positions 200 --epochs 30` (the shipped model; `--save` writes it, and `--load data/reports/lm_weights.js` takes the
+measures on the shipped weights without training), and the ablations with `--dim 32 --ffn 32 --dk 8`,
 `--cost 0.1`, `--cost 0`, `--positions 0`, `--epochs 15`, `--lr 0.01`, `--heads 4`, `--docs 200`, `--no-hedge`,
 `--opt sgd --lr 0.3`; `--curve` prints every epoch and `--ground 25` measures the grounding every fifth. A run takes
-20 to 40 s per epoch and about four minutes for the measures after training.
+20 to 40 s per epoch and about ten seconds for the measures after training. The ablation numbers above are from
+the findings block alone, the measure the page used before its Test step was given the requisition.
 
 **On the page.** The question *Reports: write the report from the findings?* (recipe ⑯, `#reports/train`) has the
 same three steps as the others. *Specimens* shows a report with its sections, and under *Reveal* the hidden case
@@ -693,13 +700,15 @@ by word by the probability the model gave each word given the words before, gree
 it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words it
 read light up on the report, in the layer and head chosen, the deeper the underline the more it listened; click a
 word to keep it. The curves are the test loss per epoch by section, the share of next words right, and, from the
-first epoch, the diagnosis the model writes from the findings alone on eight test reports, measured a few words per
-frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
-seven lines, *Write the report* makes the model write the rest one word at a time at the chosen pace, each word
-coloured by the probability it was chosen with and the bars showing what it chose from, and the rule's answer, and
-the generator's own report, appear after; the tally counts the diagnoses right and the diagnosis lines exact; the
-form can be edited, in which case the rule's answer for the edited findings is the truth; a checkbox gives the model
-nothing at all, so that it writes findings and all from what it learned; a temperature slider replaces the most
+first epoch, the diagnosis the model writes for eight test reports from their findings and requisition, the
+description written by itself, measured a few words per frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
+seven lines and go into the prompt with the case's specimen, clinical history and gross, as they would come with the
+case, so that the model writes only what a pathologist signs, the microscopic description and the diagnosis;
+*Write the report* makes it write them one word at a time at the chosen pace, each word coloured by the probability
+it was chosen with and the bars showing what it chose from, and the rule's answer, and the generator's own report,
+appear after; the tally counts the diagnoses right and the diagnosis lines exact; the form can be edited, in which
+case the rule's answer for the edited findings is the truth; a checkbox gives the model nothing at all, so that it
+writes findings, requisition and all from what it learned; a temperature slider replaces the most
 probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; and
 a card shows where the diagnosis words looked, their attention in the second layer by line of the findings and by
 section. Hovering a written word shows what the model chose from at that step and whom it read. The corpus (1 MB)

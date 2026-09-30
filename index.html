@@ -912,7 +912,7 @@
         <div class="curves">
           <div class="chart"><div class="title"><span>Loss per epoch by section, test reports</span><span class="now" id="rp-loss-now"></span></div><svg id="rp-loss" role="img" aria-label="Loss per epoch by section"></svg></div>
           <div class="chart"><div class="title"><span>Next word right per epoch</span><span class="now" id="rp-acc-now"></span></div><svg id="rp-acc" role="img" aria-label="Next-word accuracy per epoch"></svg></div>
-          <div class="chart"><div class="title"><span>Diagnosis right from the findings alone</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings alone, per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
         </div>
         <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
       </div>
@@ -953,14 +953,14 @@
       </div>
       <div class="card">
         <div class="card-head">
-          <h2 id="rp-test-title">The findings go in, the report comes out</h2>
-          <span class="small muted">the analyser's findings are the prompt · the model writes the rest one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
+          <h2 id="rp-test-title">The findings and the requisition go in, the description and the diagnosis come out</h2>
+          <span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
         </div>
         <div class="rp-two">
           <div>
             <h3>The findings</h3>
             <div class="rp-form" id="rp-form"></div>
-            <div class="ctl check" style="margin-top:10px"><input type="checkbox" id="rp-noblock"><label for="rp-noblock" class="plainlabel">No findings at all: the model writes the whole case from nothing</label></div>
+            <div class="ctl check" style="margin-top:10px"><input type="checkbox" id="rp-noblock"><label for="rp-noblock" class="plainlabel">Nothing at all: the model writes the whole case from nothing, findings and requisition included</label></div>
             <p class="small muted" id="rp-form-note" style="margin-top:8px">Change a finding and write again: the report follows the findings, right or wrong. Flip the surface to normal with invasive nests and see what it does with a combination it never saw.</p>
           </div>
           <div>
