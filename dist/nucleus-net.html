@@ -1461,7 +1461,7 @@ details.fold > ul { margin-top: 8px; }
         <div class="curves">
           <div class="chart"><div class="title"><span>Loss per epoch by section, test reports</span><span class="now" id="rp-loss-now"></span></div><svg id="rp-loss" role="img" aria-label="Loss per epoch by section"></svg></div>
           <div class="chart"><div class="title"><span>Next word right per epoch</span><span class="now" id="rp-acc-now"></span></div><svg id="rp-acc" role="img" aria-label="Next-word accuracy per epoch"></svg></div>
-          <div class="chart"><div class="title"><span>Diagnosis right from the findings alone</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings alone, per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
         </div>
         <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
       </div>
@@ -1502,14 +1502,14 @@ details.fold > ul { margin-top: 8px; }
       </div>
       <div class="card">
         <div class="card-head">
-          <h2 id="rp-test-title">The findings go in, the report comes out</h2>
-          <span class="small muted">the analyser's findings are the prompt · the model writes the rest one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
+          <h2 id="rp-test-title">The findings and the requisition go in, the description and the diagnosis come out</h2>
+          <span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
         </div>
         <div class="rp-two">
           <div>
             <h3>The findings</h3>
             <div class="rp-form" id="rp-form"></div>
-            <div class="ctl check" style="margin-top:10px"><input type="checkbox" id="rp-noblock"><label for="rp-noblock" class="plainlabel">No findings at all: the model writes the whole case from nothing</label></div>
+            <div class="ctl check" style="margin-top:10px"><input type="checkbox" id="rp-noblock"><label for="rp-noblock" class="plainlabel">Nothing at all: the model writes the whole case from nothing, findings and requisition included</label></div>
             <p class="small muted" id="rp-form-note" style="margin-top:8px">Change a finding and write again: the report follows the findings, right or wrong. Flip the surface to normal with invasive nests and see what it does with a combination it never saw.</p>
           </div>
           <div>
@@ -8137,11 +8137,11 @@ window.Viz = (function () {
     L.hist.push(rec);
     if (withGround) { L.measuring = { docs: L.test.slice(0, RP.groundN), i: 0, st: null, ok: 0, rec }; if (!L.running) requestAnimationFrame(rpTick); }
   }
-  function rpMeasureChunk(deadline) { // a few words of the grounding measure per frame, each written with the model's cache of the words so far
+  function rpMeasureChunk(deadline) { // a few words of the grounding measure per frame: the model writes the description and the diagnosis of a test report from its findings and its requisition, with its cache of the words so far
     const L = S.rp, M = L.measuring; if (!M) return;
     while (performance.now() < deadline) {
       const d = M.docs[M.i]; if (!d) break;
-      if (!M.st) M.st = L.model.genState(d.tokens.slice(0, d.words.indexOf('SPECIMEN')));
+      if (!M.st) M.st = L.model.genState(d.tokens.slice(0, d.words.indexOf('MICROSCOPIC'))); // the findings, the specimen, the history and the gross given
       const { token } = L.model.genNext(M.st, { temperature: 0 });
       if (token === L.vocab.end || M.st.tokens.length >= RP.maxWrite) {
         const dx = RPR.diagnosisOf(RPR.decode(L.vocab, M.st.tokens)); if (RPR.classOf(dx) === d.cls) M.ok++;
@@ -8210,7 +8210,7 @@ window.Viz = (function () {
       `<span>reports <b>${L.train.length}</b> training · <b>${L.test.length}</b> test · <b>${L.held.length}</b> never trained on</span>` +
       `<span>epoch <b>${L.epoch}</b> / ${L.epochs}${L.shipped ? ' (the trained model that ships with the page)' : ''}</span><span>batch <b>${L.ptr === 0 ? '–' : Math.ceil(L.ptr / RP.batch)}</b> / ${Math.ceil(L.train.length / RP.batch)}</span>` +
       `<span>loss <b>${L.trainLoss == null ? '–' : L.trainLoss.toFixed(3)}</b> training · <b>${last ? last.testLoss.toFixed(3) : '–'}</b> test</span><span>next word right <b>${last ? pct(last.acc) : '–'}</b> test</span>` +
-      `<span>diagnosis right from the findings alone <b>${L.measuring ? 'measuring…' : last && last.ground != null ? pct(last.ground) : '–'}</b> (${RP.groundN} test reports)</span>`;
+      `<span>diagnosis right from the findings <b>${L.measuring ? 'measuring…' : last && last.ground != null ? pct(last.ground) : '–'}</b> (${RP.groundN} test reports, the description written by the model)</span>`;
   }
   function rpForward(r) { const L = S.rp; if (L.fw && L.fwFor === r.id) return L.fw; L.fw = L.model.forward(r.tokens); L.fwFor = r.id; return L.fw; }
   // the words of a report as spans: each coloured by the probability the model gave it, given the words before
@@ -8328,10 +8328,11 @@ window.Viz = (function () {
   }
   function rpReadForm() { const L = S.rp, f = {}; for (const l of RPR.FINDINGS) f[l.key] = $(`rp-f-${l.key}`).value; if (f.nests === 'absent') { f.atypia = 'none'; f.contours = 'none'; f.stromal = 'none'; } L.form = f; rpSyncForm(); }
   function rpSyncForm() { const L = S.rp, f = L.form; if (!f) return; for (const l of RPR.FINDINGS) { const sel = $(`rp-f-${l.key}`); sel.value = f[l.key]; const off = f.nests === 'absent' && ['atypia', 'contours', 'stromal'].includes(l.key); sel.disabled = off || L.noblock; sel.parentElement.classList.toggle('off', off || L.noblock); } }
-  function rpLoadCase(r) { const L = S.rp; L.form = Object.assign({}, r.findings); L.formCase = r.id; L.written = null; L.truthShown = false; L.testSelected = r.id; rpSyncForm(); }
+  function rpLoadCase(r) { const L = S.rp; L.form = Object.assign({}, r.findings); L.formCase = r.id; L.reqCase = r.id; L.written = null; L.truthShown = false; L.testSelected = r.id; rpSyncForm(); }
+  function rpRequisition() { const L = S.rp, r = L.reqCase != null ? L.byId.get(L.reqCase) : null; if (!r) return []; const iSp = r.words.indexOf('SPECIMEN'), iMi = r.words.indexOf('MICROSCOPIC'); return iSp >= 0 && iMi > iSp ? r.tokens.slice(iSp, iMi) : []; } // the case's specimen, clinical history and gross, up to the newline before the microscopic description
   function rpTestSelect(id) { const L = S.rp, r = L.byId.get(id); if (!r) return; if (L.writing) rpWriteStop(); rpLoadCase(r); const res = L.trial.results.get(id); if (res) { L.written = res; L.truthShown = true; } rpRenderTest(); }
   function rpNextCase() { const L = S.rp, set = rpCaseSet(); if (L.writing) rpWriteStop(); let i = L.trial.next; if (i >= set.length) { rpNote(`All ${set.length} cases written. Clear to start over, or edit the findings and write again.`); return null; } rpLoadCase(set[i]); rpRenderTest(); return set[i]; }
-  function rpPrefix() { const L = S.rp; if (L.noblock) return [L.vocab.start]; const enc = RPR.encode(L.vocab, RPR.blockOf(L.form)); return enc.slice(0, -1).concat([L.nl]); } // the block, ending with the newline before the report
+  function rpPrefix() { const L = S.rp; if (L.noblock) return [L.vocab.start]; const enc = RPR.encode(L.vocab, RPR.blockOf(L.form)); return enc.slice(0, -1).concat([L.nl], rpRequisition()); } // the block from the form, then the case's requisition and gross: the model writes the microscopic description and the diagnosis
   function rpWrite() { // the model writes the report for the findings shown, a few words per frame at the chosen pace
     const L = S.rp; if (!L.model || !L.form) return; if (L.writing) { rpWriteStop(); return; }
     const prefix = rpPrefix(), st = L.model.genState(prefix); L.writing = { prefix, st, tokens: st.tokens, steps: [], t0: performance.now(), count: 0, docId: L.noblock ? null : L.formCase }; L.written = null; L.truthShown = false; L.hover = null; L.pinned = null;
@@ -8395,7 +8396,7 @@ window.Viz = (function () {
     $('rp-next-case').textContent = done ? `All ${set.length} cases loaded` : `Next case (${T.next + 1} of ${set.length})`;
     $('rp-test-warning').hidden = !(L.model && L.model.steps === 0 && !L.shipped);
     const doc = L.formCase ? L.byId.get(L.formCase) : null;
-    $('rp-test-title').textContent = L.noblock ? 'No findings: the model writes a whole case from nothing' : doc ? `Case ${doc.name} · ${doc.split === 'held' ? 'never trained on' : 'test'} · the findings go in, the report comes out` : 'Findings of your own · the findings go in, the report comes out';
+    $('rp-test-title').textContent = L.noblock ? 'Nothing given: the model writes a whole case from nothing' : doc ? `Case ${doc.name} · ${doc.split === 'held' ? 'never trained on' : 'test'} · the findings and the requisition go in, the description and the diagnosis come out` : 'Findings of your own · the findings and the requisition go in, the description and the diagnosis come out';
     if (L.writing) { rpRenderWriting(); }
     else if (L.written) {
       const res = L.written, el = $('rp-test-text'), stepAt = new Map(res.steps.map(s => [s.at, s])), probsOf = i => { const s = stepAt.get(i); return s ? s.probs[s.token] : null; };
@@ -8406,12 +8407,12 @@ window.Viz = (function () {
       $('rp-test-call').innerHTML = res.dx ? `The model wrote: <b>${esc(res.dxLine || res.dx)}</b>${res.truthDx != null ? ` → <span class="${res.right ? 'good-text' : 'bad-text'}">${res.right ? 'the right diagnosis' : 'the wrong diagnosis'} ${res.right ? '✓' : '✗'}${res.right && !res.exact ? ', not word for word' : ''}</span>` : ''} · ${res.steps.length} words${L.temperature > 0 ? `, drawn at temperature ${L.temperature.toFixed(2)}` : ', the most probable word each time'}. Hover a word for what the model chose from and the words it read.` : 'The model wrote no diagnosis line at all.';
       $('rp-truth').hidden = !L.truthShown;
       if (L.truthShown) $('rp-truth').innerHTML = res.noblock
-        ? `<div>Nothing was given, so there is no truth: the model drew a whole case from what it learned, findings included${res.findings ? `, and for the findings it drew the rule would give: <b>${esc(RPR.ruleOf(res.findings).text)}</b>` : ''} Draw again, and again: at temperature 1 the diagnoses follow the base rates of the queue it was trained on.</div>`
+        ? `<div>Nothing was given, so there is no truth: the model drew a whole case from what it learned, findings and requisition included${res.findings ? `, and for the findings it drew the rule would give: <b>${esc(RPR.ruleOf(res.findings).text)}</b>` : ''} Draw again, and again: at temperature 1 the diagnoses follow the base rates of the queue it was trained on.</div>`
         : `<div>The rule says: <b>${esc(res.truthLine)}</b>${doc && !L.noblock ? ` · the generator’s own report for this case reads: <b>${esc(doc.dxLine)}</b>` : ''}</div>${doc ? '' : '<div class="small muted">Findings of your own: the rule’s answer is what a pathologist would sign out for them; the model has only ever seen the training reports.</div>'}`;
       rpRenderEvidence(res);
     } else {
       $('rp-test-text').innerHTML = L.noblock ? '<span class="muted">Press Write the report: from the start token alone the model writes findings and all.</span>' : rpTextHtml(RPR.decode(L.vocab, rpPrefix()), null, null) + '<span class="muted"> … press Write the report.</span>';
-      $('rp-test-nextword').innerHTML = ''; $('rp-test-call').textContent = L.noblock ? '' : 'The findings above are the prompt; the model continues from the newline after them, one word at a time, until it writes the end token.';
+      $('rp-test-nextword').innerHTML = ''; $('rp-test-call').textContent = L.noblock ? '' : 'The findings, the specimen, the clinical history and the gross are the prompt, as they would come with the case; the model continues from the newline after the gross, one word at a time, until it writes the end token.';
       $('rp-truth').hidden = true; $('rp-evidence-card').hidden = true;
     }
     for (const [id, el] of L.testThumbs) { const rr = T.results.get(id); el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('wrong', !!rr && !rr.right); el.classList.toggle('right', !!rr && rr.right); el.querySelector('.badge').textContent = rr && rr.right ? '✓' : '✗'; }
