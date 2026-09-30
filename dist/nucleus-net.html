@@ -502,7 +502,7 @@ details.fold > ul { margin-top: 8px; }
 .fd-ctx { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .fd-ctx > div { min-width: 0; }
 @media (min-width: 1100px) { .fd-ctx { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; } }
-#fd-cards { display: grid; gap: 18px; min-width: 0; }
+#sl-cards, #fd-cards { display: grid; gap: 18px; min-width: 0; }
 
 </style>
 </head>
@@ -961,6 +961,7 @@ details.fold > ul { margin-top: 8px; }
         </div>
       </div>
 
+      <div id="sl-cards">
       <div class="card" id="sl-context-card" hidden>
         <div class="card-head">
           <h2>Who looks at whom</h2>
@@ -1014,8 +1015,9 @@ details.fold > ul { margin-top: 8px; }
         <div class="fm-selected" id="sl-summary"></div>
         <div class="net-wrap"><canvas id="sl-head" width="800" height="440" aria-label="The classifier on the slide's summary"></canvas><div class="tip" id="sl-head-tip" hidden></div></div>
       </div>
+      </div>
 
-      <div class="card">
+      <div class="card" id="sl-curves-card">
         <div class="card-head">
           <h2>Learning curves</h2>
           <div class="legend"><span><span class="line"></span>training slides</span><span><span class="line test"></span>test slides (peeking)</span><span><span class="line chance"></span>uniform attention</span></div>
@@ -1099,11 +1101,11 @@ details.fold > ul { margin-top: 8px; }
           <span class="small muted">held-out slides go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
         <div class="sl-two">
-          <div><canvas id="sl-test-canvas" width="372" height="354" aria-label="The slide under test with its attention weights"></canvas><p class="small" id="sl-test-call" style="margin-top:8px"></p></div>
+          <div><div class="net-wrap"><canvas id="sl-test-canvas" width="372" height="354" aria-label="The slide under test with its attention weights"></canvas><div class="tip" id="sl-test-tip" hidden></div></div><p class="small" id="sl-test-call" style="margin-top:8px"></p></div>
           <div><div class="sl-rank-wrap"><canvas id="sl-test-rank" width="800" height="116" aria-label="The nuclei of the slide under test ranked by attention"></canvas></div><p class="small muted" style="margin-top:8px" id="sl-test-rank-note"></p></div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" id="sl-test-results-card">
         <div class="card-head">
           <h2>Test slides · <span id="sl-test-count"></span></h2>
           <div class="legend"><span><span class="swatch ring"></span><span data-slcalled="0"></span></span><span><span class="swatch ring pos"></span><span data-slcalled="1"></span></span><span><span class="swatch badge" style="background:var(--good)">✓</span>correct</span><span><span class="swatch badge">✗</span>wrong</span></div>
@@ -6521,7 +6523,7 @@ window.Viz = (function () {
   // the weighted average of the codes is the slide's summary and a single layer makes the call. Only the slide's label
   // trains it; the pool's truth about the nuclei is only ever used to show, afterwards, where the attention landed.
   const SLC = { lr: 0.02, batch: 1, decay: 0.001, context: { dk: 8, ffn: 8, distanceBias: true, excludeSelf: true, costInit: 1.5 } }; // decay only with the context layer
-  function slNote(msg) { $('sl-note').textContent = msg || ''; }
+  function slNote(msg) { $(slOnTest() ? 'sl-test-note' : 'sl-note').textContent = msg || ''; } // the note of the step on screen
   function slData() { const D = window.LECTURE_SLIDES; return D && D.questions ? D : null; }
   function slBuild() { // the pool once; each question's slides on first use; the stage switched to the current question
     const L = S.sl, D = slData(); if (!D) return false;
@@ -6626,7 +6628,15 @@ window.Viz = (function () {
   function slStepSlide() { const L = S.sl; slStop(); const ended = slStep(); slRender(true); slNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on slide ${L.byId.get(L.lastSlide).name} (${L.meta.classes[L.byId.get(L.lastSlide).label].name}): step ${L.ptr} of ${L.train.length}.`); }
   function slStepEpoch() { const L = S.sl; slStop(); do { slStep(); } while (L.ptr !== 0); slRender(true); slNote(`Epoch ${L.epoch} complete.`); }
   function slSelect(id) { const L = S.sl; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; slWalkStop(); slDecideWalkStop(); slRenderFocus(); slRenderSummary(); slRenderTrays(); }
-  function slFocus() { const L = S.sl; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
+  const slOnTest = () => S.world === 'slides' && S.stage === 'test';
+  function slTestResult() { const L = S.sl; return L.testSelected != null ? L.trial.results.get(L.testSelected) : null; } // the call already made for the slide under test, if any
+  function slFocus() { const L = S.sl; if (slOnTest()) return (L.testSelected != null && L.byId.get(L.testSelected)) || L.test[Math.min(L.trial.next, L.test.length - 1)]; return (L.selected != null && L.byId.get(L.selected)) || (L.lastSlide != null && L.byId.get(L.lastSlide)) || L.train[0]; } // the slide on screen
+  // the diagram cards live in the Train step and move to the Test step with the slide under test (once it is classified)
+  function slPlaceCards() {
+    const cards = $('sl-cards'), onTest = slOnTest(), before = $(onTest ? 'sl-test-results-card' : 'sl-curves-card');
+    if (cards.nextElementSibling !== before) before.parentNode.insertBefore(cards, before);
+    cards.hidden = onTest && !slTestResult();
+  }
   function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
   function slSyncControls() {
@@ -6657,17 +6667,23 @@ window.Viz = (function () {
       (L.attention ? `<span>attention on the atypical nuclei <b>${pct(last.mass)}</b> training · <b>${pct(last.testMass)}</b> test (uniform: ${pct(L.share)})</span>` : `<span>every nucleus weighs <b>${pct(1 / L.meta.perSlide)}</b> (plain average)</span>`);
     void cls;
   }
-  function slFocusForward() { const L = S.sl, s = slFocus(); return { s, fw: L.model.forward(s.H, s.dist) }; }
+  function slFocusForward() { const L = S.sl, s = slFocus(), r = slOnTest() ? slTestResult() : null; return { s, fw: r ? r.fw : L.model.forward(s.H, s.dist) }; } // on the Test step, the call as it was made
   // the nucleus the cards follow: the hovered one, else the pinned one (a click on the slide or the map), else the one with the most attention
   function slShown(fw) { const L = S.sl; if (L.hoverNucleus != null) return L.hoverNucleus; if (L.pinned != null && L.pinned < fw.a.length) return L.pinned; let j = 0; for (let i = 1; i < fw.a.length; i++) if (fw.a[i] > fw.a[j]) j = i; return j; }
   function slShownWord() { const L = S.sl; return L.hoverNucleus != null ? '' : L.pinned != null ? ', pinned,' : ', the one with the most attention,'; }
   // the context layer's attention as the map shows it: what the layer uses, or what the match alone or the distance alone would give
   function slAttentionView(fw) { const L = S.sl, ex = L.model.context.explain(fw.ctx); return L.attView === 'match' ? ex.matchOnly : L.attView === 'distance' ? ex.distOnly : fw.ctx.A; }
-  function slRenderSlide() {
-    const L = S.sl, { s, fw } = slFocusForward(), cls = L.meta.classes, view = L.context && fw.ctx ? slAttentionView(fw) : null;
-    const from = L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned; // whose listening the lines show
-    Viz.drawSlide($('sl-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: fw.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus, pinned: view ? L.pinned : null,
+  function slDrawSlide(id, s, fw) { // one viewer: the slide with its attention frames and, with context, the lines of the nucleus under the cursor; plain before a call
+    const L = S.sl, n = s.nuclei.length, view = fw && L.context && fw.ctx ? slAttentionView(fw) : null, ok = i => (i != null && i >= 0 && i < n ? i : null);
+    const hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned); // whose listening the lines show
+    Viz.drawSlide($(id), { nuclei: s.nuclei.map((q, i) => ({ px: q.px, a: fw ? fw.a[i] : 0, pos: !!q.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: fw ? L.reveal : false, plain: !fw, hover, pinned: view ? pinned : null,
       links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null });
+    return view;
+  }
+  function slRenderSlide() {
+    const L = S.sl;
+    if (slOnTest()) { const r = slTestResult(); slDrawSlide('sl-test-canvas', slFocus(), r ? r.fw : null); return; } // the viewer of the Test step: the call as it was made, or the next slide plain
+    const { s, fw } = slFocusForward(), cls = L.meta.classes, view = slDrawSlide('sl-canvas', s, fw);
     if (view) $('sl-links-note').textContent = (L.linksAll
       ? `Every link above ${pct(L.linksMin)}${L.linksMin > 0 ? ' at once' : ''}: a link is wide at the end that listens, its width that nucleus’s share for the other, and comes to a point at an end that does not listen back. Hover a nucleus to lift its links out; click it to keep it.`
       : 'Lines from the hovered nucleus to the nuclei it listens to, thicker with the share. Click a nucleus to keep it as the one the cards follow; switch to every nucleus to see all the links at once.')
@@ -6677,9 +6693,11 @@ window.Viz = (function () {
     $('sl-call').innerHTML = `The model says <b>P(${esc(cls[1].name)}) = ${fw.p.toFixed(2)}</b> → <span class="${call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[call].name)} ${call === s.label ? '✓' : '✗'}</span>${L.selected == null && L.lastSlide != null ? ' · the last slide trained on' : ''}. ${L.attention ? 'Frames and percentages are the attention weights.' : 'Plain average: every nucleus weighs the same.'}`;
   }
   function slRenderRank() {
-    const L = S.sl, { s, fw } = slFocusForward();
+    const L = S.sl, onTest = slOnTest();
+    if (onTest && !slTestResult()) { const s0 = slFocus(); Viz.drawRanked($('sl-test-rank'), { items: s0.nuclei.map((n, i) => ({ px: n.px, value: 0, pos: false, index: i })), size: L.size, tint: S.tint, reveal: false, hover: null, title: 'not classified yet' }); return; }
+    const { s, fw } = slFocusForward();
     const items = s.nuclei.map((n, i) => ({ px: n.px, value: fw.a[i], pos: !!n.label, index: i })).sort((a, b) => b.value - a.value);
-    Viz.drawRanked($('sl-rank'), { items, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus, title: L.attention ? 'the 20 nuclei ranked by attention · bars: each one’s share of the slide’s attention' : 'plain average: every nucleus gets the same share' });
+    Viz.drawRanked($(onTest ? 'sl-test-rank' : 'sl-rank'), { items, size: L.size, tint: S.tint, reveal: L.reveal, hover: L.hoverNucleus, title: L.attention ? 'the 20 nuclei ranked by attention · bars: each one’s share of the slide’s attention' : 'plain average: every nucleus gets the same share' });
   }
   function slScorerModel() { // the attention network for one nucleus: the hovered one, or the one with the most attention
     const L = S.sl, { s, fw } = slFocusForward();
@@ -6724,7 +6742,7 @@ window.Viz = (function () {
   function slSyncWalk() { $('sl-walk').textContent = S.sl.walk ? '■ Stop' : '▶ Walk through'; }
   function slWalkTick(now) {
     const L = S.sl, w = L.walk; if (!w) return;
-    const el = now - w.t0, n = slFocus().nuclei.length, next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
+    const el = Math.max(0, now - w.t0), n = slFocus().nuclei.length, next = stage => { w.stage = stage; w.t = 0; w.t0 = now; };
     if (w.stage === 'score') { w.k = Math.min(n, Math.floor(el / SL_WALK.score) + 1); L.walkNucleus = w.k - 1; if (el >= n * SL_WALK.score + SL_WALK.pause) { L.walkNucleus = null; next('softmax'); } }
     else if (w.stage === 'softmax') { w.t = Math.min(1, el / SL_WALK.softmax); if (el >= SL_WALK.softmax + SL_WALK.pause) next('sum'); }
     else if (w.stage === 'sum') { w.t = Math.min(1, el / SL_WALK.sum); if (el >= SL_WALK.sum + SL_WALK.pause) next('head'); }
@@ -6781,7 +6799,7 @@ window.Viz = (function () {
   function slSyncDecideWalk() { $('sl-decide-walk').textContent = S.sl.dwalk ? '■ Stop' : '▶ Walk through'; }
   function slDecideTick(now) {
     const L = S.sl, w = L.dwalk; if (!w) return;
-    const el = now - w.t0, n = slFocus().nuclei.length, next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
+    const el = Math.max(0, now - w.t0), n = slFocus().nuclei.length, next = st => { w.stage = st; w.k = 0; w.t = 0; w.t0 = now; };
     const timed = (dur, after) => { w.t = Math.min(1, el / dur); if (el >= dur + DE_WALK.pause) next(after); };
     if (w.stage === 'query') timed(DE_WALK.query, 'keys');
     else if (w.stage === 'keys') { w.k = Math.min(n, Math.floor(el / DE_WALK.keys) + 1); if (el >= n * DE_WALK.keys + DE_WALK.pause) next('match'); }
@@ -6800,7 +6818,7 @@ window.Viz = (function () {
     slRenderDecide();
     requestAnimationFrame(slDecideTick);
   }
-  function slRenderFocus() { slRenderSlide(); slRenderRank(); slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderDecide(); }
+  function slRenderFocus() { slRenderSlide(); slRenderRank(); if (slOnTest() && !slTestResult()) return; slRenderScorer(); slRenderUnrolled(); slRenderContext(); slRenderDecide(); }
   function slRenderCurves() {
     const L = S.sl, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
     Viz.drawCurves($('sl-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
@@ -6825,6 +6843,7 @@ window.Viz = (function () {
   function slEnter() {
     const L = S.sl; if (!slData()) { slNote('The slides did not load.'); return; }
     if (!slBuild()) return;
+    slPlaceCards();
     if (!L.model || L.modelQuestion !== L.loaded) slReset(L.model ? 'A new question — fresh random weights.' : 'Untrained: the attention weights are near uniform and the calls are guesses. Step a slide to watch one gradient step, or press Train and watch the right-hand curve climb.');
     else { slEncode(); slRender(true); }
   }
@@ -6855,7 +6874,7 @@ window.Viz = (function () {
   function slClassifyNext(quiet) {
     const L = S.sl, T = L.trial; if (!L.model || T.next >= L.test.length) return false;
     const s = L.test[T.next++], fw = L.model.forward(s.H, s.dist);
-    T.results.set(s.id, { p: fw.p, call: fw.p >= 0.5 ? 1 : 0, a: fw.a }); L.testSelected = s.id;
+    T.results.set(s.id, { p: fw.p, call: fw.p >= 0.5 ? 1 : 0, a: fw.a, fw }); L.testSelected = s.id;
     if (!quiet) slRenderTest();
     return true;
   }
@@ -6878,17 +6897,15 @@ window.Viz = (function () {
     $('sl-test-warning').hidden = !(L.model && L.model.steps === 0);
     document.querySelectorAll('[data-slcalled="0"]').forEach(el => { el.textContent = `called ${neg}`; }); document.querySelectorAll('[data-slcalled="1"]').forEach(el => { el.textContent = `called ${pos}`; });
     const s = L.testSelected != null ? L.byId.get(L.testSelected) : null, r = s ? T.results.get(s.id) : null;
+    slPlaceCards(); slRenderFocus(); // the viewer and the ranking, and the cards once the slide is called
     if (s && r) {
       const k = s.nuclei.filter(n => n.label).length;
-      Viz.drawSlide($('sl-test-canvas'), { nuclei: s.nuclei.map((n, i) => ({ px: n.px, a: r.a[i], pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: L.reveal, hover: null });
-      Viz.drawRanked($('sl-test-rank'), { items: s.nuclei.map((n, i) => ({ px: n.px, value: r.a[i], pos: !!n.label, index: i })).sort((a, b) => b.value - a.value), size: L.size, tint: S.tint, reveal: L.reveal, hover: null, title: L.attention ? 'the nuclei ranked by the attention they got on this slide' : 'plain average: every nucleus gets the same share' });
+      slRenderSummary();
       $('sl-test-slide-title').textContent = `Slide ${s.name} · test · truth: ${cls[s.label].name}${L.reveal ? ` (${k} atypical nucle${k === 1 ? 'us' : 'i'})` : ''}`;
-      $('sl-test-call').innerHTML = `The model says <b>P(${esc(pos)}) = ${r.p.toFixed(2)}</b> → <span class="${r.call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[r.call].name)} ${r.call === s.label ? '✓' : '✗'}</span>. ${L.attention ? 'Frames and percentages are the attention weights; the weights never change here.' : 'Plain average: every nucleus weighs the same.'}`;
-      $('sl-test-rank-note').textContent = L.attention ? 'With Reveal ticked the dots say which nuclei were atypical: a call for the right reason lands the attention on them.' : 'A plain average has no ranking to show: every nucleus counts the same.';
+      $('sl-test-call').innerHTML = `The model says <b>P(${esc(pos)}) = ${r.p.toFixed(2)}</b> → <span class="${r.call === s.label ? 'good-text' : 'bad-text'}">${esc(cls[r.call].name)} ${r.call === s.label ? '✓' : '✗'}</span>. ${L.attention ? 'Frames and percentages are the attention weights; the weights never change here.' : 'Plain average: every nucleus weighs the same.'}${L.context ? ' Hover a nucleus for whom it listens to; click it to keep it.' : ''}`;
+      $('sl-test-rank-note').textContent = (L.attention ? 'With Reveal ticked the dots say which nuclei were atypical: a call for the right reason lands the attention on them.' : 'A plain average has no ranking to show: every nucleus counts the same.') + ' The cards below take this call apart, as they did while training; hover a nucleus on the slide to follow it through them.';
     } else {
       const s0 = L.test[Math.min(T.next, L.test.length - 1)];
-      Viz.drawSlide($('sl-test-canvas'), { nuclei: s0.nuclei.map(n => ({ px: n.px, a: 0, pos: !!n.label })), cols: L.cols, size: L.size, tint: S.tint, reveal: false, plain: true });
-      Viz.drawRanked($('sl-test-rank'), { items: s0.nuclei.map((n, i) => ({ px: n.px, value: 0, pos: false, index: i })), size: L.size, tint: S.tint, reveal: false, hover: null, title: 'not classified yet' });
       $('sl-test-slide-title').textContent = `Slide ${s0.name} · test · next up`;
       $('sl-test-call').textContent = 'Press Classify next slide: the model reads the twenty nuclei and makes one call, and the truth is shown after.';
       $('sl-test-rank-note').textContent = '';
@@ -6912,17 +6929,19 @@ window.Viz = (function () {
     $('sl-reset').addEventListener('click', () => slReset('Weights re-initialised from the seed.'));
     $('sl-prev').addEventListener('click', () => slNeighbour(-1));
     $('sl-next').addEventListener('click', () => slNeighbour(1));
-    const cv = $('sl-canvas'), tip = $('sl-tip');
-    cv.addEventListener('mousemove', ev => {
-      const L = S.sl; if (!L.model) return;
-      const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
-      if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderFocus(); }
-      if (i != null) { tip.hidden = false; tip.textContent = slNucleusTip(i); tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
-      else tip.hidden = true;
-    });
-    cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderFocus(); } } });
     const pin = i => { const L = S.sl; if (i == null || !L.context) return; L.pinned = L.pinned === i ? null : i; slDecideWalkStop(); slRenderFocus(); slNote(L.pinned == null ? 'Unpinned: the cards follow the hovered nucleus, else the one with the most attention.' : `Nucleus ${i + 1} pinned: the cards follow it until you click it again.`); };
-    cv.addEventListener('click', ev => { const L = S.sl; if (!L.model) return; const r = cv.getBoundingClientRect(); pin(Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top)); });
+    for (const [cvId, tipId] of [['sl-canvas', 'sl-tip'], ['sl-test-canvas', 'sl-test-tip']]) { // the Train step's viewer and the Test step's: hovering follows the nucleus everywhere, a click keeps it
+      const cv = $(cvId), tip = $(tipId);
+      cv.addEventListener('mousemove', ev => {
+        const L = S.sl; if (!L.model || (slOnTest() && !slTestResult())) return;
+        const r = cv.getBoundingClientRect(), i = Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top);
+        if (i !== L.hoverNucleus) { L.hoverNucleus = i; slRenderFocus(); }
+        if (i != null) { tip.hidden = false; tip.textContent = slNucleusTip(i); tip.style.left = (ev.clientX - r.left) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
+        else tip.hidden = true;
+      });
+      cv.addEventListener('mouseleave', () => { const L = S.sl; tip.hidden = true; if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) { slRenderFocus(); } } });
+      cv.addEventListener('click', ev => { const L = S.sl; if (!L.model || (slOnTest() && !slTestResult())) return; const r = cv.getBoundingClientRect(); pin(Viz.hitSlide(cv, ev.clientX - r.left, ev.clientY - r.top)); });
+    }
     document.querySelectorAll('#sl-attview-seg button').forEach(b => b.addEventListener('click', () => { S.sl.attView = b.dataset.view; slSyncControls(); if (S.sl.model) { slRenderSlide(); slRenderContext(); } }));
     document.querySelectorAll('#sl-links-seg button').forEach(b => b.addEventListener('click', () => { S.sl.linksAll = b.dataset.links === '1'; slSyncControls(); if (S.sl.model) slRenderSlide(); }));
     $('sl-links-min').addEventListener('input', () => { S.sl.linksMin = +$('sl-links-min').value / 100; $('sl-links-min-val').textContent = pct(S.sl.linksMin); if (S.sl.model) slRenderSlide(); });
@@ -6991,7 +7010,7 @@ window.Viz = (function () {
   const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'], names: ['CIS', 'invasion'],
     sources: ['data/fields/fields_data.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/fields/fields_data.js', 'https://drdoubleb.github.io/neural-networks/data/fields/fields_data.js'] }; // the page's own folder, then a mirror of the repository, then the published page
   const NFL = window.NucleusFields;
-  function fdNote(msg) { $('fd-note').textContent = msg || ''; }
+  function fdNote(msg) { $(fdOnTest() ? 'fd-test-note' : 'fd-note').textContent = msg || ''; } // the note of the step on screen
   function fdData() { const D = window.LECTURE_FIELDS; return D && D.meta ? D : null; }
   const fdCisOf = f => (FD.cisPatterns.includes(f.pattern) ? 1 : 0);
   const fdPattern = f => S.fd.meta.patterns.find(p => p.key === f.pattern);
