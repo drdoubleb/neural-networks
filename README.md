@@ -510,36 +510,53 @@ encoder, crops masked to the nucleus:
 
 | Model | Parameters | CIS right | Invasion right | Invasive fields called invasive | CIS-into-nests fields called invasive | CIS fields called invasive | Invasion head's attention on the atypical nuclei below the membrane |
 |---|---|---|---|---|---|---|---|
-| Bag of codes | 100 | 100% | 87% | 50% | 7% | 10% | 25% |
-| With positions, no context | 120 | 100% | 94% | 90% | 20% | 0% | 88% |
-| Context, no positions | 966 | 100% | 88% | 73% | 27% | 7% | 18% |
-| **Full: positions and context** | 1,186 | 100% | 94% | 93% | 20% | 3% | 78% |
-| Full, two heads per layer | 1,876 | 100% | 95% | 93% | 17% | 3% | 76% |
-| Full, big encoder (code of 16) | 2,066 | 100% | 95% | 93% | 17% | 0% | 90% |
+| Bag of codes | 100 | 100% | 77% | 10% | 17% | 7% | 22% |
+| With positions, no context | 120 | 100% | 79% | 37% | 37% | 3% | 69% |
+| Context, no positions | 966 | 100% | 89% | 83% | 20% | 20% | 50% |
+| **Full: positions and context** | 1,186 | 100% | 93% | 73% | 10% | 0% | 81% |
+| Full, two heads per layer | 1,876 | 100% | 94% | 83% | 13% | 0% | 85% |
+| Full, big encoder (code of 16) | 2,066 | 100% | 89% | 67% | 20% | 0% | 83% |
 
 No model ever calls a von Brunn nest or an inverted papilloma field invasive, and every model gets CIS right on every
 test field: cytology is read from the codes alone, as it should be. The CIS head's attention lands on the atypical
-nuclei (95 to 99%). Three things to say in front of the table:
+nuclei (98 to 100%). Three things to say in front of the table:
 
-- **Cytology alone is not invasion.** The bag of codes calls half the invasive fields invasive and cannot say more,
-  because its invasion head can only weigh how atypical the field is: the other half look, as a bag, like CIS.
-- **Location does most of the work here, and its failure is the textbook one.** Positions lift the invasive fields
-  found to 90%, and the fields that fool the model are exactly the CIS-into-von-Brunn-nests fields: atypical cells
-  below the membrane, in the one arrangement that is not invasion. The full model's learned distance costs (1.1 to 1.8 per
-  nucleus diameter in the first layer, 2.0 to 2.5 in the second) say that it reads immediate neighbours; with
-  distances but no positions it finds 73% of the invasive fields, so arrangement alone carries part of the answer.
-- **The remaining confusion is the hardest mimic for people too.** With nuclear positions and codes alone, a round
-  nest and an angulated one differ only in how their nuclei sit, and 17 to 20% of the CIS-into-nests test fields are
-  still called invasive by the full models. Give the encoder the field around each nucleus (`--crop surroundings`) and
-  the outline of the nest reaches the code: the full model then finds 87% of the invasive fields and calls no mimic
-  invasive at all, but the bag of codes also sees more than cytology (50% of invasive fields found, with 58% of its
-  attention already below the membrane), which is the leak the masked crops exist to remove.
+- **Cytology alone is not invasion, and here location alone is not either.** The bag of codes finds one invasive
+  field in ten, because its invasion head can only weigh how atypical the field is, and the CIS-into-nests fields hold
+  the same atypical nuclei. Positions find 37%, and call as many CIS-into-nests fields invasive as invasive ones: with
+  the nests hanging from the membrane as often as the cords, atypical cells below the membrane are all a position can
+  say, and that is the textbook mimic, the one arrangement of atypical cells below the membrane that is not invasion.
+- **Arrangement is what separates them.** The context stack without positions, where the only geometry is the distance
+  between nuclei inside the attention, finds 83% of the invasive fields and calls 20% of the mimics invasive; lacking
+  location, it also calls 20% of the plain CIS fields invasive, which is the mimic for a model that reads arrangement
+  without a membrane. The full model, with all three cues, gets 93% of the test fields right: 73% of the invasive
+  fields found, one CIS-into-nests field in ten called invasive, no CIS field, and 81% of its invasion head's attention
+  on the atypical nuclei below the membrane. Its learned distance costs, 2.1 to 3.9 per nucleus diameter in the first
+  layer and 2.1 to 4.3 in the second, say that a nucleus listens to its immediate neighbours, which is where a solid
+  nest and a single-file cord differ: three close neighbours against two.
+- **The remaining confusion is the hardest mimic for people too.** A nucleus's message is the weighted *mean* of what
+  its neighbours say, and a mean does not count: three atypical neighbours and two give much the same message, so the
+  shape of a nest reaches the model only through what the positions of those neighbours add, and a quarter of the
+  invasive fields are still missed. Give the encoder the field around each nucleus (`--crop surroundings`) and the
+  outline of the nest reaches the code: the full model then finds 87% of the invasive fields, but the bag of codes
+  also sees more than cytology (77% of the invasive fields found, with 54% of its invasion head's attention already
+  below the membrane, from codes that hold no position), which is the leak the masked crops exist to remove; with the
+  surroundings, both call 20% of the CIS-into-nests fields invasive.
 
 **What the data taught.** With 40 training fields per pattern the full model fitted them to 100% and found 53% of the
 invasive test fields; stronger weight decay (55%) and augmentation on that set (50%) did not help, doubling the fields
 did (80%), and doubling with augmentation did more (90%). The shipped set is 80 per pattern, and the page will train
-with the same mirrored, jittered fields; on it the full model's test accuracy holds between 93 and 97% from epoch 20
-on, with the test loss flat, where on the small set it climbed from epoch 40.
+with the same mirrored, jittered fields. The geometry taught more than the count. In the first draw the invasive nests
+hung from the epithelium and the von Brunn nests sat deep in the stroma, and positions alone found 90% of the invasive
+fields: depth was a shortcut, and the context layers had nothing to add. With both hanging from the membrane, the
+chains' overlapping nuclei were clipped by the segmentation where the rings' were not, and a probe told a chain
+nucleus from a ring nucleus at 70% from the masked code alone: a leak. Spaced by their radii, hollow rings and chains
+gave every nucleus two close neighbours, and the full model found 60% of the invasive fields while calling 20% of the
+mimics invasive: nothing left to read. Solid nests against single-file cords, three close neighbours against two, is
+the draw above. On it the full model's test accuracy reaches 95% by epoch 40 and then wanders between 86 and 94% as
+the test loss climbs, at a learning rate of 0.02; at 0.01 over 200 epochs the curve is smooth, 94% at epoch 90 and 90%
+at the end, with the test loss climbing from epoch 100 on. The model overfits 400 fields either way, so the page will
+show the curve and stop early.
 
 ## The data
 
@@ -586,21 +603,26 @@ preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
 stroma with pale spindle cells beneath, and, in four of the five patterns, cells below the membrane. Round nests and
 invasive nests alike hang from the underside of the membrane three times in four and lie free in the stroma otherwise,
-so that depth does not tell them apart and only their shape does; in rings and chains alike the nuclei touch without
-overlapping, spaced by their own radii, so that the segmentation clips them alike (a probe on an earlier draw could tell
-an invasive nest's nucleus from a von Brunn nest's at 70% from the code alone, because the chains overlapped and the
-rings did not; now it cannot). The nuclei come
-from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a field, the spindle
-cells included, is a token for the model, with its truth kept for the page: atypical or bland, above or below the
-membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a real mimic:
+so that depth does not tell them apart and only their shape does. A von Brunn nest is solid, a ring of five to seven
+nuclei around one in the middle, so that a nest nucleus has three close neighbours; an invasive nest is a cord in
+single file, six to ten nuclei long, turning as it goes, with a side branch on some and a second nucleus beside a link
+now and then, so that a cord nucleus has two. In nests and cords alike the nuclei touch without overlapping, spaced by
+their own radii, so that the segmentation clips them alike, and a probe on the masked crops tells a cord nucleus from a
+nest nucleus no better than the majority rate (55%; on an earlier draw, where the cords overlapped and the rings did
+not, it could, at 70%). The two nest patterns hold the same number of atypical nuclei below the membrane (7.3 and 7.0
+per field) and their nests hang from it equally often (77% and 79%), so that neither count nor depth separates them.
+The nuclei come from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a
+field, the spindle cells included, is a token for the model, with its truth kept for the page: atypical or bland, above
+or below the membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a
+real mimic:
 
 | Pattern | Cytology | Location | Architecture | Label |
 |---|---|---|---|---|
-| Normal urothelium with von Brunn nests | bland | below the membrane | round smooth nests, three in four hanging from the underside of the membrane | not invasive |
+| Normal urothelium with von Brunn nests | bland | below the membrane | solid round nests, three in four hanging from the underside of the membrane | not invasive |
 | Inverted papilloma | bland | below | anastomosing cords | not invasive |
 | Carcinoma in situ | atypical | above only (normal von Brunn nests below on half the fields) | | not invasive |
-| CIS extending into von Brunn nests | atypical | below | round smooth nests, three in four hanging from the membrane | not invasive |
-| Invasive carcinoma | atypical | below | angulated nests, tongues and branches hugging their nuclei, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
+| CIS extending into von Brunn nests | atypical | below | solid round nests, three in four hanging from the membrane | not invasive |
+| Invasive carcinoma | atypical | below | single-file cords hugging their nuclei, angulated where they turn, a side branch on some, three in four growing down from the epithelium; single cells shed into the stroma on half the fields | **invasive** |
 
 Ninety fields of each pattern, 80 for training and 10 held out (the test fields are drawn first, so they stay the same
 when the training count changes; 40 per pattern was not enough, see the model below). A field ships as a PNG without
@@ -615,10 +637,10 @@ crops with the field around the nucleus and for crops masked to the nucleus (`--
 
 | | Small encoder (code of 8) | Big encoder (code of 16) |
 |---|---|---|
-| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 71% | 87% |
-| Atypical vs bland, crops masked to the nucleus | 92% | 95% |
-| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 50% · 83% | 47% · 88% |
-| Below vs above the membrane, from the code alone (majority: 73%): with surroundings · masked | 78% · 73% | 84% · 73% |
+| Atypical vs bland, crops with the field around the nucleus (spindle cells aside) | 74% | 88% |
+| Atypical vs bland, crops masked to the nucleus | 92% | 94% |
+| A probe trained on the slides' pool of lone nuclei, applied to the fields' crops: with surroundings · masked | 48% · 83% | 46% · 87% |
+| Below vs above the membrane, from the code alone (majority: 75%): with surroundings · masked | 79% · 75% | 85% · 75% |
 
 A crop with the field around its nucleus holds the edges of neighbours, the membrane, stroma and the outline of a
 nest, none of which the encoder ever saw: the atypia signal weakens, a probe trained on lone nuclei does not transfer,
