@@ -615,8 +615,10 @@ nothing. A single layer then scores every word and a softmax gives P(next token)
 token of every training report (cross-entropy) with Adam, a learning rate of 0.005, batches of 8 reports, weight decay
 0.0001 and the gradient clipped to norm 1, for 30 epochs: 55,725 parameters, gradient-checked to 5 × 10⁻⁶ like the
 other models (`gradientCheckLM`). To write, it continues a prefix one token at a time, the most probable word or a
-draw at a temperature, with a cache of every layer's keys and values so that each new word costs one word's work. `tools/check_reports.js` trains it in Node and takes its measures; the trained model of seed 1
-ships as `data/reports/lm_weights.js` (`window.REPORT_LM`, with its vocabulary), the way the foundation encoders do.
+draw at a temperature, with a cache of every layer's keys and values so that each new word costs one word's work.
+`tools/check_reports.js` trains it in Node and takes its measures; the trained model of seed 1 ships as
+`data/reports/lm_weights.js` (`window.REPORT_LM`, with its vocabulary and the history of its training, epoch by
+epoch), the way the foundation encoders do.
 
 **Fluency first, grounding last.** The test loss by section as the model trains, and the diagnosis it writes when
 given the findings with the specimen, the clinical history and the gross, as they come with a case (it then writes
@@ -695,7 +697,10 @@ same three steps as the others. *Specimens* shows a report with its sections, an
 behind it and the rule table, with the training, test and never-trained-on reports as cards coloured by diagnosis.
 *Train* trains the model live, in batches of four reports so that the page stays responsive (an epoch is about half
 a minute; 48 or 32 numbers per token, position vectors on or off, the epochs, the learning rate and the seed as
-controls, and *Load the trained model* for the shipped weights at any time). The report on screen is coloured word
+controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
+model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
+score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about). The report on
+screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
 it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words it
 read light up on the report, in the layer and head chosen, the deeper the underline the more it listened; click a

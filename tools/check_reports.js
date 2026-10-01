@@ -15,8 +15,9 @@
  *                               [--seeds 1] [--seed 1] [--docs 800] [--no-hedge] [--report-only] [--curve] [--skip-gen] [--samples 20]
  * --report-only keeps the loss to the report (the block is given, never predicted); --no-hedge drops the reports
  * signed out as suspicious for invasion from the training set; --docs trains on the first N training reports;
- * --save FILE writes the last seed's trained model with its vocabulary as a script (window.REPORT_LM = {...}), the
- * model the page ships; --load FILE skips the training and takes the measures on that saved model.
+ * --save FILE writes the last seed's trained model with its vocabulary and its training history as a script
+ * (window.REPORT_LM = {...}), the model the page ships; --load FILE skips the training and takes the measures on that
+ * saved model; --ground N measures the grounding on the first N test reports every fifth epoch (--ground-every K).
  */
 'use strict';
 const fs = require('fs');
@@ -26,7 +27,7 @@ const R = require('../js/reports.js');
 const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
 const num = (k, d) => +arg(k, d);
 const has = k => process.argv.includes(k);
-const cfg = { dim: num('--dim', 32), layers: num('--layers', 2), heads: num('--heads', 2), dk: num('--dk', 8), ffn: num('--ffn', 32), cost: String(arg('--cost', '0.1')).split(',').map(Number), positions: num('--positions', 0), epochs: num('--epochs', 15), lr: num('--lr', 0.003), opt: arg('--opt', 'adam'), batch: num('--batch', 8), decay: num('--decay', 0.0001), clip: num('--clip', 1), seeds: num('--seeds', 1), docs: num('--docs', 800), samples: num('--samples', 20), temperature: num('--temperature', 0), ground: num('--ground', 0) };
+const cfg = { dim: num('--dim', 32), layers: num('--layers', 2), heads: num('--heads', 2), dk: num('--dk', 8), ffn: num('--ffn', 32), cost: String(arg('--cost', '0.1')).split(',').map(Number), positions: num('--positions', 0), epochs: num('--epochs', 15), lr: num('--lr', 0.003), opt: arg('--opt', 'adam'), batch: num('--batch', 8), decay: num('--decay', 0.0001), clip: num('--clip', 1), seeds: num('--seeds', 1), docs: num('--docs', 800), samples: num('--samples', 20), temperature: num('--temperature', 0), ground: num('--ground', 0), groundEvery: num('--ground-every', 5) };
 const noHedge = has('--no-hedge'), reportOnly = has('--report-only'), curve = has('--curve'), skipGen = has('--skip-gen'), save = arg('--save', null), load = arg('--load', null);
 const LOADED = load ? (() => { const w = {}; new Function('window', fs.readFileSync(load, 'utf8'))(w); return w.REPORT_LM; })() : null;
 const window = {}; new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', 'reports', 'reports_data.js'), 'utf8'))(window);
@@ -50,18 +51,19 @@ const tally = (rows, label) => { const c = {}; for (const r of rows) c[r] = (c[r
 const seed0 = num('--seed', 1); // the first seed; --seeds N runs N seeds from it
 for (let seed = seed0; seed < seed0 + (LOADED ? 1 : cfg.seeds); seed++) {
   const lm = LOADED ? LanguageModel.fromJSON(LOADED) : new LanguageModel({ vocabSize: vocab.size, dim: cfg.dim, layers: cfg.layers, heads: cfg.heads, dk: cfg.dk, ffn: cfg.ffn, costInit: cfg.cost.length === 1 ? cfg.cost[0] : cfg.cost, positions: cfg.positions, clip: cfg.clip, optimizer: cfg.opt, seed });
-  const rng = mulberry32(seed * 977 + 1), order = train.map((_, i) => i);
+  const rng = mulberry32(seed * 977 + 1), order = train.map((_, i) => i), hist = [];
   console.log(`\n== ${LOADED ? `loaded ${load} (${LOADED.trained})` : `seed ${seed}`} · ${lm.parameterCount()} parameters · ${lm.describe()}`);
   for (let epoch = 1; epoch <= (LOADED ? 0 : cfg.epochs); epoch++) {
     const t0 = Date.now(); let loss = 0, nb = 0;
     for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
     for (let b = 0; b < order.length; b += cfg.batch) { loss += lm.trainBatch(order.slice(b, b + cfg.batch).map(i => train[i]), cfg.lr, cfg.decay); nb++; }
     const ev = lm.evaluate(test), sec = bySection(test, ev.per), costs = lm.layers.map(c => Array.from(c.beta, b => Math.log1p(Math.exp(b)).toFixed(2)).join('/')).join(' ');
-    let ground = ''; // grounding: the diagnosis written from the block alone, on the first --ground test reports, every fifth epoch
-    if (cfg.ground && (epoch % 5 === 0 || epoch === cfg.epochs)) { let ok = 0; for (const d of test.slice(0, cfg.ground)) { const b = generated(lm, d.tokens.slice(0, d.words.indexOf('MICROSCOPIC')), 220, 0, rng); if (R.classOf(R.diagnosisOf(b)) === R.classOf(d.dx)) ok++; } ground = ` · from the findings and the requisition: class right ${pct(ok / cfg.ground)}`; }
+    let ground = '', groundValue = null; // grounding: the diagnosis written from the findings and the requisition, on the first --ground test reports, every --ground-every epochs
+    if (cfg.ground && (epoch % cfg.groundEvery === 0 || epoch === cfg.epochs)) { let ok = 0; for (const d of test.slice(0, cfg.ground)) { const b = generated(lm, d.tokens.slice(0, d.words.indexOf('MICROSCOPIC')), 220, 0, rng); if (R.classOf(R.diagnosisOf(b)) === R.classOf(d.dx)) ok++; } groundValue = ok / cfg.ground; ground = ` · from the findings and the requisition: class right ${pct(groundValue)}`; }
+    hist.push(Object.assign({ epoch, loss: +(loss / nb).toFixed(4), testLoss: +ev.loss.toFixed(4), acc: +ev.accuracy.toFixed(4), ground: groundValue }, Object.fromEntries(R.SECTIONS.map(k => [k, sec[k] == null ? null : +sec[k].toFixed(4)]))));
     if (curve || epoch === cfg.epochs || epoch % 5 === 0 || epoch === 1) console.log(`epoch ${String(epoch).padStart(3)} · train loss ${(loss / nb).toFixed(3)} · test loss ${ev.loss.toFixed(3)} · next token right ${pct(ev.accuracy)} · by section: ${R.SECTIONS.map(s => `${s} ${sec[s] == null ? '–' : sec[s].toFixed(2)}`).join(', ')} · cost/token ${costs}${ground} · ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }
-  if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the report model', trained: `${cfg.epochs} epochs on ${train.length} reports`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4) }); fs.writeFileSync(save, `window.REPORT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB)`); }
+  if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the report model', trained: `${cfg.epochs} epochs on ${train.length} reports`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4), groundN: cfg.ground || null, hist }); fs.writeFileSync(save, `window.REPORT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB) with ${hist.length} epochs of history`); }
   if (skipGen) continue;
   const t1 = Date.now();
   // the diagnosis (a) given everything up to "DIAGNOSIS:", (b) given the findings block alone, the whole report written,
