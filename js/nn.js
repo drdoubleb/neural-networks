@@ -407,10 +407,11 @@
       for (let h = 0; h < H; h++) {
         const S = [], A = [], b = costs[h], o = h * dk;
         for (let i = 0; i < n; i++) {
-          const si = new Float64Array(n), ai = new Float64Array(n); let mx = -Infinity;
-          for (let j = 0; j < n; j++) { if ((mask && j === i) || (causal && j > i)) { si[j] = -Infinity; continue; } let v = 0; for (let d = 0; d < dk; d++) v += Q[i][o + d] * K[j][o + d]; si[j] = v * sc - (b ? b * dist[i][j] : 0); mx = Math.max(mx, si[j]); }
-          let Z = 0; for (let j = 0; j < n; j++) { ai[j] = Math.exp(si[j] - mx); Z += ai[j]; }
-          for (let j = 0; j < n; j++) ai[j] /= Z;
+          const si = new Float64Array(n), ai = new Float64Array(n), last = causal ? i : n - 1; let mx = -Infinity; // causal: the tokens after i stay at zero
+          for (let j = 0; j <= last; j++) { if (mask && j === i) { si[j] = -Infinity; continue; } let v = 0; for (let d = 0; d < dk; d++) v += Q[i][o + d] * K[j][o + d]; si[j] = v * sc - (b ? b * dist[i][j] : 0); mx = Math.max(mx, si[j]); }
+          for (let j = last + 1; j < n; j++) si[j] = -Infinity;
+          let Z = 0; for (let j = 0; j <= last; j++) { ai[j] = Math.exp(si[j] - mx); Z += ai[j]; }
+          for (let j = 0; j <= last; j++) ai[j] /= Z;
           S.push(si); A.push(ai);
         }
         Sh.push(S); Ah.push(A);
@@ -441,7 +442,7 @@
     newGradient() { const z = a => new Float64Array(a.length); return { Wq: z(this.Wq), bq: z(this.bq), Wk: z(this.Wk), bk: z(this.bk), Wv: z(this.Wv), bv: z(this.bv), Wo: z(this.Wo), bo: z(this.bo), W1: z(this.W1), b1: z(this.b1), W2: z(this.W2), b2: z(this.b2), beta: new Float64Array(this.H) }; }
     // d(loss)/d(Y) in, the layer's gradients accumulated into g, d(loss)/d(X) out
     backward(fw, dY, g) {
-      const { X, dist, xy, Q, K, V, Ah, C, Xp, U } = fw, n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), rel = !!xy, mw = dk + (rel ? 2 : 0), HM = H * mw;
+      const { X, dist, xy, Q, K, V, Ah, C, Xp, U } = fw, n = X.length, D = this.D, dk = this.dk, H = this.H, HD = H * dk, F = this.F, sc = 1 / Math.sqrt(dk), rel = !!xy, mw = dk + (rel ? 2 : 0), HM = H * mw, causal = this.causal;
       const dXp = dY.map(v => Float64Array.from(v));
       for (let i = 0; i < n; i++) { // the feed-forward, then its residual
         const dU = new Float64Array(F);
@@ -458,9 +459,9 @@
       for (let h = 0; h < H; h++) { // every head: the weighted values and the softmax over the slide
         const A = Ah[h], o = h * dk, om = h * mw;
         for (let i = 0; i < n; i++) {
-          const dA = new Float64Array(n); let dot = 0;
-          for (let j = 0; j < n; j++) { let v = 0; for (let e = 0; e < dk; e++) { v += dC[i][om + e] * V[j][o + e]; dV[j][o + e] += A[i][j] * dC[i][om + e]; } if (rel) v += dC[i][om + dk] * (xy[j][0] - xy[i][0]) + dC[i][om + dk + 1] * (xy[j][1] - xy[i][1]); dA[j] = v; dot += A[i][j] * v; }
-          for (let j = 0; j < n; j++) { const dS = A[i][j] * (dA[j] - dot); if (!dS) continue; for (let e = 0; e < dk; e++) { dQ[i][o + e] += dS * sc * K[j][o + e]; dK[j][o + e] += dS * sc * Q[i][o + e]; } if (this.distanceBias) dbeta[h] -= dS * dist[i][j]; }
+          const dA = new Float64Array(n), last = causal ? i : n - 1; let dot = 0; // causal: the tokens after i carry no attention
+          for (let j = 0; j <= last; j++) { let v = 0; for (let e = 0; e < dk; e++) { v += dC[i][om + e] * V[j][o + e]; dV[j][o + e] += A[i][j] * dC[i][om + e]; } if (rel) v += dC[i][om + dk] * (xy[j][0] - xy[i][0]) + dC[i][om + dk + 1] * (xy[j][1] - xy[i][1]); dA[j] = v; dot += A[i][j] * v; }
+          for (let j = 0; j <= last; j++) { const dS = A[i][j] * (dA[j] - dot); if (!dS) continue; for (let e = 0; e < dk; e++) { dQ[i][o + e] += dS * sc * K[j][o + e]; dK[j][o + e] += dS * sc * Q[i][o + e]; } if (this.distanceBias) dbeta[h] -= dS * dist[i][j]; }
         }
       }
       if (this.distanceBias) for (let h = 0; h < H; h++) g.beta[h] += dbeta[h] * sigmoid(this.beta[h]); // through the softplus

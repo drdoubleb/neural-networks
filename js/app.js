@@ -2735,7 +2735,7 @@
     const L = S.rp; rpStop(); if (!rpBuild()) return;
     L.model = new NN.LanguageModel(rpConfig()); L.shipped = false;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
-    L.epoch = 0; L.ptr = 0; L.hist = []; L.lastBatch = []; L.trainLoss = null; L.lastRender = 0; L.measuring = null; L.fw = null; L.fwFor = null;
+    L.epoch = 0; L.ptr = 0; L.hist = []; L.lastBatch = []; L.trainLoss = null; L.lastRender = 0; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.hover = null; L.pinned = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false; // a new model: the test step starts over
     rpRecordEpoch(false);
@@ -2747,11 +2747,12 @@
     const L = S.rp, W = window.REPORT_LM; if (!W) { rpNote('The trained model did not load with the page.'); return; } rpStop(); if (!rpBuild()) return;
     L.model = NN.LanguageModel.fromJSON(W); L.shipped = true; L.dim = W.dim; L.positions = W.positions > 0;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
-    L.epoch = 30; L.epochs = Math.max(L.epochs, 30); L.ptr = 0; L.hist = []; L.lastBatch = []; L.trainLoss = null; L.measuring = null; L.fw = null; L.fwFor = null;
+    const hist = Array.isArray(W.hist) && W.hist.length ? W.hist.map(h => Object.assign({}, h)) : null; // the history of its training in Node, epoch by epoch, when the file carries it
+    L.epoch = hist ? hist.length : 30; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist || []; L.lastBatch = []; L.trainLoss = hist ? hist[hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false;
-    rpRecordEpoch(true);
+    if (!hist) rpRecordEpoch(true);
     rpSyncControls(); rpRenderAll();
-    rpNote(`Loaded the trained model: ${W.trained}, test loss ${W.testLoss}. It writes from the findings; go to 3 · Test, or keep training it here.`);
+    rpNote(`Loaded the trained model: ${W.trained}, test loss ${W.testLoss}${hist ? ', and the curves of its training' : ''}. It writes from the findings; go to 3 · Test, or keep training it here.`);
   }
   // the test loss by section on the first reports of the test set, and, from epoch 1, the diagnosis written from the
   // findings alone on a few of them (measured in the animation loop, a few words per frame, so the page stays alive)
@@ -2773,7 +2774,7 @@
         M.i++; M.st = null;
       }
     }
-    if (M.i >= M.docs.length) { M.rec.ground = M.ok / M.docs.length; L.measuring = null; rpRenderCurves(); rpRenderStatus(); }
+    if (M.i >= M.docs.length) { M.rec.ground = M.ok / M.docs.length; L.measuring = null; rpRenderCurves(); rpRenderStatus(); if (!L.running && L.finishedAt === M.rec.epoch) rpFinishNote(); }
   }
   function rpStep() { // one gradient step on the next batch of the epoch's order; true when the epoch ended
     const L = S.rp, n = L.train.length;
@@ -2804,7 +2805,13 @@
     } catch (e) { console.error(e); L.running = false; rpSyncButtons(); }
     if (L.running || L.measuring) requestAnimationFrame(rpTick);
   }
-  function rpFinish() { const L = S.rp, last = L.hist[L.hist.length - 1]; rpStop(`Finished ${L.epochs} epochs on the next word alone. Test loss ${last.testLoss.toFixed(3)}, ${pct(last.acc)} of next words right; the diagnosis written from the findings alone follows in the third chart. Go to 3 · Test to make it write.`); }
+  function rpFinish() { const L = S.rp; L.finishedAt = L.epoch; rpStop(`Finished ${rpEpochs(L.epochs)} on the next word alone. Measuring the diagnosis from the findings on ${RP.groundN} test reports…`); if (!L.measuring) rpFinishNote(); }
+  const rpEpochs = n => `${n} epoch${n === 1 ? '' : 's'}`;
+  function rpFinishNote() { // the run's last word, with the shipped model for comparison
+    const L = S.rp, last = L.hist[L.hist.length - 1], W = window.REPORT_LM, shipped = W && Array.isArray(W.hist) && W.hist.length ? W.hist[W.hist.length - 1] : null, same = W && L.dim === W.dim && L.positions === (W.positions > 0);
+    const cmp = shipped && shipped.ground != null ? (L.shipped ? ` The trained model that ships with the page, which you continued, had ${pct(shipped.ground)} after its ${W.hist.length} epochs.` : ` The trained model that ships with the page, ${same ? 'the same recipe' : `${W.dim} numbers per token`} after ${W.hist.length} epochs, gets ${pct(shipped.ground)}${last.ground != null && last.ground < shipped.ground ? ': fluent first, grounded later. Load it to compare, or raise the epochs and keep training' : ''}.`) : '';
+    rpNote(`Finished ${rpEpochs(L.epochs)} on the next word alone. Test loss ${last.testLoss.toFixed(3)}, ${pct(last.acc)} of next words right, and the diagnosis right from the findings for ${last.ground == null ? '–' : pct(last.ground)} of ${RP.groundN} test reports.${cmp} Go to 3 · Test to make it write.`);
+  }
   function rpStepBatch() { const L = S.rp; if (!L.model) return; rpStop(); const ended = rpStep(); rpRender(true); rpNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on ${L.lastBatch.length} reports (${L.lastBatch.join(', ')}): batch ${Math.ceil(L.ptr / RP.batch)} of ${Math.ceil(L.train.length / RP.batch)}.`); }
   function rpStepEpoch() { const L = S.rp; if (!L.model) return; if (L.running) { rpStop(); return; } rpStart(L.epoch + 1); }
   function rpSelect(id) { const L = S.rp; L.selected = id === L.selected ? null : id; L.hover = null; L.pinned = null; L.fw = null; rpRenderFocus(); rpRenderTrays(); }
@@ -2835,7 +2842,7 @@
       `<span>reports <b>${L.train.length}</b> training · <b>${L.test.length}</b> test · <b>${L.held.length}</b> never trained on</span>` +
       `<span>epoch <b>${L.epoch}</b> / ${L.epochs}${L.shipped ? ' (the trained model that ships with the page)' : ''}</span><span>batch <b>${L.ptr === 0 ? '–' : Math.ceil(L.ptr / RP.batch)}</b> / ${Math.ceil(L.train.length / RP.batch)}</span>` +
       `<span>loss <b>${L.trainLoss == null ? '–' : L.trainLoss.toFixed(3)}</b> training · <b>${last ? last.testLoss.toFixed(3) : '–'}</b> test</span><span>next word right <b>${last ? pct(last.acc) : '–'}</b> test</span>` +
-      `<span>diagnosis right from the findings <b>${L.measuring ? 'measuring…' : last && last.ground != null ? pct(last.ground) : '–'}</b> (${RP.groundN} test reports, the description written by the model)</span>`;
+      `<span>diagnosis right from the findings <b>${L.measuring ? 'measuring…' : last && last.ground != null ? pct(last.ground) : '–'}</b> (${L.shipped && window.REPORT_LM && window.REPORT_LM.groundN ? window.REPORT_LM.groundN : RP.groundN} test reports, the description written by the model)</span>`;
   }
   function rpForward(r) { const L = S.rp; if (L.fw && L.fwFor === r.id) return L.fw; L.fw = L.model.forward(r.tokens); L.fwFor = r.id; return L.fw; }
   // the words of a report as spans: each coloured by the probability the model gave it, given the words before
