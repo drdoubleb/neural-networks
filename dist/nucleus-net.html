@@ -557,6 +557,28 @@ details.fold > ul { margin-top: 8px; }
 .thumb.report.rp-inv { border-color: var(--bad); }
 .legend .swatch.ring.inv { border-color: var(--bad); }
 
+/* ---------- reports: the model's diagrams ---------- */
+.rp-text { position: relative; }
+.rp-text svg.rp-arcs { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.rp-text svg.rp-arcs path { fill: none; stroke: var(--accent); stroke-linecap: round; }
+.rp-text .tok.att-q { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rp-text .tok.att-k { outline: 2px dashed var(--accent); outline-offset: 1px; }
+.rp-att { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 900px) { .rp-att { grid-template-columns: 300px 300px minmax(0, 1fr); } }
+.rp-ttl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin-bottom: 6px; }
+.rp-att .net-wrap canvas { max-width: 300px; }
+.rp-sec-grid { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); margin-top: 14px; }
+@media (min-width: 900px) { .rp-sec-grid { grid-template-columns: 1fr 1fr; } }
+table.rp-sec { border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; width: 100%; }
+table.rp-sec th, table.rp-sec td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+table.rp-sec th { font-weight: 600; color: var(--ink-3); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+table.rp-sec th.row { text-align: left; }
+table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.rp-map svg { width: 100%; height: auto; display: block; }
+.rp-map text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-2); pointer-events: none; }
+.rp-map text.axlabel { fill: var(--ink-3); font-size: 10px; }
+.rp-map line.axis { stroke: var(--line-strong); stroke-width: 1; }
+
 </style>
 </head>
 <body>
@@ -1445,12 +1467,30 @@ details.fold > ul { margin-top: 8px; }
       <div class="card">
         <div class="card-head">
           <h2 id="rp-report-title">The report</h2>
-          <div class="actions-inline"><span class="small muted">who reads whom · layer</span><div class="seg small" id="rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div><span class="small muted">head</span><div class="seg small" id="rp-head-seg"><button type="button" data-head="-1" class="is-active" title="both heads averaged">both</button><button type="button" data-head="0">near</button><button type="button" data-head="1">far</button></div><button type="button" class="btn" id="rp-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-next" title="the next report">next ▶</button></div>
+          <div class="actions-inline"><span class="small muted">who reads whom · layer</span><div class="seg small rp-layer-seg" id="rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div><span class="small muted">head</span><div class="seg small rp-head-seg" id="rp-head-seg"><button type="button" data-head="-1" class="is-active" title="both heads averaged">both</button><button type="button" data-head="0">near</button><button type="button" data-head="1">far</button></div><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-arcs" class="rp-arcs-check" checked><label for="rp-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span><button type="button" class="btn" id="rp-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-next" title="the next report">next ▶</button></div>
         </div>
         <div class="rp-two">
           <div><div class="rp-text" id="rp-text"></div><p class="small muted" id="rp-text-note" style="margin-top:8px"></p></div>
           <div><div class="rp-next" id="rp-nextword"></div><p class="small muted" id="rp-next-note" style="margin-top:8px"></p></div>
         </div>
+      </div>
+
+      <div class="card" id="rp-net-card">
+        <div class="card-head">
+          <h2 id="rp-net-title">How a word was chosen</h2>
+          <span class="small muted">the word before it goes in as a vector · each layer's heads read the words so far and add what they hear · the feed-forward is added · the output layer scores every word</span>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-net" width="800" height="536" aria-label="How one word of the report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-net-tip" hidden></div></div></div>
+        <p class="small muted" id="rp-net-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" id="rp-att-card">
+        <div class="card-head">
+          <h2>Who reads whom, across the report</h2>
+          <div class="actions-inline"><span class="small muted">rows ask, columns answer · one matrix per head · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div id="rp-att-body"></div>
+        <p class="small muted" id="rp-att-note" style="margin-top:8px"></p>
       </div>
 
       <div class="card">
@@ -1464,6 +1504,15 @@ details.fold > ul { margin-top: 8px; }
           <div class="chart"><div class="title"><span>Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
         </div>
         <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
+      </div>
+
+      <div class="card" id="rp-map-card">
+        <div class="card-head">
+          <h2>The words as the model sees them</h2>
+          <div class="legend" id="rp-map-legend"></div>
+        </div>
+        <div class="rp-map"><svg id="rp-map" role="img" aria-label="The words of the vocabulary placed by the two directions of their learned vectors that spread them most, coloured by the section they mostly appear in"></svg></div>
+        <p class="small muted" id="rp-map-note" style="margin-top:8px"></p>
       </div>
 
       <div class="card">
@@ -1503,7 +1552,7 @@ details.fold > ul { margin-top: 8px; }
       <div class="card">
         <div class="card-head">
           <h2 id="rp-test-title">The findings and the requisition go in, the description and the diagnosis come out</h2>
-          <span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span>
+          <div class="actions-inline"><span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-test-arcs" class="rp-arcs-check" checked><label for="rp-test-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span></div>
         </div>
         <div class="rp-two">
           <div>
@@ -1520,6 +1569,22 @@ details.fold > ul { margin-top: 8px; }
           </div>
         </div>
         <div class="rp-truth" id="rp-truth" hidden></div>
+      </div>
+      <div class="card" id="rp-test-net-card" hidden>
+        <div class="card-head">
+          <h2 id="rp-test-net-title">How a word was chosen</h2>
+          <span class="small muted">the report the model wrote: hover or click one of its words to follow it through the model</span>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-test-net" width="800" height="536" aria-label="How one word of the written report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-test-net-tip" hidden></div></div></div>
+        <p class="small muted" id="rp-test-net-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="rp-test-att-card" hidden>
+        <div class="card-head">
+          <h2>Who reads whom, across the written report</h2>
+          <div class="actions-inline"><span class="small muted">rows ask, columns answer · one matrix per head · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div id="rp-test-att-body"></div>
+        <p class="small muted" id="rp-test-att-note" style="margin-top:8px"></p>
       </div>
       <div class="card" id="rp-evidence-card" hidden>
         <div class="card-head"><h2>Where the diagnosis looked</h2><span class="small muted">the attention of the diagnosis words in the second layer, both heads averaged: on each line of the findings, and on each section of the report</span></div>
@@ -5369,7 +5434,170 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  // ------------------------------------------------------------------ the language model's diagrams (the reports question)
+  // How one word was chosen. The model stands at the word before it (position q): that word's vector and its position
+  // vector go in; every layer's heads read the words so far (the largest shares shown), their messages are projected
+  // back and added to the vector, the feed-forward is added; the output layer scores every word of the vocabulary.
+  // The app prepares m; nothing here touches the model.
+  // m = { word, qword, i, q, n, V, D, dk, arch, emb, pos (or null), x0, lens0: [{ word, p }], layers: [{ heads: [{ name,
+  //       cost, query, message, reads: [{ j, a, word, dist }] }], heard, after, out, lens }], out: [{ word, p, target }],
+  //       chosen (the model's own report: the target is the word it chose), hover ({ kind, l, h, k, d, j, text } or null) }
+  const TN_W = 800;
+  function layoutTokenNet(m) {
+    const nL = m.layers.length, H = nL ? m.layers[0].heads.length : 0, headPitch = 30, blockH = 22 + H * headPitch + 10 + 16 + 14 + 14 + 10, yL0 = 92, yOut = yL0 + nL * blockH;
+    return { nL, H, headPitch, blockH, yL0, yOut, outPitch: 14, H_: yOut + 24 + m.out.length * 14 + 30,
+      inp: { y: 44, h: 16, w: 150, xEmb: 12, xPos: 192, xIn: 372, xLens: 540 },
+      head: { xLabel: 12, xQuery: 100, qW: 70, xReads: 190, slot: 72, nSlots: 5, barMax: 40, xMsg: 574, mW: 70 },
+      comb: { xHeard: 100, xAfter: 300, xOut: 530, w: 140, h: 16 },
+      outRow: { xWord: 190, xBar: 200, barMax: 220, xPct: 430 } };
+  }
+  function drawTokenNetwork(canvas, m) {
+    const L = layoutTokenNet(m), c = colors(), ctx = fitCanvas(canvas, TN_W, L.H_), D = m.D, dk = m.dk;
+    canvas._tokenNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const hov = m.hover, is = (kind, l, h, k) => !!hov && hov.kind === kind && (l == null || hov.l === l) && (h == null || hov.h === h) && (k == null || hov.k === k);
+    ctx.clearRect(0, 0, TN_W, L.H_); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, TN_W, L.H_);
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+    // one scale per row of strips, so that the strips of a row compare: the input row, and every layer's queries, messages and vectors (the vectors grow through the layers)
+    const amax = arrs => { let mx = 1e-9; for (const a of arrs) for (const v of a) mx = Math.max(mx, Math.abs(v)); return mx; };
+    const mI = amax(m.pos ? [m.emb, m.pos, m.x0] : [m.emb, m.x0]);
+    const strip = (x, y, w, h, code, scale, on) => { codeStrip(ctx, c, x, y, w, h, code, scale); if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 1, y - 1, w + 2, h + 2); } };
+    const empty = (x, y, w, h, label) => { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); ctx.setLineDash([]); text(label, x + w / 2, y + h / 2, mono8, c.ink3, 'center', 'middle'); };
+    const lensText = lens => lens.map(t => `${t.word} ${pctText(t.p)}`).join(' · ');
+    // the heading
+    text(`HOW “${m.word}” WAS ${m.chosen ? 'CHOSEN' : 'EXPECTED'} · WORD ${m.i} OF ${m.n - 1}`, 12, 8, capFont, c.ink);
+    text(`the model stands at “${m.qword}” (word ${m.q}) and reads the ${m.q + 1} words so far`, 12, 24, mono9, c.ink3);
+    // the input: the word's vector, its position vector, their sum, and what the output layer would read off it
+    const I = L.inp;
+    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(`“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
+    text('+', I.xEmb + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
+    if (m.pos) { strip(I.xPos, I.y, I.w, I.h, m.pos, mI, is('pos')); text(`position ${m.q} · its vector · ${D}`, I.xPos, I.y + I.h + 4, mono8, c.ink3); }
+    else { empty(I.xPos, I.y, I.w, I.h, 'no position vectors'); text('the heads know distance only through their cost', I.xPos, I.y + I.h + 4, mono8, c.ink3); }
+    text('=', I.xPos + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
+    strip(I.xIn, I.y, I.w, I.h, m.x0, mI, is('x0')); text(`the input · ${D} numbers`, I.xIn, I.y + I.h + 4, mono8, c.ink3);
+    text('read off the input alone:', I.xLens, I.y - 2, mono9, c.ink3); text(lensText(m.lens0), I.xLens, I.y + 10, mono9, c.ink2);
+    // the layers: every head's query, the words it reads and its message; what the layer hears, added; the feed-forward
+    m.layers.forEach((lay, l) => {
+      const yL = L.yL0 + l * L.blockH, Hd = L.head, Cb = L.comb, last = l === m.layers.length - 1, mQ = amax(lay.heads.map(h => h.query)), mC = amax(lay.heads.map(h => h.message)), mF = amax([lay.heard, lay.after, lay.out]);
+      text(`LAYER ${l + 1}`, 12, yL, capFont, c.ink); text(`${lay.heads.length} heads, each reading the ${m.q + 1} words so far with its own query, keys and values · the ${Hd.nSlots} largest shares shown`, 70, yL + 1, mono9, c.ink3);
+      lay.heads.forEach((hd, h) => {
+        const yh = yL + 30 + h * L.headPitch;
+        text(hd.name, Hd.xLabel, yh - 5, mono9, c.ink2, 'left', 'middle'); text(`cost ${hd.cost.toFixed(2)}/word`, Hd.xLabel, yh + 6, mono8, c.ink3, 'left', 'middle');
+        strip(Hd.xQuery, yh - 7, Hd.qW, 14, hd.query, mQ, is('query', l, h));
+        let mx = 1e-9; for (const r of hd.reads) mx = Math.max(mx, r.a);
+        hd.reads.forEach((r, k) => {
+          const x = Hd.xReads + k * Hd.slot, rel = r.a / mx, bw = 8 + Hd.barMax * rel, on = is('read', l, h, k);
+          ctx.fillStyle = rgbStr(c.rgb.accent, 0.25 + 0.75 * rel); ctx.fillRect(x, yh - 6, bw, 12);
+          if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x - 1, yh - 7, bw + 2, 14); }
+          text(pctText(r.a), x + bw + 3, yh, mono8, c.ink3, 'left', 'middle'); text(`${cut(r.word, 9)} −${r.dist}`, x, yh + 12, mono8, on ? c.ink : c.ink3, 'left', 'middle');
+        });
+        if (!hd.reads.length) text('reads nothing yet', Hd.xReads, yh, mono8, c.ink3, 'left', 'middle');
+        strip(Hd.xMsg, yh - 7, Hd.mW, 14, hd.message, mC, is('msg', l, h)); text(`message · ${dk}`, Hd.xMsg + Hd.mW + 6, yh, mono8, c.ink3, 'left', 'middle');
+      });
+      const yc = yL + 22 + lay.heads.length * L.headPitch + 10;
+      strip(Cb.xHeard, yc, Cb.w, Cb.h, lay.heard, mF, is('heard', l)); text('what it hears · the messages × Wo', Cb.xHeard, yc + Cb.h + 4, mono8, c.ink3);
+      text(l === 0 ? '+ input =' : '+ above =', (Cb.xHeard + Cb.w + Cb.xAfter) / 2, yc + Cb.h / 2, mono8, c.ink2, 'center', 'middle');
+      strip(Cb.xAfter, yc, Cb.w, Cb.h, lay.after, mF, is('after', l)); text('after the heads · added, not swapped', Cb.xAfter, yc + Cb.h + 4, mono8, c.ink3);
+      text('+ feed-fwd =', (Cb.xAfter + Cb.w + Cb.xOut) / 2, yc + Cb.h / 2, mono8, c.ink2, 'center', 'middle');
+      strip(Cb.xOut, yc, Cb.w, Cb.h, lay.out, mF, is('out', l)); text(`the layer's output · ${D}`, Cb.xOut, yc + Cb.h + 4, mono8, c.ink3);
+      text(`read off after layer ${l + 1}${last ? ' (the output)' : ''}: ${lensText(lay.lens)}`, Cb.xHeard, yc + Cb.h + 18, mono9, last ? c.ink2 : c.ink3);
+    });
+    // the output: the last vector through the output layer
+    const O = L.outRow, yO = L.yOut;
+    text('OUTPUT', 12, yO, capFont, c.ink); text(`the last vector × Wout, softmax over the ${m.V} words: the probability of every next word · ${m.chosen ? 'the word the model chose marked ←' : 'the actual next word marked ✓'}`, 70, yO + 1, mono9, c.ink3);
+    let pm = 1e-9; for (const o of m.out) pm = Math.max(pm, o.p);
+    m.out.forEach((o, k) => {
+      const y = yO + 24 + k * L.outPitch + 7, on = is('word', null, null, k), w = Math.max(1, O.barMax * o.p / pm);
+      text(cut(o.word, 14), O.xWord, y, o.target ? mono : mono9, o.target ? c.ink : c.ink2, 'right', 'middle');
+      ctx.fillStyle = o.target ? (m.chosen ? c.irregular : c.good) : rgbStr(c.rgb.accent, 0.75); ctx.fillRect(O.xBar, y - 5, w, 10);
+      if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(O.xBar - 1, y - 6, w + 2, 12); }
+      text(`${pctText(o.p)}${o.target ? (m.chosen ? ' ←' : ' ✓') : ''}`, O.xPct, y, mono9, o.target ? c.ink : c.ink3, 'left', 'middle');
+    });
+    text(hov && hov.text ? hov.text : 'hover a strip for its numbers, or a read word to find it in the report · hover or click a word of the report to follow it here', 12, L.H_ - 16, mono9, c.ink3);
+  }
+  // what is under a point of the diagram (canvas-relative CSS pixels), with a text for the tip
+  function hitTokenNetwork(canvas, px, py, m) {
+    const L = canvas._tokenNet; if (!L) return null;
+    const s = TN_W / canvas.clientWidth, x = px * s, y = py * s, I = L.inp, Hd = L.head, Cb = L.comb, O = L.outRow, f = v => fmtSigned(v, 2);
+    const inBox = (x0, y0, w, h) => x >= x0 && x <= x0 + w && y >= y0 - 2 && y <= y0 + h + 2, cell = (x0, w, n) => Math.min(n - 1, Math.max(0, Math.floor((x - x0) / (w / n))));
+    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
+    if (m.pos && inBox(I.xPos, I.y, I.w, I.h)) { const d = cell(I.xPos, I.w, m.D); return { kind: 'pos', d, text: `position ${m.q} vector ${d + 1} = ${f(m.pos[d])} · learned, one vector per position` }; }
+    if (inBox(I.xIn, I.y, I.w, I.h)) { const d = cell(I.xIn, I.w, m.D); return { kind: 'x0', d, text: `input ${d + 1} = ${f(m.x0[d])}${m.pos ? ` (${f(m.emb[d])} + ${f(m.pos[d])})` : ''}` }; }
+    for (let l = 0; l < m.layers.length; l++) {
+      const lay = m.layers[l], yL = L.yL0 + l * L.blockH;
+      for (let h = 0; h < lay.heads.length; h++) {
+        const hd = lay.heads[h], yh = yL + 30 + h * L.headPitch;
+        if (inBox(Hd.xQuery, yh - 7, Hd.qW, 14)) { const d = cell(Hd.xQuery, Hd.qW, m.dk); return { kind: 'query', l, h, d, text: `${hd.name}, layer ${l + 1}: query ${d + 1} = ${f(hd.query[d])} · the vector × Wq, what this head looks for` }; }
+        if (inBox(Hd.xMsg, yh - 7, Hd.mW, 14)) { const d = cell(Hd.xMsg, Hd.mW, m.dk); return { kind: 'msg', l, h, d, text: `${hd.name}, layer ${l + 1}: message ${d + 1} = ${f(hd.message[d])} · Σ share × value over the words read` }; }
+        for (let k = 0; k < hd.reads.length; k++) { const r = hd.reads[k], x0 = Hd.xReads + k * Hd.slot; if (x >= x0 && x <= x0 + Hd.slot - 4 && y >= yh - 8 && y <= yh + 18) return { kind: 'read', l, h, k, j: r.j, text: `${hd.name}, layer ${l + 1}, reads “${r.word}” (word ${r.j}, ${r.dist} back): ${pctText(r.a)} of its attention` }; }
+      }
+      const yc = yL + 22 + lay.heads.length * L.headPitch + 10, inp = l === 0 ? m.x0 : m.layers[l - 1].out;
+      if (inBox(Cb.xHeard, yc, Cb.w, Cb.h)) { const d = cell(Cb.xHeard, Cb.w, m.D); return { kind: 'heard', l, d, text: `layer ${l + 1} hears ${d + 1} = ${f(lay.heard[d])} · the heads' messages × Wo` }; }
+      if (inBox(Cb.xAfter, yc, Cb.w, Cb.h)) { const d = cell(Cb.xAfter, Cb.w, m.D); return { kind: 'after', l, d, text: `after the heads ${d + 1} = ${f(lay.after[d])} (${f(inp[d])} + ${f(lay.heard[d])})` }; }
+      if (inBox(Cb.xOut, yc, Cb.w, Cb.h)) { const d = cell(Cb.xOut, Cb.w, m.D); return { kind: 'out', l, d, text: `layer ${l + 1} output ${d + 1} = ${f(lay.out[d])} (${f(lay.after[d])} + ${f(lay.out[d] - lay.after[d])} from the feed-forward)` }; }
+    }
+    for (let k = 0; k < m.out.length; k++) { const y0 = L.yOut + 24 + k * L.outPitch; if (y >= y0 && y < y0 + L.outPitch && x >= 100 && x <= O.xPct + 60) { const o = m.out[k]; return { kind: 'word', k, text: `“${o.word}”: ${(o.p * 100).toFixed(1)}%${o.target ? (m.chosen ? ' · the word the model chose' : ' · the actual next word') : ''}` }; } }
+    return null;
+  }
+  // The attention of one head over a whole report: rows ask, columns answer, every row scaled to its largest share so
+  // that where each word looks shows whether the head spreads its attention or not. The section of every word runs as a
+  // band along both edges, the section boundaries as thin lines; the chosen word's row (the query that predicted it) is
+  // outlined, the hovered cell marked. opt = { A (rows; row i over j ≤ i), n, sections, colors: { section: css colour },
+  // mark (a row or null), hover ({ i, j } or null) }
+  const TA_W = 320;
+  function drawTokenAttention(canvas, opt) {
+    const n = opt.n, band = 7, m0 = band + 3, side = TA_W - m0 - 2, cell = side / n, ctx = fitCanvas(canvas, TA_W, TA_W), c = colors();
+    ctx.clearRect(0, 0, TA_W, TA_W); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, TA_W, TA_W);
+    let img = canvas._attnImg;
+    if (!img || canvas._attnFor !== opt.A || canvas._attnTheme !== c || img.width !== n) { // the cells, once per attention and theme: an n × n image, scaled up without smoothing
+      img = document.createElement('canvas'); img.width = n; img.height = n;
+      const ictx = img.getContext('2d'), data = ictx.createImageData(n, n), px = data.data, lo = c.rgb.surface2, hi = c.rgb.accent, bg = c.rgb.surface;
+      for (let i = 0; i < n; i++) {
+        const row = opt.A[i]; let mx = 1e-9; for (let j = 0; j <= i; j++) mx = Math.max(mx, row[j]);
+        for (let j = 0; j < n; j++) { const k = (i * n + j) * 4; if (j > i) { px[k] = bg[0]; px[k + 1] = bg[1]; px[k + 2] = bg[2]; px[k + 3] = 255; continue; } const t = Math.pow(row[j] / mx, 0.7); px[k] = lo[0] + (hi[0] - lo[0]) * t; px[k + 1] = lo[1] + (hi[1] - lo[1]) * t; px[k + 2] = lo[2] + (hi[2] - lo[2]) * t; px[k + 3] = 255; }
+      }
+      ictx.putImageData(data, 0, 0); canvas._attnImg = img; canvas._attnFor = opt.A; canvas._attnTheme = c;
+    }
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(img, m0, m0, side, side);
+    for (let i = 0; i < n; i++) { ctx.fillStyle = opt.colors[opt.sections[i]] || c.ink3; const p = m0 + i * cell, w = Math.ceil(cell); ctx.fillRect(p, 0, w, band); ctx.fillRect(0, p, band, w); }
+    ctx.strokeStyle = rgbStr(c.rgb.ink, 0.35); ctx.lineWidth = 1;
+    for (let i = 1; i < n; i++) if (opt.sections[i] !== opt.sections[i - 1]) { const p = Math.round(m0 + i * cell) + 0.5; ctx.beginPath(); ctx.moveTo(p, m0); ctx.lineTo(p, m0 + side); ctx.moveTo(m0, p); ctx.lineTo(m0 + side, p); ctx.stroke(); }
+    if (opt.mark != null && opt.mark < n) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(m0 - 0.5, m0 + opt.mark * cell - 0.5, side + 1, Math.max(1.5, cell) + 1); }
+    if (opt.hover) { const h = opt.hover; ctx.fillStyle = rgbStr(c.rgb.ink, 0.08); ctx.fillRect(m0, m0 + h.i * cell, side, Math.max(1, cell)); ctx.fillRect(m0 + h.j * cell, m0, Math.max(1, cell), side); ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(m0 + h.j * cell - 1.5, m0 + h.i * cell - 1.5, cell + 3, cell + 3); }
+    canvas._attn = { n, m0, cell, W: TA_W };
+  }
+  function hitTokenAttention(canvas, px, py) {
+    const L = canvas._attn; if (!L) return null;
+    const s = L.W / canvas.clientWidth, x = px * s, y = py * s, j = Math.floor((x - L.m0) / L.cell), i = Math.floor((y - L.m0) / L.cell);
+    return i < 0 || j < 0 || i >= L.n || j >= L.n || j > i ? null : { i, j };
+  }
+  // grouped bars: opt = { labels: [group names], series: [{ name, color, values }], pct, xLabel, W, H }
+  function drawGroupedBars(svg, opt) {
+    const W = opt.W || 560, H = opt.H || 230, ml = 42, mr = 10, mt = 12, mb = 36, pw = W - ml - mr, ph = H - mt - mb, nG = opt.labels.length, nS = opt.series.length;
+    let maxV = 0; for (const s of opt.series) for (const v of s.values) maxV = Math.max(maxV, v);
+    const top = opt.pct ? Math.max(0.1, Math.min(1, Math.ceil(maxV * 10 + 1e-9) / 10)) : (maxV || 1), bw = pw / nG, inner = bw * 0.8 / nS, sx = gi => ml + gi * bw, sy = v => mt + ph * (1 - Math.min(v, top) / top);
+    let g = '<g class="grid">';
+    for (let k = 0; k <= 4; k++) { const v = top * k / 4, y = sy(v); g += `<line x1="${ml}" x2="${W - mr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text x="${ml - 5}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${opt.pct ? Math.round(v * 100) + '%' : v.toFixed(2)}</text>`; }
+    g += '</g>';
+    opt.series.forEach((s, si) => s.values.forEach((v, gi) => { const x = sx(gi) + bw * 0.1 + si * inner, y = sy(v); g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(1, inner - 1).toFixed(1)}" height="${(mt + ph - y).toFixed(1)}" style="fill:${s.color}"><title>${esc(s.name)} · ${esc(opt.labels[gi])}: ${opt.pct ? (v * 100).toFixed(1) + '%' : v.toFixed(3)}</title></rect>`; }));
+    opt.labels.forEach((l, gi) => { g += `<text x="${(sx(gi) + bw / 2).toFixed(1)}" y="${mt + ph + 14}" text-anchor="middle">${esc(l)}</text>`; });
+    if (opt.xLabel) g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
+  // the vocabulary on two axes: opt = { points: [{ id, word, x, y, color, label }], W, H, xLabel, yLabel }
+  function drawWordMap(svg, opt) {
+    const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (W - 2 * pad), sy = v => H - pad - (v - y0) / ((y1 - y0) || 1) * (H - 2 * pad);
+    let g = `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/>`;
+    g += `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
+    for (const p of pts) g += `<circle r="${p.label ? 4 : 3}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" style="fill:${p.color};fill-opacity:${p.label ? 0.95 : 0.65}" data-id="${p.id}"><title>${esc(p.word)}${p.note ? ' · ' + esc(p.note) : ''}</title></circle>`;
+    for (const p of pts) if (p.label) g += `<text x="${(sx(p.x) + 5).toFixed(1)}" y="${(sy(p.y) + 3).toFixed(1)}">${esc(p.word)}</text>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
+
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap };
 })();
 
 </script>
@@ -5395,7 +5623,7 @@ window.Viz = (function () {
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
-    rp: { built: false, model: null, dim: 48, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null },
+    rp: { built: false, model: null, dim: 48, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null },
     fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -8103,6 +8331,8 @@ window.Viz = (function () {
     L.train = D.train.map(r => prep(r, 'train')); L.test = D.test.map(r => prep(r, 'test')); L.held = D.held.map(r => prep(r, 'held'));
     L.all = [...L.train, ...L.test, ...L.held]; L.byId = new Map(L.all.map(r => [r.id, r]));
     L.nl = L.vocab.index.get('\n');
+    const secCount = L.vocab.words.map(() => ({})); for (const r of L.train) r.tokens.forEach((t, k) => { const sec = r.sections[k]; secCount[t][sec] = (secCount[t][sec] || 0) + 1; });
+    L.wordSec = secCount.map(cnt => { let best = null, bv = 0; for (const sec of RPR.SECTIONS) if ((cnt[sec] || 0) > bv) { bv = cnt[sec]; best = sec; } return best; }); // the section each word mostly appears in
     L.built = true;
     return true;
   }
@@ -8199,8 +8429,9 @@ window.Viz = (function () {
     const L = S.rp;
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.dim === L.dim));
     document.querySelectorAll('#rp-pos-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.pos === '1') === L.positions));
-    document.querySelectorAll('#rp-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
-    document.querySelectorAll('#rp-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
+    document.querySelectorAll('.rp-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
+    document.querySelectorAll('.rp-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
+    document.querySelectorAll('.rp-arcs-check').forEach(cb => { cb.checked = L.arcs; });
     document.querySelectorAll('#rp-cases-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.cases === L.cases));
     $('rp-epochs').value = L.epochs; $('rp-epochs-val').textContent = L.epochs;
     $('rp-lr').value = rpSliderFromLr(L.lr); $('rp-lr-val').textContent = L.lr;
@@ -8248,25 +8479,27 @@ window.Viz = (function () {
     for (const h of heads) for (let j = 0; j <= i; j++) row[j] += c.Ah[h][i][j] / heads.length;
     return row;
   }
-  function rpHighlight(el, fw, i) { // light up the words token i reads
-    const spans = el.querySelectorAll('.tok'); spans.forEach(s => { s.classList.remove('reads', 'hover'); s.style.boxShadow = ''; });
-    if (i == null || !fw) return;
-    const row = rpAttentionRow(fw, i); let mx = 1e-9; for (let j = 0; j < i; j++) mx = Math.max(mx, row[j]);
-    spans.forEach(s => { const j = +s.dataset.i; if (j === i) s.classList.add('hover'); else if (j < i && row[j] > 0.02 * mx) { s.classList.add('reads'); s.style.boxShadow = `inset 0 -${(2 + 6 * row[j] / mx).toFixed(1)}px 0 rgba(74,58,167,${(0.15 + 0.7 * row[j] / mx).toFixed(2)})`; } });
+  function rpHighlight(el, fw, i, opts) { // light up the words the model read, standing at the word before word i, to choose it, and draw the lines to them; soft: the word followed by default, not hovered
+    const L = S.rp, o = opts || {}, spans = el.querySelectorAll('.tok'); spans.forEach(s => { s.classList.remove('reads', 'hover', 'cur', 'pinned'); s.style.boxShadow = ''; });
+    const q = i == null ? null : i - 1;
+    if (q == null || q < 0 || !fw || q >= fw.tokens.length) { rpArcs(el, null); return; }
+    const row = rpAttentionRow(fw, q); let mx = 1e-9; for (let j = 0; j <= q; j++) mx = Math.max(mx, row[j]);
+    spans.forEach(s => { const j = +s.dataset.i; if (j === L.pinned) s.classList.add('pinned'); if (j === i) s.classList.add(o.soft ? 'cur' : 'hover'); else if (j <= q && row[j] > 0.02 * mx) { s.classList.add('reads'); s.style.boxShadow = `inset 0 -${(2 + 6 * row[j] / mx).toFixed(1)}px 0 rgba(74,58,167,${(0.15 + 0.7 * row[j] / mx).toFixed(2)})`; } });
+    rpArcs(el, i, row, q);
   }
   function rpRenderText() {
     const L = S.rp, r = rpFocus(), fw = rpForward(r), probsOf = i => (i > 0 ? fw.probs[i - 1][r.tokens[i]] : null);
     $('rp-report-title').textContent = `Report ${r.name} · ${r.split === 'train' ? 'training' : r.split === 'test' ? 'test' : 'never trained on'} · ${RPR.CLASS_NAMES[r.cls]}${L.selected == null && L.lastBatch.length ? ' · in the last batch trained on' : ''}`;
     const el = $('rp-text'); el.innerHTML = rpTextHtml(r.words, probsOf, null);
     let s = 0, n = 0, right = 0; for (let i = 1; i < r.tokens.length; i++) { const p = probsOf(i); s += -Math.log(p + 1e-7); n++; const pr = fw.probs[i - 1]; let best = 0; for (let v = 1; v < pr.length; v++) if (pr[v] > pr[best]) best = v; if (best === r.tokens[i]) right++; }
-    $('rp-text-note').textContent = `Each word is coloured by the probability the model gave it, given the words before: green when it expected it, red when it did not (loss ${(s / n).toFixed(2)} per word on this report, ${pct(right / n)} of its words the most probable). Hover a word: the bars show what the model expected there, and the words it read light up, in the layer and head chosen above; click to keep a word.`;
-    const i = L.hover != null ? L.hover : L.pinned; rpHighlight(el, fw, i); rpRenderNextWord(i);
+    $('rp-text-note').textContent = `Each word is coloured by the probability the model gave it, given the words before: green when it expected it, red when it did not (loss ${(s / n).toFixed(2)} per word on this report, ${pct(right / n)} of its words the most probable). Hover a word: the bars show what the model expected there, and the words it read to expect it light up, with lines to them, in the layer and head chosen above; click to keep a word. The diagrams below follow the same word.`;
+    rpFollowWord(false); rpRenderAttention(rpView(false), false);
   }
   function rpRenderNextWord(i) {
     const L = S.rp, r = rpFocus(), fw = rpForward(r), el = $('rp-nextword');
-    if (i == null || i < 1) { el.innerHTML = rpNextWordHtml(fw.probs[r.tokens.length - 2], r.tokens[r.tokens.length - 1], null, 'the last word of the report: what the model expected'); $('rp-next-note').textContent = 'The model writes a report by drawing the next word from bars like these, over and over: at every step it can only say what usually comes next.'; return; }
+    if (i == null || i < 1) { const k = rpDefaultWord(r.words); el.innerHTML = rpNextWordHtml(fw.probs[k - 1], r.tokens[k], null, `before “${rpWordLabel(r.words[k])}”, ${k === r.words.length - 1 ? 'the last word' : 'the first word of the diagnosis'}: what the model expected`); $('rp-next-note').textContent = 'The model writes a report by drawing the next word from bars like these, over and over: at every step it can only say what usually comes next. Hover any word of the report for its bars.'; return; }
     el.innerHTML = rpNextWordHtml(fw.probs[i - 1], r.tokens[i], null, `before “${r.words[i] === '\n' ? '↵' : r.words[i]}”: what the model expected`);
-    $('rp-next-note').textContent = `The eight most probable next words after “${r.words.slice(Math.max(1, i - 4), i).map(w => (w === '\n' ? '↵' : w)).join(' ')}”, and the actual one (✓). The lit words on the left are the ones this word read in layer ${L.layer + 1}${L.head < 0 ? ', both heads' : L.head ? ', the far head' : ', the near head'}; the deeper the underline, the more it listened.`;
+    $('rp-next-note').textContent = `The eight most probable next words after “${r.words.slice(Math.max(1, i - 4), i).map(w => (w === '\n' ? '↵' : w)).join(' ')}”, and the actual one (✓). The lit words on the left, with the lines to them, are the ones the model read, standing at “${rpWordLabel(r.words[i - 1])}”, to expect this word, in layer ${L.layer + 1}${L.head < 0 ? ', both heads' : L.head ? ', the far head' : ', the near head'}; the deeper the underline and the thicker the line, the more it listened.`;
   }
   function rpRenderCurves() {
     const L = S.rp, keys = RPR.SECTIONS.map(s => ({ key: s, color: RP.colors[s] })), last = L.hist[L.hist.length - 1];
@@ -8293,11 +8526,12 @@ window.Viz = (function () {
   }
   function rpRenderTrays() { const L = S.rp, focus = rpFocus(), batch = new Set(L.lastBatch); rpTrays('train'); for (const [id, el] of L.thumbs) { el.classList.toggle('selected', focus.id === id); el.classList.toggle('in-batch', batch.has(id)); } }
   function rpRenderFocus() { rpRenderText(); }
-  function rpRender(full) { const L = S.rp; if (!L.model) return; rpRenderStatus(); rpRenderFocus(); if (full) { rpRenderCurves(); rpRenderTrays(); } rpSyncButtons(); }
+  function rpRender(full) { const L = S.rp; if (!L.model) return; rpRenderStatus(); rpRenderFocus(); if (full) { rpRenderCurves(); rpRenderTrays(); rpRenderWordMap(); } rpSyncButtons(); }
   function rpRenderAll() { const L = S.rp; if (S.world !== 'reports' || !L.built) return; if (S.stage === 'data') rpRenderData(); else if (S.stage === 'test') rpRenderTest(); else if (L.model) rpRender(true); }
   function rpEnter() {
     const L = S.rp; if (!rpData()) { rpNote('The reports did not load.'); return; }
     if (!rpBuild()) return;
+    L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null;
     if (!L.model) rpReset('Untrained: every next word is a guess over the whole vocabulary, so the report on screen is red all over. Step a batch to watch one gradient step, press Train and watch the loss by section, or load the trained model.');
     else rpRender(true);
   }
@@ -8328,7 +8562,7 @@ window.Viz = (function () {
   }
   // ---- Test: the findings go in, the model writes the report
   function rpCaseSet() { const L = S.rp; return L.cases === 'held' ? L.held : L.test; }
-  function rpEnterTest() { const L = S.rp; if (!rpData() || !rpBuild()) return; if (!L.model) rpReset(); rpTrays('test', rpTestSelect); rpBuildForm(); if (!L.form) rpLoadCase(rpCaseSet()[Math.min(L.trial.next, rpCaseSet().length - 1)]); rpRenderTest(); }
+  function rpEnterTest() { const L = S.rp; if (!rpData() || !rpBuild()) return; if (!L.model) rpReset(); L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpTrays('test', rpTestSelect); rpBuildForm(); if (!L.form) rpLoadCase(rpCaseSet()[Math.min(L.trial.next, rpCaseSet().length - 1)]); rpRenderTest(); }
   function rpBuildForm() {
     const L = S.rp, el = $('rp-form'); if (el.childElementCount) return;
     el.innerHTML = RPR.FINDINGS.map(l => `<div class="row" data-key="${l.key}"><label for="rp-f-${l.key}">${esc(l.line)}:</label><select id="rp-f-${l.key}">${l.states.map(s => `<option value="${s}">${s}</option>`).join('')}</select></div>`).join('');
@@ -8403,21 +8637,19 @@ window.Viz = (function () {
     $('rp-next-case').disabled = done; $('rp-write-all').disabled = done && !L.batchWriting;
     $('rp-next-case').textContent = done ? `All ${set.length} cases loaded` : `Next case (${T.next + 1} of ${set.length})`;
     $('rp-test-warning').hidden = !(L.model && L.model.steps === 0 && !L.shipped);
-    const doc = L.formCase ? L.byId.get(L.formCase) : null;
+    const doc = L.formCase ? L.byId.get(L.formCase) : null, showCards = !!L.written && !L.writing;
+    $('rp-test-net-card').hidden = !showCards; $('rp-test-att-card').hidden = !showCards;
     $('rp-test-title').textContent = L.noblock ? 'Nothing given: the model writes a whole case from nothing' : doc ? `Case ${doc.name} · ${doc.split === 'held' ? 'never trained on' : 'test'} · the findings and the requisition go in, the description and the diagnosis come out` : 'Findings of your own · the findings and the requisition go in, the description and the diagnosis come out';
     if (L.writing) { rpRenderWriting(); }
     else if (L.written) {
       const res = L.written, el = $('rp-test-text'), stepAt = new Map(res.steps.map(s => [s.at, s])), probsOf = i => { const s = stepAt.get(i); return s ? s.probs[s.token] : null; };
       el.innerHTML = rpTextHtml(res.words, probsOf, null);
-      const i = L.hover != null ? L.hover : L.pinned; rpHighlight(el, res.fw, i);
-      const s = i != null ? stepAt.get(i) : null;
-      $('rp-test-nextword').innerHTML = s ? rpNextWordHtml(s.probs, null, s.token, `word ${res.steps.indexOf(s) + 1}: what the model chose from`) : rpNextWordHtml(res.steps[res.steps.length - 1].probs, null, res.steps[res.steps.length - 1].token, 'the last word: what the model chose from');
       $('rp-test-call').innerHTML = res.dx ? `The model wrote: <b>${esc(res.dxLine || res.dx)}</b>${res.truthDx != null ? ` → <span class="${res.right ? 'good-text' : 'bad-text'}">${res.right ? 'the right diagnosis' : 'the wrong diagnosis'} ${res.right ? '✓' : '✗'}${res.right && !res.exact ? ', not word for word' : ''}</span>` : ''} · ${res.steps.length} words${L.temperature > 0 ? `, drawn at temperature ${L.temperature.toFixed(2)}` : ', the most probable word each time'}. Hover a word for what the model chose from and the words it read.` : 'The model wrote no diagnosis line at all.';
       $('rp-truth').hidden = !L.truthShown;
       if (L.truthShown) $('rp-truth').innerHTML = res.noblock
         ? `<div>Nothing was given, so there is no truth: the model drew a whole case from what it learned, findings and requisition included${res.findings ? `, and for the findings it drew the rule would give: <b>${esc(RPR.ruleOf(res.findings).text)}</b>` : ''} Draw again, and again: at temperature 1 the diagnoses follow the base rates of the queue it was trained on.</div>`
         : `<div>The rule says: <b>${esc(res.truthLine)}</b>${doc && !L.noblock ? ` · the generator’s own report for this case reads: <b>${esc(doc.dxLine)}</b>` : ''}</div>${doc ? '' : '<div class="small muted">Findings of your own: the rule’s answer is what a pathologist would sign out for them; the model has only ever seen the training reports.</div>'}`;
-      rpRenderEvidence(res);
+      rpRenderEvidence(res); rpFollowWord(true); rpRenderAttention(rpView(true), false);
     } else {
       $('rp-test-text').innerHTML = L.noblock ? '<span class="muted">Press Write the report: from the start token alone the model writes findings and all.</span>' : rpTextHtml(RPR.decode(L.vocab, rpPrefix()), null, null) + '<span class="muted"> … press Write the report.</span>';
       $('rp-test-nextword').innerHTML = ''; $('rp-test-call').textContent = L.noblock ? '' : 'The findings, the specimen, the clinical history and the gross are the prompt, as they would come with the case; the model continues from the newline after the gross, one word at a time, until it writes the end token.';
@@ -8435,6 +8667,107 @@ window.Viz = (function () {
     $('rp-evidence-card').hidden = false;
     $('rp-evidence').innerHTML = bars('by line of the findings', RPR.FINDINGS.map(l => { const key = { surface: 'surface', nests: 'nests', atypia: 'atypia in nests', contours: 'contours', stromal: 'stromal reaction', mp: 'muscularis propria', inflammation: 'inflammation' }[l.key]; return [l.line, byLine[key] || 0]; })) + bars('by section of the report', RPR.SECTIONS.map(s => [s === 'diagnosis' ? 'the diagnosis itself' : s, bySec[s] || 0]));
   }
+  // ---- the model's diagrams: how a word was chosen, who reads whom across the report, the words as the model sees them
+  const RP_HEAD_COLORS = ['#4a3aa7', '#0891b2'];
+  const RP_BINS = [[0, 0, 'itself'], [1, 1, '1 back'], [2, 2, '2'], [3, 4, '3–4'], [5, 8, '5–8'], [9, 16, '9–16'], [17, 32, '17–32'], [33, 64, '33–64'], [65, 128, '65–128'], [129, 1e9, '129+']];
+  const RP_LABELLED = new Set(['FINDINGS', 'SPECIMEN', 'CLINICAL', 'GROSS', 'MICROSCOPIC', 'DIAGNOSIS', 'surface', 'urothelium', 'normal', 'reactive', 'atypia', 'denuded', 'nests', 'basement', 'membrane', 'absent', 'present', 'none', 'contours', 'rounded', 'irregular', 'stromal', 'desmoplasia', 'muscularis', 'propria', 'involved', 'inflammation', 'mild', 'marked', 'carcinoma', 'situ', 'invasive', 'lamina', 'Benign', 'Denuded', 'suspicious', 'foci', 'associated', 'Urothelial', 'Bladder', 'biopsy', 'Hematuria', 'cm', 'fragments', 'The', 'is', 'and', 'with', 'of', ',', '.', ':', '\n', RPR.END, RPR.START, '1', '2', '0']);
+  const rpHeadName = (h, H) => (H === 2 ? (h === 0 ? 'near head' : 'far head') : `head ${h + 1}`);
+  const rpWordLabel = w => (w === RPR.END ? '⟨end⟩' : w === RPR.START ? '⟨start⟩' : w === '\n' ? '↵' : w);
+  function rpDefaultWord(words) { const i = words.indexOf('DIAGNOSIS'); return i >= 0 && i + 2 < words.length ? i + 2 : words.length - 1; } // the word the panels follow when none is hovered or kept: the first word of the diagnosis, else the last
+  function rpView(onTest) { // what the diagrams draw from: the report on screen, or the report the model wrote
+    const L = S.rp; if (!L.model || !L.built) return null;
+    if (onTest) { const res = L.written; if (!res || L.writing) return null; return { words: res.words, tokens: res.tokens, fw: res.fw, textEl: $('rp-test-text'), pre: 'rp-test-', chosen: true, steps: res.steps }; }
+    const r = rpFocus(); return { words: r.words, tokens: r.tokens, fw: rpForward(r), textEl: $('rp-text'), pre: 'rp-', chosen: false, steps: null };
+  }
+  function rpFocusWord(view) { const L = S.rp, i = L.hover != null ? L.hover : L.pinned != null ? L.pinned : rpDefaultWord(view.words); return Math.max(1, Math.min(view.words.length - 1, i)); }
+  function rpFollowWord(onTest) { // every panel follows one word: hovered, else kept, else the first word of the diagnosis
+    const L = S.rp, view = rpView(onTest); if (!view) return;
+    const i = rpFocusWord(view), soft = L.hover == null && L.pinned == null;
+    rpHighlight(view.textEl, view.fw, i, { soft });
+    if (onTest) { const s = view.steps.find(x => x.at === i); $('rp-test-nextword').innerHTML = s ? rpNextWordHtml(s.probs, null, s.token, `word ${view.steps.indexOf(s) + 1} it wrote, “${rpWordLabel(view.words[i])}”: what the model chose from`) : rpNextWordHtml(view.fw.probs[i - 1], view.tokens[i], null, `before “${rpWordLabel(view.words[i])}”, given in the prompt: what the model expected`); }
+    else rpRenderNextWord(soft ? null : i);
+    rpRenderNet(view); rpRenderAttention(view, true);
+  }
+  // lines over the report, from the word followed to the words the model read for it
+  function rpArcs(el, i, row, q) {
+    const L = S.rp; let svg = el.querySelector('svg.rp-arcs');
+    if (!svg) { svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('class', 'rp-arcs'); el.appendChild(svg); }
+    if (i == null || !row || !L.arcs) { svg.innerHTML = ''; return; }
+    const box = el.getBoundingClientRect(), W = el.clientWidth, Hh = el.clientHeight; svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`); svg.style.width = `${W}px`; svg.style.height = `${Hh}px`;
+    const at = j => { const s = el.querySelector(`.tok[data-i="${j}"]`); if (!s) return null; const r = s.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, top: r.top - box.top, bottom: r.bottom - box.top }; };
+    const to = at(i); if (!to) { svg.innerHTML = ''; return; }
+    let mx = 1e-9; for (let j = 0; j <= q; j++) if (j !== i) mx = Math.max(mx, row[j]);
+    const items = []; for (let j = 0; j <= q; j++) if (j !== i && row[j] >= 0.08 * mx) items.push({ j, rel: row[j] / mx });
+    items.sort((a, b) => a.rel - b.rel);
+    svg.innerHTML = items.slice(-12).map(({ j, rel }) => { const fr = at(j); if (!fr) return ''; const same = Math.abs(fr.top - to.top) < 4, x1 = to.x, y1 = to.top, x2 = fr.x, y2 = same ? fr.top : fr.bottom, d = same ? `M${x1.toFixed(1)} ${y1.toFixed(1)} Q${((x1 + x2) / 2).toFixed(1)} ${(y1 - 10 - Math.abs(x2 - x1) * 0.12).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}` : `M${x1.toFixed(1)} ${y1.toFixed(1)} L${x2.toFixed(1)} ${y2.toFixed(1)}`; return `<path d="${d}" style="stroke-width:${(0.8 + 3 * rel).toFixed(1)};stroke-opacity:${(0.25 + 0.65 * rel).toFixed(2)}"/>`; }).join('');
+  }
+  function rpMarkPair(el, i, j) { el.querySelectorAll('.tok.att-q, .tok.att-k').forEach(s => s.classList.remove('att-q', 'att-k')); if (i != null) { const a = el.querySelector(`.tok[data-i="${i}"]`); if (a) a.classList.add('att-q'); } if (j != null) { const b = el.querySelector(`.tok[data-i="${j}"]`); if (b) b.classList.add('att-k'); } }
+  // how the word was chosen: the numbers of position q = i − 1 on their way through the model, prepared for the drawing
+  function rpRenderNet(view) {
+    const L = S.rp, m = L.model, i = rpFocusWord(view), q = i - 1, fw = view.fw, D = m.D, dk = m.dk, H = m.H, canvas = $(`${view.pre}net`), chosen = !!view.chosen && !!view.steps && view.steps.some(x => x.at === i); if (!canvas || q < 0 || q >= fw.tokens.length) return; // chosen: the model wrote this word; a word of the prompt was given, and the diagram says what the model expected there
+    const tq = view.tokens[q], emb = m.E.subarray(tq * D, (tq + 1) * D), pos = m.Pos && q < m.P ? m.Pos.subarray(q * D, (q + 1) * D) : null;
+    const lens = x => { const z = new Float64Array(m.V); let mx = -Infinity; for (let v = 0; v < m.V; v++) { let s = m.bout[v]; const off = v * D; for (let d = 0; d < D; d++) s += m.Wout[off + d] * x[d]; z[v] = s; mx = Math.max(mx, s); } let Z = 0; for (let v = 0; v < m.V; v++) { z[v] = Math.exp(z[v] - mx); Z += z[v]; } const idx = Array.from(z.keys()).sort((a, b) => z[b] - z[a]).slice(0, 3); return idx.map(v => ({ word: rpWordLabel(L.vocab.words[v]), p: z[v] / Z })); };
+    const layers = fw.ctxs.map((c, l) => {
+      const lay = m.layers[l], HM = H * dk, heard = new Float64Array(D); for (let d = 0; d < D; d++) { let s = lay.bo[d]; const off = d * HM; for (let e = 0; e < HM; e++) s += lay.Wo[off + e] * c.C[q][e]; heard[d] = s; }
+      const heads = Array.from({ length: H }, (_, h) => { const row = c.Ah[h][q], reads = []; for (let j = 0; j <= q; j++) reads.push({ j, a: row[j] }); reads.sort((a, b) => b.a - a.a); return { name: rpHeadName(h, H), cost: c.costs[h], query: c.Q[q].subarray(h * dk, (h + 1) * dk), message: c.C[q].subarray(h * dk, (h + 1) * dk), reads: reads.slice(0, 5).filter(r => r.a > 0.005).map(r => ({ j: r.j, a: r.a, word: rpWordLabel(view.words[r.j]), dist: q - r.j })) }; });
+      return { heads, heard, after: c.Xp[q], out: c.Y[q], lens: lens(c.Y[q]) };
+    });
+    const probs = fw.probs[q], target = view.tokens[i], idx = Array.from(probs.keys()).sort((a, b) => probs[b] - probs[a]).slice(0, 6); if (!idx.includes(target)) idx.push(target);
+    const model = { i, q, n: view.words.length, V: m.V, D, dk, word: rpWordLabel(view.words[i]), qword: rpWordLabel(view.words[q]), arch: `${m.V} words → vector of ${D}${m.P ? ' + position' : ''} → ${m.layers.length} × (${H} heads of ${dk} + feed-forward ${m.F}) → softmax over ${m.V} words`, emb, pos, x0: fw.X[q], lens0: lens(fw.X[q]), layers, out: idx.map(v => ({ word: rpWordLabel(L.vocab.words[v]), p: probs[v], target: v === target })), chosen, hover: L.hoverNet && L.hoverNet.pre === view.pre ? L.hoverNet : null };
+    canvas._model = model; Viz.drawTokenNetwork(canvas, model);
+    const title = $(`${view.pre}net-title`); if (title) title.textContent = `How “${model.word}” was ${chosen ? 'chosen' : 'expected'}${view.chosen && !chosen ? ' (given in the prompt)' : ''}`;
+    const note = $(`${view.pre}net-note`); if (note) note.textContent = `The diagram follows the word hovered or kept on the report (the first word of the diagnosis when none is). Standing at “${model.qword}”, the model adds that word's vector to its position vector; in each layer the near head, with its steep distance cost, reads the last few words, and the far head, with a shallow one, can reach back to the findings; the heads' messages are projected and added to the vector, never swapped for it, and the feed-forward is added too; the output layer scores all ${m.V} words. The "read off" lines show what the output layer would say at each stage: the prediction takes shape layer by layer.`;
+  }
+  // who reads whom across the whole report, in the chosen layer: one matrix per head, the attention by distance, where the words of each section look
+  function rpRenderAttention(view, light) {
+    const L = S.rp, m = L.model, fw = view.fw, n = view.words.length, l = Math.min(L.layer, fw.ctxs.length - 1), c = fw.ctxs[l], H = m.H, pre = view.pre, { sections } = RPR.sectionsOf(view.words), q = rpFocusWord(view) - 1;
+    rpEnsureAttBody(pre, H);
+    for (let h = 0; h < H; h++) { const hv = L.hoverAtt && L.hoverAtt.pre === pre && L.hoverAtt.h === h ? L.hoverAtt : null; Viz.drawTokenAttention($(`${pre}att-${h}`), { A: c.Ah[h], n, sections, colors: RP.colors, mark: q, hover: hv }); $(`${pre}att-${h}-title`).textContent = `${rpHeadName(h, H)}, layer ${l + 1} · cost ${c.costs[h].toFixed(3)} per word of distance`; }
+    if (light) return;
+    const series = Array.from({ length: H }, (_, h) => { const vals = RP_BINS.map(() => 0); for (let i = 0; i < n; i++) { const row = c.Ah[h][i]; for (let j = 0; j <= i; j++) { const d = i - j; let b = 0; while (d > RP_BINS[b][1]) b++; vals[b] += row[j] / n; } } return { name: rpHeadName(h, H), color: RP_HEAD_COLORS[h % RP_HEAD_COLORS.length], values: vals }; });
+    Viz.drawGroupedBars($(`${pre}att-dist`), { labels: RP_BINS.map(b => b[2]), series, pct: true, xLabel: 'words back from the one asking' });
+    $(`${pre}att-dist-legend`).innerHTML = series.map(s => `<span><span class="swatch" style="background:${s.color}"></span>${s.name}</span>`).join('');
+    for (let h = 0; h < H; h++) { $(`${pre}sec-${h}`).innerHTML = rpSectionTable(rpSectionMatrix(c.Ah[h], sections, n)); $(`${pre}sec-${h}-title`).textContent = `${rpHeadName(h, H)} · where a word of each section looks`; }
+    const note = $(`${pre}att-note`); if (note) note.textContent = `Rows ask, columns answer: every row is one word's shares over the words before it, scaled to its largest share, with the sections as bands along the edges and thin lines at their boundaries. The near head hugs the diagonal, reading the words just before; the far head's columns stand in the findings block, where the diagnosis is decided. The bars give each head's attention by distance back, averaged over the ${n} words; the tables, where the words of each section look on average. Hover a cell for its pair of words; the outlined row is the word the diagram follows.`;
+  }
+  function rpSectionMatrix(A, sections, n) { const S6 = RPR.SECTIONS, idx = new Map(S6.map((s, k) => [s, k])), M = S6.map(() => S6.map(() => 0)), cnt = S6.map(() => 0); for (let i = 0; i < n; i++) { const r = idx.get(sections[i]); cnt[r]++; const row = A[i]; for (let j = 0; j <= i; j++) M[r][idx.get(sections[j])] += row[j]; } return { M: M.map((row, r) => row.map(v => (cnt[r] ? v / cnt[r] : 0))), cnt }; }
+  function rpSectionTable(sm) { const S6 = RPR.SECTIONS; return `<tr><th class="row">a word in …</th>${S6.map(s => `<th>reads ${s}</th>`).join('')}</tr>` + S6.map((s, r) => `<tr><th class="row">${s} <span class="n">(${sm.cnt[r]})</span></th>${S6.map((t, k) => { const v = sm.M[r][k]; return `<td style="background:${Viz.sequential(Math.sqrt(v), 0.8)}${v > 0.5 ? ';color:#fff' : ''}">${v >= 0.005 ? pct(v) : '·'}</td>`; }).join('')}</tr>`).join(''); }
+  function rpAttBodyHtml(pre, H) {
+    return `<div class="rp-att">${Array.from({ length: H }, (_, h) => `<div><div class="rp-ttl" id="${pre}att-${h}-title">${rpHeadName(h, H)}</div><div class="net-wrap"><canvas id="${pre}att-${h}" width="320" height="320" aria-label="${rpHeadName(h, H)}: the attention between the words of the report, rows ask, columns answer"></canvas><div class="tip" id="${pre}att-${h}-tip" hidden></div></div></div>`).join('')}<div class="chart"><div class="title"><span>How far back each head reads</span></div><svg id="${pre}att-dist" role="img" aria-label="Each head's attention by distance back, averaged over the words of the report"></svg><div class="legend" id="${pre}att-dist-legend" style="margin-top:6px"></div></div></div><div class="rp-sec-grid">${Array.from({ length: H }, (_, h) => `<div><div class="rp-ttl" id="${pre}sec-${h}-title">${rpHeadName(h, H)}</div><table class="rp-sec" id="${pre}sec-${h}"></table></div>`).join('')}</div>`;
+  }
+  function rpEnsureAttBody(pre, H) { // the matrices, the chart and the tables for H heads, built once, their canvases wired
+    const body = $(`${pre}att-body`); if (!body || +body.dataset.heads === H) return; body.dataset.heads = H; body.innerHTML = rpAttBodyHtml(pre, H);
+    const L = S.rp, onTest = pre === 'rp-test-';
+    for (let h = 0; h < H; h++) rpBindTip($(`${pre}att-${h}`), $(`${pre}att-${h}-tip`), (cv, x, y) => { const hit = Viz.hitTokenAttention(cv, x, y), view = rpView(onTest); if (!hit || !view) return null; const l = Math.min(L.layer, view.fw.ctxs.length - 1), a = view.fw.ctxs[l].Ah[h][hit.i][hit.j]; hit.text = `“${rpWordLabel(view.words[hit.i])}” (word ${hit.i}) reads “${rpWordLabel(view.words[hit.j])}” (word ${hit.j}, ${hit.i - hit.j} back): ${(a * 100).toFixed(1)}%`; return hit; }, hit => { L.hoverAtt = hit ? { pre, h, i: hit.i, j: hit.j } : null; const view = rpView(onTest); if (!view) return; rpRenderAttention(view, true); rpMarkPair(view.textEl, hit ? hit.i : null, hit ? hit.j : null); });
+  }
+  function rpBindTip(canvas, tip, hit, onChange) { // a canvas with a tooltip: hit(canvas, x, y) → { …, text } or null; onChange when what is under the mouse changes
+    const keyOf = h => (h ? `${h.kind || ''}:${h.l == null ? '' : h.l}:${h.h == null ? '' : h.h}:${h.k == null ? '' : h.k}:${h.d == null ? '' : h.d}:${h.i == null ? '' : h.i}:${h.j == null ? '' : h.j}` : '');
+    canvas.addEventListener('mousemove', ev => { const r = canvas.getBoundingClientRect(), h = hit(canvas, ev.clientX - r.left, ev.clientY - r.top), key = keyOf(h); if (key !== (canvas._hitKey || '')) { canvas._hitKey = key; onChange(h); } if (h && h.text) { tip.hidden = false; tip.textContent = h.text; const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; } else tip.hidden = true; });
+    canvas.addEventListener('mouseleave', () => { tip.hidden = true; if (canvas._hitKey) { canvas._hitKey = ''; onChange(null); } });
+  }
+  // the words as the model sees them: the two directions of the D that spread the V word vectors most (power iteration
+  // on their covariance, the second with the first taken out); the signs follow the previous axes, so that the map does
+  // not flip between renders
+  function rpPca2(E, V, D, prev) {
+    const mean = new Float64Array(D); for (let v = 0; v < V; v++) for (let d = 0; d < D; d++) mean[d] += E[v * D + d] / V;
+    const C = new Float64Array(D * D), x = new Float64Array(D);
+    for (let v = 0; v < V; v++) { for (let d = 0; d < D; d++) x[d] = E[v * D + d] - mean[d]; for (let a = 0; a < D; a++) { const xa = x[a] / V; if (!xa) continue; const off = a * D; for (let b = 0; b < D; b++) C[off + b] += xa * x[b]; } }
+    const axis = (deflate, seed) => { let u = Float64Array.from({ length: D }, (_, d) => Math.cos(d * 1.7 + seed)); for (let it = 0; it < 80; it++) { const w = new Float64Array(D); for (let a = 0; a < D; a++) { let s = 0; const off = a * D; for (let b = 0; b < D; b++) s += C[off + b] * u[b]; w[a] = s; } if (deflate) { let dot = 0; for (let d = 0; d < D; d++) dot += w[d] * deflate[d]; for (let d = 0; d < D; d++) w[d] -= dot * deflate[d]; } let nrm = 0; for (const v of w) nrm += v * v; nrm = Math.sqrt(nrm) || 1; u = Float64Array.from(w, v => v / nrm); } return u; };
+    const u1 = axis(null, 0), u2 = axis(u1, 1);
+    for (const [u, p] of [[u1, prev && prev[0]], [u2, prev && prev[1]]]) if (p) { let dot = 0; for (let d = 0; d < D; d++) dot += u[d] * p[d]; if (dot < 0) for (let d = 0; d < D; d++) u[d] = -u[d]; }
+    const lam = u => { let s = 0; for (let a = 0; a < D; a++) { let t = 0; const off = a * D; for (let b = 0; b < D; b++) t += C[off + b] * u[b]; s += u[a] * t; } return s; };
+    let trace = 0; for (let d = 0; d < D; d++) trace += C[d * D + d];
+    const xs = new Float64Array(V), ys = new Float64Array(V); for (let v = 0; v < V; v++) { let sx = 0, sy = 0; for (let d = 0; d < D; d++) { const e = E[v * D + d] - mean[d]; sx += e * u1[d]; sy += e * u2[d]; } xs[v] = sx; ys[v] = sy; }
+    return { x: xs, y: ys, axes: [u1, u2], share: trace > 0 ? (lam(u1) + lam(u2)) / trace : 0 };
+  }
+  function rpRenderWordMap() {
+    const L = S.rp, m = L.model, el = $('rp-map'); if (!el || !m || !L.wordSec) return;
+    const pca = rpPca2(m.E, m.V, m.D, L.pcaAxes); L.pcaAxes = pca.axes;
+    const pts = L.vocab.words.map((w, v) => ({ id: v, word: rpWordLabel(w), note: L.wordSec[v] ? `mostly in the ${L.wordSec[v]}` : 'never in the training reports', x: pca.x[v], y: pca.y[v], color: L.wordSec[v] ? RP.colors[L.wordSec[v]] : Viz.colors().ink3, label: RP_LABELLED.has(w) }));
+    Viz.drawWordMap(el, { points: pts, W: 640, H: 400 });
+    $('rp-map-legend').innerHTML = RPR.SECTIONS.map(s => `<span><span class="swatch" style="background:${RP.colors[s]}"></span>mostly in the ${s}</span>`).join('');
+    $('rp-map-note').textContent = `Every word is a learned vector of ${m.D} numbers; the map is the two directions that spread the ${m.V} vectors most (${pct(pca.share)} of their spread), each word coloured by the section it mostly appears in on the training reports. Untrained, the vectors are random and the map a cloud; as the model trains, words used alike move together: the states of a findings line, the numbers, the words of the diagnosis. Hover a dot for its word.`;
+  }
   function bindReports() {
     const L = S.rp;
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.dim; if (v === L.dim) return; L.dim = v; rpReset(`${v} numbers per token — fresh random weights.`); }));
@@ -8449,15 +8782,18 @@ window.Viz = (function () {
     $('rp-prev').addEventListener('click', () => rpNeighbour(-1)); $('rp-next').addEventListener('click', () => rpNeighbour(1));
     $('rp-data-prev').addEventListener('click', () => rpDataNeighbour(-1)); $('rp-data-next').addEventListener('click', () => rpDataNeighbour(1));
     $('rp-data-reveal').addEventListener('change', ev => rpSetReveal(ev.target.checked));
-    document.querySelectorAll('#rp-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; rpSyncControls(); if (L.model) { if (rpOnTest()) rpRenderTest(); else rpRenderFocus(); } }));
-    document.querySelectorAll('#rp-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; rpSyncControls(); if (L.model) { if (rpOnTest()) rpRenderTest(); else rpRenderFocus(); } }));
+    document.querySelectorAll('.rp-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; rpSyncControls(); if (L.model) { if (rpOnTest()) rpRenderTest(); else rpRenderFocus(); } }));
+    document.querySelectorAll('.rp-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; rpSyncControls(); if (L.model) { if (rpOnTest()) rpRenderTest(); else rpRenderFocus(); } }));
     // hovering a word on either report follows it: what the model expected there, and whom it read
     for (const [id, onTest] of [['rp-text', false], ['rp-test-text', true]]) {
       const el = $(id), tokAt = ev => { const t = ev.target.closest('.tok'); return t && el.contains(t) ? +t.dataset.i : null; };
-      el.addEventListener('mousemove', ev => { const i = tokAt(ev); if (i === L.hover) return; L.hover = i; if (!L.model) return; if (onTest) { if (L.written && !L.writing) { rpHighlight(el, L.written.fw, i != null ? i : L.pinned); const s = i != null ? L.written.steps.find(x => x.at === i) : null; if (s) $('rp-test-nextword').innerHTML = rpNextWordHtml(s.probs, null, s.token, `word ${L.written.steps.indexOf(s) + 1}: what the model chose from`); } } else { const fw = rpForward(rpFocus()); rpHighlight(el, fw, i != null ? i : L.pinned); rpRenderNextWord(i != null ? i : L.pinned); } });
-      el.addEventListener('mouseleave', () => { if (L.hover == null) return; L.hover = null; if (!L.model) return; if (onTest) { if (L.written && !L.writing) rpHighlight(el, L.written.fw, L.pinned); } else { rpHighlight(el, rpForward(rpFocus()), L.pinned); rpRenderNextWord(L.pinned); } });
-      el.addEventListener('click', ev => { const i = tokAt(ev); if (i == null || !L.model) return; L.pinned = L.pinned === i ? null : i; el.querySelectorAll('.tok.pinned').forEach(t => t.classList.remove('pinned')); if (L.pinned != null) { const t = el.querySelector(`.tok[data-i="${L.pinned}"]`); if (t) t.classList.add('pinned'); } });
+      el.addEventListener('mousemove', ev => { const i = tokAt(ev); if (i === L.hover) return; L.hover = i; if (L.model) rpFollowWord(onTest); });
+      el.addEventListener('mouseleave', () => { if (L.hover == null) return; L.hover = null; if (L.model) rpFollowWord(onTest); });
+      el.addEventListener('click', ev => { const i = tokAt(ev); if (i == null || !L.model) return; L.pinned = L.pinned === i ? null : i; rpFollowWord(onTest); });
     }
+    // the diagrams: a tooltip on every canvas; a read word hovered on the diagram is marked on the report
+    for (const pre of ['rp-', 'rp-test-']) { const cv = $(`${pre}net`); if (!cv) continue; rpBindTip(cv, $(`${pre}net-tip`), (c, x, y) => (c._model ? Viz.hitTokenNetwork(c, x, y, c._model) : null), h => { L.hoverNet = h ? Object.assign({ pre }, h) : null; const view = rpView(pre === 'rp-test-'); if (!view) return; rpRenderNet(view); rpMarkPair(view.textEl, null, h && h.kind === 'read' ? h.j : null); }); }
+    document.querySelectorAll('.rp-arcs-check').forEach(cb => cb.addEventListener('change', () => { L.arcs = cb.checked; rpSyncControls(); if (L.model) rpFollowWord(rpOnTest()); }));
     // the Test step
     $('rp-write').addEventListener('click', rpWrite); $('rp-next-case').addEventListener('click', () => rpNextCase()); $('rp-write-all').addEventListener('click', () => (L.batchWriting ? (L.batchWriting = false, $('rp-write-all').textContent = 'Write all') : rpWriteAll())); $('rp-test-clear').addEventListener('click', rpTestClear);
     document.querySelectorAll('#rp-cases-seg button').forEach(b => b.addEventListener('click', () => rpSetCases(b.dataset.cases)));

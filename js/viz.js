@@ -2230,5 +2230,168 @@ window.Viz = (function () {
     }
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H };
+  // ------------------------------------------------------------------ the language model's diagrams (the reports question)
+  // How one word was chosen. The model stands at the word before it (position q): that word's vector and its position
+  // vector go in; every layer's heads read the words so far (the largest shares shown), their messages are projected
+  // back and added to the vector, the feed-forward is added; the output layer scores every word of the vocabulary.
+  // The app prepares m; nothing here touches the model.
+  // m = { word, qword, i, q, n, V, D, dk, arch, emb, pos (or null), x0, lens0: [{ word, p }], layers: [{ heads: [{ name,
+  //       cost, query, message, reads: [{ j, a, word, dist }] }], heard, after, out, lens }], out: [{ word, p, target }],
+  //       chosen (the model's own report: the target is the word it chose), hover ({ kind, l, h, k, d, j, text } or null) }
+  const TN_W = 800;
+  function layoutTokenNet(m) {
+    const nL = m.layers.length, H = nL ? m.layers[0].heads.length : 0, headPitch = 30, blockH = 22 + H * headPitch + 10 + 16 + 14 + 14 + 10, yL0 = 92, yOut = yL0 + nL * blockH;
+    return { nL, H, headPitch, blockH, yL0, yOut, outPitch: 14, H_: yOut + 24 + m.out.length * 14 + 30,
+      inp: { y: 44, h: 16, w: 150, xEmb: 12, xPos: 192, xIn: 372, xLens: 540 },
+      head: { xLabel: 12, xQuery: 100, qW: 70, xReads: 190, slot: 72, nSlots: 5, barMax: 40, xMsg: 574, mW: 70 },
+      comb: { xHeard: 100, xAfter: 300, xOut: 530, w: 140, h: 16 },
+      outRow: { xWord: 190, xBar: 200, barMax: 220, xPct: 430 } };
+  }
+  function drawTokenNetwork(canvas, m) {
+    const L = layoutTokenNet(m), c = colors(), ctx = fitCanvas(canvas, TN_W, L.H_), D = m.D, dk = m.dk;
+    canvas._tokenNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const hov = m.hover, is = (kind, l, h, k) => !!hov && hov.kind === kind && (l == null || hov.l === l) && (h == null || hov.h === h) && (k == null || hov.k === k);
+    ctx.clearRect(0, 0, TN_W, L.H_); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, TN_W, L.H_);
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+    // one scale per row of strips, so that the strips of a row compare: the input row, and every layer's queries, messages and vectors (the vectors grow through the layers)
+    const amax = arrs => { let mx = 1e-9; for (const a of arrs) for (const v of a) mx = Math.max(mx, Math.abs(v)); return mx; };
+    const mI = amax(m.pos ? [m.emb, m.pos, m.x0] : [m.emb, m.x0]);
+    const strip = (x, y, w, h, code, scale, on) => { codeStrip(ctx, c, x, y, w, h, code, scale); if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x - 1, y - 1, w + 2, h + 2); } };
+    const empty = (x, y, w, h, label) => { ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.setLineDash([4, 3]); ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1); ctx.setLineDash([]); text(label, x + w / 2, y + h / 2, mono8, c.ink3, 'center', 'middle'); };
+    const lensText = lens => lens.map(t => `${t.word} ${pctText(t.p)}`).join(' · ');
+    // the heading
+    text(`HOW “${m.word}” WAS ${m.chosen ? 'CHOSEN' : 'EXPECTED'} · WORD ${m.i} OF ${m.n - 1}`, 12, 8, capFont, c.ink);
+    text(`the model stands at “${m.qword}” (word ${m.q}) and reads the ${m.q + 1} words so far`, 12, 24, mono9, c.ink3);
+    // the input: the word's vector, its position vector, their sum, and what the output layer would read off it
+    const I = L.inp;
+    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(`“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
+    text('+', I.xEmb + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
+    if (m.pos) { strip(I.xPos, I.y, I.w, I.h, m.pos, mI, is('pos')); text(`position ${m.q} · its vector · ${D}`, I.xPos, I.y + I.h + 4, mono8, c.ink3); }
+    else { empty(I.xPos, I.y, I.w, I.h, 'no position vectors'); text('the heads know distance only through their cost', I.xPos, I.y + I.h + 4, mono8, c.ink3); }
+    text('=', I.xPos + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
+    strip(I.xIn, I.y, I.w, I.h, m.x0, mI, is('x0')); text(`the input · ${D} numbers`, I.xIn, I.y + I.h + 4, mono8, c.ink3);
+    text('read off the input alone:', I.xLens, I.y - 2, mono9, c.ink3); text(lensText(m.lens0), I.xLens, I.y + 10, mono9, c.ink2);
+    // the layers: every head's query, the words it reads and its message; what the layer hears, added; the feed-forward
+    m.layers.forEach((lay, l) => {
+      const yL = L.yL0 + l * L.blockH, Hd = L.head, Cb = L.comb, last = l === m.layers.length - 1, mQ = amax(lay.heads.map(h => h.query)), mC = amax(lay.heads.map(h => h.message)), mF = amax([lay.heard, lay.after, lay.out]);
+      text(`LAYER ${l + 1}`, 12, yL, capFont, c.ink); text(`${lay.heads.length} heads, each reading the ${m.q + 1} words so far with its own query, keys and values · the ${Hd.nSlots} largest shares shown`, 70, yL + 1, mono9, c.ink3);
+      lay.heads.forEach((hd, h) => {
+        const yh = yL + 30 + h * L.headPitch;
+        text(hd.name, Hd.xLabel, yh - 5, mono9, c.ink2, 'left', 'middle'); text(`cost ${hd.cost.toFixed(2)}/word`, Hd.xLabel, yh + 6, mono8, c.ink3, 'left', 'middle');
+        strip(Hd.xQuery, yh - 7, Hd.qW, 14, hd.query, mQ, is('query', l, h));
+        let mx = 1e-9; for (const r of hd.reads) mx = Math.max(mx, r.a);
+        hd.reads.forEach((r, k) => {
+          const x = Hd.xReads + k * Hd.slot, rel = r.a / mx, bw = 8 + Hd.barMax * rel, on = is('read', l, h, k);
+          ctx.fillStyle = rgbStr(c.rgb.accent, 0.25 + 0.75 * rel); ctx.fillRect(x, yh - 6, bw, 12);
+          if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x - 1, yh - 7, bw + 2, 14); }
+          text(pctText(r.a), x + bw + 3, yh, mono8, c.ink3, 'left', 'middle'); text(`${cut(r.word, 9)} −${r.dist}`, x, yh + 12, mono8, on ? c.ink : c.ink3, 'left', 'middle');
+        });
+        if (!hd.reads.length) text('reads nothing yet', Hd.xReads, yh, mono8, c.ink3, 'left', 'middle');
+        strip(Hd.xMsg, yh - 7, Hd.mW, 14, hd.message, mC, is('msg', l, h)); text(`message · ${dk}`, Hd.xMsg + Hd.mW + 6, yh, mono8, c.ink3, 'left', 'middle');
+      });
+      const yc = yL + 22 + lay.heads.length * L.headPitch + 10;
+      strip(Cb.xHeard, yc, Cb.w, Cb.h, lay.heard, mF, is('heard', l)); text('what it hears · the messages × Wo', Cb.xHeard, yc + Cb.h + 4, mono8, c.ink3);
+      text(l === 0 ? '+ input =' : '+ above =', (Cb.xHeard + Cb.w + Cb.xAfter) / 2, yc + Cb.h / 2, mono8, c.ink2, 'center', 'middle');
+      strip(Cb.xAfter, yc, Cb.w, Cb.h, lay.after, mF, is('after', l)); text('after the heads · added, not swapped', Cb.xAfter, yc + Cb.h + 4, mono8, c.ink3);
+      text('+ feed-fwd =', (Cb.xAfter + Cb.w + Cb.xOut) / 2, yc + Cb.h / 2, mono8, c.ink2, 'center', 'middle');
+      strip(Cb.xOut, yc, Cb.w, Cb.h, lay.out, mF, is('out', l)); text(`the layer's output · ${D}`, Cb.xOut, yc + Cb.h + 4, mono8, c.ink3);
+      text(`read off after layer ${l + 1}${last ? ' (the output)' : ''}: ${lensText(lay.lens)}`, Cb.xHeard, yc + Cb.h + 18, mono9, last ? c.ink2 : c.ink3);
+    });
+    // the output: the last vector through the output layer
+    const O = L.outRow, yO = L.yOut;
+    text('OUTPUT', 12, yO, capFont, c.ink); text(`the last vector × Wout, softmax over the ${m.V} words: the probability of every next word · ${m.chosen ? 'the word the model chose marked ←' : 'the actual next word marked ✓'}`, 70, yO + 1, mono9, c.ink3);
+    let pm = 1e-9; for (const o of m.out) pm = Math.max(pm, o.p);
+    m.out.forEach((o, k) => {
+      const y = yO + 24 + k * L.outPitch + 7, on = is('word', null, null, k), w = Math.max(1, O.barMax * o.p / pm);
+      text(cut(o.word, 14), O.xWord, y, o.target ? mono : mono9, o.target ? c.ink : c.ink2, 'right', 'middle');
+      ctx.fillStyle = o.target ? (m.chosen ? c.irregular : c.good) : rgbStr(c.rgb.accent, 0.75); ctx.fillRect(O.xBar, y - 5, w, 10);
+      if (on) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(O.xBar - 1, y - 6, w + 2, 12); }
+      text(`${pctText(o.p)}${o.target ? (m.chosen ? ' ←' : ' ✓') : ''}`, O.xPct, y, mono9, o.target ? c.ink : c.ink3, 'left', 'middle');
+    });
+    text(hov && hov.text ? hov.text : 'hover a strip for its numbers, or a read word to find it in the report · hover or click a word of the report to follow it here', 12, L.H_ - 16, mono9, c.ink3);
+  }
+  // what is under a point of the diagram (canvas-relative CSS pixels), with a text for the tip
+  function hitTokenNetwork(canvas, px, py, m) {
+    const L = canvas._tokenNet; if (!L) return null;
+    const s = TN_W / canvas.clientWidth, x = px * s, y = py * s, I = L.inp, Hd = L.head, Cb = L.comb, O = L.outRow, f = v => fmtSigned(v, 2);
+    const inBox = (x0, y0, w, h) => x >= x0 && x <= x0 + w && y >= y0 - 2 && y <= y0 + h + 2, cell = (x0, w, n) => Math.min(n - 1, Math.max(0, Math.floor((x - x0) / (w / n))));
+    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
+    if (m.pos && inBox(I.xPos, I.y, I.w, I.h)) { const d = cell(I.xPos, I.w, m.D); return { kind: 'pos', d, text: `position ${m.q} vector ${d + 1} = ${f(m.pos[d])} · learned, one vector per position` }; }
+    if (inBox(I.xIn, I.y, I.w, I.h)) { const d = cell(I.xIn, I.w, m.D); return { kind: 'x0', d, text: `input ${d + 1} = ${f(m.x0[d])}${m.pos ? ` (${f(m.emb[d])} + ${f(m.pos[d])})` : ''}` }; }
+    for (let l = 0; l < m.layers.length; l++) {
+      const lay = m.layers[l], yL = L.yL0 + l * L.blockH;
+      for (let h = 0; h < lay.heads.length; h++) {
+        const hd = lay.heads[h], yh = yL + 30 + h * L.headPitch;
+        if (inBox(Hd.xQuery, yh - 7, Hd.qW, 14)) { const d = cell(Hd.xQuery, Hd.qW, m.dk); return { kind: 'query', l, h, d, text: `${hd.name}, layer ${l + 1}: query ${d + 1} = ${f(hd.query[d])} · the vector × Wq, what this head looks for` }; }
+        if (inBox(Hd.xMsg, yh - 7, Hd.mW, 14)) { const d = cell(Hd.xMsg, Hd.mW, m.dk); return { kind: 'msg', l, h, d, text: `${hd.name}, layer ${l + 1}: message ${d + 1} = ${f(hd.message[d])} · Σ share × value over the words read` }; }
+        for (let k = 0; k < hd.reads.length; k++) { const r = hd.reads[k], x0 = Hd.xReads + k * Hd.slot; if (x >= x0 && x <= x0 + Hd.slot - 4 && y >= yh - 8 && y <= yh + 18) return { kind: 'read', l, h, k, j: r.j, text: `${hd.name}, layer ${l + 1}, reads “${r.word}” (word ${r.j}, ${r.dist} back): ${pctText(r.a)} of its attention` }; }
+      }
+      const yc = yL + 22 + lay.heads.length * L.headPitch + 10, inp = l === 0 ? m.x0 : m.layers[l - 1].out;
+      if (inBox(Cb.xHeard, yc, Cb.w, Cb.h)) { const d = cell(Cb.xHeard, Cb.w, m.D); return { kind: 'heard', l, d, text: `layer ${l + 1} hears ${d + 1} = ${f(lay.heard[d])} · the heads' messages × Wo` }; }
+      if (inBox(Cb.xAfter, yc, Cb.w, Cb.h)) { const d = cell(Cb.xAfter, Cb.w, m.D); return { kind: 'after', l, d, text: `after the heads ${d + 1} = ${f(lay.after[d])} (${f(inp[d])} + ${f(lay.heard[d])})` }; }
+      if (inBox(Cb.xOut, yc, Cb.w, Cb.h)) { const d = cell(Cb.xOut, Cb.w, m.D); return { kind: 'out', l, d, text: `layer ${l + 1} output ${d + 1} = ${f(lay.out[d])} (${f(lay.after[d])} + ${f(lay.out[d] - lay.after[d])} from the feed-forward)` }; }
+    }
+    for (let k = 0; k < m.out.length; k++) { const y0 = L.yOut + 24 + k * L.outPitch; if (y >= y0 && y < y0 + L.outPitch && x >= 100 && x <= O.xPct + 60) { const o = m.out[k]; return { kind: 'word', k, text: `“${o.word}”: ${(o.p * 100).toFixed(1)}%${o.target ? (m.chosen ? ' · the word the model chose' : ' · the actual next word') : ''}` }; } }
+    return null;
+  }
+  // The attention of one head over a whole report: rows ask, columns answer, every row scaled to its largest share so
+  // that where each word looks shows whether the head spreads its attention or not. The section of every word runs as a
+  // band along both edges, the section boundaries as thin lines; the chosen word's row (the query that predicted it) is
+  // outlined, the hovered cell marked. opt = { A (rows; row i over j ≤ i), n, sections, colors: { section: css colour },
+  // mark (a row or null), hover ({ i, j } or null) }
+  const TA_W = 320;
+  function drawTokenAttention(canvas, opt) {
+    const n = opt.n, band = 7, m0 = band + 3, side = TA_W - m0 - 2, cell = side / n, ctx = fitCanvas(canvas, TA_W, TA_W), c = colors();
+    ctx.clearRect(0, 0, TA_W, TA_W); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, TA_W, TA_W);
+    let img = canvas._attnImg;
+    if (!img || canvas._attnFor !== opt.A || canvas._attnTheme !== c || img.width !== n) { // the cells, once per attention and theme: an n × n image, scaled up without smoothing
+      img = document.createElement('canvas'); img.width = n; img.height = n;
+      const ictx = img.getContext('2d'), data = ictx.createImageData(n, n), px = data.data, lo = c.rgb.surface2, hi = c.rgb.accent, bg = c.rgb.surface;
+      for (let i = 0; i < n; i++) {
+        const row = opt.A[i]; let mx = 1e-9; for (let j = 0; j <= i; j++) mx = Math.max(mx, row[j]);
+        for (let j = 0; j < n; j++) { const k = (i * n + j) * 4; if (j > i) { px[k] = bg[0]; px[k + 1] = bg[1]; px[k + 2] = bg[2]; px[k + 3] = 255; continue; } const t = Math.pow(row[j] / mx, 0.7); px[k] = lo[0] + (hi[0] - lo[0]) * t; px[k + 1] = lo[1] + (hi[1] - lo[1]) * t; px[k + 2] = lo[2] + (hi[2] - lo[2]) * t; px[k + 3] = 255; }
+      }
+      ictx.putImageData(data, 0, 0); canvas._attnImg = img; canvas._attnFor = opt.A; canvas._attnTheme = c;
+    }
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(img, m0, m0, side, side);
+    for (let i = 0; i < n; i++) { ctx.fillStyle = opt.colors[opt.sections[i]] || c.ink3; const p = m0 + i * cell, w = Math.ceil(cell); ctx.fillRect(p, 0, w, band); ctx.fillRect(0, p, band, w); }
+    ctx.strokeStyle = rgbStr(c.rgb.ink, 0.35); ctx.lineWidth = 1;
+    for (let i = 1; i < n; i++) if (opt.sections[i] !== opt.sections[i - 1]) { const p = Math.round(m0 + i * cell) + 0.5; ctx.beginPath(); ctx.moveTo(p, m0); ctx.lineTo(p, m0 + side); ctx.moveTo(m0, p); ctx.lineTo(m0 + side, p); ctx.stroke(); }
+    if (opt.mark != null && opt.mark < n) { ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.strokeRect(m0 - 0.5, m0 + opt.mark * cell - 0.5, side + 1, Math.max(1.5, cell) + 1); }
+    if (opt.hover) { const h = opt.hover; ctx.fillStyle = rgbStr(c.rgb.ink, 0.08); ctx.fillRect(m0, m0 + h.i * cell, side, Math.max(1, cell)); ctx.fillRect(m0 + h.j * cell, m0, Math.max(1, cell), side); ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(m0 + h.j * cell - 1.5, m0 + h.i * cell - 1.5, cell + 3, cell + 3); }
+    canvas._attn = { n, m0, cell, W: TA_W };
+  }
+  function hitTokenAttention(canvas, px, py) {
+    const L = canvas._attn; if (!L) return null;
+    const s = L.W / canvas.clientWidth, x = px * s, y = py * s, j = Math.floor((x - L.m0) / L.cell), i = Math.floor((y - L.m0) / L.cell);
+    return i < 0 || j < 0 || i >= L.n || j >= L.n || j > i ? null : { i, j };
+  }
+  // grouped bars: opt = { labels: [group names], series: [{ name, color, values }], pct, xLabel, W, H }
+  function drawGroupedBars(svg, opt) {
+    const W = opt.W || 560, H = opt.H || 230, ml = 42, mr = 10, mt = 12, mb = 36, pw = W - ml - mr, ph = H - mt - mb, nG = opt.labels.length, nS = opt.series.length;
+    let maxV = 0; for (const s of opt.series) for (const v of s.values) maxV = Math.max(maxV, v);
+    const top = opt.pct ? Math.max(0.1, Math.min(1, Math.ceil(maxV * 10 + 1e-9) / 10)) : (maxV || 1), bw = pw / nG, inner = bw * 0.8 / nS, sx = gi => ml + gi * bw, sy = v => mt + ph * (1 - Math.min(v, top) / top);
+    let g = '<g class="grid">';
+    for (let k = 0; k <= 4; k++) { const v = top * k / 4, y = sy(v); g += `<line x1="${ml}" x2="${W - mr}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}"/><text x="${ml - 5}" y="${(y + 3.5).toFixed(1)}" text-anchor="end">${opt.pct ? Math.round(v * 100) + '%' : v.toFixed(2)}</text>`; }
+    g += '</g>';
+    opt.series.forEach((s, si) => s.values.forEach((v, gi) => { const x = sx(gi) + bw * 0.1 + si * inner, y = sy(v); g += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(1, inner - 1).toFixed(1)}" height="${(mt + ph - y).toFixed(1)}" style="fill:${s.color}"><title>${esc(s.name)} · ${esc(opt.labels[gi])}: ${opt.pct ? (v * 100).toFixed(1) + '%' : v.toFixed(3)}</title></rect>`; }));
+    opt.labels.forEach((l, gi) => { g += `<text x="${(sx(gi) + bw / 2).toFixed(1)}" y="${mt + ph + 14}" text-anchor="middle">${esc(l)}</text>`; });
+    if (opt.xLabel) g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
+  // the vocabulary on two axes: opt = { points: [{ id, word, x, y, color, label }], W, H, xLabel, yLabel }
+  function drawWordMap(svg, opt) {
+    const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (W - 2 * pad), sy = v => H - pad - (v - y0) / ((y1 - y0) || 1) * (H - 2 * pad);
+    let g = `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/>`;
+    g += `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
+    for (const p of pts) g += `<circle r="${p.label ? 4 : 3}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" style="fill:${p.color};fill-opacity:${p.label ? 0.95 : 0.65}" data-id="${p.id}"><title>${esc(p.word)}${p.note ? ' · ' + esc(p.note) : ''}</title></circle>`;
+    for (const p of pts) if (p.label) g += `<text x="${(sx(p.x) + 5).toFixed(1)}" y="${(sy(p.y) + 3).toFixed(1)}">${esc(p.word)}</text>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
+
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap };
 })();
