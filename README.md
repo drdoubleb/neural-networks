@@ -702,9 +702,22 @@ model's own training; a run that finishes on the page says how grounded its mode
 score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about). The report on
 screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
-it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words it
-read light up on the report, in the layer and head chosen, the deeper the underline the more it listened; click a
-word to keep it. The curves are the test loss per epoch by section, the share of next words right, and, from the
+it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words the
+model read to expect it, standing at the word before, light up on the report with lines to them, in the layer and
+head chosen, the deeper the underline and the thicker the line the more it listened; click a word to keep it. Three
+cards follow the same word (the first word of the diagnosis when none is hovered or kept). *How a word was chosen*
+draws the word's path through the model: the vector of the word before it added to its position vector; each layer's
+two heads with their queries, the five words they read most and their messages; what the layer hears, added to the
+vector, and the feed-forward added after; what the output layer would read off the vector at each stage, so that the
+prediction can be watched taking shape layer by layer; and the probabilities of the next word, with the actual one
+marked. Every strip and bar has a tooltip, and a read word hovered on the diagram is marked on the report. *Who reads
+whom, across the report* draws one attention matrix per head for the chosen layer, rows asking and columns answering,
+every row scaled to its largest share, with the sections as bands along the edges and the chosen word's row outlined
+(hover a cell for its pair of words); next to it, each head's attention by distance back, averaged over the report,
+where the near head's steep distance cost and the far head's shallow one show as the words just before against the
+findings block, and two tables of where the words of each section look on average. *The words as the model sees
+them* places the 281 word vectors on the two directions that spread them most, coloured by the section each word
+mostly appears in: a cloud before training, clusters after, redrawn as the model trains. The curves are the test loss per epoch by section, the share of next words right, and, from the
 first epoch, the diagnosis the model writes for eight test reports from their findings and requisition, the
 description written by itself, measured a few words per frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
 seven lines and go into the prompt with the case's specimen, clinical history and gross, as they would come with the
@@ -714,7 +727,9 @@ it was chosen with and the bars showing what it chose from, and the rule's answe
 appear after; the tally counts the diagnoses right and the diagnosis lines exact; the form can be edited, in which
 case the rule's answer for the edited findings is the truth; a checkbox gives the model nothing at all, so that it
 writes findings, requisition and all from what it learned; a temperature slider replaces the most
-probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; and
+probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; the word diagram and the
+attention matrices follow the report the model wrote, a word of the prompt saying what the model expected there and a
+word it wrote what it chose from; and
 a card shows where the diagnosis words looked, their attention in the second layer by line of the findings and by
 section. Hovering a written word shows what the model chose from at that step and whom it read. The corpus (1 MB)
 and the trained model (0.5 MB) load with the page.
