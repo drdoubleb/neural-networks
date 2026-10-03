@@ -567,3 +567,5 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .rp-map text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-2); pointer-events: none; }
 .rp-map text.axlabel { fill: var(--ink-3); font-size: 10px; }
 .rp-map line.axis { stroke: var(--line-strong); stroke-width: 1; }
+.rp-text svg.rp-arcs path.hop2 { stroke: var(--irregular); stroke-dasharray: 4 3; }
+.rp-text .tok.reads2 { box-shadow: inset 0 -3px 0 rgba(235, 104, 52, 0.45); }

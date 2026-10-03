@@ -710,14 +710,25 @@ draws the word's path through the model: the vector of the word before it added 
 two heads with their queries, the five words they read most and their messages; what the layer hears, added to the
 vector, and the feed-forward added after; what the output layer would read off the vector at each stage, so that the
 prediction can be watched taking shape layer by layer; and the probabilities of the next word, with the actual one
-marked. Every strip and bar has a tooltip, and a read word hovered on the diagram is marked on the report. *Who reads
-whom, across the report* draws one attention matrix per head for the chosen layer, rows asking and columns answering,
+marked. Every strip and bar has a tooltip, a read word hovered on the diagram is marked on the report, and the tooltip
+of a read word in the second layer also says what that word had itself read in the first. *How each head decides where
+to look* lays the two heads of the chosen layer one under the other, along the words so far: the match (query · key),
+the cost the head subtracts (its learned cost per word × the distance back, a wedge that is steep for the near head and
+nearly flat for the far one), the score, and the share the softmax makes of it, with what the match alone would give
+in grey behind the shares; the heads differ in that one learned number, and the card is where "near" and "far" can be
+seen to mean nothing more. A *two hops* checkbox next to *lines* adds dashed lines from the words read most to what they
+had themselves read a layer earlier, which is how a word such as "and" comes to stand for the phrase it closes. *Who
+reads whom, across the report* draws one attention matrix per head for the chosen layer, rows asking and columns answering,
 every row scaled to its largest share, with the sections as bands along the edges and the chosen word's row outlined
 (hover a cell for its pair of words); next to it, each head's attention by distance back, averaged over the report,
 where the near head's steep distance cost and the far head's shallow one show as the words just before against the
 findings block, and two tables of where the words of each section look on average. *The words as the model sees
-them* places the 281 word vectors on the two directions that spread them most, coloured by the section each word
-mostly appears in: a cloud before training, clusters after, redrawn as the model trains. The curves are the test loss per epoch by section, the share of next words right, and, from the
+them* maps the 281 words, by default as the rows of the output layer (the numbers the model scores each word with as
+the next word, which carry the relationships: the states of a line together, the numbers together, the walls of the
+bladder together) or as their vectors at the input, laid out by t-SNE (cosine affinities at a perplexity of 20, started
+from the two-direction map and pushed a few iterations per frame, carried on after each training step) or on the two
+directions that spread the vectors most, coloured by the section each word mostly appears in: a cloud before training,
+neighbourhoods after. The curves are the test loss per epoch by section, the share of next words right, and, from the
 first epoch, the diagnosis the model writes for eight test reports from their findings and requisition, the
 description written by itself, measured a few words per frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
 seven lines and go into the prompt with the case's specimen, clinical history and gross, as they would come with the
@@ -727,7 +738,7 @@ it was chosen with and the bars showing what it chose from, and the rule's answe
 appear after; the tally counts the diagnoses right and the diagnosis lines exact; the form can be edited, in which
 case the rule's answer for the edited findings is the truth; a checkbox gives the model nothing at all, so that it
 writes findings, requisition and all from what it learned; a temperature slider replaces the most
-probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; the word diagram and the
+probable word by a draw; the *never trained on* set holds the eight reports with invasion under a normal surface; the word diagram, the heads card and the
 attention matrices follow the report the model wrote, a word of the prompt saying what the model expected there and a
 word it wrote what it chose from; and
 a card shows where the diagnosis words looked, their attention in the second layer by line of the findings and by

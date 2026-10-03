@@ -2326,7 +2326,7 @@ window.Viz = (function () {
         const hd = lay.heads[h], yh = yL + 30 + h * L.headPitch;
         if (inBox(Hd.xQuery, yh - 7, Hd.qW, 14)) { const d = cell(Hd.xQuery, Hd.qW, m.dk); return { kind: 'query', l, h, d, text: `${hd.name}, layer ${l + 1}: query ${d + 1} = ${f(hd.query[d])} · the vector × Wq, what this head looks for` }; }
         if (inBox(Hd.xMsg, yh - 7, Hd.mW, 14)) { const d = cell(Hd.xMsg, Hd.mW, m.dk); return { kind: 'msg', l, h, d, text: `${hd.name}, layer ${l + 1}: message ${d + 1} = ${f(hd.message[d])} · Σ share × value over the words read` }; }
-        for (let k = 0; k < hd.reads.length; k++) { const r = hd.reads[k], x0 = Hd.xReads + k * Hd.slot; if (x >= x0 && x <= x0 + Hd.slot - 4 && y >= yh - 8 && y <= yh + 18) return { kind: 'read', l, h, k, j: r.j, text: `${hd.name}, layer ${l + 1}, reads “${r.word}” (word ${r.j}, ${r.dist} back): ${pctText(r.a)} of its attention` }; }
+        for (let k = 0; k < hd.reads.length; k++) { const r = hd.reads[k], x0 = Hd.xReads + k * Hd.slot; if (x >= x0 && x <= x0 + Hd.slot - 4 && y >= yh - 8 && y <= yh + 18) return { kind: 'read', l, h, k, j: r.j, text: `${hd.name}, layer ${l + 1}, reads “${r.word}” (word ${r.j}, ${r.dist} back): ${pctText(r.a)} of its attention${r.prior ? ` · which had itself read, in layer ${l}: ${r.prior}` : l === 0 ? ' · in layer 1 a word is just its own vector and position' : ''}` }; }
       }
       const yc = yL + 22 + lay.heads.length * L.headPitch + 10, inp = l === 0 ? m.x0 : m.layers[l - 1].out;
       if (inBox(Cb.xHeard, yc, Cb.w, Cb.h)) { const d = cell(Cb.xHeard, Cb.w, m.D); return { kind: 'heard', l, d, text: `layer ${l + 1} hears ${d + 1} = ${f(lay.heard[d])} · the heads' messages × Wo` }; }
@@ -2381,17 +2381,65 @@ window.Viz = (function () {
     if (opt.xLabel) g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
+  // How each head decides where to look, from one asking position q: along the words so far, the match (query · key /
+  // √dk), the cost the head subtracts (its learned cost per word × the distance back), the score and the share the
+  // softmax makes of it, with what the match alone would give behind the shares. The heads of one layer, one under
+  // the other: the same rule with a different slope, which is all that "near" and "far" mean.
+  // m = { q, qword, word, words (0..q), sections (0..q), colors, heads: [{ name, cost, note, match, costs, score, share, matchOnly }], hover ({ h, j, text } or null) }
+  const HR_W = 800;
+  function layoutHeadRows(m) { const n = m.q + 1, x0 = 62, pw = HR_W - x0 - 12, cw = pw / n, panelH = 178, top = 28; return { n, x0, pw, cw, panelH, top, H: top + m.heads.length * panelH + 18, x: j => x0 + (j + 0.5) * cw }; }
+  function drawHeadRows(canvas, m) {
+    const L = layoutHeadRows(m), c = colors(), ctx = fitCanvas(canvas, HR_W, L.H); canvas._headRows = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    ctx.clearRect(0, 0, HR_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, HR_W, L.H);
+    text(`WHERE EACH HEAD LOOKS FROM “${m.qword}” (WORD ${m.q}), TO EXPECT “${m.word}”`, 12, 8, capFont, c.ink);
+    const hov = m.hover, bw = Math.max(1, L.cw - 0.6);
+    m.heads.forEach((hd, h) => {
+      const yP = L.top + h * L.panelH, rows = { match: { y: yP + 16, h: 34 }, cost: { y: yP + 54, h: 22 }, score: { y: yP + 80, h: 34 }, share: { y: yP + 128, h: 36 } }, band = yP + 168;
+      let mM = 1e-9, mC = 1e-9, mS = 1e-9, mSh = 1e-9; for (let j = 0; j < L.n; j++) { mM = Math.max(mM, Math.abs(hd.match[j])); mC = Math.max(mC, hd.costs[j]); mS = Math.max(mS, Math.abs(hd.score[j])); mSh = Math.max(mSh, hd.share[j], hd.matchOnly[j]); }
+      text(`${hd.name.toUpperCase()} · cost ${hd.cost.toFixed(2)} per word of distance · ${hd.note}`, 12, yP, mono9, c.ink2);
+      const lbl = (a, b, r) => { text(a, L.x0 - 6, r.y + r.h / 2 - (b ? 5 : 0), mono8, c.ink3, 'right', 'middle'); if (b) text(b, L.x0 - 6, r.y + r.h / 2 + 5, mono8, c.ink3, 'right', 'middle'); };
+      lbl('match', 'query · key', rows.match); lbl('− cost', '× distance', rows.cost); lbl('= score', null, rows.score); lbl('share', 'softmax', rows.share);
+      ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.4); ctx.lineWidth = 1;
+      for (const y of [rows.match.y + rows.match.h / 2, rows.score.y + rows.score.h / 2, rows.cost.y, rows.share.y + rows.share.h]) { const yy = Math.round(y) + 0.5; ctx.beginPath(); ctx.moveTo(L.x0, yy); ctx.lineTo(L.x0 + L.pw, yy); ctx.stroke(); }
+      for (let j = 0; j < L.n; j++) {
+        const x = L.x0 + j * L.cw, on = hov && hov.h === h && hov.j === j;
+        for (const [r, v, mx] of [[rows.match, hd.match[j], mM], [rows.score, hd.score[j], mS]]) { const mid = r.y + r.h / 2, len = Math.abs(v) / mx * (r.h / 2 - 1); ctx.fillStyle = rgbStr(v >= 0 ? c.rgb.irregular : c.rgb.regular, on ? 1 : 0.7); ctx.fillRect(x, v >= 0 ? mid - len : mid, bw, Math.max(0.5, len)); }
+        { const len = hd.costs[j] / mC * (rows.cost.h - 2); ctx.fillStyle = rgbStr(c.rgb.ink3, on ? 0.9 : 0.45); ctx.fillRect(x, rows.cost.y, bw, Math.max(0.5, len)); }
+        { const r = rows.share, lenM = hd.matchOnly[j] / mSh * (r.h - 2), len = hd.share[j] / mSh * (r.h - 2); ctx.fillStyle = rgbStr(c.rgb.ink3, 0.22); ctx.fillRect(x, r.y + r.h - lenM, bw, lenM); ctx.fillStyle = rgbStr(c.rgb.accent, on ? 1 : 0.85); ctx.fillRect(x, r.y + r.h - len, bw, Math.max(0.5, len)); }
+        ctx.fillStyle = m.colors[m.sections[j]] || c.ink3; ctx.fillRect(x, band, Math.ceil(L.cw), 5);
+      }
+      // the largest shares, labelled, the labels nudged apart
+      const top = Array.from({ length: L.n }, (_, j) => j).sort((a, b) => hd.share[b] - hd.share[a]).slice(0, 5).filter(j => hd.share[j] >= 0.02).sort((a, b) => a - b);
+      let lastX = -1e9, lastY = 0;
+      for (const j of top) { const x = L.x(j), t = `${m.words[j]} ${pctText(hd.share[j])}`; ctx.font = mono8; const tw = ctx.measureText(t).width, cx = Math.min(HR_W - 4 - tw / 2, Math.max(L.x0 + tw / 2, x)), y = cx - lastX < tw + 6 && lastY === 0 ? -10 : 0; text(t, cx, rows.share.y - 3 + y, mono8, c.ink, 'center', 'bottom'); ctx.strokeStyle = rgbStr(c.rgb.ink, 0.35); ctx.beginPath(); ctx.moveTo(x, rows.share.y - 1 + y); ctx.lineTo(x, rows.share.y + rows.share.h - hd.share[j] / mSh * (rows.share.h - 2) - 1); ctx.stroke(); lastX = cx; lastY = y; }
+      if (hov && hov.h === h) { const x = Math.round(L.x(hov.j)) + 0.5; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, yP + 14); ctx.lineTo(x, band + 5); ctx.stroke(); }
+    });
+    text(hov && hov.text ? hov.text : `the words so far, left to right, up to “${m.qword}” · hover a column for its word and numbers · grey behind the shares: what the match alone would give`, 12, L.H - 14, mono9, c.ink3);
+  }
+  function hitHeadRows(canvas, px, py, m) {
+    const L = canvas._headRows; if (!L) return null;
+    const s = HR_W / canvas.clientWidth, x = px * s, y = py * s, j = Math.floor((x - L.x0) / L.cw); if (j < 0 || j >= L.n || y < L.top) return null;
+    const h = Math.floor((y - L.top) / L.panelH); if (h < 0 || h >= m.heads.length) return null;
+    const hd = m.heads[h], f = v => fmtSigned(v, 2);
+    return { h, j, text: `${hd.name}: “${m.words[j]}” (word ${j}, ${m.q - j} back) · match ${f(hd.match[j])} − cost ${hd.costs[j].toFixed(2)} = ${f(hd.score[j])} → share ${pctText(hd.share[j])} (the match alone would give ${pctText(hd.matchOnly[j])})` };
+  }
   // the vocabulary on two axes: opt = { points: [{ id, word, x, y, color, label }], W, H, xLabel, yLabel }
   function drawWordMap(svg, opt) {
     const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
     const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (W - 2 * pad), sy = v => H - pad - (v - y0) / ((y1 - y0) || 1) * (H - 2 * pad);
-    let g = `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/>`;
-    g += `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
+    let g = opt.axes === false ? `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || '')}</text>` : `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/><text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
     for (const p of pts) g += `<circle r="${p.label ? 4 : 3}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" style="fill:${p.color};fill-opacity:${p.label ? 0.95 : 0.65}" data-id="${p.id}"><title>${esc(p.word)}${p.note ? ' · ' + esc(p.note) : ''}</title></circle>`;
-    for (const p of pts) if (p.label) g += `<text x="${(sx(p.x) + 5).toFixed(1)}" y="${(sy(p.y) + 3).toFixed(1)}">${esc(p.word)}</text>`;
+    const placed = []; // labels nudged down or up until they no longer overlap one already placed
+    for (const p of pts.filter(q => q.label).sort((a, b) => sx(a.x) - sx(b.x))) {
+      const x = sx(p.x) + 5, w = p.word.length * 5.6, h = 10; let y = sy(p.y) + 3;
+      for (const dy of [0, 10, -10, 20, -20, 30]) { const yy = sy(p.y) + 3 + dy; if (!placed.some(b => x < b.x + b.w && x + w > b.x && yy - h < b.y && yy > b.y - h)) { y = yy; break; } }
+      placed.push({ x, y, w, h }); g += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}">${esc(p.word)}</text>`;
+    }
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows };
 })();
