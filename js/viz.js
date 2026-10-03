@@ -2381,6 +2381,117 @@ window.Viz = (function () {
     if (opt.xLabel) g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
+  // The network itself, for one word: every unit a circle filled by the number it holds for this word (red positive,
+  // blue negative), every learned weight a line (the strongest drawn, red positive, blue negative), the attention as
+  // purple lines from the words read into the heads' messages. One column per step: the input, then for every layer the
+  // queries, the reads, the messages, what the layer hears, the add, the feed-forward, the add, and last the output
+  // layer's scores for the most probable words. m as for drawTokenNetwork, plus layers[l].hidden (the tanh units),
+  // layers[l].W = { Wq, Wo, W1, W2 }, Wout, out[k].v, and walk ({ at, t } or null: the columns lit one by one).
+  const TG_W = 1000, TG_H = 560;
+  function layoutTokenGraph(m) {
+    const D = m.D, dk = m.dk, H = m.layers.length ? m.layers[0].heads.length : 0, y0 = 62, y1 = 472, pitch = (y1 - y0) / (D - 1), nR = 5;
+    const band = (h, n) => { const top = y0 + h * (y1 - y0) / H + 18, span = (y1 - y0) / H - 36; return Array.from({ length: n }, (_, k) => top + (n === 1 ? span / 2 : k * span / (n - 1))); };
+    const units = (key, x, label, l, n) => { const nn = n || D, pt = (y1 - y0) / (nn - 1); return { key, x, kind: 'units', n: nn, pitch: pt, ys: Array.from({ length: nn }, (_, i) => y0 + i * pt), label, l }; };
+    const cols = [units('input', 22, 'input', -1)];
+    m.layers.forEach((lay, l) => {
+      const b = 62 + l * 420;
+      cols.push({ key: `q${l}`, x: b, kind: 'heads', n: dk, ys: Array.from({ length: H }, (_, h) => band(h, dk)), label: 'queries', l });
+      cols.push({ key: `r${l}`, x: b + 92, kind: 'reads', ys: Array.from({ length: H }, (_, h) => band(h, nR)), label: 'reads', l, w: 86, h: 13 });
+      cols.push({ key: `m${l}`, x: b + 172, kind: 'heads', n: dk, ys: Array.from({ length: H }, (_, h) => band(h, dk)), label: 'messages', l });
+      cols.push(units(`h${l}`, b + 222, 'hears', l)); cols.push(units(`a${l}`, b + 272, '+ input', l)); cols.push(units(`f${l}`, b + 322, 'tanh', l, lay.hidden.length)); cols.push(units(`o${l}`, b + 372, 'output', l));
+    });
+    cols.push({ key: 'out', x: 908, kind: 'words', ys: m.out.map((_, k) => 130 + k * 24), label: 'next word', l: m.layers.length });
+    return { cols, y0, y1, pitch, r: Math.max(2.4, Math.min(3.4, pitch / 2 - 1)), rh: 4.2, W: TG_W, H: TG_H };
+  }
+  function drawTokenGraph(canvas, m) {
+    const L = layoutTokenGraph(m), c = colors(), ctx = fitCanvas(canvas, TG_W, TG_H), D = m.D, dk = m.dk, H = m.layers.length ? m.layers[0].heads.length : 0;
+    canvas._tokenGraph = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+    const w = m.walk, at = w ? w.at : L.cols.length, hov = m.hover, isHov = (kind, key, i) => !!hov && hov.kind === kind && hov.key === key && (i == null || hov.i === i);
+    const vis = ci => (ci <= at ? 1 : 0.1), lit = ci => w && ci === at;
+    ctx.clearRect(0, 0, TG_W, TG_H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, TG_W, TG_H);
+    text(`THE NETWORK FOR “${m.word}” · THE MODEL STANDS AT “${m.qword}” (WORD ${m.q} OF ${m.n - 1})`, 12, 8, capFont, c.ink);
+    m.layers.forEach((lay, l) => text(`LAYER ${l + 1}`, 62 + l * 420 + 186, 26, capFont, c.ink2, 'center'));
+    text('OUTPUT', 940, 26, capFont, c.ink2, 'center');
+    const ly = ci => 40 + (ci % 2) * 10; // the column labels, staggered so that neighbours do not touch
+    const amax = a => { let mx = 1e-9; for (const v of a) mx = Math.max(mx, Math.abs(v)); return mx; };
+    const thresh = (vals, frac) => { const a = Float64Array.from(vals, Math.abs).sort((x, y) => y - x); return a[Math.min(a.length - 1, Math.floor(frac * a.length))] || 0; };
+    // the learned weights between two columns of units: the strongest drawn, red positive, blue negative
+    const fan = (src, dst, wAt, frac, alpha) => { const vals = []; for (let j = 0; j < dst.pts.length; j++) for (let i = 0; i < src.pts.length; i++) vals.push(wAt(i, j)); const th = thresh(vals, frac), mx = amax(vals);
+      for (let j = 0; j < dst.pts.length; j++) for (let i = 0; i < src.pts.length; i++) { const v = wAt(i, j); if (Math.abs(v) < th || !v) continue; const rel = Math.abs(v) / mx; ctx.strokeStyle = rgbStr(v > 0 ? c.rgb.irregular : c.rgb.regular, (0.08 + 0.6 * rel) * alpha); ctx.lineWidth = 0.3 + 1.4 * rel; ctx.beginPath(); ctx.moveTo(src.pts[i].x + L.r, src.pts[i].y); ctx.lineTo(dst.pts[j].x - L.r, dst.pts[j].y); ctx.stroke(); } };
+    const pointsOf = col => { if (col.kind === 'units') return { pts: col.ys.map(y => ({ x: col.x, y })) }; if (col.kind === 'heads') { const pts = []; col.ys.forEach(ys => ys.forEach(y => pts.push({ x: col.x, y }))); return { pts }; } return { pts: col.ys.map(y => ({ x: col.x, y })) }; };
+    const unitCol = (col, values, ci, label) => { const mx = amax(values), on = lit(ci), a = vis(ci); for (let i = 0; i < col.ys.length; i++) { const y = col.ys[i], v = values[i] / mx, hv = isHov('unit', col.key, i); ctx.globalAlpha = a; circleNode(ctx, col.x, y, hv ? L.r + 1.5 : L.r, diverging(clamp(v, -1, 1)), null, null, hv); ctx.globalAlpha = 1; } if (on) { ctx.strokeStyle = c.accent; ctx.lineWidth = 2; roundedRect(ctx, col.x - L.r - 5, L.y0 - L.r - 6, 2 * L.r + 10, L.y1 - L.y0 + 2 * L.r + 12, 6); ctx.stroke(); } text(label, col.x, ly(ci), mono8, on ? c.accent : c.ink3, 'center'); };
+    const headCol = (col, valuesOf, ci, label) => { const on = lit(ci), a = vis(ci); col.ys.forEach((ys, h) => { const vals = valuesOf(h), mx = amax(vals); ys.forEach((y, k) => { const hv = isHov('unit', col.key, h * dk + k); ctx.globalAlpha = a; circleNode(ctx, col.x, y, hv ? L.rh + 1.5 : L.rh, diverging(clamp(vals[k] / mx, -1, 1)), null, null, hv); ctx.globalAlpha = 1; }); const nm = m.layers[col.l].heads[h].name; ctx.font = mono8; const tw = ctx.measureText(nm).width; ctx.fillStyle = c.surface; ctx.fillRect(col.x - tw / 2 - 2, ys[0] - 15, tw + 4, 10); text(nm, col.x, ys[0] - 14, mono8, c.ink3, 'center'); }); if (on) { ctx.strokeStyle = c.accent; ctx.lineWidth = 2; roundedRect(ctx, col.x - L.rh - 5, L.y0 - 2, 2 * L.rh + 10, L.y1 - L.y0 + 4, 6); ctx.stroke(); } text(label, col.x, ly(ci), mono8, on ? c.accent : c.ink3, 'center'); };
+    let prevUnits = null;
+    L.cols.forEach((col, ci) => {
+      const a = vis(ci), lay = col.l >= 0 && col.l < m.layers.length ? m.layers[col.l] : null;
+      if (col.kind === 'units' && col.key === 'input') { unitCol(col, m.x0, ci, 'input'); prevUnits = col; return; }
+      if (col.kind === 'heads' && col.key[0] === 'q') { // the queries, from the units before: Wq
+        const src = pointsOf(prevUnits), dst = pointsOf(col); fan(src, dst, (i, j) => lay.W.Wq[j * D + i], 0.3, a); headCol(col, h => lay.heads[h].query, ci, 'queries'); return;
+      }
+      if (col.kind === 'reads') { // the words read, from the queries, each with its share
+        const q = L.cols[ci - 1];
+        col.ys.forEach((ys, h) => { const hd = lay.heads[h]; let mxs = 1e-9; for (const r of hd.reads) mxs = Math.max(mxs, r.a); const qy = (q.ys[h][0] + q.ys[h][q.ys[h].length - 1]) / 2;
+          hd.reads.forEach((r, k) => { if (k >= ys.length) return; const y = ys[k], rel = r.a / mxs, hv = isHov('read', col.key, h * 5 + k);
+            ctx.strokeStyle = rgbStr(c.rgb.accent, (0.15 + 0.6 * rel) * a); ctx.lineWidth = 0.5 + 2 * rel; ctx.beginPath(); ctx.moveTo(q.x + L.rh, qy); ctx.lineTo(col.x - col.w / 2, y); ctx.stroke();
+            ctx.globalAlpha = a; ctx.fillStyle = rgbStr(c.rgb.accent, 0.1 + 0.5 * rel); roundedRect(ctx, col.x - col.w / 2, y - col.h / 2, col.w, col.h, 4); ctx.fill(); ctx.strokeStyle = hv ? c.ink : c.lineStrong; ctx.lineWidth = hv ? 1.5 : 1; ctx.stroke();
+            text(`${cut(r.word, 8)} −${r.dist} ${pctText(r.a)}`, col.x, y, mono8, rel > 0.5 ? c.ink : c.ink2, 'center', 'middle'); ctx.globalAlpha = 1; });
+          if (!hd.reads.length) text('reads nothing yet', col.x, ys[0], mono8, c.ink3, 'center', 'middle'); });
+        text('reads', col.x, ly(ci), mono8, lit(ci) ? c.accent : c.ink3, 'center'); return;
+      }
+      if (col.kind === 'heads' && col.key[0] === 'm') { // the messages: the values of the words read, weighted by their shares
+        const r = L.cols[ci - 1];
+        col.ys.forEach((ys, h) => { const hd = lay.heads[h]; let mxs = 1e-9; for (const rd of hd.reads) mxs = Math.max(mxs, rd.a); hd.reads.forEach((rd, k) => { if (k >= r.ys[h].length) return; const rel = rd.a / mxs; ctx.strokeStyle = rgbStr(c.rgb.accent, (0.06 + 0.4 * rel) * a); ctx.lineWidth = 0.3 + 1.2 * rel; ys.forEach(y => { ctx.beginPath(); ctx.moveTo(r.x + r.w / 2, r.ys[h][k]); ctx.lineTo(col.x - L.rh, y); ctx.stroke(); }); }); });
+        headCol(col, h => lay.heads[h].message, ci, 'messages'); return;
+      }
+      if (col.kind === 'units') {
+        const k = col.key[0];
+        if (k === 'h') { const src = pointsOf(L.cols[ci - 1]), dst = pointsOf(col), HM = H * dk; fan(src, dst, (i, j) => lay.W.Wo[j * HM + i], 0.25, a); unitCol(col, lay.heard, ci, 'hears'); }
+        else if (k === 'a') { text('+', col.x - 25, (L.y0 + L.y1) / 2, mono9, c.ink2, 'center', 'middle'); unitCol(col, lay.after, ci, col.l === 0 ? '+ input' : '+ above'); }
+        else if (k === 'f') { const src = pointsOf(L.cols[ci - 1]), dst = pointsOf(col); fan(src, dst, (i, j) => lay.W.W1[j * D + i], 0.15, a); unitCol(col, lay.hidden, ci, 'tanh'); }
+        else if (k === 'o') { const src = pointsOf(L.cols[ci - 1]), dst = pointsOf(col), F = lay.hidden.length; fan(src, dst, (i, j) => lay.W.W2[j * F + i], 0.15, a); text('+', col.x - 25, (L.y0 + L.y1) / 2, mono9, c.ink2, 'center', 'middle'); unitCol(col, lay.out, ci, 'output'); const top = lay.lens[0]; text(`→ ${cut(top.word, 9)} ${pctText(top.p)}`, col.x, L.y1 + 10, mono8, c.ink2, 'center'); prevUnits = col; }
+        return;
+      }
+      if (col.kind === 'words') { // the output layer: a score for every word of the vocabulary, the most probable shown
+        const src = pointsOf(prevUnits), pts = col.ys.map(y => ({ x: col.x, y })), vals = []; for (let k = 0; k < m.out.length; k++) for (let i = 0; i < D; i++) vals.push(m.Wout[m.out[k].v * D + i]); const th = thresh(vals, 0.3), mx = amax(vals);
+        m.out.forEach((o, k) => { for (let i = 0; i < D; i++) { const v = m.Wout[o.v * D + i]; if (Math.abs(v) < th) continue; const rel = Math.abs(v) / mx; ctx.strokeStyle = rgbStr(v > 0 ? c.rgb.irregular : c.rgb.regular, (0.08 + 0.6 * rel) * a); ctx.lineWidth = 0.3 + 1.4 * rel; ctx.beginPath(); ctx.moveTo(src.pts[i].x + L.r, src.pts[i].y); ctx.lineTo(col.x - 5, pts[k].y); ctx.stroke(); } });
+        let pm = 1e-9; for (const o of m.out) pm = Math.max(pm, o.p);
+        m.out.forEach((o, k) => { const y = pts[k].y, hv = isHov('word', 'out', k); ctx.globalAlpha = a; circleNode(ctx, col.x, y, hv ? 6 : 5, o.target ? (m.chosen ? c.irregular : c.good) : sequential(o.p / pm), null, null, hv); text(`${cut(o.word, 9)} ${pctText(o.p)}${o.target ? (m.chosen ? ' ←' : ' ✓') : ''}`, col.x + 9, y, o.target ? mono9 : mono8, o.target ? c.ink : c.ink2, 'left', 'middle'); ctx.globalAlpha = 1; });
+        text(`${m.V - m.out.length} other words…`, col.x + 9, pts[pts.length - 1].y + 18, mono8, c.ink3, 'left', 'middle');
+        if (lit(ci)) { ctx.strokeStyle = c.accent; ctx.lineWidth = 2; roundedRect(ctx, col.x - 9, pts[0].y - 12, 68, pts[pts.length - 1].y - pts[0].y + 24, 6); ctx.stroke(); }
+        text('next word', col.x + 20, ly(ci), mono8, lit(ci) ? c.accent : c.ink3, 'center');
+      }
+    });
+    // the footer: the walk's stage, the hover, or the legend
+    let foot;
+    if (w && at < L.cols.length) { const col = L.cols[at], lay = col.l >= 0 && col.l < m.layers.length ? m.layers[col.l] : null, k = col.kind === 'words' ? 'w' : col.key[0];
+      foot = col.key === 'input' ? `the word's vector plus its position vector: ${D} numbers in, red positive, blue negative`
+        : k === 'q' ? `each head makes its query from those ${D} numbers (× Wq): ${dk} numbers, what the head looks for`
+        : k === 'r' ? `the query meets every earlier word's key, minus the head's cost × distance; the softmax gives the shares: the ${H === 2 ? 'near and far heads’' : 'heads’'} largest reads`
+        : k === 'm' ? `the values of the words read, each weighted by its share, add up to the head's message: ${dk} numbers`
+        : k === 'h' ? `the ${H} messages, joined, × Wo: what the layer hears, back to ${D} numbers`
+        : k === 'a' ? (col.l === 0 ? 'added to the input: the word keeps its own vector and gains what it heard' : 'added to the layer above’s output: the vector keeps growing, never swapped')
+        : k === 'f' ? `the feed-forward: × W1 into ${lay.hidden.length} tanh units`
+        : k === 'o' ? `× W2, added to the vector again: layer ${col.l + 1}’s output, which reads off as “${lay.lens[0].word}” ${pctText(lay.lens[0].p)}`
+        : `× Wout: a score for each of the ${m.V} words, the softmax turns them into probabilities, and the next word is “${m.out[0].word}”`; }
+    else if (hov && hov.text) foot = hov.text;
+    else foot = 'circles: this word\u2019s numbers at each step (red +, blue −) · lines: the learned weights, the strongest drawn (red +, blue −) · purple: the attention shares · hover anything';
+    text(foot, 12, TG_H - 14, mono9, w ? c.accent : c.ink3);
+  }
+  function hitTokenGraph(canvas, px, py, m) {
+    const L = canvas._tokenGraph; if (!L) return null;
+    const s = TG_W / canvas.clientWidth, x = px * s, y = py * s, f = v => fmtSigned(v, 2), dk = m.dk;
+    for (const col of L.cols) {
+      const lay = col.l >= 0 && col.l < m.layers.length ? m.layers[col.l] : null;
+      if (col.kind === 'units' && Math.abs(x - col.x) <= L.r + 3) { const i = Math.round((y - L.y0) / col.pitch); if (i < 0 || i >= col.n || Math.abs(y - col.ys[i]) > L.r + 3) continue; const vals = col.key === 'input' ? m.x0 : col.key[0] === 'h' ? lay.heard : col.key[0] === 'a' ? lay.after : col.key[0] === 'f' ? lay.hidden : lay.out; const name = col.key === 'input' ? 'input' : col.key[0] === 'h' ? `layer ${col.l + 1} hears` : col.key[0] === 'a' ? `layer ${col.l + 1} after the heads` : col.key[0] === 'f' ? `layer ${col.l + 1} tanh unit` : `layer ${col.l + 1} output`; return { kind: 'unit', key: col.key, i, text: `${name} ${i + 1} = ${f(vals[i])}` }; }
+      if (col.kind === 'heads' && Math.abs(x - col.x) <= L.rh + 3) { for (let h = 0; h < col.ys.length; h++) for (let k = 0; k < col.ys[h].length; k++) if (Math.abs(y - col.ys[h][k]) <= L.rh + 3) { const hd = lay.heads[h], q = col.key[0] === 'q'; return { kind: 'unit', key: col.key, i: h * dk + k, text: `${hd.name}, layer ${col.l + 1}: ${q ? 'query' : 'message'} ${k + 1} = ${f((q ? hd.query : hd.message)[k])}` }; } }
+      if (col.kind === 'reads' && Math.abs(x - col.x) <= col.w / 2) { for (let h = 0; h < col.ys.length; h++) for (let k = 0; k < col.ys[h].length; k++) { const r = lay.heads[h].reads[k]; if (r && Math.abs(y - col.ys[h][k]) <= col.h / 2 + 2) return { kind: 'read', key: col.key, i: h * 5 + k, j: r.j, text: `${lay.heads[h].name}, layer ${col.l + 1}, reads “${r.word}” (word ${r.j}, ${r.dist} back): ${pctText(r.a)} of its attention${r.prior ? ` · which had itself read, in layer ${col.l}: ${r.prior}` : ''}` }; } }
+      if (col.kind === 'words' && x >= col.x - 8 && x <= TG_W) { for (let k = 0; k < col.ys.length; k++) if (Math.abs(y - col.ys[k]) <= 11) { const o = m.out[k]; return { kind: 'word', key: 'out', i: k, text: `“${o.word}”: ${(o.p * 100).toFixed(1)}%${o.target ? (m.chosen ? ' · the word the model chose' : ' · the actual next word') : ''}` }; } }
+    }
+    return null;
+  }
   // How each head decides where to look, from one asking position q: along the words so far, the match (query · key /
   // √dk), the cost the head subtracts (its learned cost per word × the distance back), the score and the share the
   // softmax makes of it, with what the match alone would give behind the shares. The heads of one layer, one under
@@ -2441,5 +2552,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows };
+  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

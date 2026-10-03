@@ -706,12 +706,17 @@ it did not; hover a word for the eight words the model expected there, with the 
 model read to expect it, standing at the word before, light up on the report with lines to them, in the layer and
 head chosen, the deeper the underline and the thicker the line the more it listened; click a word to keep it. Three
 cards follow the same word (the first word of the diagnosis when none is hovered or kept). *How a word was chosen*
-draws the word's path through the model: the vector of the word before it added to its position vector; each layer's
-two heads with their queries, the five words they read most and their messages; what the layer hears, added to the
-vector, and the feed-forward added after; what the output layer would read off the vector at each stage, so that the
-prediction can be watched taking shape layer by layer; and the probabilities of the next word, with the actual one
-marked. Every strip and bar has a tooltip, a read word hovered on the diagram is marked on the report, and the tooltip
-of a read word in the second layer also says what that word had itself read in the first. *How each head decides where
+draws the network itself for that word, as circles and lines like the diagrams of the earlier questions: one column
+per step, the input (the vector of the word before it plus its position vector), then for each layer the two heads'
+queries, the five words each head reads most, their messages, what the layer hears, the add, the feed-forward and the
+add, and last the output layer's scores for the most probable next words; every circle is one of the numbers the
+model holds for this word at that step, red positive and blue negative, every line a learned weight (the strongest
+drawn, red positive and blue negative, the same for every word of every report), and the purple lines the attention,
+this report's shares, which are computed rather than learned. *Walk through* lights the columns one by one with a
+sentence for each step, and a second view, *the numbers*, shows the same pass as strips, with what the output layer
+would read off the vector at each stage, so that the prediction can be watched taking shape layer by layer. Every
+circle, strip and bar has a tooltip, a read word hovered on the diagram is marked on the report, and the tooltip of a
+read word in the second layer also says what that word had itself read in the first. *How each head decides where
 to look* lays the two heads of the chosen layer one under the other, along the words so far: the match (query · key),
 the cost the head subtracts (its learned cost per word × the distance back, a wedge that is steep for the near head and
 nearly flat for the far one), the score, and the share the softmax makes of it, with what the match alone would give
