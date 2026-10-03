@@ -896,7 +896,7 @@
       <div class="card">
         <div class="card-head">
           <h2 id="rp-report-title">The report</h2>
-          <div class="actions-inline"><span class="small muted">who reads whom · layer</span><div class="seg small rp-layer-seg" id="rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div><span class="small muted">head</span><div class="seg small rp-head-seg" id="rp-head-seg"><button type="button" data-head="-1" class="is-active" title="both heads averaged">both</button><button type="button" data-head="0">near</button><button type="button" data-head="1">far</button></div><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-arcs" class="rp-arcs-check" checked><label for="rp-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span><button type="button" class="btn" id="rp-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-next" title="the next report">next ▶</button></div>
+          <div class="actions-inline"><span class="small muted">who reads whom · layer</span><div class="seg small rp-layer-seg" id="rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div><span class="small muted">head</span><div class="seg small rp-head-seg" id="rp-head-seg"><button type="button" data-head="-1" class="is-active" title="both heads averaged">both</button><button type="button" data-head="0">near</button><button type="button" data-head="1">far</button></div><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-arcs" class="rp-arcs-check" checked><label for="rp-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-hops" class="rp-hops-check"><label for="rp-hops" class="plainlabel" title="dashed lines from the words read to what they had themselves read a layer earlier">two hops</label></span><button type="button" class="btn" id="rp-prev" title="the previous report">◀ previous</button><button type="button" class="btn" id="rp-next" title="the next report">next ▶</button></div>
         </div>
         <div class="rp-two">
           <div><div class="rp-text" id="rp-text"></div><p class="small muted" id="rp-text-note" style="margin-top:8px"></p></div>
@@ -911,6 +911,15 @@
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-net" width="800" height="536" aria-label="How one word of the report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-net-tip" hidden></div></div></div>
         <p class="small muted" id="rp-net-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card" id="rp-heads-card">
+        <div class="card-head">
+          <h2 id="rp-heads-title">How each head decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">for the word followed above: query · key = match, − the head's cost × distance = score, softmax = share · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-heads" width="800" height="402" aria-label="How each head of the chosen layer decides where to look from the followed word: along the words so far, the match, the distance cost, the score and the share, for the near head and the far head"></canvas><div class="tip" id="rp-heads-tip" hidden></div></div></div>
+        <p class="small muted" id="rp-heads-note" style="margin-top:8px"></p>
       </div>
 
       <div class="card" id="rp-att-card">
@@ -938,7 +947,7 @@
       <div class="card" id="rp-map-card">
         <div class="card-head">
           <h2>The words as the model sees them</h2>
-          <div class="legend" id="rp-map-legend"></div>
+          <div class="actions-inline"><div class="legend" id="rp-map-legend"></div><div class="seg small" id="rp-map-src-seg"><button type="button" data-src="in" title="the word's vector at the input of the model">as input</button><button type="button" data-src="out" class="is-active" title="the word's row of the output layer: how the model scores it as the next word">as prediction</button></div><div class="seg small" id="rp-map-seg"><button type="button" data-map="pca" title="the two directions of the vectors that spread the words most">two directions</button><button type="button" data-map="tsne" class="is-active" title="t-SNE: neighbours in the model's space stay neighbours on the map">neighbourhoods</button></div></div>
         </div>
         <div class="rp-map"><svg id="rp-map" role="img" aria-label="The words of the vocabulary placed by the two directions of their learned vectors that spread them most, coloured by the section they mostly appear in"></svg></div>
         <p class="small muted" id="rp-map-note" style="margin-top:8px"></p>
@@ -981,7 +990,7 @@
       <div class="card">
         <div class="card-head">
           <h2 id="rp-test-title">The findings and the requisition go in, the description and the diagnosis come out</h2>
-          <div class="actions-inline"><span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-test-arcs" class="rp-arcs-check" checked><label for="rp-test-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span></div>
+          <div class="actions-inline"><span class="small muted">the analyser's findings, with the specimen, the history and the gross as they came with the case, are the prompt · the model writes the microscopic description and the diagnosis one word at a time · <kbd>N</kbd> writes the next case · the weights never change here</span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-test-arcs" class="rp-arcs-check" checked><label for="rp-test-arcs" class="plainlabel" title="lines from the word followed to the words the model read for it">lines</label></span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-test-hops" class="rp-hops-check"><label for="rp-test-hops" class="plainlabel" title="dashed lines from the words read to what they had themselves read a layer earlier">two hops</label></span></div>
         </div>
         <div class="rp-two">
           <div>
@@ -1006,6 +1015,14 @@
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-test-net" width="800" height="536" aria-label="How one word of the written report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-test-net-tip" hidden></div></div></div>
         <p class="small muted" id="rp-test-net-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="rp-test-heads-card" hidden>
+        <div class="card-head">
+          <h2 id="rp-test-heads-title">How each head decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">for the word followed above, on the report the model wrote · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-test-heads" width="800" height="402" aria-label="How each head of the chosen layer decides where to look from the followed word of the written report"></canvas><div class="tip" id="rp-test-heads-tip" hidden></div></div></div>
+        <p class="small muted" id="rp-test-heads-note" style="margin-top:8px"></p>
       </div>
       <div class="card" id="rp-test-att-card" hidden>
         <div class="card-head">
