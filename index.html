@@ -907,7 +907,7 @@
       <div class="card" id="rp-net-card">
         <div class="card-head">
           <h2 id="rp-net-title">How a word was chosen</h2>
-          <span class="small muted">the word before it goes in as a vector · each layer's heads read the words so far and add what they hear · the feed-forward is added · the output layer scores every word</span>
+          <div class="actions-inline"><span class="small muted">the word before it goes in · each layer's heads read the words so far and add what they hear · the feed-forward is added · the output layer scores every word</span><div class="seg small rp-netview-seg"><button type="button" data-view="graph" class="is-active" title="the network as circles and lines: every unit, every learned weight, the attention in purple">the network</button><button type="button" data-view="strips" title="the same numbers as strips, with the five largest reads and what the output layer would read off at each step">the numbers</button></div><button type="button" class="btn" id="rp-net-walk" title="light the network up column by column, input to output">▶ Walk through</button></div>
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-net" width="800" height="536" aria-label="How one word of the report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-net-tip" hidden></div></div></div>
         <p class="small muted" id="rp-net-note" style="margin-top:8px"></p>
@@ -1011,7 +1011,7 @@
       <div class="card" id="rp-test-net-card" hidden>
         <div class="card-head">
           <h2 id="rp-test-net-title">How a word was chosen</h2>
-          <span class="small muted">the report the model wrote: hover or click one of its words to follow it through the model</span>
+          <div class="actions-inline"><span class="small muted">the report the model wrote: hover or click one of its words to follow it through the model</span><div class="seg small rp-netview-seg"><button type="button" data-view="graph" class="is-active" title="the network as circles and lines: every unit, every learned weight, the attention in purple">the network</button><button type="button" data-view="strips" title="the same numbers as strips, with the five largest reads and what the output layer would read off at each step">the numbers</button></div><button type="button" class="btn" id="rp-test-net-walk" title="light the network up column by column, input to output">▶ Walk through</button></div>
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-test-net" width="800" height="536" aria-label="How one word of the written report was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="rp-test-net-tip" hidden></div></div></div>
         <p class="small muted" id="rp-test-net-note" style="margin-top:8px"></p>
