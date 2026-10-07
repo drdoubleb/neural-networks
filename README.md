@@ -721,8 +721,8 @@ to look* lays the two heads of the chosen layer one under the other, along the w
 the cost the head subtracts (its learned cost per word × the distance back, a wedge that is steep for the near head and
 nearly flat for the far one), the score, and the share the softmax makes of it, with what the match alone would give
 in grey behind the shares; the heads differ in that one learned number, and the card is where "near" and "far" can be
-seen to mean nothing more. A *two hops* checkbox next to *lines* adds dashed lines from the words read most to what they
-had themselves read a layer earlier, which is how a word such as "and" comes to stand for the phrase it closes. *Who
+seen to mean nothing more. A *two hops* checkbox next to *lines*, on by default, adds dashed lines from the words read most to what
+they had themselves read a layer earlier, which is how a word such as "and" comes to stand for the phrase it closes. *Who
 reads whom, across the report* draws one attention matrix per head for the chosen layer, rows asking and columns answering,
 every row scaled to its largest share, with the sections as bands along the edges and the chosen word's row outlined
 (hover a cell for its pair of words); next to it, each head's attention by distance back, averaged over the report,
