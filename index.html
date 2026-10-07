@@ -871,8 +871,8 @@
     <section class="stage-panel" id="panel-reports" hidden>
       <div class="card bar">
         <div class="card-head">
-          <h2>Reports: a small language model</h2>
-          <span class="small muted">every word predicted from the words before it · the only teacher is the next word</span>
+          <h2 id="rp-panel-title">Reports: a small language model</h2>
+          <span class="small muted" id="rp-panel-sub">every word predicted from the words before it · the only teacher is the next word</span>
         </div>
         <p class="prose small" id="rp-blurb"></p>
         <div class="bar-row">
@@ -939,7 +939,7 @@
         <div class="curves">
           <div class="chart"><div class="title"><span>Loss per epoch by section, test reports</span><span class="now" id="rp-loss-now"></span></div><svg id="rp-loss" role="img" aria-label="Loss per epoch by section"></svg></div>
           <div class="chart"><div class="title"><span>Next word right per epoch</span><span class="now" id="rp-acc-now"></span></div><svg id="rp-acc" role="img" aria-label="Next-word accuracy per epoch"></svg></div>
-          <div class="chart"><div class="title"><span>Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
+          <div class="chart"><div class="title"><span id="rp-ground-title">Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
         </div>
         <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
       </div>
@@ -955,8 +955,8 @@
 
       <div class="card">
         <div class="card-head">
-          <h2>The reports</h2>
-          <div class="legend"><span><span class="swatch ring"></span>benign, reactive or denuded</span><span><span class="swatch ring pos"></span>carcinoma in situ, or suspicious</span><span><span class="swatch ring inv"></span>invasive</span><span><span class="swatch batch"></span>the last batch trained on</span></div>
+          <h2 id="rp-trays-title">The reports</h2>
+          <div class="legend" id="rp-trays-legend"><span><span class="swatch ring"></span>benign, reactive or denuded</span><span><span class="swatch ring pos"></span>carcinoma in situ, or suspicious</span><span><span class="swatch ring inv"></span>invasive</span><span><span class="swatch batch"></span>the last batch trained on</span></div>
         </div>
         <p class="small muted" style="margin:0 0 8px" id="rp-train-label">Training reports</p>
         <div class="tray reports" id="rp-train-tray"></div>
@@ -1045,6 +1045,143 @@
       </div>
     </section>
 
+    <!-- ============================ CHAT · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-ch-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="ch-data-title">Chat</h2>
+          <span class="small muted" id="ch-data-sub"></span>
+        </div>
+        <p class="prose small" id="ch-data-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl check"><input type="checkbox" id="ch-data-reveal"><label for="ch-data-reveal" class="plainlabel">Reveal the case behind the transcript and the rule's answer (the model only ever sees the words)</label></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="ch-data-transcript-title">The transcript</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="ch-data-prev" title="the previous transcript">◀ previous</button><button type="button" class="btn" id="ch-data-next" title="the next transcript">next ▶</button></div>
+        </div>
+        <div class="rp-two">
+          <div><div class="rp-text" id="ch-data-text"></div><div class="legend" id="ch-data-roles" style="margin-top:8px"></div></div>
+          <div><div class="rp-case" id="ch-data-case"></div><p class="small muted" id="ch-data-note" style="margin-top:8px"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>From the next-word model to a chatbot, and to an agent</h2><span class="small muted">what a real system does, and what this toy does of it</span></div>
+        <div class="ch-explain">
+          <div><h3>1 · Pretraining</h3><p>The Reports question is pretraining in miniature: a pile of text and one task, the next word. A real model does the same over trillions of words of web pages, books and code, and that is where nearly everything it knows is learned. Nothing in that stage says the model should answer anyone.</p></div>
+          <div><h3>2 · Instruction tuning</h3><p>To make a chatbot, the same model trains the same way on a smaller corpus of transcripts: a system line, the user's turn, the assistant's turn, with the assistant's turns written the way one wants answers to read. The next word again, nothing else: the model learns that after <b>ASSISTANT:</b> comes an answer to what the user asked. This question is that stage, on 2,400 toy transcripts, except that it starts from random weights rather than from the report model, whose vocabulary is a different one.</p></div>
+          <div><h3>3 · Preference tuning</h3><p>A third stage makes the answers people prefer more likely: the model writes two answers, a person (or a model trained on people's choices) picks the better one, and the weights move towards it. That is where tone, refusals and much of the polish come from. Not done here: the page has no preferences to learn from.</p></div>
+          <div><h3>The system prompt</h3><pre class="ch-sys">You are the pathology assistant of the Example Hospital reporting system.
+Answer the pathologist's questions about the case in front of them from the case's findings only, and say when a question cannot be answered from them.
+Keep answers short unless the pathologist asks for the reasoning.
+Never present a diagnosis as final: the pathologist signs out.
+Tools: findings() returns the image analyser's findings for the open case. To call a tool, write its name on a line of its own; the result follows in a TOOL turn.</pre><p>A real chatbot runs with text like this placed before the conversation by the people who run it, often thousands of words of persona, rules, formats and tools, and the model continues from it as from anything else. The words work because the model met instructions like them, in countless phrasings, in instruction tuning. The toy's system line is one sentence, in three phrasings per style: enough for the model to learn each phrasing as a cue for a style of answer, which is the honest description of what it does. On the Test step, rephrase it and watch the cue fail.</p></div>
+          <div><h3>An agent</h3><p>An agent is the chatbot in a loop with a program. The model writes a tool call as text; the program sees it, runs the tool, pastes the result into the transcript as a <b>TOOL</b> turn and asks the model to continue; the model reads the result and writes the next step, or the answer. Nothing in the model changes: the agency is the loop. In the agent style here the user asks the question alone, the assistant writes <b>findings()</b>, the page runs it, pastes the analyser's findings for the case, and the assistant answers from them.</p></div>
+          <div><h3>What this toy cannot do</h3><p>Its vocabulary is 133 words, all from these transcripts. It has never read an instruction, only met these; a question it was never asked gets a fluent answer, right or wrong, because the next word is all it knows how to write; <b>findings()</b> is three tokens it learned to write after one kind of system line, not a function it knows. A real model is the same machine with far more words, far more text and the two later stages: better at all of this, and at that last thing too.</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The instruction, in the words the model learned</h2><span class="small muted">three phrasings per style in training, a fourth held out, and lines it never saw</span></div>
+        <div class="rp-rule" id="ch-phrasings"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The transcripts</h2>
+          <div class="legend"><span><span class="swatch ring ch-brief"></span>brief</span><span><span class="swatch ring ch-full"></span>full sentence</span><span><span class="swatch ring ch-agent"></span>agent</span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px" id="ch-data-train-label">Training transcripts</p>
+        <div class="tray reports scroll" id="ch-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="ch-data-test-label">Test transcripts · held out, on the trained phrasings</p>
+        <div class="tray reports scroll" id="ch-data-test-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="ch-data-held-label">Held-out phrasings · the same cases and questions, the fourth phrasing of every instruction</p>
+        <div class="tray reports scroll" id="ch-data-held-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ CHAT · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-ch-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="ch-ask" title="the model writes the assistant's turn, one word at a time (N asks the next transcript)">Ask</button>
+            <button type="button" class="btn" id="ch-next-case" title="the next transcript of the set: its case, its instruction and its question">Next transcript</button>
+            <button type="button" class="btn" id="ch-ask-all" title="answer every remaining transcript of the set without the animation">Ask all</button>
+            <button type="button" class="btn" id="ch-test-clear">Clear</button>
+          </div>
+          <div class="ctl"><span class="lbl">Transcripts</span><div class="seg small" id="ch-cases-seg"><button type="button" data-cases="test" class="is-active" title="300 test transcripts: cases the model never trained on, with the trained phrasings of the instruction">trained phrasings</button><button type="button" data-cases="held" title="the same 300 cases and questions, with the fourth phrasing of every instruction, which the model never saw">held-out phrasings</button></div></div>
+          <div class="ctl slim"><label for="ch-temp">Temperature <span class="val" id="ch-temp-val">0</span></label><input type="range" id="ch-temp" min="0" max="150" step="5" value="0"></div>
+          <div class="ctl slim"><label for="ch-pace">Pace <span class="val" id="ch-pace-val">8 words/s</span></label><input type="range" id="ch-pace" min="1" max="60" step="1" value="8"></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">asked</span><b id="ch-stat-n">0 / 300</b><small id="ch-stat-n-sub">transcripts, as written</small></div>
+            <div class="metric"><span class="lbl">answer exact</span><b id="ch-stat-exact">–</b><small id="ch-stat-exact-sub"></small></div>
+            <div class="metric"><span class="lbl">first word right</span><b id="ch-stat-first">–</b><small id="ch-stat-first-sub"></small></div>
+          </div>
+        </div>
+        <p class="note" id="ch-test-warning" hidden>The model has not trained: it will write noise, which is itself worth a look. Load the trained model on the Train step, or train it there.</p>
+        <div class="note" id="ch-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="ch-test-title">Ask the model about a case</h2>
+          <div class="actions-inline"><span class="small muted">the system line, the case and the question are the prompt · the model writes the assistant's turn one word at a time · <kbd>N</kbd> asks the next transcript · the weights never change here</span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" class="rp-hops-check" id="ch-test-hops" checked><label for="ch-test-hops" class="plainlabel">two hops</label></span></div>
+        </div>
+        <div class="rp-two">
+          <div>
+            <h3>The prompt</h3>
+            <div class="ch-prompt">
+              <div class="row"><span class="k">style</span><div class="seg small" id="ch-style-seg"><button type="button" data-style="brief" title="the findings and the question in the user's turn; a word or two back">brief</button><button type="button" data-style="full" title="the same, answered in a full sentence with the reason">full sentence</button><button type="button" data-style="agent" title="the question alone: the assistant has to call findings() first">agent</button></div></div>
+              <div class="row"><span class="k">instruction</span><div><select id="ch-line"></select><input type="text" id="ch-line-text" placeholder="the instruction, in your own words" hidden></div></div>
+              <div class="row"><span class="k">case</span><div class="actions-inline"><button type="button" class="btn" id="ch-case-prev" title="the previous case of the set">◀</button><span id="ch-case-name"></span><button type="button" class="btn" id="ch-case-next" title="the next case of the set">▶</button></div></div>
+              <div class="row"><span class="k">findings</span><div class="rp-case" id="ch-case-block"></div></div>
+              <div class="row"><span class="k">question</span><div><select id="ch-question"></select><input type="text" id="ch-question-text" placeholder="the question, in your own words" hidden></div></div>
+            </div>
+            <p class="small muted" id="ch-prompt-note" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <h3 id="ch-test-transcript-head">The transcript</h3>
+            <div class="rp-text" id="ch-test-text"></div>
+            <ol class="ch-steps" id="ch-steps" hidden></ol>
+            <p class="small" id="ch-test-call" style="margin-top:8px"></p>
+            <div class="rp-next" id="ch-test-nextword"></div>
+          </div>
+        </div>
+        <div class="rp-truth" id="ch-truth" hidden></div>
+      </div>
+      <div class="card" id="ch-test-net-card" hidden>
+        <div class="card-head">
+          <h2 id="ch-test-net-title">How a word was chosen</h2>
+          <div class="actions-inline"><span class="small muted">the transcript the model continued: hover or click one of its words to follow it through the model</span><div class="seg small rp-netview-seg"><button type="button" data-view="graph" class="is-active" title="the network as circles and lines: every unit, every learned weight, the attention in purple">the network</button><button type="button" data-view="strips" title="the same numbers as strips, stage by stage">the numbers</button></div><button type="button" class="btn" id="ch-test-net-walk" title="light the network stage by stage, as the word is computed">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="ch-test-net" width="800" height="536" aria-label="How one word of the assistant's turn was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="ch-test-net-tip" hidden></div></div></div>
+        <p class="small muted" id="ch-test-net-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="ch-test-heads-card" hidden>
+        <div class="card-head">
+          <h2 id="ch-test-heads-title">How each head decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">for the word followed above, on the transcript the model continued · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="ch-test-heads" width="800" height="402" aria-label="How each head of the chosen layer decides where to look from the followed word of the transcript"></canvas><div class="tip" id="ch-test-heads-tip" hidden></div></div></div>
+        <p class="small muted" id="ch-test-heads-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="ch-test-att-card" hidden>
+        <div class="card-head">
+          <h2>Who reads whom, across the transcript</h2>
+          <div class="actions-inline"><span class="small muted">rows ask, columns answer · one matrix per head · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div id="ch-test-att-body"></div>
+        <p class="small muted" id="ch-test-att-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Transcripts · <span id="ch-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch badge" style="background:var(--good)">✓</span>answer exact</span><span><span class="swatch badge">✗</span>not the rule's answer</span></div>
+        </div>
+        <div class="tray reports scroll" id="ch-test-results"></div>
+      </div>
+    </section>
+
   <!-- ============================ INSPECTOR ============================ -->
   <aside class="inspector" aria-label="Specimen inspector">
     <div class="card">
@@ -1106,9 +1243,12 @@
 <script src="data/slides/slides_data.js"></script>
 <script src="data/reports/reports_data.js"></script>
 <script src="data/reports/lm_weights.js"></script>
+<script src="data/chat/chat_data.js"></script>
+<script src="data/chat/chat_weights.js"></script>
 <script src="js/features.js"></script>
 <script src="js/fields.js"></script>
 <script src="js/reports.js"></script>
+<script src="js/chat.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>

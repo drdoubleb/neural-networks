@@ -45,9 +45,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists nine questions: a blood count, three nucleus questions, the foundation model, two questions asked
-of slides, the fields of bladder, and the reports a small language model writes from an analyser's findings. Whatever
-the question, the nav has the same three steps, and a lecture recipe simply selects a question and its settings.
+The masthead lists ten questions: a blood count, three nucleus questions, the foundation model, two questions asked
+of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, and the chat
+the same model holds about a case. Whatever the question, the nav has the same three steps, and a lecture recipe
+simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
@@ -171,7 +172,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the sixteen recipe buttons
+## The lecture arc: the seventeen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -194,6 +195,8 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑬ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
 | ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
 | ⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~90% invasion right on the test fields; three invasive fields in four found, one CIS-into-nests field in four still called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns, positions add the membrane, and the context is what tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
+| ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
+| ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -819,6 +822,29 @@ questions are each a click away. Reproduce with `node tools/check_chat.js --epoc
 --ground-every 1 --seed 1` (the shipped model; `--save data/chat/chat_weights.js` writes it, `--load` takes the
 measures on the shipped weights without training, `--skip-gen` skips the per-epoch answers). A run takes about a
 minute per epoch and ten seconds for the measures after training.
+
+**On the page.** The question *Chat: ask the model about a case?* (recipe ⑰, `#chat/train`) shares the Train step
+with the reports question: the same lab, controls, curves, trays and diagram cards, on this corpus and this model,
+with the loss by role instead of by section and, as the third chart, the answers the model writes for eight test
+transcripts after every epoch; the two worlds keep their own state, so a run on one goes on while the other is on
+screen. *Specimens* shows a transcript with every token coloured by its role (system, user, findings, question,
+assistant, tool), the style, the instruction with which phrasing it is, the question and, under *Reveal*, the case
+and the rule's answer; an explainer card walks from pretraining to instruction tuning to preference tuning, shows
+what a real system prompt looks like, says what an agent is (the chatbot in a loop with a program, the agency in the
+loop) and what this toy cannot do; a table lists the trained and the held-out phrasings and the probes; and the
+training, test and held-out-phrasing transcripts are cards coloured by style. *Test* is the chat box: the style, the
+instruction (a trained phrasing, the held-out one, a line never seen, or one's own words), the case with its
+findings, and the question (one of the eight, one never asked, or one's own) make the prompt, shown as the model
+sees it, words it has no token for marked as unknown; *Ask* makes the model continue the transcript from
+`ASSISTANT:` one word at a time at the chosen pace, each word coloured by its probability and the bars showing what
+it chose from, and the rule's answer appears after, with whether the answer is exact, right in its first word, and
+in the style the instruction asked for. In the agent style the page is the program of the loop: when the assistant's
+line is `findings()` it pastes the analyser's findings for the case back as a `TOOL` turn and lets the model go on,
+and a numbered list shows the loop's steps as they happen. *Next transcript* (or <kbd>N</kbd>) asks the next test
+transcript as written, and the tally counts the answers exact and the first words right over the trained or the
+held-out phrasings (*Ask all* runs the whole set); changing anything makes a prompt of one's own, compared with the
+rule's answer where there is one and not tallied. The three diagram cards of the reports question follow the
+transcript the model continued. The transcripts (1.8 MB) and the trained model (0.4 MB) load with the page.
 
 ## The data
 
