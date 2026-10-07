@@ -45,9 +45,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists nine questions: a blood count, three nucleus questions, the foundation model, two questions asked
-of slides, the fields of bladder, and the reports a small language model writes from an analyser's findings. Whatever
-the question, the nav has the same three steps, and a lecture recipe simply selects a question and its settings.
+The masthead lists ten questions: a blood count, three nucleus questions, the foundation model, two questions asked
+of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, and the chat
+the same model holds about a case. Whatever the question, the nav has the same three steps, and a lecture recipe
+simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
@@ -171,7 +172,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the sixteen recipe buttons
+## The lecture arc: the seventeen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -194,6 +195,8 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑬ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
 | ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
 | ⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~90% invasion right on the test fields; three invasive fields in four found, one CIS-into-nests field in four still called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns, positions add the membrane, and the context is what tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
+| ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
+| ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -750,6 +753,99 @@ a card shows where the diagnosis words looked, their attention in the second lay
 section. Hovering a written word shows what the model chose from at that step and whom it read. The corpus (1 MB)
 and the trained model (0.5 MB) load with the page.
 
+## Chat: the same model on transcripts
+
+The last question turns the report model into a chatbot, and the chatbot into an agent, with nothing new in the
+model: the corpus changes, from reports to transcripts, and a program is put in a loop with it. The transcripts are
+described under *The data*: 2,400 for training, 300 test transcripts on the trained phrasings of the instruction and
+300 on the held-out phrasings, in three styles (brief, full sentence, agent), eight questions answered from the
+findings by the rule of the report corpus, and probe questions and system lines the model never trained on.
+
+**The model** is the report model's recipe on the transcripts: the same `LanguageModel` (48 numbers per token, 200
+learned positions, two causal context layers of two heads, query · key of 12 with a learned distance cost per head,
+a 48-unit tanh feed-forward, Adam at 0.005, batches of 8, weight decay 0.0001, gradients clipped at 1) on a
+vocabulary of 133 built on the training transcripts, 41,369 parameters, trained for 30 epochs from random weights
+(about 55 s per epoch in Node). It is instruction tuning in miniature, except that it does not start from the
+pretrained report model, whose vocabulary is a different one. The test loss by role as it trains (the tool role is
+the `TOOL:` header line alone, fully predictable after the call, and costs nothing), and, after every epoch, the
+answers of the first 24 test transcripts written by the model from the transcript up to its last `ASSISTANT:`
+(exact, word for word):
+
+| Epoch | Test loss | system | user | findings | question | assistant | Answers right, written by the model |
+|---|---|---|---|---|---|---|---|
+| 1 | 0.161 | 0.14 | 0.10 | 0.13 | 0.39 | 0.27 | 25% |
+| 2 | 0.144 | 0.14 | 0.09 | 0.12 | 0.36 | 0.20 | 29% |
+| 5 | 0.133 | 0.13 | 0.10 | 0.12 | 0.35 | 0.13 | 50% |
+| 10 | 0.130 | 0.13 | 0.09 | 0.11 | 0.39 | 0.12 | 42% |
+| 20 | 0.131 | 0.14 | 0.09 | 0.11 | 0.33 | 0.14 | 46% |
+| 30 | 0.125 | 0.13 | 0.09 | 0.12 | 0.34 | 0.09 | 75% |
+
+The system line, the user's line and the findings cost little from the first epoch: they repeat, and only the choice
+among phrasings and the case's findings are unpredictable. The question line stays near 0.35 nats per token, since
+nothing predicts which of the eight questions comes, and that is most of the loss there is. The assistant line is
+the only one that matters and the last to fall, from 0.27 to 0.09, and the last column is the reports' lesson again,
+fluency first and grounding last: at epoch 5 the transcripts read as well as they ever will and half the answers are
+right; the model that answers three in four needs all 30 epochs, with a loss curve that has been flat since epoch
+10.
+
+**What it does** (seed 1, the shipped model, the test transcripts; the model is given everything up to the last
+`ASSISTANT:` and writes the answer to the end of the line):
+
+| | brief | full sentence | agent |
+|---|---|---|---|
+| Answer exact, the trained phrasings of the instruction | 85% | 52% | 72% |
+| First word right (yes, no, or the diagnosis' first word), the trained phrasings | 93% | 81% | 80% |
+| Answer exact, the held-out phrasing | 41% | 3% | 26% |
+| First word right, the held-out phrasing | 63% | 71% | 40% |
+
+By question, brief and full together: the nest contours 25 of 25, invasion 20 of 24, muscularis propria 14 of 16,
+inflammation 23 of 37, the surface 14 of 22, carcinoma in situ 16 of 27, benign or not 13 of 26, the diagnosis 12 of
+23. The questions answered by one line of the block are easy, those that need the rule across several lines are not,
+and the full-sentence answers, which restate the reason, are the hardest to get word for word. The agent loop holds:
+given the question alone, the model writes `findings()` first for 100 of 100 agent transcripts, and after the `TOOL`
+turn answers exactly for 72.
+
+**The instruction is a cue, not an instruction.** With the fourth phrasing of each instruction, held out of training,
+the exact answers fall from 85% to 41% in the brief style and from 52% to 3% in the full-sentence style: the model
+still answers, fluently, but mostly in the wrong style, since nothing in it understands *Explain the reason in a full
+sentence*, only the three phrasings it saw; for an invasive case and a benign one that phrasing with *Is there
+invasion?* gets *No.* twice, brief and, for the invasive case, wrong. The system lines it never saw (*Keep your
+answers short.*, *Please explain your reasoning.*, *You are a helpful assistant.*) all get the brief answer to the
+same question, *Yes.* for the invasive case and *No.* for the benign one, whatever the line asks for. And the
+questions never asked in training get fluent nonsense: *What is the patient's name?* → *Yes.* for the benign case and
+*No, atypical.* for the invasive one; *Is this cancer?* → *Yes, mild.* for both; *What stage is it?* → *Yes, mild.*
+and *Yes, present and not involved.*; *Is the margin clear?* → *Yes, present and not involved.* for both, the answer
+to the muscularis propria question. A model that knows only the next word answers everything and knows nothing about
+whether it can. That is the honest frame for the chat question on the page, and the limitation is built into it: the
+system line is presented as a learned cue, and the held-out phrasing, the never-seen lines and the never-asked
+questions are each a click away. Reproduce with `node tools/check_chat.js --epochs 30 --curve --ground 24
+--ground-every 1 --seed 1` (the shipped model; `--save data/chat/chat_weights.js` writes it, `--load` takes the
+measures on the shipped weights without training, `--skip-gen` skips the per-epoch answers). A run takes about a
+minute per epoch and ten seconds for the measures after training.
+
+**On the page.** The question *Chat: ask the model about a case?* (recipe ⑰, `#chat/train`) shares the Train step
+with the reports question: the same lab, controls, curves, trays and diagram cards, on this corpus and this model,
+with the loss by role instead of by section and, as the third chart, the answers the model writes for eight test
+transcripts after every epoch; the two worlds keep their own state, so a run on one goes on while the other is on
+screen. *Specimens* shows a transcript with every token coloured by its role (system, user, findings, question,
+assistant, tool), the style, the instruction with which phrasing it is, the question and, under *Reveal*, the case
+and the rule's answer; an explainer card walks from pretraining to instruction tuning to preference tuning, shows
+what a real system prompt looks like, says what an agent is (the chatbot in a loop with a program, the agency in the
+loop) and what this toy cannot do; a table lists the trained and the held-out phrasings and the probes; and the
+training, test and held-out-phrasing transcripts are cards coloured by style. *Test* is the chat box: the style, the
+instruction (a trained phrasing, the held-out one, a line never seen, or one's own words), the case with its
+findings, and the question (one of the eight, one never asked, or one's own) make the prompt, shown as the model
+sees it, words it has no token for marked as unknown; *Ask* makes the model continue the transcript from
+`ASSISTANT:` one word at a time at the chosen pace, each word coloured by its probability and the bars showing what
+it chose from, and the rule's answer appears after, with whether the answer is exact, right in its first word, and
+in the style the instruction asked for. In the agent style the page is the program of the loop: when the assistant's
+line is `findings()` it pastes the analyser's findings for the case back as a `TOOL` turn and lets the model go on,
+and a numbered list shows the loop's steps as they happen. *Next transcript* (or <kbd>N</kbd>) asks the next test
+transcript as written, and the tally counts the answers exact and the first words right over the trained or the
+held-out phrasings (*Ask all* runs the whole set); changing anything makes a prompt of one's own, compared with the
+rule's answer where there is one and not tallied. The three diagram cards of the reports question follow the
+transcript the model continued. The transcripts (1.8 MB) and the trained model (0.4 MB) load with the page.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -878,6 +974,27 @@ corpus without them will show what a model trained only on confident text does w
 row, invasion under a normal surface, is real, rare and never trained on, to ask whether the model learned the
 findings or the templates. A report is 94 to 179 word tokens, 133 on average, over a vocabulary of 277.
 
+`tools/generate_chat.js` (no dependencies) writes the transcripts of the chat question to `data/chat/chat_data.js`
+(1.8 MB), from the cases of the report corpus: for every training report one transcript of each of three styles,
+2,400 in all, and for every test report one of each style on the trained phrasings (300) and one on the held-out
+phrasings (300), with a sheet of examples in `data/chat/sample_transcripts.md`. A transcript is a system line, the
+persona *You are a pathology assistant.* followed by an instruction, then the user's turn, then the assistant's. In
+the *brief* and the *full sentence* styles the user's turn is *Here are the findings.*, the findings block of the
+case, and one of eight questions (the diagnosis, muscularis propria, invasion, carcinoma in situ, the nest contours,
+the surface, inflammation, whether the case can be signed out as benign), answered from the findings by the rule of
+the report corpus, in a word or two or in a full sentence with the reason, as the instruction asks. In the *agent*
+style the user's turn is the question alone: the assistant's first turn is `findings()`, a tool call, a TOOL turn
+holds the findings block, and the assistant answers briefly after it. Every style's instruction comes in three
+phrasings in training (*Answer briefly.*, *Be brief.*, *Reply briefly.*; *Answer in a full sentence, with the
+reason.* and two variants; *Call findings() to get the analyser's findings before you answer.* and two variants) and
+a fourth is held out (*Keep the answer brief.*, *Explain the reason in a full sentence.*, *Get the findings with
+findings() first, then answer.*), to ask whether the instruction's words carry any meaning beyond the transcripts they
+appeared in. Four probe questions never asked in training (*What is the patient's name?*, *Is this cancer?*, *What
+stage is it?*, *Is the margin clear?*) and three system lines never seen (*Keep your answers short.*, *Please explain
+your reasoning.*, *You are a helpful assistant.*) are kept for the page. The vocabulary is 133 words; a transcript is
+70 to 96 tokens. `js/chat.js` gives every token its role (system, user, findings, question, assistant, tool), finds
+the assistant's last answer, and says whether an assistant line is the tool call.
+
 ## Code map
 
 ```
@@ -886,6 +1003,7 @@ css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation (browser + Node)
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token (browser + Node)
+js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
@@ -895,6 +1013,8 @@ data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' 
 data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
 data/reports/reports_data.js the reports of the language-model question in preparation: 908 synthetic bladder biopsy reports with their hidden cases, written by tools/generate_reports.js; sample_reports.md beside it is a sheet of 21 for reading
 data/reports/lm_weights.js  the trained report model with its vocabulary (seed 1 of the shipped configuration), written by tools/check_reports.js --save
+data/chat/chat_data.js     the transcripts of the chat question: 2,400 training, 300 test and 300 held-out-phrasing transcripts written from the report corpus's cases by tools/generate_chat.js; sample_transcripts.md shows the phrasings, the questions with both answers for four cases, and one transcript of each style
+data/chat/chat_weights.js  the trained chat model with its vocabulary and the curves of its training, written by tools/check_chat.js --save
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -905,6 +1025,8 @@ tools/check_slides.js      the slide models in Node: attention pooling against a
 tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
 tools/generate_reports.js  make the reports: a findings block and a sign-out written from a hidden case by a fixed rule, several phrasings per finding
 tools/check_reports.js     train the report language model and take its measures: loss by section, the diagnosis from the prefix and from the block alone, the held-out combination, what it writes from nothing, where the diagnosis looks
+tools/generate_chat.js     make the transcripts: three styles, three phrasings of each instruction and a fourth held out, eight questions answered from the findings by the rule, the probes
+tools/check_chat.js        train the chat model and take its measures: loss by role, the answers written from the transcript up to the last ASSISTANT: by style on the trained and the held-out phrasings and by question, the agent loop, the probes
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```

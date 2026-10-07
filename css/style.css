@@ -569,3 +569,30 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .rp-map line.axis { stroke: var(--line-strong); stroke-width: 1; }
 .rp-text svg.rp-arcs path.hop2 { stroke: var(--irregular); stroke-dasharray: 4 3; }
 .rp-text .tok.reads2 { box-shadow: inset 0 -3px 0 rgba(235, 104, 52, 0.45); }
+
+/* ---------- chat: the transcripts, the chat box, the agent loop ---------- */
+.rp-text .tok.sec-system { color: #8a8fa8; }
+.rp-text .tok.sec-user { color: #9c8f63; }
+.rp-text .tok.sec-question { color: #b8860b; }
+.rp-text .tok.sec-assistant { color: #d8582a; }
+.rp-text .tok.sec-tool { color: #0e9f6e; }
+.thumb.report.ch-brief { border-color: #6b7fd4; }
+.thumb.report.ch-full { border-color: #d4a017; }
+.thumb.report.ch-agent { border-color: #0e9f6e; }
+.legend .swatch.ring.ch-brief { border-color: #6b7fd4; }
+.legend .swatch.ring.ch-full { border-color: #d4a017; }
+.legend .swatch.ring.ch-agent { border-color: #0e9f6e; }
+.tray.reports.scroll { max-height: 300px; overflow: auto; padding: 2px; }
+.ch-prompt { display: grid; gap: 10px; }
+.ch-prompt .row { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px; align-items: start; }
+.ch-prompt .row > .k { color: var(--ink-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding-top: 6px; }
+.ch-prompt select, .ch-prompt input[type=text] { font-family: var(--font-mono); font-size: 12px; padding: 4px 6px; width: 100%; max-width: 440px; box-sizing: border-box; }
+.ch-prompt input[type=text] { margin-top: 6px; }
+.ch-prompt .rp-case .row { grid-template-columns: 190px 1fr; gap: 6px; }
+.ch-prompt #ch-case-name { font-family: var(--font-mono); font-size: 12px; min-width: 80px; text-align: center; }
+.ch-steps { margin: 8px 0 0; padding-left: 20px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); display: grid; gap: 4px; }
+.ch-steps li.now { color: var(--ink); font-weight: 600; }
+.ch-explain { display: grid; gap: 16px 20px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.ch-explain h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.ch-explain p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
+.ch-sys { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 0 0 8px; color: var(--ink); }
