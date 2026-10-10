@@ -722,7 +722,7 @@ word's row enlarged, the row of its position from the second table added to it, 
 and the eight rows nearest to it by cosine, random words before training and the states of a line, the numbers or
 the words of a phrase after; every cell has a tooltip and a row hovered is marked on the report, and the note says
 why training makes rows alike (two words that must predict the same next words are scored the same way by the
-output layer, which is a third table of the same shape). *How a word was chosen*
+output layer, which is a third table of the same shape), and that today's large models keep no position table but fold the position into each head's match as a rotation, of which the toy's distance cost per head is the small cousin. *How a word was chosen*
 draws the network itself for that word, as circles and lines like the diagrams of the earlier questions: one column
 per step, the input (the vector of the word before it plus its position vector), then for each layer the two heads'
 queries, the five words each head reads most, their messages, what the layer hears, the add, the feed-forward and the
