@@ -698,7 +698,15 @@ the findings block alone, the measure the page used before its Test step was giv
 **On the page.** The question *Reports: write the report from the findings?* (recipe ⑯, `#reports/train`) has the
 same three steps as the others. *Specimens* shows a report with its sections, and under *Reveal* the hidden case
 behind it and the rule table, with the training, test and never-trained-on reports as cards coloured by diagnosis.
-*Train* trains the model live, in batches of four reports so that the page stays responsive (an epoch is about half
+A *From text to tokens* card shows the same report as the model receives it: every token a chip with its number
+in the vocabulary (whole words, numbers, punctuation marks and the newline, with the start, the end and ⟨?⟩ as
+specials), the vocabulary of 281 as a table with how often each token occurs in the training reports and in which
+section, the two marking each other on hover, and a box to put a word of one's own through the tokenizer, which
+shows an unseen word becoming ⟨?⟩. A switch shows the same report in *sub-word pieces* instead, from a byte-pair
+tokenizer learned on the training reports the way a real model's tokenizer is built (start from single letters,
+merge the most frequent adjacent pair, repeat; 50, 200 or 600 merges), with the pieces in use as the table: frequent
+words become one piece, rare ones several, and a word never seen is still written in pieces that were, so nothing
+has to become ⟨?⟩. *Train* trains the model live, in batches of four reports so that the page stays responsive (an epoch is about half
 a minute; 48 or 32 numbers per token, position vectors on or off, the epochs, the learning rate and the seed as
 controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
 model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
@@ -707,8 +715,14 @@ screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
 it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words the
 model read to expect it, standing at the word before, light up on the report with lines to them, in the layer and
-head chosen, the deeper the underline and the thicker the line the more it listened; click a word to keep it. Three
-cards follow the same word (the first word of the diagnosis when none is hovered or kept). *How a word was chosen*
+head chosen, the deeper the underline and the thicker the line the more it listened; click a word to keep it. Four
+cards follow the same word (the first word of the diagnosis when none is hovered or kept). *The lookup table* draws
+the embedding matrix itself, every word of the vocabulary a row of 48 numbers as a heat map, with the followed
+word's row enlarged, the row of its position from the second table added to it, the sum that enters the first layer,
+and the eight rows nearest to it by cosine, random words before training and the states of a line, the numbers or
+the words of a phrase after; every cell has a tooltip and a row hovered is marked on the report, and the note says
+why training makes rows alike (two words that must predict the same next words are scored the same way by the
+output layer, which is a third table of the same shape). *How a word was chosen*
 draws the network itself for that word, as circles and lines like the diagrams of the earlier questions: one column
 per step, the input (the vector of the word before it plus its position vector), then for each layer the two heads'
 queries, the five words each head reads most, their messages, what the layer hears, the add, the feed-forward and the
@@ -1002,7 +1016,7 @@ index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation (browser + Node)
-js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token (browser + Node)
+js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)

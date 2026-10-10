@@ -104,5 +104,23 @@
     return { dx, mp, text: `${dx} ${mp}` };
   }
   const CLASS_NAMES = { benign: 'benign', reactive: 'reactive', denuded: 'denuded', cis: 'CIS', suspicious: 'suspicious', invasive: 'invasive', 'invasive-mp': 'invasive, MP', other: 'other', none: 'none' };
-  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, classOf, blockOf, findingsOf, ruleOf, FINDINGS, CLASS_NAMES, START, END, UNK, NL, SECTIONS, HEADERS };
+  // a byte-pair tokenizer, the way a real model's tokenizer is built, for the page's demonstration: start from single
+  // letters with a mark for the end of a word, merge the most frequent adjacent pair over the training words, repeat
+  // n times; a word, seen or not, is then written in the pieces the merges made
+  const BPE_EOW = '·';
+  function bpeLearn(texts, n) {
+    const freq = new Map(); for (const t of texts) for (const w of tokenize(t)) if (/^[A-Za-z]/.test(w)) freq.set(w, (freq.get(w) || 0) + 1);
+    const words = [...freq.entries()].map(([w, f]) => ({ syms: [...w, BPE_EOW], f })), merges = [];
+    for (let m = 0; m < n; m++) {
+      const pairs = new Map(); for (const { syms, f } of words) for (let i = 0; i + 1 < syms.length; i++) { const k = syms[i] + '\u0000' + syms[i + 1]; pairs.set(k, (pairs.get(k) || 0) + f); }
+      let best = null, bf = 0; for (const [k, f] of pairs) if (f > bf) { bf = f; best = k; }
+      if (!best) break;
+      const [a, b] = best.split('\u0000'); merges.push([a, b]);
+      for (const w of words) { const s = w.syms; for (let i = 0; i + 1 < s.length; i++) if (s[i] === a && s[i + 1] === b) s.splice(i, 2, a + b); }
+    }
+    return { merges, freq };
+  }
+  function bpeEncode(word, bpe) { const s = [...word, BPE_EOW]; for (const [a, b] of bpe.merges) for (let i = 0; i + 1 < s.length; i++) if (s[i] === a && s[i + 1] === b) s.splice(i, 2, a + b); return s; }
+  function bpeVocab(bpe) { const count = new Map(); for (const [w, f] of bpe.freq) for (const p of bpeEncode(w, bpe)) count.set(p, (count.get(p) || 0) + f); return [...count.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)); } // the pieces in use over the training words, most frequent first
+  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, classOf, blockOf, findingsOf, ruleOf, bpeLearn, bpeEncode, bpeVocab, BPE_EOW, FINDINGS, CLASS_NAMES, START, END, UNK, NL, SECTIONS, HEADERS };
 });

@@ -2537,6 +2537,61 @@ window.Viz = (function () {
     return { h, j, text: `${hd.name}: “${m.words[j]}” (word ${j}, ${m.q - j} back) · match ${f(hd.match[j])} − cost ${hd.costs[j].toFixed(2)} = ${f(hd.score[j])} → share ${pctText(hd.share[j])} (the match alone would give ${pctText(hd.matchOnly[j])})` };
   }
   // the vocabulary on two axes: opt = { points: [{ id, word, x, y, color, label }], W, H, xLabel, yLabel }
+  // ---- the lookup table: the embedding matrix as a heat map (every word a row), the followed word's row with its
+  // position vector and their sum, and the rows nearest to it by cosine; one colour scale for the whole table
+  const ET_W = 800;
+  function layoutEmbTable(m) {
+    const V = m.V, D = m.D, thumbRow = V > 220 ? 1 : V > 110 ? 2 : 3, thumb = { x: 12, y: 40, w: 96, h: V * thumbRow, cw: 96 / D, row: thumbRow };
+    const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = m.pos ? 3 : 1, nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
+    return { thumb, rows, nbY, nbH, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22) };
+  }
+  function drawEmbeddingTable(canvas, m) {
+    const L = layoutEmbTable(m), c = colors(), ctx = fitCanvas(canvas, ET_W, L.H), { thumb, rows } = L, V = m.V, D = m.D, E = m.E, hov = m.hover;
+    canvas._embTable = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono = `500 11px "IBM Plex Mono", ui-monospace, monospace`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    const cut = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
+    ctx.clearRect(0, 0, ET_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, ET_W, L.H);
+    let mx = 1e-9; for (let i = 0; i < E.length; i++) mx = Math.max(mx, Math.abs(E[i])); if (m.pos) for (const v of m.pos) mx = Math.max(mx, Math.abs(v));
+    // the whole table
+    text(`the whole table · ${V} rows × ${D}`, thumb.x, 20, capFont, c.ink3);
+    ctx.fillStyle = c.surface2; ctx.fillRect(thumb.x, thumb.y, thumb.w, thumb.h);
+    for (let v = 0; v < V; v++) { const off = v * D, y = thumb.y + v * thumb.row; for (let d = 0; d < D; d++) { ctx.fillStyle = diverging(E[off + d] / mx); ctx.fillRect(thumb.x + d * thumb.cw, y, thumb.cw, thumb.row); } }
+    ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(thumb.x - 0.5, thumb.y - 0.5, thumb.w + 1, thumb.h + 1);
+    const tick = (v, color, long) => { const y = thumb.y + v * thumb.row + thumb.row / 2; ctx.strokeStyle = color; ctx.lineWidth = long ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(thumb.x + thumb.w + 2, y); ctx.lineTo(thumb.x + thumb.w + (long ? 10 : 6), y); ctx.stroke(); };
+    for (const n of m.neighbours) tick(n.v, c.accent, false);
+    tick(m.v, c.ink, true); { const y = thumb.y + m.v * thumb.row + thumb.row / 2; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(thumb.x - 2, y); ctx.lineTo(thumb.x + thumb.w + 2, y); ctx.stroke(); }
+    if (hov && hov.kind === 'thumb') tick(hov.v, c.ink2, true);
+    text('this word', thumb.x + thumb.w + 13, thumb.y + m.v * thumb.row - 5, mono9, c.ink3);
+    // the followed word's row, the position vector, the sum
+    const cells = (x, y, code, hovD) => { for (let d = 0; d < D; d++) { ctx.fillStyle = diverging(code[d] / mx); ctx.fillRect(x + d * rows.cw, y, rows.cw - 1, rows.h); } if (hovD != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x + hovD * rows.cw - 1.5, y - 1.5, rows.cw + 2, rows.h + 3); } };
+    const label = (t, y, color) => text(t, rows.labelX, y + rows.h / 2, mono, color || c.ink, 'right', 'middle');
+    const hd = key => (hov && hov.kind === 'cell' && hov.row === key ? hov.d : null);
+    const emb = E.subarray(m.v * D, (m.v + 1) * D);
+    text(`row ${m.v} of the table, looked up for “${cut(m.word, 24)}”`, rows.xs, 20, capFont, c.ink3);
+    label(`“${cut(m.word, 14)}” row ${m.v}`, rows.y); cells(rows.xs, rows.y, emb, hd('word'));
+    if (m.pos) {
+      const sum = Float64Array.from(emb, (x, d) => x + m.pos[d]);
+      label(`+ position ${m.posIndex}`, rows.y + rows.pitch, c.ink2); cells(rows.xs, rows.y + rows.pitch, m.pos, hd('pos'));
+      label('= into the network', rows.y + 2 * rows.pitch, c.ink2); cells(rows.xs, rows.y + 2 * rows.pitch, sum, hd('sum'));
+    }
+    // the nearest rows
+    text(`the ${m.neighbours.length} rows nearest to it, by cosine${m.trained ? '' : ' · random before training'}`, rows.xs, L.nbY - 16, capFont, c.ink3);
+    m.neighbours.forEach((n, k) => { const y = L.nbY + k * L.nbH, on = hov && hov.kind === 'nb' && hov.k === k; label(`${cut(n.word, 14)} ${n.cos.toFixed(2)}`, y, on ? c.ink : c.ink2); cells(rows.xs, y, E.subarray(n.v * D, (n.v + 1) * D), on ? hov.d : null); if (on) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1; ctx.strokeRect(rows.xs - 2.5, y - 2.5, rows.w + 4, rows.h + 5); } });
+    text(`red positive, blue negative, one scale for the whole table (±${mx.toFixed(2)})`, rows.xs, L.H - 13, mono9, c.ink3);
+  }
+  function hitEmbeddingTable(canvas, px, py, m) {
+    const L = canvas._embTable; if (!L) return null;
+    const s = ET_W / canvas.clientWidth, x = px * s, y = py * s, { thumb, rows } = L, D = m.D, f = v => fmtSigned(v, 2), E = m.E;
+    if (x >= thumb.x - 2 && x <= thumb.x + thumb.w + 12 && y >= thumb.y && y < thumb.y + thumb.h) { const v = Math.min(m.V - 1, Math.max(0, Math.floor((y - thumb.y) / thumb.row))); return { kind: 'thumb', v, text: `row ${v}: “${m.words[v]}”${m.counts ? ` · ${m.counts[v]} times in training` : ''}` }; }
+    const inStrip = y0 => y >= y0 - 2 && y <= y0 + rows.h + 2, dOf = () => Math.min(D - 1, Math.max(0, Math.floor((x - rows.xs) / rows.cw))), inX = x >= rows.xs - 2 && x <= rows.xs + rows.w + 2, inLabel = x >= rows.labelX - 130 && x < rows.xs;
+    const emb = E.subarray(m.v * D, (m.v + 1) * D);
+    if (inX && inStrip(rows.y)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `“${m.word}” number ${d + 1} of ${D} = ${f(emb[d])} · learned, looked up by the word’s row` }; }
+    if (m.pos && inX && inStrip(rows.y + rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'pos', d, text: `position ${m.posIndex} number ${d + 1} = ${f(m.pos[d])} · learned, one row per position` }; }
+    if (m.pos && inX && inStrip(rows.y + 2 * rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'sum', d, text: `into the network, number ${d + 1} = ${f(emb[d] + m.pos[d])} (${f(emb[d])} + ${f(m.pos[d])})` }; }
+    for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}” · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
+    return null;
+  }
   function drawWordMap(svg, opt) {
     const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
@@ -2552,5 +2607,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();
