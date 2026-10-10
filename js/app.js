@@ -2787,7 +2787,7 @@
     L.train = D.train.map(r => prep(r, 'train')); L.test = D.test.map(r => prep(r, 'test')); L.held = (D.held || D.rephrased || []).map(r => prep(r, 'held'));
     L.all = [...L.train, ...L.test, ...L.held]; L.byId = new Map(L.all.map(r => [r.id, r]));
     L.nl = L.vocab.index.get('\n');
-    const secCount = L.vocab.words.map(() => ({})); for (const r of L.train) r.tokens.forEach((t, k) => { const sec = r.sections[k]; secCount[t][sec] = (secCount[t][sec] || 0) + 1; });
+    const secCount = L.vocab.words.map(() => ({})); L.wordCount = new Float64Array(L.vocab.size); for (const r of L.train) r.tokens.forEach((t, k) => { L.wordCount[t]++; const sec = r.sections[k]; secCount[t][sec] = (secCount[t][sec] || 0) + 1; });
     L.wordSec = secCount.map(cnt => { let best = null, bv = 0; for (const sec of WD.sections) if ((cnt[sec] || 0) > bv) { bv = cnt[sec]; best = sec; } return best; }); // the section each word mostly appears in
     L.built = true;
     return true;
@@ -3020,7 +3020,59 @@
       ['atypia or denuded', 'atypical, irregular, desmoplasia', 'Urothelial carcinoma, invasive into lamina propria (into muscularis propria when involved), with associated carcinoma in situ when the surface shows atypia', '20%'],
       ['atypia', 'atypical, contours and desmoplasia discordant', 'Urothelial carcinoma in situ with foci suspicious for invasion', '5%'], ['normal', 'atypical, irregular, desmoplasia', 'Urothelial carcinoma, invasive into lamina propria', 'never trained on']].map(row => `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td><td class="num">${row[3]}</td></tr>`).join('')}</tbody></table><p class="small muted" style="margin-top:8px">A line on the muscularis propria closes every diagnosis. Inflammation bears on nothing. The last row is real and rare, and the training set never holds it: whether the model still calls invasion when it meets it says whether it learned the findings or the templates.</p>`;
     for (const [id, el] of L.dataThumbs) el.classList.toggle('selected', id === L.dataSelected);
+    rpRenderTokens();
   }
+  // ---- Specimens: from text to tokens, and the sub-word pieces a real tokenizer would make
+  function rpBpe(n) { const L = S.rp; L.bpes = L.bpes || {}; if (!L.bpes[n]) L.bpes[n] = RPR.bpeLearn(L.train.map(r => r.text), n); return L.bpes[n]; } // the byte-pair tokenizer learned on the training reports, once per merge count
+  const rpTokMode = () => S.rp.tokMode || 'words', rpBpeN = () => S.rp.bpeN || 200, rpIsWord = w => /^[A-Za-z]/.test(w);
+  function rpRenderTokens() {
+    const L = S.rp, r = L.byId.get(L.dataSelected) || L.train[0], mode = rpTokMode(), n = rpBpeN(), el = $('rp-tokens'), sp = w => w === RPR.START || w === RPR.END;
+    document.querySelectorAll('#rp-tok-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.pieces === mode)); $('rp-bpe-n').value = String(n); $('rp-bpe-n').hidden = mode !== 'bpe';
+    let html = '';
+    if (mode === 'words') r.words.forEach((w, i) => { const v = r.tokens[i]; html += `<span class="tk${sp(w) || w === '\n' ? ' sp' : ''}${v === L.vocab.unk ? ' unk' : ''}" data-i="${i}" data-v="${v}">${esc(rpWordLabel(w))}<span class="id">${v}</span></span>${w === '\n' ? '<br>' : ''}`; });
+    else { const bpe = rpBpe(n); r.words.forEach((w, i) => { if (w === '\n') { html += `<span class="tk sp" data-i="${i}">↵</span><br>`; return; } if (sp(w)) { html += `<span class="tk sp" data-i="${i}">${esc(rpWordLabel(w))}</span>`; return; } const pcs = rpIsWord(w) ? RPR.bpeEncode(w, bpe) : [w]; html += `<span class="wd">${pcs.map((p, k) => `<span class="tk" data-i="${i}" data-k="${k}" data-p="${esc(p)}">${esc(p)}</span>`).join('')}</span>`; }); }
+    el.innerHTML = html;
+    rpRenderVocab(mode, n); rpTokDetail(null); rpRenderTry();
+    $('rp-tok-note').textContent = mode === 'words'
+      ? `A tokenizer splits the text into pieces; this one takes whole words, numbers, punctuation marks and the newline: ${r.tokens.length - 2} tokens for this report, plus the start and the end. The vocabulary is the list of every piece seen in the training reports, most frequent first, with three specials: the start, the end, and ⟨?⟩ for a piece that is not in the list. Encoding replaces every piece by its number in the list and decoding is the reverse, so the model never sees letters: this report is ${r.tokens.length} numbers between 0 and ${L.vocab.size - 1}. A word that is not in the list becomes ⟨?⟩, and nothing of it survives; try one below. Hover a token for its number and how often it occurs.`
+      : `A real tokenizer works on sub-word pieces, learned like this: start from single letters, with a dot for the end of a word, merge the most frequent adjacent pair across the training words, and repeat; ${n} merges on these reports give the pieces on the right. Frequent words end up as one piece and rare ones as several, and a word never seen can still be written in pieces that were, so nothing has to become ⟨?⟩ and the spelling is partly carried: a piece shared by two words gives them something in common before any training. Real vocabularies hold tens of thousands of pieces, learned the same way on far more text. Try a word below, and raise or lower the merges.`;
+  }
+  function rpRenderVocab(mode, n) { // the vocabulary, or the pieces in use, as a table; built once per mode and merge count
+    const L = S.rp, el = $('rp-vocab'), key = `${L.vocab.size}:${mode}:${n}`; if (el.dataset.key === key) return; el.dataset.key = key;
+    if (mode === 'words') { $('rp-vocab-title').textContent = `The vocabulary · ${L.vocab.size} tokens, most frequent first`; el.innerHTML = `<table><thead><tr><th class="num">#</th><th>token</th><th class="num">in training</th><th>mostly in</th></tr></thead><tbody>${L.vocab.words.map((w, v) => `<tr data-v="${v}"><td class="num">${v}</td><td>${esc(rpWordLabel(w))}</td><td class="num">${L.wordCount ? L.wordCount[v] : ''}</td><td class="sec">${L.wordSec[v] || '–'}</td></tr>`).join('')}</tbody></table>`; }
+    else { const pcs = RPR.bpeVocab(rpBpe(n)); $('rp-vocab-title').textContent = `The pieces · ${n} merges, ${pcs.length} pieces in use`; el.innerHTML = `<table><thead><tr><th class="num">#</th><th>piece</th><th class="num">in training</th></tr></thead><tbody>${pcs.map(([p, f], k) => `<tr data-p="${esc(p)}"><td class="num">${k}</td><td>${esc(p)}</td><td class="num">${f}</td></tr>`).join('')}</tbody></table>`; }
+  }
+  function rpVocabRow(row) { const box = $('rp-vocab'); box.querySelectorAll('tr.is-hl').forEach(x => x.classList.remove('is-hl')); if (!row) return; row.classList.add('is-hl'); box.scrollTop = Math.max(0, row.offsetTop - box.clientHeight / 2); } // mark a row of the table and bring it into the box's view, without moving the page
+  function rpTokDetail(t) { // what a hovered chip is: the token's number and frequency, or the piece and its word
+    const L = S.rp, el = $('rp-tok-detail'), r = L.byId.get(L.dataSelected) || L.train[0];
+    if (!t) { rpVocabRow(null); el.textContent = rpTokMode() === 'words' ? 'Hover a token for its number, how often it occurs in the training reports and in which section.' : 'Hover a piece for the word it comes from, and the table for how often the piece occurs.'; return; }
+    const i = +t.dataset.i, w = r.words[i];
+    if (rpTokMode() === 'words') { const v = +t.dataset.v; el.innerHTML = `<b>${esc(rpWordLabel(w))}</b> · token ${i} of ${r.tokens.length - 1} · number ${v} in the vocabulary · ${L.wordCount[v]} times in the training reports${L.wordSec[v] ? `, mostly in the ${L.wordSec[v]} section` : ''}${v === L.vocab.unk ? ' · not in the vocabulary' : ''}`; rpVocabRow($('rp-vocab').querySelector(`tr[data-v="${v}"]`)); }
+    else { const p = t.dataset.p; el.innerHTML = p != null ? `<b>${esc(p)}</b> · piece ${+t.dataset.k + 1} of ${t.parentElement.childElementCount} of “${esc(rpWordLabel(w))}”` : `<b>${esc(rpWordLabel(w))}</b>`; rpVocabRow(p != null ? [...$('rp-vocab').querySelectorAll('tr[data-p]')].find(x => x.dataset.p === p) : null); }
+  }
+  function rpRenderTry() { // a word of one's own through the tokenizer on screen
+    const L = S.rp, word = ($('rp-tok-try').value || '').trim(), out = $('rp-tok-try-out'); if (!word) { out.innerHTML = ''; return; }
+    const toks = RPR.tokenize(word);
+    if (rpTokMode() === 'words') { const unk = toks.filter(w => !L.vocab.index.has(w)); out.innerHTML = `<span class="arrow">→</span> ${toks.map(w => { const v = L.vocab.index.has(w) ? L.vocab.index.get(w) : L.vocab.unk; return `<span class="tk${v === L.vocab.unk ? ' unk' : ''}">${esc(v === L.vocab.unk ? RPR.UNK : w)}<span class="id">${v}</span></span>`; }).join('')} <span class="small muted">${unk.length ? `${unk.map(w => `“${esc(w)}”`).join(', ')} not in the vocabulary: ${unk.length === 1 ? 'it goes' : 'they go'} in as ⟨?⟩` : 'in the vocabulary'}</span>`; }
+    else { const bpe = rpBpe(rpBpeN()), parts = toks.map(w => (rpIsWord(w) ? RPR.bpeEncode(w, bpe) : [w])); out.innerHTML = `<span class="arrow">→</span> ${parts.map(pcs => `<span class="wd">${pcs.map(p => `<span class="tk">${esc(p)}</span>`).join('')}</span>`).join('')} <span class="small muted">${parts.map(p => p.length).reduce((a, b) => a + b, 0)} piece${parts.length === 1 && parts[0].length === 1 ? '' : 's'}, every one in the table</span>`; }
+  }
+  // ---- the lookup table on the Train step: the embedding matrix, the followed word's row with its position vector, and the rows nearest to it
+  function rpRenderEmbedding(view) {
+    const L = LM(), m = L.model, canvas = $('rp-emb'); if (!canvas || !m || !view) return;
+    const i = rpFocusWord(view), v = view.tokens[i], D = m.D, V = m.V, E = m.E, row = E.subarray(v * D, (v + 1) * D);
+    let nr = 0; for (const x of row) nr += x * x; nr = Math.sqrt(nr) || 1e-9;
+    const sims = []; for (let u = 0; u < V; u++) { if (u === v) continue; let dot = 0, nu = 0; const off = u * D; for (let d = 0; d < D; d++) { dot += E[off + d] * row[d]; nu += E[off + d] * E[off + d]; } sims.push({ v: u, cos: dot / (nr * (Math.sqrt(nu) || 1e-9)) }); }
+    sims.sort((a, b) => b.cos - a.cos);
+    const nb = sims.slice(0, 8).map(x => ({ v: x.v, cos: x.cos, word: rpWordLabel(L.vocab.words[x.v]) })), word = rpWordLabel(view.words[i]);
+    const model = { E, V, D, v, word, words: L.vocab.words.map(rpWordLabel), pos: m.Pos && i < m.P ? m.Pos.subarray(i * D, (i + 1) * D) : null, posIndex: i, neighbours: nb, hover: L.hoverEmb || null, trained: m.steps > 0, counts: L.wordCount || null };
+    canvas._model = model; Viz.drawEmbeddingTable(canvas, model);
+    $('rp-emb-title').textContent = `The lookup table: every word is a row of ${D} numbers · “${word}”`;
+    const three = nb.slice(0, 3).map(x => `“${x.word}”`).join(', ');
+    $('rp-emb-note').textContent = m.steps === 0
+      ? `Row ${v} is all that “${word}” is to the model: ${D} numbers, looked up by the word’s number and nothing else${model.pos ? `, with the row of position ${i} from a second table of ${m.P} rows added before the first layer` : ''}. Before training the table is random numbers from the seed, so the rows nearest to “${word}” are random words: ${three}. Every step moves the rows of the words in the batch, pulled towards whatever makes their next words more probable. Train, or load the trained model, and watch the neighbours become the states of a line, the numbers, the words of a phrase.`
+      : `Row ${v} is all that “${word}” is to the model: ${D} numbers, looked up by the word’s number and nothing else${model.pos ? `, with the row of position ${i} from a second table of ${m.P} rows added before the first layer` : ''}. Training moved the rows: two words that have to predict the same next words end up with similar rows, because the output layer scores them the same way, which is why the rows nearest to “${word}” are now ${three}. The output layer is a third table of the same shape read the other way, a score for every word from the last vector, and it is what the map below draws by default. Hover a cell for its value, a row for its word; the row hovered is marked on the text above.`;
+  }
+  function rpMarkWord(view, v) { const el = view.textEl; el.querySelectorAll('.tok.att-k').forEach(s => s.classList.remove('att-k')); if (v == null) return; el.querySelectorAll('.tok').forEach(s => { if (view.tokens[+s.dataset.i] === v) s.classList.add('att-k'); }); } // every occurrence of a word on the text
   // ---- Test: the findings go in, the model writes the report
   function rpCaseSet() { const L = S.rp; return L.cases === 'held' ? L.held : L.test; }
   function rpEnterTest() { const L = S.rp; if (!rpData() || !rpBuild()) return; if (!L.model) rpReset(); L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpTrays('test', rpTestSelect); rpBuildForm(); if (!L.form) rpLoadCase(rpCaseSet()[Math.min(L.trial.next, rpCaseSet().length - 1)]); rpRenderTest(); }
@@ -3147,6 +3199,7 @@
     rpHighlight(view.textEl, view.fw, i, { soft });
     if (onTest && view.nextEl) { const s = view.steps.find(x => x.at === i); $(view.nextEl).innerHTML = s ? rpNextWordHtml(s.probs, null, s.token, `word ${view.steps.indexOf(s) + 1} it wrote, “${rpWordLabel(view.words[i])}”: what the model chose from`) : rpNextWordHtml(view.fw.probs[i - 1], view.tokens[i], null, `before “${rpWordLabel(view.words[i])}”, given in the prompt: what the model expected`); }
     else rpRenderNextWord(soft ? null : i);
+    if (!onTest) rpRenderEmbedding(view);
     rpRenderNet(view); rpRenderHeads(view); rpRenderAttention(view, true);
   }
   // lines over the report, from the word followed to the words the model read for it
@@ -3550,6 +3603,17 @@
     for (const pre of ['rp-', 'rp-test-', 'ch-test-']) { const ch = $(`${pre}heads`); if (!ch) continue; rpBindTip(ch, $(`${pre}heads-tip`), (c, x, y) => (c._model ? Viz.hitHeadRows(c, x, y, c._model) : null), h => { L.hoverHeads = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderHeads(view); rpMarkPair(view.textEl, null, h ? h.j : null); }); }
     document.querySelectorAll('#rp-map-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.map; if (v === L.map.mode) return; L.map.mode = v; rpSyncControls(); if (!L.model) return; if (v === 'tsne') rpMapRestart(true); else { L.map.running = false; rpRenderWordMap(); } }));
     document.querySelectorAll('#rp-map-src-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.src; if (v === L.map.source) return; L.map.source = v; L.pcaAxes = null; rpSyncControls(); if (!L.model) return; if (L.map.mode === 'tsne') rpMapRestart(true); else rpRenderWordMap(); }));
+    // from text to tokens: the pieces, the merges, a word of one's own, the chips and the table marking each other
+    document.querySelectorAll('#rp-tok-seg button').forEach(b => b.addEventListener('click', () => { S.rp.tokMode = b.dataset.pieces; if (S.rp.built) rpRenderTokens(); }));
+    $('rp-bpe-n').addEventListener('change', () => { S.rp.bpeN = +$('rp-bpe-n').value; if (S.rp.built) rpRenderTokens(); });
+    $('rp-tok-try').addEventListener('input', () => { if (S.rp.built) rpRenderTry(); });
+    const tokBox = $('rp-tokens'), unmark = () => tokBox.querySelectorAll('.tk.is-hl').forEach(x => x.classList.remove('is-hl'));
+    tokBox.addEventListener('mouseover', ev => { const t = ev.target.closest('.tk'); unmark(); if (t && tokBox.contains(t) && t.dataset.i != null) { t.classList.add('is-hl'); rpTokDetail(t); } });
+    tokBox.addEventListener('mouseleave', () => { unmark(); rpTokDetail(null); });
+    $('rp-vocab').addEventListener('mouseover', ev => { const row = ev.target.closest('tr[data-v], tr[data-p]'); unmark(); if (!row) return; if (row.dataset.v != null) tokBox.querySelectorAll(`.tk[data-v="${row.dataset.v}"]`).forEach(x => x.classList.add('is-hl')); else for (const x of tokBox.querySelectorAll('.tk[data-p]')) if (x.dataset.p === row.dataset.p) x.classList.add('is-hl'); });
+    $('rp-vocab').addEventListener('mouseleave', unmark);
+    // the lookup table: a tooltip on every cell and row; a row hovered is marked on the text
+    const embCv = $('rp-emb'); if (embCv) rpBindTip(embCv, $('rp-emb-tip'), (c, x, y) => (c._model ? Viz.hitEmbeddingTable(c, x, y, c._model) : null), h => { L.hoverEmb = h; const view = rpView(false); if (!view) return; rpRenderEmbedding(view); rpMarkWord(view, h && h.kind !== 'cell' ? h.v : null); });
     // the Test step
     $('rp-write').addEventListener('click', rpWrite); $('rp-next-case').addEventListener('click', () => rpNextCase()); $('rp-write-all').addEventListener('click', () => (L.batchWriting ? (L.batchWriting = false, $('rp-write-all').textContent = 'Write all') : rpWriteAll())); $('rp-test-clear').addEventListener('click', rpTestClear);
     document.querySelectorAll('#rp-cases-seg button').forEach(b => b.addEventListener('click', () => rpSetCases(b.dataset.cases)));

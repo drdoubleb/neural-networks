@@ -849,6 +849,24 @@
           <div><div class="rp-case" id="rp-data-case"></div><p class="small muted" id="rp-data-note" style="margin-top:8px"></p></div>
         </div>
       </div>
+      <div class="card" id="rp-tok-card">
+        <div class="card-head">
+          <h2>From text to tokens</h2>
+          <div class="actions-inline"><span class="small muted">the only thing the model ever sees is a list of numbers · pieces</span><div class="seg small" id="rp-tok-seg"><button type="button" data-pieces="words" class="is-active" title="the toy’s tokenizer: whole words, numbers, punctuation marks and the newline">whole words</button><button type="button" data-pieces="bpe" title="a real tokenizer’s way: sub-word pieces learned on the training reports by merging the most frequent pairs of letters">sub-word pieces</button></div><select id="rp-bpe-n" title="how many pair merges the sub-word tokenizer learned on the training reports" hidden><option value="50">50 merges</option><option value="200" selected>200 merges</option><option value="600">600 merges</option></select></div>
+        </div>
+        <div class="rp-two">
+          <div>
+            <div class="rp-tokens" id="rp-tokens"></div>
+            <p class="small" id="rp-tok-detail" style="margin-top:8px"></p>
+            <div class="rp-try"><label for="rp-tok-try">Try a word of your own:</label><input type="text" id="rp-tok-try" value="cystitis" spellcheck="false" autocomplete="off"><span class="rp-tokens slim" id="rp-tok-try-out"></span></div>
+            <p class="small muted" id="rp-tok-note" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <h3 id="rp-vocab-title">The vocabulary</h3>
+            <div class="rp-vocab" id="rp-vocab"></div>
+          </div>
+        </div>
+      </div>
       <div class="card" id="rp-rule-card" hidden>
         <div class="card-head"><h2>The rule the diagnosis follows</h2><span class="small muted">what the generator did with the findings; the model has to find it in the words</span></div>
         <div class="rp-rule" id="rp-rule"></div>
@@ -904,6 +922,14 @@
         </div>
       </div>
 
+      <div class="card" id="rp-emb-card">
+        <div class="card-head">
+          <h2 id="rp-emb-title">The lookup table: every word is a row of numbers</h2>
+          <span class="small muted">the first thing the model does with a token: look its number up in a table it learns · follows the word hovered or kept on the text above</span>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="rp-emb" width="800" height="340" aria-label="The embedding table: every word of the vocabulary as a row of numbers, the followed word’s row enlarged with its position vector and their sum, and the rows nearest to it by cosine"></canvas><div class="tip" id="rp-emb-tip" hidden></div></div></div>
+        <p class="small muted" id="rp-emb-note" style="margin-top:8px"></p>
+      </div>
       <div class="card" id="rp-net-card">
         <div class="card-head">
           <h2 id="rp-net-title">How a word was chosen</h2>
@@ -1079,7 +1105,7 @@ Keep answers short unless the pathologist asks for the reasoning.
 Never present a diagnosis as final: the pathologist signs out.
 Tools: findings() returns the image analyser's findings for the open case. To call a tool, write its name on a line of its own; the result follows in a TOOL turn.</pre><p>A real chatbot runs with text like this placed before the conversation by the people who run it, often thousands of words of persona, rules, formats and tools, and the model continues from it as from anything else. The words work because the model met instructions like them, in countless phrasings, in instruction tuning. The toy's system line is one sentence, in three phrasings per style: enough for the model to learn each phrasing as a cue for a style of answer, which is the honest description of what it does. On the Test step, rephrase it and watch the cue fail.</p></div>
           <div><h3>An agent</h3><p>An agent is the chatbot in a loop with a program. The model writes a tool call as text; the program sees it, runs the tool, pastes the result into the transcript as a <b>TOOL</b> turn and asks the model to continue; the model reads the result and writes the next step, or the answer. Nothing in the model changes: the agency is the loop. In the agent style here the user asks the question alone, the assistant writes <b>findings()</b>, the page runs it, pastes the analyser's findings for the case, and the assistant answers from them.</p></div>
-          <div><h3>What this toy cannot do</h3><p>Its vocabulary is 133 words, all from these transcripts. It has never read an instruction, only met these; a question it was never asked gets a fluent answer, right or wrong, because the next word is all it knows how to write; <b>findings()</b> is three tokens it learned to write after one kind of system line, not a function it knows. A real model is the same machine with far more words, far more text and the two later stages: better at all of this, and at that last thing too.</p></div>
+          <div><h3>What this toy cannot do</h3><p>Its vocabulary is 133 words, all from these transcripts; a word of your own outside it becomes the <b>⟨?⟩</b> token, whose row in the lookup table (the Reports question’s Train step shows that table) was never trained and has decayed to nothing, so the model sees that something stands there, not what. It has never read an instruction, only met these; a question it was never asked gets a fluent answer, right or wrong, because the next word is all it knows how to write; <b>findings()</b> is three tokens it learned to write after one kind of system line, not a function it knows. A real model is the same machine with far more words, far more text and the two later stages: better at all of this, and at that last thing too.</p></div>
         </div>
       </div>
       <div class="card">

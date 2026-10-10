@@ -596,3 +596,27 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .ch-explain h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 .ch-explain p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-2); }
 .ch-sys { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; white-space: pre-wrap; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 0 0 8px; color: var(--ink); }
+
+/* ---------- reports: from text to tokens, and the lookup table ---------- */
+.rp-tokens { font-family: var(--font-mono); font-size: 12px; line-height: 2.2; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 420px; overflow: auto; }
+.rp-tokens .tk { display: inline-block; padding: 0 5px; margin: 0 3px 0 0; border-radius: 4px; background: var(--surface); border: 1px solid var(--line-strong); line-height: 1.6; cursor: default; vertical-align: middle; }
+.rp-tokens .tk .id { color: var(--ink-3); font-size: 9px; margin-left: 4px; }
+.rp-tokens .tk.sp { color: var(--ink-3); border-style: dashed; }
+.rp-tokens .tk.unk { border-color: var(--bad); color: var(--bad); }
+.rp-tokens .tk.is-hl { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.rp-tokens .wd { display: inline-block; margin-right: 7px; white-space: nowrap; }
+.rp-tokens .wd .tk { margin-right: 0; border-radius: 0; border-left-width: 0; }
+.rp-tokens .wd .tk:first-child { border-radius: 4px 0 0 4px; border-left-width: 1px; }
+.rp-tokens .wd .tk:last-child { border-radius: 0 4px 4px 0; }
+.rp-tokens .wd .tk:only-child { border-radius: 4px; }
+.rp-tokens.slim { display: inline-block; background: none; border: 0; padding: 0; max-height: none; line-height: 1.9; vertical-align: middle; }
+.rp-vocab { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-mono); font-size: 11.5px; background: var(--surface-2); }
+.rp-vocab table { width: 100%; border-collapse: collapse; }
+.rp-vocab th, .rp-vocab td { padding: 2px 8px; text-align: left; white-space: nowrap; }
+.rp-vocab th { position: sticky; top: 0; background: var(--surface-2); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); border-bottom: 1px solid var(--line); }
+.rp-vocab td.num { text-align: right; color: var(--ink-3); }
+.rp-vocab td.sec { color: var(--ink-3); }
+.rp-vocab tr.is-hl td { background: var(--accent-soft); color: var(--ink); }
+.rp-try { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
+.rp-try input { font-family: var(--font-mono); font-size: 12px; padding: 4px 6px; width: 150px; }
+.rp-try .arrow { color: var(--ink-3); }
