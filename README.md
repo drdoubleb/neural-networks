@@ -49,9 +49,9 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists ten questions: a blood count, three nucleus questions, the foundation model, two questions asked
-of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, and the chat
-the same model holds about a case. Whatever the question, the nav has the same three steps, and a lecture recipe
+The masthead lists eleven questions: a blood count, three nucleus questions, the foundation model, two questions
+asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
+chat the same model holds about a case, and the description it writes of a nucleus from its image. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
@@ -181,7 +181,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the eighteen recipe buttons
+## The lecture arc: the nineteen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -207,6 +207,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ⑱ Reports · no context layer · the next word from the current word alone | 36,857 | test loss 0.62 after 10 epochs against 0.16 with two layers; the diagnosis right from the findings for 33% of the test reports, the base rate, and for none of the held-out ones | The lookup table and the output table with no attention between them: every next word from the current word and its position. The reports read as locally fluent nonsense, nothing can read the findings, and the fourth chart stays empty. Set the layers back to 2 and watch what attention buys. |
+| ⑲ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -971,6 +972,19 @@ and the traits still come out right: the image is read early and what was read t
 diagnosis read the findings through the microscopic prose in the reports. At temperature 1 the descriptions keep
 their traits but the grammar slips in about one draw in three (*the, with coarsely granular chromatin clumped*):
 320 descriptions teach four sentence shapes, not the language.
+
+**The page.** *Specimens* shows each nucleus with its description as tokens (the image token drawn as the nucleus
+itself), its four traits, and its code as sixteen bars, with an explainer of the three joins: the image becomes a
+code, the code becomes the first token, the model writes. *Train* is the shared language-model lab: the Reports
+question's Train step on the descriptions, the image token first in every document, the loss by section, the test
+nuclei described after every epoch with all four traits right or not as the third chart, and the share of the
+description's attention on the image token as the fourth; the diagrams read the image token like any word before
+them, and *Load the trained model* brings the shipped model with its curves and its words' paths. *Test* describes
+a test nucleus from its image one word at a time, ticks the four traits the model named against the generator's and
+the impression, and tallies the test set (all four right, and each trait); the image can be swapped for the other
+lab's scan of the same nucleus, for the scan flipped and turned, or for no image at all (a code of zeros), each a
+tally of its own, so that the stain-dependent word, the encoder's invariance and the base rates can each be shown in
+a minute. Recipe ⑲ sets it up.
 
 ## The data
 

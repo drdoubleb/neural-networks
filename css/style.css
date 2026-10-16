@@ -544,6 +544,22 @@ details.fold > ul { margin-top: 8px; }
 .thumb.report.rp-benign { border-color: var(--regular); }
 .thumb.report.rp-cis { border-color: var(--irregular); }
 .thumb.report.rp-inv { border-color: var(--bad); }
+.thumb.report.ds-thumb { height: 62px; grid-template-rows: 42px 14px; padding: 1px; align-content: start; }
+.thumb.report.ds-thumb canvas { width: 40px; height: 40px; margin: 1px auto 0; border-radius: 3px; image-rendering: auto; }
+.thumb.report.ds-thumb .dx { letter-spacing: 1px; }
+.thumb.report.ds-bland, .swatch.ring.ds-bland { border-color: var(--regular); }
+.thumb.report.ds-atyp, .swatch.ring.ds-atyp { border-color: var(--irregular); }
+.tok.tok-img { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; padding: 1px 6px 1px 2px; }
+.tok.tok-img img { width: 28px; height: 28px; border-radius: 3px; display: block; }
+.ds-side { display: flex; flex-direction: column; gap: 10px; }
+.ds-pair { display: flex; gap: 14px; flex-wrap: wrap; } .ds-pair > div { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.ds-nucleus { width: 160px; height: 160px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); image-rendering: auto; display: block; }
+.ds-traits { display: flex; flex-wrap: wrap; gap: 6px; }
+.ds-trait { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); }
+.ds-trait.on { border-color: var(--irregular); color: var(--ink); } .ds-trait b { font-weight: 600; }
+.ds-trait.right { box-shadow: inset 0 0 0 1px var(--good); } .ds-trait.wrong { box-shadow: inset 0 0 0 1px var(--bad); }
+.ds-trait i { font-style: normal; font-weight: 700; } .ds-trait.right i { color: var(--good); } .ds-trait.wrong i { color: var(--bad); }
+.ds-codebox { display: flex; flex-direction: column; gap: 4px; } .ds-code { display: block; max-width: 100%; height: auto; }
 .legend .swatch.ring.inv { border-color: var(--bad); }
 
 /* ---------- reports: the model's diagrams ---------- */
