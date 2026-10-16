@@ -600,7 +600,7 @@
       return { tokens: st.tokens.slice(prefix.length), steps };
     }
     parameterCount() { return this.E.length + (this.Pos ? this.Pos.length : 0) + this.Wout.length + this.bout.length + this.layers.reduce((a, c) => a + c.parameterCount(), 0); }
-    describe() { return `${this.V} words → embedding of ${this.D}${this.P ? ' + position' : ''} → ${this.layers.length} × ${this.layers[0] ? this.layers[0].describe() : ''} → single layer → softmax over the ${this.V} words`; }
+    describe() { return `${this.V} words → embedding of ${this.D}${this.P ? ' + position' : ''} → ${this.layers.length ? `${this.layers.length} × ${this.layers[0].describe()}` : 'no context layer'} → single layer → softmax over the ${this.V} words`; }
     // the weights as plain numbers, to ship a trained model, and a model back from them
     toJSON(meta) {
       const r = v => Array.from(v, q => +q.toPrecision(5));
