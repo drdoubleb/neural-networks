@@ -3143,7 +3143,7 @@
   function rpMarkWord(view, v) { const el = view.textEl; el.querySelectorAll('.tok.att-k').forEach(s => s.classList.remove('att-k')); if (v == null) return; el.querySelectorAll('.tok').forEach(s => { if (view.tokens[+s.dataset.i] === v) s.classList.add('att-k'); }); } // every occurrence of a word on the text
   // ---- Test: the findings go in, the model writes the report
   function rpCaseSet() { const L = S.rp; return L.cases === 'held' ? L.held : L.test; }
-  function rpEnterTest() { const L = S.rp; if (!rpData() || !rpBuild()) return; if (!L.model) rpReset(); L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpTrays('test', rpTestSelect); rpBuildForm(); if (!L.form) rpLoadCase(rpCaseSet()[Math.min(L.trial.next, rpCaseSet().length - 1)]); rpRenderTest(); }
+  function rpEnterTest() { const L = S.rp; if (!rpData() || !rpBuild()) return; rpBuildForm(); if (!L.form) rpLoadCase(rpCaseSet()[Math.min(L.trial.next, rpCaseSet().length - 1)]); if (!L.model) rpReset(); /* a case before the model: the reset renders the step */ L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpTrays('test', rpTestSelect); rpRenderTest(); }
   function rpBuildForm() {
     const L = S.rp, el = $('rp-form'); if (el.childElementCount) return;
     el.innerHTML = RPR.FINDINGS.map(l => `<div class="row" data-key="${l.key}"><label for="rp-f-${l.key}">${esc(l.line)}:</label><select id="rp-f-${l.key}">${l.states.map(s => `<option value="${s}">${s}</option>`).join('')}</select></div>`).join('');
@@ -3498,7 +3498,7 @@
   const chCaseSet = () => (S.ch.cases === 'held' ? S.ch.held : S.ch.test);
   function chChat() { const L = S.ch; if (!L.chat) L.chat = { style: 'brief', line: 0, lineText: '', caseId: null, qi: 0, qText: '', docId: null, view: null }; return L.chat; }
   function chCases() { const L = S.ch; if (!L.caseIds) { L.blocks = new Map(); for (const r of L.all) if (!L.blocks.has(r.case)) L.blocks.set(r.case, CHR.blockOfText(r.text)); L.caseIds = [...new Set(L.test.map(r => r.case))]; } return L.caseIds; } // the test cases, the same for both sets
-  function chEnterTest() { const L = S.ch; if (!LMW().data() || !rpBuild()) return; if (!L.model) rpReset(); L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; chTrays('test'); if (!chChat().caseId) chLoadDoc(chCaseSet()[Math.min(L.trial.next, chCaseSet().length - 1)]); chRenderTest(); }
+  function chEnterTest() { const L = S.ch; if (!LMW().data() || !rpBuild()) return; if (!chChat().caseId) chLoadDoc(chCaseSet()[Math.min(L.trial.next, chCaseSet().length - 1)]); if (!L.model) rpReset(); L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; chTrays('test'); chRenderTest(); }
   function chLoadDoc(r) { // a transcript as written: its style, its instruction, its case and its question
     const L = S.ch, C = chChat(); if (L.writing) chWriteStop(); C.style = r.style; C.line = r.line; C.caseId = r.case; C.qi = r.qi; C.docId = r.id; C.view = null; L.written = null; L.truthShown = false; L.testSelected = r.id;
   }

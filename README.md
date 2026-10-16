@@ -27,7 +27,11 @@ The masthead has two dropdowns: the **question** (which dataset) and the **lectu
 each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
 (input, convolution, hidden units, and the training buttons in the order a resident should try them: Teach next case,
 Step batch, Step epoch, Complete training, Reset); everything else lives under *Advanced settings*. Controls that
-do not apply to the current question are hidden.
+do not apply to the current question are hidden. The masthead's **Glossary** button opens one definition per
+recurring term (loss, epoch, softmax, embedding, attention head, distance cost, calibration, t-SNE and some sixty
+more), in the words the page uses; on the page itself a term is underlined where it first appears in a paragraph or a
+note, hovering it (or tapping it) shows the definition, and the underlines follow the page as it rewrites its notes
+during training. They can be switched off from the glossary, and the choice is kept in the browser.
 
 ## Four questions, one page
 
@@ -1063,6 +1067,7 @@ js/chat.js                 the transcripts of the chat question: the role of eve
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
+js/glossary.js             the glossary: one definition per recurring term, underlined where it first appears in a paragraph (re-marked as the page rewrites its notes), a tooltip on hover, the whole list behind the masthead's Glossary button
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
