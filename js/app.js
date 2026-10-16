@@ -19,8 +19,8 @@
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
-    rp: { world: 'reports', built: false, model: null, dim: 48, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
-    ch: { world: 'chat', built: false, model: null, dim: 48, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
+    rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
+    ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
     fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -36,7 +36,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question', '⑯ Reports · a small language model writes the report from the findings · fluency first, grounding last', '⑰ Chat · the next-word model on transcripts · ask it about a case'];
+  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question', '⑯ Reports · a small language model writes the report from the findings · fluency first, grounding last', '⑰ Chat · the next-word model on transcripts · ask it about a case', '⑱ Reports · no context layer · the next word from the current word alone'];
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -1176,6 +1176,12 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
+      if (k === '18') { // the reports question without attention: the lookup table and the output table alone
+        S.rp.dim = 48; S.rp.layers = 0; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
+        selectQuestion('reports'); showStage('train');
+        rpReset(`Recipe ${RECIPE_LABELS[18]}: the lookup table and the output table with no attention between them, so every next word is predicted from the current word and its position and nothing else. Press Train: the loss falls to the floor such a model allows, the reports read as locally fluent nonsense, and the diagnosis is never right from the findings, since nothing in the model can read them; the fourth chart stays empty. Then set the context layers back to 2 and watch what attention buys.`);
+        return;
+      }
       if (k === '17') { // the chat question: the same model on transcripts
         S.ch.dim = 48; S.ch.positions = true; S.ch.epochs = 10; S.ch.lr = 0.005; S.ch.seed = 1; S.ch.reveal = false;
         selectQuestion('chat'); showStage('train');
@@ -2817,7 +2823,7 @@
     L.built = true;
     return true;
   }
-  function rpConfig() { const L = LM(); return { vocabSize: L.vocab.size, dim: L.dim, layers: RP.layers, heads: RP.heads, dk: L.dim >= 48 ? 12 : 8, ffn: L.dim, costInit: RP.costs, positions: L.positions ? RP.positions : 0, clip: RP.clip, optimizer: 'adam', seed: L.seed }; }
+  function rpConfig() { const L = LM(); return { vocabSize: L.vocab.size, dim: L.dim, layers: L.layers, heads: RP.heads, dk: L.dim >= 48 ? 12 : 8, ffn: L.dim, costInit: RP.costs, positions: L.positions ? RP.positions : 0, clip: RP.clip, optimizer: 'adam', seed: L.seed }; }
   function rpReset(reason) {
     const L = LM(); rpStop(); if (!rpBuild()) return;
     L.model = new NN.LanguageModel(rpConfig()); L.shipped = false;
@@ -2834,7 +2840,7 @@
   function rpKeptInfo() { try { const raw = localStorage.getItem(rpKeptKey()); if (!raw) return null; const o = JSON.parse(raw); return { savedAt: o.savedAt, epochs: o.epochs, testLoss: o.testLoss, dim: o.dim }; } catch (e) { return null; } }
   function rpKeep() {
     const L = LM(), WD = LMW(); if (!L.model) return; if (L.model.steps === 0) { rpNote('Nothing to keep yet: train it first, or load the trained model.'); return; }
-    const last = L.hist[L.hist.length - 1], payload = { savedAt: new Date().toISOString(), epochs: L.epoch, testLoss: last ? +last.testLoss.toFixed(4) : null, dim: L.dim, positions: L.positions, seed: L.seed, lr: L.lr, shipped: L.shipped, hist: L.hist, model: L.model.toJSON({ words: L.vocab.words }) };
+    const last = L.hist[L.hist.length - 1], payload = { savedAt: new Date().toISOString(), epochs: L.epoch, testLoss: last ? +last.testLoss.toFixed(4) : null, dim: L.dim, layers: L.layers, positions: L.positions, seed: L.seed, lr: L.lr, shipped: L.shipped, hist: L.hist, model: L.model.toJSON({ words: L.vocab.words }) };
     try { localStorage.setItem(rpKeptKey(), JSON.stringify(payload)); } catch (e) { rpNote(`Could not keep the model: the browser refused the storage (${e.name}). Try a smaller model, or free the other world’s kept model.`); return; }
     rpSyncControls(); rpNote(`Kept: ${rpEpochs(L.epoch)}, test loss ${payload.testLoss}, with its curves. It stays in this browser; Restore kept brings it back, after a reload too.`);
   }
@@ -2843,7 +2849,7 @@
     if (!o || !o.model) { rpNote('No kept model in this browser for this question.'); return; }
     rpStop(); if (!rpBuild()) return;
     if (!o.model.words || o.model.words.length !== L.vocab.size || o.model.words.some((w, i) => w !== L.vocab.words[i])) { rpNote('The kept model was trained on a different vocabulary than this corpus; it cannot be restored.'); return; }
-    L.model = NN.LanguageModel.fromJSON(o.model); L.shipped = false; L.dim = o.dim; L.positions = !!o.positions; L.seed = o.seed || L.seed; L.lr = o.lr || L.lr;
+    L.model = NN.LanguageModel.fromJSON(o.model); L.shipped = false; L.dim = o.dim; L.layers = o.model.layers; L.positions = !!o.positions; L.seed = o.seed || L.seed; L.lr = o.lr || L.lr;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
     L.epoch = o.epochs || 0; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = Array.isArray(o.hist) ? o.hist : []; L.lastBatch = []; L.trainLoss = L.hist.length ? L.hist[L.hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false; if (L.chat) L.chat.view = null;
@@ -2854,7 +2860,7 @@
   // the model trained for 30 epochs in Node, the weights that ship with the page
   function rpLoadShipped() {
     const L = LM(), WD = LMW(), W = WD.shipped(); if (!W) { rpNote('The trained model did not load with the page.'); return; } rpStop(); if (!rpBuild()) return;
-    L.model = NN.LanguageModel.fromJSON(W); L.shipped = true; L.dim = W.dim; L.positions = W.positions > 0;
+    L.model = NN.LanguageModel.fromJSON(W); L.shipped = true; L.dim = W.dim; L.layers = W.layers; L.positions = W.positions > 0;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
     const hist = Array.isArray(W.hist) && W.hist.length ? W.hist.map(h => Object.assign({}, h)) : null; // the history of its training in Node, epoch by epoch, when the file carries it
     L.epoch = hist ? hist.length : 30; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist || []; L.lastBatch = []; L.trainLoss = hist ? hist[hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
@@ -2923,8 +2929,8 @@
   function rpFinish(Lx) { const L = Lx || LM(), WD = WDof(L); L.finishedAt = L.epoch; rpStop(`Finished ${rpEpochs(L.epochs)} on the next word alone. ${WD.groundVerb} on ${RP.groundN} test ${WD.unit}…`, L); if (!L.measuring && L === LM()) rpFinishNote(); }
   const rpEpochs = n => `${n} epoch${n === 1 ? '' : 's'}`;
   function rpFinishNote() { // the run's last word, with the shipped model for comparison
-    const L = LM(), WD = LMW(), last = L.hist[L.hist.length - 1], W = WD.shipped(), shipped = W && Array.isArray(W.hist) && W.hist.length ? W.hist[W.hist.length - 1] : null, same = W && L.dim === W.dim && L.positions === (W.positions > 0);
-    const cmp = shipped && shipped.ground != null ? (L.shipped ? ` The trained model that ships with the page, which you continued, had ${pct(shipped.ground)} after its ${W.hist.length} epochs.` : ` The trained model that ships with the page, ${same ? 'the same recipe' : `${W.dim} numbers per token`} after ${W.hist.length} epochs, gets ${pct(shipped.ground)}${last.ground != null && last.ground < shipped.ground ? ': fluent first, grounded later. Load it to compare, or raise the epochs and keep training' : ''}.`) : '';
+    const L = LM(), WD = LMW(), last = L.hist[L.hist.length - 1], W = WD.shipped(), shipped = W && Array.isArray(W.hist) && W.hist.length ? W.hist[W.hist.length - 1] : null, same = W && L.dim === W.dim && L.positions === (W.positions > 0) && L.layers === W.layers;
+    const cmp = shipped && shipped.ground != null ? (L.shipped ? ` The trained model that ships with the page, which you continued, had ${pct(shipped.ground)} after its ${W.hist.length} epochs.` : ` The trained model that ships with the page, ${same ? 'the same recipe' : `${W.layers} context layer${W.layers === 1 ? '' : 's'} and ${W.dim} numbers per token`} after ${W.hist.length} epochs, gets ${pct(shipped.ground)}${last.ground != null && last.ground < shipped.ground ? ': fluent first, grounded later. Load it to compare, or raise the epochs and keep training' : ''}.`) : '';
     rpNote(`Finished ${rpEpochs(L.epochs)} on the next word alone. Test loss ${last.testLoss.toFixed(3)}, ${pct(last.acc)} of next words right, and ${WD.groundLabel} for ${last.ground == null ? '–' : pct(last.ground)} of ${RP.groundN} test ${WD.unit}.${cmp} Go to 3 · Test to ${WD.key === 'chat' ? 'ask it' : 'make it write'}.`);
   }
   function rpStepBatch() { const L = LM(); if (!L.model) return; rpStop(); const ended = rpStep(); rpRender(true); rpNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on ${L.lastBatch.length} ${LMW().unit} (${L.lastBatch.join(', ')}): batch ${Math.ceil(L.ptr / RP.batch)} of ${Math.ceil(L.train.length / RP.batch)}.`); }
@@ -2938,6 +2944,8 @@
     const L = LM();
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.dim === L.dim));
     document.querySelectorAll('#rp-pos-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.pos === '1') === L.positions));
+    document.querySelectorAll('#rp-layers-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layers === L.layers));
+    { const nl = L.model ? L.model.layers.length : L.layers; document.querySelectorAll('.rp-layer-seg button').forEach(b => { b.disabled = +b.dataset.layer >= nl; }); }
     document.querySelectorAll('.rp-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
     document.querySelectorAll('.rp-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
     document.querySelectorAll('.rp-arcs-check').forEach(cb => { cb.checked = L.arcs; });
@@ -2988,6 +2996,7 @@
   }
   function rpAttentionRow(fw, i) { return rpAttentionRowAt(fw, LM().layer, i); } // whom token i reads, in the chosen layer, the chosen head or both averaged
   function rpAttentionRowAt(fw, layer, i) {
+    if (!fw.ctxs.length) return null; // no context layer: nothing reads anything
     const L = LM(), c = fw.ctxs[Math.max(0, Math.min(layer, fw.ctxs.length - 1))], row = new Float64Array(i + 1);
     const heads = L.head < 0 ? c.Ah.map((_, h) => h) : [Math.min(L.head, c.Ah.length - 1)];
     for (const h of heads) for (let j = 0; j <= i; j++) row[j] += c.Ah[h][i][j] / heads.length;
@@ -2997,7 +3006,8 @@
     const L = LM(), o = opts || {}, spans = el.querySelectorAll('.tok'); spans.forEach(s => { s.classList.remove('reads', 'reads2', 'hover', 'cur', 'pinned'); s.style.boxShadow = ''; });
     const q = i == null ? null : i - 1;
     if (q == null || q < 0 || !fw || q >= fw.tokens.length) { rpArcs(el, fw, null); return; }
-    const row = rpAttentionRow(fw, q); let mx = 1e-9; for (let j = 0; j <= q; j++) mx = Math.max(mx, row[j]);
+    const row = rpAttentionRow(fw, q); if (!row) { spans.forEach(s => { const j = +s.dataset.i; if (j === L.pinned) s.classList.add('pinned'); if (j === i) s.classList.add(o.soft ? 'cur' : 'hover'); }); rpArcs(el, fw, null); return; }
+    let mx = 1e-9; for (let j = 0; j <= q; j++) mx = Math.max(mx, row[j]);
     spans.forEach(s => { const j = +s.dataset.i; if (j === L.pinned) s.classList.add('pinned'); if (j === i) s.classList.add(o.soft ? 'cur' : 'hover'); else if (j <= q && row[j] > 0.02 * mx) { s.classList.add('reads'); s.style.boxShadow = `inset 0 -${(2 + 6 * row[j] / mx).toFixed(1)}px 0 rgba(74,58,167,${(0.15 + 0.7 * row[j] / mx).toFixed(2)})`; } });
     rpArcs(el, fw, i, row, q);
   }
@@ -3023,7 +3033,7 @@
     Viz.drawSeries($('rp-evidence'), { hist: L.hist, keys: [{ key: 'evidence', color: WD.evidenceColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-evidence-title').textContent = WD.evidenceChart; $('rp-evidence-now').textContent = last && last.evidence != null ? `${pct(last.evidence)} ${WD.evidenceNow}` : '';
     $('rp-legend').innerHTML = WD.sections.map(s => `<span><span class="line" style="border-top-color:${WD.colors[s]}"></span>${s}</span>`).join('');
     $('rp-loss-now').textContent = last ? `test ${last.testLoss.toFixed(3)}` : ''; $('rp-acc-now').textContent = last ? pct(last.acc) : ''; $('rp-ground-now').textContent = last && last.ground != null ? pct(last.ground) : L.measuring ? 'measuring…' : '';
-    $('rp-curves-note').textContent = WD.curvesNote;
+    $('rp-curves-note').textContent = WD.curvesNote + (L.model && !L.model.layers.length ? ' With no context layer the fourth chart stays empty: nothing reads the block, and the model can only write the most probable continuation of each word.' : '');
   }
   function rpThumb(r, onClick) {
     const WD = LMW(), b = document.createElement('button'); b.type = 'button'; b.className = `thumb report ${WD.thumbClass(r)}`; b.dataset.id = r.id; b.title = WD.thumbTitle(r);
@@ -3302,6 +3312,7 @@
   }
   // who reads whom across the whole report, in the chosen layer: one matrix per head, the attention by distance, where the words of each section look
   function rpRenderAttention(view, light) {
+    { const card = $(`${view.pre}att-card`); if (card) card.hidden = !view.fw.ctxs.length; if (!view.fw.ctxs.length) return; } // no context layer: nothing reads anything
     const L = LM(), m = L.model, fw = view.fw, n = view.words.length, l = Math.min(L.layer, fw.ctxs.length - 1), c = fw.ctxs[l], H = m.H, pre = view.pre, WD = LMW(), sections = WD.sectionsOf(view.words), q = rpFocusWord(view) - 1;
     rpEnsureAttBody(pre, H);
     for (let h = 0; h < H; h++) { const hv = L.hoverAtt && L.hoverAtt.pre === pre && L.hoverAtt.h === h ? L.hoverAtt : null; Viz.drawTokenAttention($(`${pre}att-${h}`), { A: c.Ah[h], n, sections, colors: WD.colors, mark: q, hover: hv }); $(`${pre}att-${h}-title`).textContent = `${rpHeadName(h, H)}, layer ${l + 1} · cost ${c.costs[h].toFixed(3)} per word of distance`; }
@@ -3344,6 +3355,7 @@
   }
   // ---- how each head decides where to look, from the followed word's position, in the chosen layer
   function rpRenderHeads(view) {
+    { const card = $(`${view.pre}heads-card`); if (card) card.hidden = !view.fw.ctxs.length; if (!view.fw.ctxs.length) return; } // no context layer: no heads to show
     const L = LM(), m = L.model, fw = view.fw, i = rpFocusWord(view), q = i - 1, l = Math.min(L.layer, fw.ctxs.length - 1), c = fw.ctxs[l], dk = m.dk, sc = 1 / Math.sqrt(dk), n = q + 1, canvas = $(`${view.pre}heads`); if (!canvas || q < 0) return;
     const sections = LMW().sectionsOf(view.words), words = view.words.slice(0, n).map(rpWordLabel);
     const heads = Array.from({ length: m.H }, (_, h) => {
@@ -3362,7 +3374,7 @@
   const RP_WALK_MS = 900;
   function rpNetWalkStart(pre) { const L = LM(); if (L.netWalk) { rpNetWalkStop(); return; } L.netView = 'graph'; rpSyncControls(); L.netWalk = { pre, at: 0, t: 0, t0: performance.now() }; const b = $(`${pre}net-walk`); if (b) b.textContent = '■ Stop'; requestAnimationFrame(rpNetWalkTick); }
   function rpNetWalkStop() { const L = LM(), wk = L.netWalk; if (!wk) return; L.netWalk = null; const b = $(`${wk.pre}net-walk`); if (b) b.textContent = '▶ Walk through'; const view = rpView(wk.pre === 'rp-test-'); if (view) rpRenderNet(view); }
-  function rpNetWalkTick(now) { const L = LM(), wk = L.netWalk; if (!wk) return; const view = rpView(wk.pre !== 'rp-'), canvas = $(`${wk.pre}net`); if (!view || !canvas) { rpNetWalkStop(); return; } const el = (now - wk.t0) / RP_WALK_MS, nCols = canvas._tokenGraph ? canvas._tokenGraph.cols.length : 16; wk.at = Math.floor(el); wk.t = el - wk.at; if (wk.at > nCols) { rpNetWalkStop(); return; } rpRenderNet(view); requestAnimationFrame(rpNetWalkTick); }
+  function rpNetWalkTick(now) { const L = LM(), wk = L.netWalk; if (!wk) return; const view = rpView(wk.pre !== 'rp-'), canvas = $(`${wk.pre}net`); if (!view || !canvas) { rpNetWalkStop(); return; } const el = (now - wk.t0) / RP_WALK_MS, nCols = canvas._tokenGraph ? canvas._tokenGraph.cols.length : 16; wk.at = Math.max(0, Math.floor(el)); wk.t = Math.max(0, el - wk.at); if (wk.at > nCols) { rpNetWalkStop(); return; } /* the first frame can come a hair before t0 */ rpRenderNet(view); requestAnimationFrame(rpNetWalkTick); }
   // the words a position read most, in one layer, both heads averaged, itself left out
   function rpTopReadsAvg(fw, layer, i, k) { const c = fw.ctxs[layer], row = new Float64Array(i + 1); for (let h = 0; h < c.Ah.length; h++) for (let j = 0; j <= i; j++) row[j] += c.Ah[h][i][j] / c.Ah.length; const idx = []; for (let j = 0; j < i; j++) idx.push(j); idx.sort((a, b) => row[b] - row[a]); return idx.slice(0, k).map(j => ({ j, a: row[j] })); }
   // ---- the word map laid out by t-SNE: Gaussian affinities in the model's space (each word's width set to a perplexity
@@ -3630,6 +3642,7 @@
     const L = new Proxy({}, { get: (_, k) => LM()[k], set: (_, k, v) => { LM()[k] = v; return true; } }); // the state of the world on screen, looked up at every event
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.dim; if (v === L.dim) return; L.dim = v; rpReset(`${v} numbers per token — fresh random weights.`); }));
     document.querySelectorAll('#rp-pos-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.pos === '1'; if (v === L.positions) return; L.positions = v; rpReset(v ? 'Learned position vectors: every word also carries where it is — fresh random weights.' : 'No position vectors: the layers know how far back a word is only through their distance cost — fresh random weights.'); }));
+    document.querySelectorAll('#rp-layers-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.layers; if (v === L.layers) return; L.layers = v; rpReset(v === 0 ? 'No context layer: the lookup table and the output table alone, every next word from the current word and its position — fresh random weights.' : `${v} context layer${v === 1 ? '' : 's'} — fresh random weights.`); }));
     $('rp-epochs').addEventListener('input', () => { L.epochs = +$('rp-epochs').value; $('rp-epochs-val').textContent = L.epochs; if (L.model) { rpRenderStatus(); rpRenderCurves(); } });
     $('rp-lr').addEventListener('input', () => { L.lr = rpLrFromSlider(+$('rp-lr').value); $('rp-lr-val').textContent = L.lr; });
     $('rp-seed').addEventListener('change', () => { L.seed = Math.max(1, Math.round(+$('rp-seed').value) || 1); rpReset(`Seed ${L.seed} — fresh random weights.`); });

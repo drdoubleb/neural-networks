@@ -177,7 +177,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the seventeen recipe buttons
+## The lecture arc: the eighteen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -202,6 +202,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~90% invasion right on the test fields; three invasive fields in four found, one CIS-into-nests field in four still called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns, positions add the membrane, and the context is what tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
 | ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
+| ⑱ Reports · no context layer · the next word from the current word alone | 36,857 | test loss 0.62 after 10 epochs against 0.16 with two layers; the diagnosis right from the findings for 33% of the test reports, the base rate, and for none of the held-out ones | The lookup table and the output table with no attention between them: every next word from the current word and its position. The reports read as locally fluent nonsense, nothing can read the findings, and the fourth chart stays empty. Set the layers back to 2 and watch what attention buys. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -633,14 +634,14 @@ given the findings with the specimen, the clinical history and the gross, as the
 the microscopic description and the diagnosis itself; the share of the first 25 test reports whose diagnosis class
 comes out right):
 
-| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right, the description written by the model |
-|---|---|---|---|---|---|---|---|---|
-| 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | |
-| 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | |
-| 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% |
-| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 72% |
-| 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% |
-| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (97% of all 100) |
+| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right, the description written by the model | The diagnosis' attention on the findings block |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | | 10% |
+| 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | | 7% |
+| 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% | 20% |
+| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 72% | 17% |
+| 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% | 18% |
+| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (97% of all 100) | 18% |
 
 The specimen, clinical and gross losses are a floor set by the draws (which wall, which history, how many fragments:
 nothing in the report predicts them); the findings block is easy from the start (fixed lines, one value each); the
@@ -650,6 +651,11 @@ its diagnosis is right for barely half the reports at epoch 5, when its reports 
 will, and reaches 97% only at the end. Reading a finding forty to a hundred tokens back changes the loss by a few
 hundredths of a nat per token, against the phrasing the model has to guess at every token, so the loss curve is flat
 long before the model is grounded: fluency is learned first, grounding last, and the loss cannot tell them apart.
+The last column, the share of the diagnosis words' attention (last layer, heads averaged) that lands on the findings
+block of the first 40 test reports, is recorded after every epoch too and is the fourth curve of the Train step: it
+climbs from a tenth to a fifth by epoch 5 and stays there, while the grounding goes on from half to all. Looking at
+the block is learned early; what is learned late is which line of it to read, and what to make of it (at the end 8%
+of the diagnosis' attention is on the nests line and 4% on the muscularis propria line, the two that decide).
 
 **What it does with the test reports** (seed 1, the shipped model; three prompts: everything up to DIAGNOSIS:, so
 that only the diagnosis is written; the findings with the specimen, the clinical history and the gross, as they come
@@ -687,7 +693,15 @@ next-token model needs is near. With the cost started near zero it stayed there 
 model had no notion of distance (11%). Learned position vectors are what made the block readable, since every
 finding then sits at a known place (40% at 15 epochs, 76% at 30, 84% with a learning rate of 0.01; the block was
 made fixed-format for this, every line always there with a one-word value, where lines that came and went had shifted
-the positions from report to report). Four heads of 32 numbers reached 73% at 15 epochs; 48 numbers per token, the
+the positions from report to report). With no context layer at all, the lookup table and the output table alone
+(recipe ⑱, `--layers 0`), the model is a bigram with positions: the test loss stops at 0.62 after 10 epochs against
+0.16, three quarters of next words still come out right because so much of a report is phrase, and the diagnosis is
+right from the findings for 33% of the test reports, the base rate of the commonest class, and for none of the
+held-out ones, since nothing in the model can read a line forty tokens back. One layer (`--layers 1`) gets the test
+loss to 0.20 in the same 10 epochs, but its diagnosis reads the microscopic prose just before it and not the block:
+none of its attention lands on the findings, against 17% with two layers at the same epoch, and from the findings and
+the requisition it is right for 30% of the test reports, under the base rate, against 64% given the whole report up
+to the diagnosis. Four heads of 32 numbers reached 73% at 15 epochs; 48 numbers per token, the
 shipped model, 96% at 30. Trained on 200 reports instead of 800 the same 32-number model reaches 69% and its test
 loss stays at 0.23 against 0.16: the data-size lesson again. Trained without the hedged reports it never hedges: on
 the five discordant test cases it writes invasion four times and carcinoma in situ once, in the confident wording it
@@ -712,8 +726,8 @@ tokenizer learned on the training reports the way a real model's tokenizer is bu
 merge the most frequent adjacent pair, repeat; 50, 200 or 600 merges), with the pieces in use as the table: frequent
 words become one piece, rare ones several, and a word never seen is still written in pieces that were, so nothing
 has to become ⟨?⟩. *Train* trains the model live, in batches of four reports so that the page stays responsive (an epoch is about half
-a minute; 48 or 32 numbers per token, position vectors on or off, the epochs, the learning rate and the seed as
-controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
+a minute; 48 or 32 numbers per token, position vectors on or off, no context layer or one or two, the epochs, the
+learning rate and the seed as controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
 model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
 score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about; *Keep this model*
 saves a model trained on the page in the browser, with its curves and settings, and *Restore kept* brings it back,
@@ -795,14 +809,14 @@ the `TOOL:` header line alone, fully predictable after the call, and costs nothi
 answers of the first 24 test transcripts written by the model from the transcript up to its last `ASSISTANT:`
 (exact, word for word):
 
-| Epoch | Test loss | system | user | findings | question | assistant | Answers right, written by the model |
-|---|---|---|---|---|---|---|---|
-| 1 | 0.161 | 0.14 | 0.10 | 0.13 | 0.39 | 0.27 | 25% |
-| 2 | 0.144 | 0.14 | 0.09 | 0.12 | 0.36 | 0.20 | 29% |
-| 5 | 0.133 | 0.13 | 0.10 | 0.12 | 0.35 | 0.13 | 50% |
-| 10 | 0.130 | 0.13 | 0.09 | 0.11 | 0.39 | 0.12 | 42% |
-| 20 | 0.131 | 0.14 | 0.09 | 0.11 | 0.33 | 0.14 | 46% |
-| 30 | 0.125 | 0.13 | 0.09 | 0.12 | 0.34 | 0.09 | 75% |
+| Epoch | Test loss | system | user | findings | question | assistant | Answers right, written by the model | The answer's attention on the findings |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0.161 | 0.14 | 0.10 | 0.13 | 0.39 | 0.27 | 25% | 46% |
+| 2 | 0.144 | 0.14 | 0.09 | 0.12 | 0.36 | 0.20 | 29% | 37% |
+| 5 | 0.133 | 0.13 | 0.10 | 0.12 | 0.35 | 0.13 | 50% | 43% |
+| 10 | 0.130 | 0.13 | 0.09 | 0.11 | 0.39 | 0.12 | 42% | 40% |
+| 20 | 0.131 | 0.14 | 0.09 | 0.11 | 0.33 | 0.14 | 46% | 32% |
+| 30 | 0.125 | 0.13 | 0.09 | 0.12 | 0.34 | 0.09 | 75% | 40% |
 
 The system line, the user's line and the findings cost little from the first epoch: they repeat, and only the choice
 among phrasings and the case's findings are unpredictable. The question line stays near 0.35 nats per token, since
@@ -810,7 +824,10 @@ nothing predicts which of the eight questions comes, and that is most of the los
 the only one that matters and the last to fall, from 0.27 to 0.09, and the last column is the reports' lesson again,
 fluency first and grounding last: at epoch 5 the transcripts read as well as they ever will and half the answers are
 right; the model that answers three in four needs all 30 epochs, with a loss curve that has been flat since epoch
-10.
+10. The last column, the share of the answer's attention on the findings (last layer, heads averaged, the first 40
+test transcripts), is the fourth curve of the Train step, and here it is flat from the first epoch at about two
+fifths: with the findings most of the transcript, the answer reads them from the start, and what it learns over the
+30 epochs is not where to look but what to make of what it finds.
 
 **What it does** (seed 1, the shipped model, the test transcripts; the model is given everything up to the last
 `ASSISTANT:` and writes the answer to the end of the line):
