@@ -314,8 +314,8 @@ function sampleTraits(label, task, i) {
   t.subtype = on.length === 1 ? TRAIT_SUBTYPE[on[0]] : 'combined';
   return t;
 }
-function makeOne(label, task, i) {
-  const traits = sampleTraits(label, task, i);
+function makeOne(label, task, i, given) {
+  const traits = given || sampleTraits(label, task, i); // given: the traits chosen by the caller (the Describe set); else sampled as the task says
   // resample until the contour is unambiguously smooth or unambiguously irregular (clearly so in the atypia set, where
   // an irregular outline may be the only trait)
   const minRms = task.id === 'atypia' ? 0.11 : 0.065;

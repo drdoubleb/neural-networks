@@ -27,9 +27,16 @@
     <button type="button" class="stage" data-stage="test">3 · Test</button>
   </nav>
   <div class="masthead-tools">
+    <button type="button" class="btn-ghost" id="gloss-open" title="every recurring term of the page, defined; the terms are underlined where they first appear in a paragraph, hover one for its definition">Glossary</button>
     <button type="button" class="btn-ghost" id="theme-toggle">☾ Dark</button>
   </div>
 </header>
+
+<dialog id="gloss-dialog" aria-labelledby="gloss-title">
+  <form method="dialog" class="gloss-head"><h2 id="gloss-title">Glossary</h2><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="gloss-underline" checked><label for="gloss-underline" class="plainlabel">underline the terms on the page</label></span><button type="submit" class="btn" aria-label="Close">Close</button></form>
+  <p class="small muted no-gloss">One definition per recurring term, in the words the page uses. On the page, a term is underlined where it first appears in a paragraph; hover it (or tap it) for its definition.</p>
+  <dl id="gloss-list"></dl>
+</dialog>
 
 <main class="bench">
   <div class="stage-panels">
@@ -999,7 +1006,7 @@
       <div class="card" id="rp-map-card">
         <div class="card-head">
           <h2>The words as the model sees them</h2>
-          <div class="actions-inline"><div class="legend" id="rp-map-legend"></div><div class="seg small" id="rp-map-src-seg"><button type="button" data-src="in" title="the word's vector at the input of the model">as input</button><button type="button" data-src="out" class="is-active" title="the word's row of the output layer: how the model scores it as the next word">as prediction</button></div><div class="seg small" id="rp-map-seg"><button type="button" data-map="pca" title="the two directions of the vectors that spread the words most">two directions</button><button type="button" data-map="tsne" class="is-active" title="t-SNE: neighbours in the model's space stay neighbours on the map">neighbourhoods</button></div></div>
+          <div class="actions-inline"><div class="legend" id="rp-map-legend"></div><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" id="rp-map-trail"><label for="rp-map-trail" class="plainlabel" title="each labelled word's path through training, from its random start to where it stands now, on the two directions of the table as it is now; hover a word for its own path">paths</label></span><div class="seg small" id="rp-map-src-seg"><button type="button" data-src="in" title="the word's vector at the input of the model">as input</button><button type="button" data-src="out" class="is-active" title="the word's row of the output layer: how the model scores it as the next word">as prediction</button></div><div class="seg small" id="rp-map-seg"><button type="button" data-map="pca" title="the two directions of the vectors that spread the words most">two directions</button><button type="button" data-map="tsne" class="is-active" title="t-SNE: neighbours in the model's space stay neighbours on the map">neighbourhoods</button></div></div>
         </div>
         <div class="rp-map"><svg id="rp-map" role="img" aria-label="The words of the vocabulary placed by the two directions of their learned vectors that spread them most, coloured by the section they mostly appear in"></svg></div>
         <p class="small muted" id="rp-map-note" style="margin-top:8px"></p>
@@ -1234,6 +1241,256 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
       </div>
     </section>
 
+    <!-- ============================ DESCRIBE · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-ds-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Describe: from pixels to words</h2>
+          <span class="small muted" id="ds-data-sub"></span>
+        </div>
+        <p class="prose small" id="ds-data-blurb"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="ds-data-nucleus-title">The nucleus and its description</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="ds-data-prev" title="the previous nucleus">◀ previous</button><button type="button" class="btn" id="ds-data-next" title="the next nucleus">next ▶</button></div>
+        </div>
+        <div class="rp-two">
+          <div class="ds-side">
+            <canvas class="ds-nucleus" id="ds-data-canvas" width="32" height="32" aria-label="the nucleus, as scanned at our lab"></canvas>
+            <div class="ds-traits" id="ds-data-traits"></div>
+            <div class="ds-codebox"><span class="small muted" id="ds-data-code-label"></span><div id="ds-data-code"></div></div>
+          </div>
+          <div><div class="rp-text" id="ds-data-text"></div><div class="legend" id="ds-data-sections" style="margin-top:8px"></div><p class="small muted" id="ds-data-note" style="margin-top:8px"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>From pixels to words</h2><span class="small muted">what a vision-language model does, and what this toy does of it</span></div>
+        <div class="ch-explain">
+          <div><h3>1 · The image becomes a code</h3><p>The encoder of the Foundation question, pretrained with no labels to give two views of the same nucleus the same code, turns the image into 16 numbers. It is frozen here: nothing in this question changes it. Whatever the encoder failed to keep (a texture too fine for its filters), the words can never say.</p></div>
+          <div><h3>2 · The code becomes the first token</h3><p>A language model reads vectors of 48 numbers, one per token. One learned matrix (16 × 48) and a bias turn the code into such a vector, which stands at position 0 in place of a word's row of the lookup table, the position vector added as usual. The matrix is trained with the rest of the model, by the next word alone: the gradient flows back through the words into the projection, and nothing tells it what the code means.</p></div>
+          <div><h3>3 · The model writes</h3><p>From the image token on, this is the Reports question's model: two context layers whose attention can read the image token like any word before it, and a next-word softmax. On the Test step it writes a test nucleus's description from the image alone, and the page ticks the four traits it named against the generator's. The real captioning and vision-language models are this with a far larger encoder, many image tokens rather than one, and a language model that already speaks: the projection is still the join.</p></div>
+          <div><h3>What this toy cannot do</h3><p>It has 53 words and four things to say; a nucleus is never anything but four traits to it. It writes the commonest word when the code is silent on a trait, fluently, and the only way to know is to tick the traits against the truth, as the Test step does. The probes there ask the same nucleus scanned at the other lab, flipped and turned, and with no image at all, to see which words follow the image and which the habit.</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The nuclei</h2>
+          <div class="legend"><span><span class="swatch ring ds-bland"></span>bland</span><span><span class="swatch ring ds-atyp"></span>atypical in one way or more</span><span class="small muted">the letters: E enlarged · D dark · I irregular · C coarse</span></div>
+        </div>
+        <p class="small muted" style="margin:0 0 8px" id="ds-data-train-label">Training nuclei</p>
+        <div class="tray reports scroll" id="ds-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="ds-data-test-label">Test nuclei</p>
+        <div class="tray reports scroll" id="ds-data-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ DESCRIBE · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-ds-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="ds-describe" title="the model writes the nucleus's description from its image, one word at a time (N describes the next nucleus)">Describe</button>
+            <button type="button" class="btn" id="ds-next-case" title="the next test nucleus">Next nucleus</button>
+            <button type="button" class="btn" id="ds-describe-all" title="describe every remaining test nucleus without the animation">Describe all</button>
+            <button type="button" class="btn" id="ds-test-clear">Clear</button>
+          </div>
+          <div class="ctl"><span class="lbl">The image</span><div class="seg small" id="ds-probe-seg"><button type="button" data-probe="own" class="is-active" title="the test nucleus as scanned at our lab, the lab the encoder and the model were trained on">our lab’s scan</button><button type="button" data-probe="other" title="the same nucleus as scanned at the other lab, the weaker stain">the other lab’s scan</button><button type="button" data-probe="flip" title="the same scan flipped and turned: the encoder was pretrained to give it the same code">flipped</button><button type="button" data-probe="none" title="a code of zeros: what the model writes with nothing to go on">no image</button></div></div>
+          <div class="ctl slim"><label for="ds-temp">Temperature <span class="val" id="ds-temp-val">0</span></label><input type="range" id="ds-temp" min="0" max="150" step="5" value="0"></div>
+          <div class="ctl slim"><label for="ds-pace">Pace <span class="val" id="ds-pace-val">8 words/s</span></label><input type="range" id="ds-pace" min="1" max="60" step="1" value="8"></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">described</span><b id="ds-stat-n">0 / 80</b><small id="ds-stat-n-sub">test nuclei</small></div>
+            <div class="metric"><span class="lbl">all four traits right</span><b id="ds-stat-all">–</b><small id="ds-stat-all-sub"></small></div>
+            <div class="metric"><span class="lbl">each trait right</span><b id="ds-stat-traits">–</b><small id="ds-stat-traits-sub"></small></div>
+          </div>
+        </div>
+        <p class="note" id="ds-test-warning" hidden>The model has not trained: it will write noise, which is itself worth a look. Load the trained model on the Train step, or train it there.</p>
+        <div class="note" id="ds-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="ds-test-title">Describe a nucleus</h2>
+          <div class="actions-inline"><span class="small muted">the image token carries the nucleus's code · the model writes the description one word at a time · <kbd>N</kbd> describes the next nucleus · the weights never change here</span><span class="ctl check" style="padding:0;font-size:13px"><input type="checkbox" class="rp-hops-check" id="ds-test-hops" checked><label for="ds-test-hops" class="plainlabel">two hops</label></span></div>
+        </div>
+        <div class="rp-two">
+          <div class="ds-side">
+            <div class="ds-pair"><div><canvas class="ds-nucleus" id="ds-test-canvas" width="32" height="32" aria-label="the test nucleus, as scanned at our lab"></canvas><span class="small muted">our lab’s scan</span></div><div id="ds-test-probe-wrap" hidden><canvas class="ds-nucleus" id="ds-test-probe-canvas" width="32" height="32" aria-label="the image the model is given"></canvas><span class="small muted" id="ds-test-probe-label"></span></div></div>
+            <div class="ds-codebox"><span class="small muted" id="ds-test-code-label"></span><div id="ds-test-code"></div></div>
+            <h3 style="margin-top:10px">The generator’s traits</h3>
+            <div class="ds-traits" id="ds-test-truth-traits"></div>
+          </div>
+          <div>
+            <h3>The description</h3>
+            <div class="rp-text" id="ds-test-text"></div>
+            <p class="small" id="ds-test-call" style="margin-top:8px"></p>
+            <div class="rp-next" id="ds-test-nextword"></div>
+          </div>
+        </div>
+        <div class="rp-truth" id="ds-truth" hidden></div>
+      </div>
+      <div class="card" id="ds-test-net-card" hidden>
+        <div class="card-head">
+          <h2 id="ds-test-net-title">How a word was chosen</h2>
+          <div class="actions-inline"><span class="small muted">the description the model wrote: hover or click one of its words to follow it through the model</span><div class="seg small rp-netview-seg"><button type="button" data-view="graph" class="is-active" title="the network as circles and lines: every unit, every learned weight, the attention in purple">the network</button><button type="button" data-view="strips" title="the same numbers as strips, stage by stage">the numbers</button></div><button type="button" class="btn" id="ds-test-net-walk" title="light the network stage by stage, as the word is computed">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="ds-test-net" width="800" height="536" aria-label="How one word of the description was chosen: the vector of the word before it and its position vector, each layer's heads with the words they read, what the layer hears and its output, and the probabilities over the vocabulary"></canvas><div class="tip" id="ds-test-net-tip" hidden></div></div></div>
+        <p class="small muted" id="ds-test-net-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="ds-test-heads-card" hidden>
+        <div class="card-head">
+          <h2 id="ds-test-heads-title">How each head decides where to look</h2>
+          <div class="actions-inline"><span class="small muted">for the word followed above, on the description the model wrote · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="ds-test-heads" width="800" height="402" aria-label="How each head of the chosen layer decides where to look from the followed word of the description"></canvas><div class="tip" id="ds-test-heads-tip" hidden></div></div></div>
+        <p class="small muted" id="ds-test-heads-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="ds-test-att-card" hidden>
+        <div class="card-head">
+          <h2>Who reads whom, across the description</h2>
+          <div class="actions-inline"><span class="small muted">rows ask, columns answer · the first column is the image · one matrix per head · layer</span><div class="seg small rp-layer-seg"><button type="button" data-layer="0">first</button><button type="button" data-layer="1" class="is-active">second</button></div></div>
+        </div>
+        <div id="ds-test-att-body"></div>
+        <p class="small muted" id="ds-test-att-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Test nuclei · <span id="ds-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch badge" style="background:var(--good)">✓</span>all four traits right</span><span><span class="swatch badge">3</span>how many of the four were right</span></div>
+        </div>
+        <div class="tray reports scroll" id="ds-test-results"></div>
+      </div>
+    </section>
+
+    <!-- ============================ SEGMENT · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-sg-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Segment: a class for every pixel</h2>
+          <span class="small muted" id="sg-data-sub"></span>
+        </div>
+        <p class="prose small" id="sg-data-blurb"></p>
+        <div class="note" id="sg-data-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sg-data-field-title">The field and its mask</h2>
+          <div class="actions-inline"><div class="seg small" id="sg-data-view-seg"><button type="button" data-view="image" title="the field as scanned">image</button><button type="button" data-view="truth" class="is-active" title="the mask: a class on every pixel, from the field's own geometry">mask</button></div><button type="button" class="btn" id="sg-data-prev" title="the previous field">◀ previous</button><button type="button" class="btn" id="sg-data-next" title="the next field">next ▶</button></div>
+        </div>
+        <div class="fd-two">
+          <div><div class="net-wrap"><canvas id="sg-data-canvas" width="528" height="384" aria-label="The field with its mask: the lumen, the epithelium, the stroma and the cells below the membrane"></canvas></div><div class="legend" id="sg-data-legend" style="margin-top:8px"></div></div>
+          <div><p class="small muted" id="sg-data-caption"></p><div class="ch-explain" style="margin-top:10px">
+            <div><h3>Where the mask comes from</h3><p>Nobody painted these. The generator that drew the field kept its own geometry, the membrane's height and every nest's outline, and the mask is read off it: above the surface is lumen, between the surface and the membrane is epithelium, below the membrane is stroma, except inside a nest's outline, a cord or a shed single cell, which is the fourth class. Real segmentation masks are drawn by hand, a pixel at a time, and are the dearest labels in the field.</p></div>
+            <div><h3>What the network has to do</h3><p>A class for every one of the 22,528 pixels of a field, from the pixels around it. That is 22,528 labelled examples per field, which is why segmentation learns from few fields; but the examples are not independent, and the hard part is not telling a nucleus from the stroma, it is telling a nucleus in the epithelium from the same nucleus in a nest below the membrane, which no pixel can do on its own.</p></div>
+          </div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The fields</h2><div class="legend"><span><span class="swatch ring"></span>not invasive</span><span><span class="swatch ring pos"></span>invasive</span></div></div>
+        <p class="small muted" style="margin:0 0 8px" id="sg-data-train-label">Training fields</p>
+        <div class="tray fields" id="sg-data-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="sg-data-test-label">Test fields · held out</p>
+        <div class="tray fields" id="sg-data-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ SEGMENT · 2 · TRAIN ============================ -->
+    <section class="stage-panel" id="panel-segment" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Segment: a tiny fully convolutional network</h2>
+          <span class="small muted">3 × 3 convolutions at the pixels' scale · levels of context below them · a class for every pixel</span>
+        </div>
+        <p class="prose small" id="sg-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sg-levels-seg"><button type="button" data-levels="0" title="two 3 × 3 convolutions at the pixels' own scale: a window of 5 px">none</button><button type="button" data-levels="1" title="one level down: pool 2 × 2, convolve, upsample, join: a window of 15 px">1 level</button><button type="button" data-levels="2" class="is-active" title="two levels down: a window of 35 px, wide enough to see the membrane">2 levels</button></div></div>
+          <div class="ctl"><span class="lbl">Channels</span><div class="seg" id="sg-channels-seg"><button type="button" data-channels="8" class="is-active">8</button><button type="button" data-channels="16">16</button></div></div>
+          <div class="ctl"><span class="lbl">Crops per epoch</span><div class="seg" id="sg-crops-seg"><button type="button" data-crops="100" class="is-active" title="100 random crops of 64 × 64 from the training fields">100</button><button type="button" data-crops="200">200</button><button type="button" data-crops="400">400</button></div></div>
+          <div class="ctl slim"><label for="sg-epochs">Epochs <span class="val" id="sg-epochs-val">15</span></label><input type="range" id="sg-epochs" min="1" max="60" step="1" value="15"></div>
+          <div class="ctl slim"><label for="sg-seed">Random seed</label><input type="number" id="sg-seed" min="1" max="9999" value="1"></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="sg-step-batch" title="one gradient step on a batch of crops">Step batch</button>
+            <button type="button" class="btn" id="sg-step-epoch" title="one epoch of crops">Step epoch</button>
+            <button type="button" class="btn primary big" id="sg-train" title="run the remaining epochs (space)">▶ Train</button>
+            <button type="button" class="btn" id="sg-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="sg-load" title="the network trained for 20 epochs of 400 crops in Node, with the curves of its training">Load the trained model</button>
+          </div>
+        </div>
+        <div class="status" id="sg-status"></div>
+        <div class="note" id="sg-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sg-field-title">The field, as the network paints it</h2>
+          <div class="actions-inline"><div class="seg small" id="sg-view-seg"><button type="button" data-view="image" title="the field as scanned">image</button><button type="button" data-view="pred" class="is-active" title="the class the network gives every pixel, over the field">prediction</button><button type="button" data-view="truth" title="the mask the field carries">truth</button><button type="button" data-view="errors" title="the pixels the network gets wrong, in red">errors</button></div><button type="button" class="btn" id="sg-prev" title="the previous field">◀ previous</button><button type="button" class="btn" id="sg-next" title="the next field">next ▶</button></div>
+        </div>
+        <div class="fd-two">
+          <div><div class="net-wrap"><canvas id="sg-canvas" width="528" height="384" aria-label="The field with the network's prediction, the truth or the errors painted over it; hover a pixel for its probabilities and the window the network sees"></canvas><div class="tip" id="sg-tip" hidden></div></div><div class="legend" id="sg-legend" style="margin-top:8px"></div></div>
+          <div><p class="small muted" id="sg-field-note"></p><h3 style="margin-top:12px">What the first layer sees</h3><div class="net-wrap"><canvas id="sg-filters" width="240" height="60" aria-label="The filters of the first layer"></canvas></div><p class="small muted" id="sg-filters-note" style="margin-top:6px"></p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The first layer's maps on this field</h2><span class="small muted">each filter's response, dark where strong · the network looks at these, never at the pixels again</span></div>
+        <div class="net-wrap"><canvas id="sg-maps" width="720" height="300" aria-label="The maps of the first layer on the field"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Curves</h2><span class="small muted" id="sg-curves-sub">on crops as it trains · on a few test fields after every epoch</span></div>
+        <div class="curves">
+          <div class="chart"><div class="chart-title">Loss <span class="now" id="sg-loss-now"></span></div><svg id="sg-loss" viewBox="0 0 320 180" role="img" aria-label="Loss per epoch"></svg></div>
+          <div class="chart"><div class="chart-title">Pixels right <span class="now" id="sg-acc-now"></span></div><svg id="sg-acc" viewBox="0 0 320 180" role="img" aria-label="Pixel accuracy per epoch"></svg></div>
+          <div class="chart"><div class="chart-title">Intersection over union, per class <span class="now" id="sg-iou-now"></span></div><svg id="sg-iou" viewBox="0 0 320 180" role="img" aria-label="IoU per class per epoch"></svg></div>
+        </div>
+        <p class="small muted" id="sg-curves-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The fields</h2><div class="legend"><span><span class="swatch badge" style="background:var(--good)">72</span>mean IoU on a scored field, in %</span><span><span class="swatch batch"></span>the field the last crops came from</span></div></div>
+        <p class="small muted" style="margin:0 0 8px" id="sg-train-label">Training fields</p>
+        <div class="tray fields" id="sg-train-tray"></div>
+        <p class="small muted" style="margin:14px 0 8px" id="sg-test-label">Test fields · never trained on</p>
+        <div class="tray fields" id="sg-test-tray"></div>
+      </div>
+    </section>
+
+    <!-- ============================ SEGMENT · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-sg-test" hidden>
+      <div class="card bar">
+        <div class="bar-row">
+          <div class="actions-inline">
+            <button type="button" class="btn primary big" id="sg-segment-next" title="paint the next test field (N)">Segment next field</button>
+            <button type="button" class="btn" id="sg-segment-all">Segment all</button>
+            <button type="button" class="btn" id="sg-test-clear">Clear</button>
+          </div>
+          <div class="ctl"><span class="lbl">Show</span><div class="seg small" id="sg-test-view-seg"><button type="button" data-view="image">image</button><button type="button" data-view="pred" class="is-active">prediction</button><button type="button" data-view="truth">truth</button><button type="button" data-view="errors">errors</button></div></div>
+          <div class="metrics">
+            <div class="metric"><span class="lbl">segmented</span><b id="sg-stat-n">0 / 50</b><small>held-out fields</small></div>
+            <div class="metric"><span class="lbl">pixels right</span><b id="sg-stat-acc">–</b><small id="sg-stat-acc-sub"></small></div>
+            <div class="metric"><span class="lbl">mean IoU</span><b id="sg-stat-iou">–</b><small id="sg-stat-iou-sub"></small></div>
+            <div class="metric"><span class="lbl">nests found</span><b id="sg-stat-nest">–</b><small id="sg-stat-nest-sub"></small></div>
+          </div>
+        </div>
+        <p class="note" id="sg-test-warning" hidden>The network has not trained yet: it will paint noise, which is itself worth seeing. Load the trained model on the Train step, or train it there.</p>
+        <div class="note" id="sg-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="sg-test-field-title">The field under test</h2>
+          <span class="small muted">held-out fields go through one at a time · <kbd>N</kbd> paints the next · hover a pixel for its probabilities · the weights never change here</span>
+        </div>
+        <div class="fd-two">
+          <div><div class="net-wrap"><canvas id="sg-test-canvas" width="528" height="384" aria-label="The field under test with the network's prediction, the truth or the errors"></canvas><div class="tip" id="sg-test-tip" hidden></div></div><div class="legend" id="sg-test-legend" style="margin-top:8px"></div></div>
+          <div><p class="small muted" id="sg-test-field-note"></p><div class="rp-case" id="sg-test-iou" style="margin-top:10px"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Test fields · <span id="sg-test-count"></span></h2>
+          <div class="legend"><span><span class="swatch badge" style="background:var(--good)">72</span>mean IoU, in %</span></div>
+        </div>
+        <div class="tray fields" id="sg-test-results"></div>
+      </div>
+    </section>
+
+
+
   <!-- ============================ INSPECTOR ============================ -->
   <aside class="inspector" aria-label="Specimen inspector">
     <div class="card">
@@ -1297,13 +1554,18 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="data/reports/lm_weights.js"></script>
 <script src="data/chat/chat_data.js"></script>
 <script src="data/chat/chat_weights.js"></script>
+<script src="data/describe/describe_data.js"></script>
+<script src="data/describe/describe_weights.js"></script>
+<script src="data/fields/seg_weights.js"></script>
 <script src="js/features.js"></script>
 <script src="js/fields.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/describe.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>
+<script src="js/glossary.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

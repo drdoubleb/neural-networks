@@ -27,7 +27,11 @@ The masthead has two dropdowns: the **question** (which dataset) and the **lectu
 each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
 (input, convolution, hidden units, and the training buttons in the order a resident should try them: Teach next case,
 Step batch, Step epoch, Complete training, Reset); everything else lives under *Advanced settings*. Controls that
-do not apply to the current question are hidden.
+do not apply to the current question are hidden. The masthead's **Glossary** button opens one definition per
+recurring term (loss, epoch, softmax, embedding, attention head, distance cost, calibration, t-SNE and some sixty
+more), in the words the page uses; on the page itself a term is underlined where it first appears in a paragraph or a
+note, hovering it (or tapping it) shows the definition, and the underlines follow the page as it rewrites its notes
+during training. They can be switched off from the glossary, and the choice is kept in the browser.
 
 ## Four questions, one page
 
@@ -45,9 +49,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists ten questions: a blood count, three nucleus questions, the foundation model, two questions asked
-of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, and the chat
-the same model holds about a case. Whatever the question, the nav has the same three steps, and a lecture recipe
+The masthead lists twelve questions: a blood count, three nucleus questions, the foundation model, two questions
+asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
+chat the same model holds about a case, the description it writes of a nucleus from its image, and the same fields
+of bladder painted a class per pixel. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
@@ -177,7 +182,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the eighteen recipe buttons
+## The lecture arc: the twenty recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -203,6 +208,8 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ⑱ Reports · no context layer · the next word from the current word alone | 36,857 | test loss 0.62 after 10 epochs against 0.16 with two layers; the diagnosis right from the findings for 33% of the test reports, the base rate, and for none of the held-out ones | The lookup table and the output table with no attention between them: every next word from the current word and its position. The reports read as locally fluent nonsense, nothing can read the findings, and the fourth chart stays empty. Set the layers back to 2 and watch what attention buys. |
+| ⑲ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
+| ⑳ Segment · a class for every pixel · the window it is decided from | 700 (no context) | mean IoU 59% with no context (nest 12%), 71% with one level (nest 32%), 83% with two (nest 66%); pixels right 84%, 90% and 95% | A fully convolutional network: every weight is a 3 × 3 filter slid over the field, so the same few thousand weights paint any field. With no context a pixel's class is decided from the 5 px window around it, which cannot tell a nucleus in the epithelium from the same nucleus in a nest below the membrane: three in four nest pixels are called epithelium and the nest line of the IoU chart stays on the floor. Each level of pooling widens the window (15 px, then 35 px) until it sees the membrane. Set two levels or load the trained network, paint the held-out fields on the Test step, and hover a pixel for its probabilities and the window it was decided from. |
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -714,6 +721,17 @@ measures on the shipped weights without training), and the ablations with `--dim
 20 to 40 s per epoch and about ten seconds for the measures after training. The ablation numbers above are from
 the findings block alone, the measure the page used before its Test step was given the requisition.
 
+**The paths on the word map** (the shipped models, from their random tables to epoch 30, on the two directions of
+their final tables) are not straight: a word ends about a third of the way it travels from where it started (38% on
+the report model's output rows, 33% on the chat model's); a quarter to a third of the way is made in the first epoch
+and half by the third epoch (the report model) or the sixth (the chat model), and the rest is a slow wander over the
+remaining epochs while the loss creeps down. The words of the findings block travel least and the words of the
+microscopic prose most; rare words wander more than frequent ones (0.93 against 0.84 on the output rows, for words
+seen fewer than 20 times and 100 times or more); the one word never seen in training only shrinks toward the centre
+under weight decay. The embedding rows rearrange without spreading (an rms radius of 0.43 at the start, 0.41 at the
+end) while the output rows spread out (0.26 to 0.38), the output rows setting the size of the scores as well as their
+direction.
+
 **On the page.** The question *Reports: write the report from the findings?* (recipe ⑯, `#reports/train`) has the
 same three steps as the others. *Specimens* shows a report with its sections, and under *Reveal* the hidden case
 behind it and the rule table, with the training, test and never-trained-on reports as cards coloured by diagnosis.
@@ -730,7 +748,7 @@ a minute; 48 or 32 numbers per token, position vectors on or off, no context lay
 learning rate and the seed as controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
 model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
 score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about; *Keep this model*
-saves a model trained on the page in the browser, with its curves and settings, and *Restore kept* brings it back,
+saves a model trained on the page in the browser, with its curves, its words' paths and settings, and *Restore kept* brings it back,
 after a reload too, so that a model trained before a lecture is there during it). The report on
 screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
@@ -771,7 +789,11 @@ the next word, which carry the relationships: the states of a line together, the
 bladder together) or as their vectors at the input, laid out by t-SNE (cosine affinities at a perplexity of 20, started
 from the two-direction map and pushed a few iterations per frame, carried on after each training step) or on the two
 directions that spread the vectors most, coloured by the section each word mostly appears in: a cloud before training,
-neighbourhoods after. The curves are the test loss per epoch by section, the share of next words right, from the
+neighbourhoods after. *Paths* draws, on the two-direction map, each labelled word's way through training: the two
+tables are kept after every epoch from the random start, each kept table is centred and projected on the two
+directions of the table as it is now, and a word's path runs from a hollow ring at epoch 0 through a dot per epoch
+to where it stands; hover a word for its own path. The shipped models bring their paths from Node (epochs 0 to 6,
+then 8, 10, 12, 15, 20, 25 and 30), a kept model its own, projected. The curves are the test loss per epoch by section, the share of next words right, from the
 first epoch the diagnosis the model writes for eight test reports from their findings and requisition, the
 description written by itself, measured a few words per frame after each epoch, and, as a fourth chart, where the
 diagnosis looks: the share of the diagnosis words' attention, in the last layer, that lands on the findings block of
@@ -887,6 +909,149 @@ held-out phrasings (*Ask all* runs the whole set); changing anything makes a pro
 rule's answer where there is one and not tallied. The three diagram cards of the reports question follow the
 transcript the model continued. The transcripts (1.8 MB) and the trained model (0.4 MB) load with the page.
 
+## Describe: from pixels to words
+
+The Describe question joins the two halves of the page: the foundation encoder that turns a nucleus into a code, and
+the language model that writes. A nucleus's code is projected into the embedding space by one learned matrix and
+stands as the first token of the document; the language model of the Reports question then writes the nucleus's
+description word by word, trained on the next word alone, as before. It is a vision-language model in miniature,
+the idea of the captioning models that put an image encoder's features in front of a language model and let the
+words attend to them, with every part small enough to watch. The nuclei and their descriptions are described under
+*The data*: 400 nuclei with the four traits chosen independently, 320 for training and 80 for test, a description
+of each in one of four sentence shapes with a few phrasings per trait, ending with an impression.
+
+**The model.** `LanguageModel` gains an optional image input (`codeDim`): a projection `Pin` (48 × 16) and a bias
+`bin` turn the code into the vector at position 0, in place of a word's row of the lookup table (the position vector
+is added as usual), and the gradient at that position flows into the projection (checked numerically with the rest
+of the model). Writing starts from the image token with its code, which the cache holds like any other token. The
+encoder is the second backbone shipped with the page (`page240-k8`: 8 filters, a code of 16, pretrained
+contrastively on the page's 240 training nuclei), frozen: pixels → ink → the backbone's standardiser → the encoder
+→ 16 numbers. The language model is the report model's recipe (48 numbers per token, 32 learned positions, two
+causal context layers of two heads, query · key of 12 with a learned distance cost per head, a 48-unit tanh
+feed-forward, Adam at 0.005, batches of 8, gradients clipped at 1) with weight decay 0.001 rather than 0.0001, since
+320 descriptions are few, on a vocabulary of 53: 26,361 parameters, trained for 20 epochs from random weights
+(about 2.5 s per epoch in Node). Reproduce with `node tools/check_describe.js --backbone page240-k8 --epochs 20
+--decay 0.001 --ground 80 --ground-every 1 --curve` (`--save data/describe/describe_weights.js` writes the shipped
+model, `--load` takes the measures on it, `--no-code` and `--shuffle-codes` run the controls below).
+
+The test loss by section as it trains (the image token's own prediction, the first word, counts with the
+description), and, after every epoch, the 80 test nuclei described from their image alone (greedily, from the image
+token and its code): the share with all four traits right, each trait's accuracy, and the share of the description
+words' attention (the last layer, heads averaged) that lands on the image token:
+
+| Epoch | Test loss | description | impression | All four traits right | enlarged | hyperchromatic | irregular | coarse | The description's attention on the image |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.820 | 1.05 | 0.14 | 0% | 96% | 45% | 30% | 8% | 6% |
+| 2 | 0.555 | 0.71 | 0.11 | 25% | 93% | 63% | 68% | 51% | 7% |
+| 3 | 0.497 | 0.63 | 0.10 | 40% | 91% | 65% | 76% | 89% | 6% |
+| 5 | 0.477 | 0.60 | 0.11 | 45% | 95% | 78% | 68% | 75% | 11% |
+| 7 | 0.449 | 0.59 | 0.05 | 60% | 100% | 84% | 78% | 93% | 9% |
+| 10 | 0.438 | 0.56 | 0.07 | 61% | 100% | 89% | 74% | 90% | 11% |
+| 15 | 0.412 | 0.53 | 0.05 | 69% | 100% | 88% | 84% | 96% | 9% |
+| 20 | 0.425 | 0.55 | 0.05 | 63% | 96% | 86% | 80% | 98% | 9% |
+
+**What the data taught.** Size comes first and free: the code carries it so plainly that the first epoch already
+names 96% of the test nuclei's sizes right, while the other three traits start at the commoner word (*pale*,
+*smooth*, *fine* for everyone: 45%, 30% and 8%). Chromatin texture is learned by the third epoch and the stain by
+the fifth; the outline is learned last and least (80% at the end), the trait that a 5 × 5 filter sees only in
+pieces. The test loss bottoms at epoch 15 and the training loss keeps falling: 320 descriptions are few, and the
+curve shows where to stop. All four traits are right for 63% of the test nuclei at the end (69% at epoch 15; 73%
+and 68% with seeds 2 and 3; 61% with 32 numbers per token and half the parameters) and the impression for 94%;
+with 80 test nuclei and one greedy description each, the shares move by several points from epoch to epoch. Two
+controls say that the words come from the image: with no code at all (the image token a plain word) the model
+writes one description for everyone (*The nucleus is large and pale, with fine chromatin and a rounded outline*)
+and is right by base rate alone (enlarged 40%, hyperchromatic 59%, irregular 64%, coarse 53%; all four 6%), and
+with every training nucleus given another nucleus's code it does no better (all four 9%). What the code carries
+decides what the description can say: with the first backbone (4 filters, a code of 8) the same recipe names coarse
+chromatin right for 73% of the test nuclei after 40 epochs and 59% to 66% after 20, against 98% with the 8-filter
+code of 16, which has room for texture, while size, stain and outline differ little between the two. The other
+lab's scans (the weaker stain) cost the trait that lives in the stain: 11 of the 33 hyperchromatic test nuclei lose
+the word, and the four traits agree with our lab's description for 65% of the nuclei, though each trait's accuracy
+barely moves (99%, 83%, 79%, 86%), the errors having moved around. The seven other views of a test nucleus (flips
+and rotations) get the same four traits as the upright view for 91% of the views: the encoder was pretrained to
+give them the same code. Only a tenth of the description's attention in the last layer lands on the image token,
+and the traits still come out right: the image is read early and what was read travels in the words between, as the
+diagnosis read the findings through the microscopic prose in the reports. At temperature 1 the descriptions keep
+their traits but the grammar slips in about one draw in three (*the, with coarsely granular chromatin clumped*):
+320 descriptions teach four sentence shapes, not the language.
+
+**The page.** *Specimens* shows each nucleus with its description as tokens (the image token drawn as the nucleus
+itself), its four traits, and its code as sixteen bars, with an explainer of the three joins: the image becomes a
+code, the code becomes the first token, the model writes. *Train* is the shared language-model lab: the Reports
+question's Train step on the descriptions, the image token first in every document, the loss by section, the test
+nuclei described after every epoch with all four traits right or not as the third chart, and the share of the
+description's attention on the image token as the fourth; the diagrams read the image token like any word before
+them, and *Load the trained model* brings the shipped model with its curves and its words' paths. *Test* describes
+a test nucleus from its image one word at a time, ticks the four traits the model named against the generator's and
+the impression, and tallies the test set (all four right, and each trait); the image can be swapped for the other
+lab's scan of the same nucleus, for the scan flipped and turned, or for no image at all (a code of zeros), each a
+tally of its own, so that the stain-dependent word, the encoder's invariance and the base rates can each be shown in
+a minute. Recipe ⑲ sets it up.
+
+## Segment: a class for every pixel
+
+The Segment question asks the fields of the invasion question a different question: not whether the field is
+invasive, but what every pixel is. Four classes: the lumen above the surface, the epithelium, the stroma, and the
+cells below the membrane (a von Brunn nest, a cord of an inverted papilloma, an invasive nest or a shed single cell).
+It is semantic segmentation in miniature, the task behind the nucleus and gland segmentation networks of computational
+pathology, with a network small enough that every filter and every map fits on the screen. The masks are described
+under *The data*: nobody painted them; `js/fields.js` reads them off the geometry each field carries, the membrane's
+height and every nest's outline, and they come out as 5%, 34%, 47% and 14% of the pixels.
+
+**The model.** `SegNet` in `js/nn.js` is a fully convolutional network: every weight belongs to a 3 × 3 filter slid
+over the whole field with 'same' padding and followed by a ReLU, so the same few thousand weights paint a field of any
+size, a 64 × 64 crop in training and the whole 176 × 128 field at test. Two convolutions of 8 channels at the pixels'
+own scale decide each pixel's class from the 5 × 5 window around it; each **level of context** below them pools the
+maps 2 × 2 (the maximum), convolves twice at the coarser scale, upsamples the result (nearest neighbour) and joins it
+to the finer map before two more convolutions, a U-Net in miniature, so that the window a pixel is decided from widens
+to 15 px with one level and 35 px with two while the join keeps the fine edges. A 1 × 1 convolution gives four scores
+per pixel and a softmax the probabilities; the loss is the cross-entropy per pixel, optionally weighted by 1/√(class
+share) so that the rare lumen and nests count; Adam at 0.003 on batches of 4 random crops of 64 × 64 from the
+training fields, 400 crops per epoch, weight decay 0.0001, gradients clipped at 1, the ink centred on its mean
+(0.289). The gradient is checked numerically against the loss (worst relative error 3 × 10⁻⁵ over 354 gradients at
+two levels). Parameters: 700 with no context, 3,028 with one level, 5,356 with two. Reproduce with
+`node tools/check_segment.js --levels 2 --epochs 20 --crops 400 --weighted --curve` (about 34 s per epoch in Node;
+`--save data/fields/seg_weights.js` writes the shipped network, `--load` takes the measures on it, `--sheet` a sheet
+of predictions).
+
+**What the window buys.** After 20 epochs, on the 50 held-out fields, the same recipe at each depth (seed 1):
+
+| Context | Window | Parameters | Pixels right | Mean IoU | Lumen | Epithelium | Stroma | Nest | Of the nest pixels, called epithelium |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 5 px | 700 | 84% | 59% | 62% | 69% | 94% | 12% | 75% |
+| 1 level | 15 px | 3,028 | 90% | 71% | 76% | 79% | 98% | 32% | 56% |
+| 2 levels | 35 px | 5,356 | 95% | 81% | 68% | 88% | 98% | 66% | 4% |
+| 2 levels, pixels weighted by 1/√share (the shipped network) | 35 px | 5,356 | 95% | 83% | 79% | 89% | 97% | 66% | 5% |
+
+Pixels right is the easy number: the stroma and the epithelium are 81% of the field and the stroma is a plain
+texture, so even the 5 px window gets 84%, and the stroma's IoU is 94% at every depth. The intersection over union per
+class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane looks exactly like
+the nucleus above it in the epithelium, the same cells from the same generator, so the only thing that separates the
+two classes is where the pixel lies relative to the membrane, which a 5 px window cannot see: with no context three in
+four nest pixels are called epithelium and the nest IoU is 12%. One level (15 px) halves the confusion; two levels
+(35 px, enough to see the membrane from most of a nest) send 90% of the nest pixels to the nest class. The weighting
+lifts the lumen, a thin strip of 5% of the pixels, from 68% to 79% and the mean to 83% without costing the rest, and
+that is the network that ships. The nest's remaining 66% is mostly a scoring artefact of the carcinoma in situ fields:
+eight of the ten have no nest at all, and a few hundred stray nest pixels on each (49 to 1,252 of 22,528) count as an
+IoU of zero for the whole field; over the 42 test fields that have a nest the nest IoU averages 79% (von Brunn nests
+79%, CIS in von Brunn nests 73%, inverted papilloma 83%, invasive 78%). What it gets wrong is on the sheet
+`data/fields/contact_sheet_segmentation.png` (ten test fields: the image, the truth, the prediction with the wrong
+pixels darkened): the darkest nuclei inside a nest, called epithelium or stroma from their texture, the rim of a nest,
+and the surface line where the lumen begins, the boundaries, as ever in segmentation.
+
+**The page.** *Specimens* shows the fields of the invasion question again with their masks painted over them (image
+or mask), each field's class shares, and two explainers: where the mask comes from, and what the network has to do
+(22,528 labelled pixels per field, which are anything but independent). *Train* is a live training loop on crops: the
+context control (none, one level, two levels) rebuilds the network and its window, Step batch takes one gradient step
+on two crops, an epoch of 100, 200 or 400 crops scores five test fields and fills the curves (the loss on the crops
+and on the test fields, pixels right, the IoU per class), the focus field is painted after every epoch as the
+prediction, the truth or the errors in red, and hovering a pixel gives its truth, the network's class, the four
+probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
+on the field are on the cards below, and *Load the trained model* brings the shipped network with its twenty epochs
+of curves. *Test* paints the held-out fields one at a time (N for the next) with the IoU per class of each and a
+tally over the fifty. Recipe ⑳ sets it up with no context, so that the nest line's failure is the first thing seen;
+set two levels and train again, or load the trained network, for the comparison.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -925,8 +1090,8 @@ the 20 test slides, so no test slide shares a nucleus with a training slide. The
 slides come from the same pool under the same held-out rule; every slide holds four atypical nuclei, placed as one of the
 12 possible 2 × 2 blocks or as one of the 454 ways to scatter four cells with no two adjacent.
 
-`tools/generate_fields.js` (no dependencies) draws the tissue fields of the invasion question, the next question in
-preparation: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50 held out, written to
+`tools/generate_fields.js` (no dependencies) draws the tissue fields of the invasion question, and of the
+segmentation question after it: 450 strips of bladder of 176 × 128 pixels, 400 for training and 50 held out, written to
 `data/fields/fields_data.js`, with two contact sheets in H&E colour (`contact_sheet_fields.png`, and
 `contact_sheet_fields_truth.png` with the membrane, the nest outlines and every nucleus's truth drawn over it). Each
 field is urothelium of two or three rows of nuclei on a wavy basement membrane whose height varies from field to field,
@@ -945,7 +1110,11 @@ The two nest patterns hold the same number of atypical nuclei below the membrane
 nests hang from it equally often (72% and 68%), so that neither count nor depth separates them.
 The nuclei come from the atypia generator, so their cytology is what the encoder learned on, and every nucleus of a
 field, the spindle cells included, is a token for the model, with its truth kept for the page: atypical or bland, above
-or below the membrane, which nest. Invasion is the conjunction of three cues, and every pattern that lacks one is a
+or below the membrane, which nest. The field also keeps its own geometry, the membrane's height every 8 px and every nest's
+outline (an ellipse with a faint harmonic for a round nest or a shed single cell, a band around polylines for the
+cords of an inverted papilloma, closed ribbons for an invasive nest), from which `js/fields.js` builds a mask for the
+segmentation question: a class for every pixel, the lumen above the surface, the epithelium, the stroma, and cells
+below the membrane in a nest, a cord or shed singly (5%, 34%, 47% and 14% of the pixels). Invasion is the conjunction of three cues, and every pattern that lacks one is a
 real mimic:
 
 | Pattern | Cytology | Location | Architecture | Label |
@@ -1036,26 +1205,50 @@ your reasoning.*, *You are a helpful assistant.*) are kept for the page. The voc
 70 to 96 tokens. `js/chat.js` gives every token its role (system, user, findings, question, assistant, tool), finds
 the assistant's last answer, and says whether an assistant line is the tool call.
 
+`tools/generate_describe.js` writes the nuclei of the Describe question to `data/describe/describe_data.js` (750 KB):
+400 nuclei from the atypia generator (`tools/generate_nuclei.js`, the same shapes, stains and textures), but with
+each of the four traits (enlarged, hyperchromatic, irregular outline, coarse chromatin) switched on by its own coin,
+so that every one of the sixteen combinations occurs (15 to 41 nuclei each; 41 are bland), 320 for training and 80
+for test, the test nuclei also rendered as scanned at the other lab. Each nucleus comes with a description in words,
+written from its traits by `js/describe.js`: one of four sentence shapes (*A large, dark nucleus with an irregular
+contour and finely granular chromatin.*, *Nucleus big and densely stained; the outline is smooth and the chromatin
+coarsely granular.*, *The nucleus is small and faint, with even chromatin and a rounded outline.*, *Outline notched,
+chromatin fine; the nucleus is enlarged and pale.*), each trait in one of three or four phrasings on and off
+(enlarged, large, big against normal-sized, small, modest; hyperchromatic, dark, densely stained against pale,
+lightly stained, faint; irregular, notched, lobulated, angulated against smooth, regular, rounded; coarse, clumped,
+coarsely granular against fine, finely granular, even), and an impression, *bland* when no trait is on and
+*atypical* otherwise. The vocabulary is 53 tokens, four of them special (start, end, unknown and the image, which
+stands first in every document and carries the nucleus's code instead of a word); a description is 20 tokens on
+average. A contact sheet of the first 100 nuclei is in `data/describe/contact_sheet.png` and their descriptions with
+their traits in `data/describe/sample_descriptions.md`. `js/describe.js` also reads a written description back into
+the four traits (true, false, or unsaid when a trait is not named or named both ways) and the impression, for the
+measures and the page's ticks.
+
 ## Code map
 
 ```
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation, with an image code as its first token; the segmentation network, 3 × 3 convolutions with levels of pooling and upsampling and a class for every pixel (browser + Node)
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
-js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
+js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
+js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
-js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
+js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network
+js/glossary.js             the glossary: one definition per recurring term, underlined where it first appears in a paragraph (re-marked as the page rewrites its notes), a tooltip on hover, the whole list behind the masthead's Glossary button
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
-data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
+data/fields/fields_data.js the tissue fields of the invasion and segmentation questions: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
 data/reports/reports_data.js the reports of the language-model question in preparation: 908 synthetic bladder biopsy reports with their hidden cases, written by tools/generate_reports.js; sample_reports.md beside it is a sheet of 21 for reading
-data/reports/lm_weights.js  the trained report model with its vocabulary (seed 1 of the shipped configuration), written by tools/check_reports.js --save
+data/reports/lm_weights.js  the trained report model with its vocabulary, the curves of its training and the words' paths (seed 1 of the shipped configuration), written by tools/check_reports.js --save
 data/chat/chat_data.js     the transcripts of the chat question: 2,400 training, 300 test and 300 held-out-phrasing transcripts written from the report corpus's cases by tools/generate_chat.js; sample_transcripts.md shows the phrasings, the questions with both answers for four cases, and one transcript of each style
-data/chat/chat_weights.js  the trained chat model with its vocabulary and the curves of its training, written by tools/check_chat.js --save
+data/chat/chat_weights.js  the trained chat model with its vocabulary, the curves of its training and the words' paths, written by tools/check_chat.js --save
+data/describe/describe_data.js  the nuclei of the Describe question: 400 from the atypia generator with the four traits chosen independently, each with its description; the test nuclei as scanned at both labs; written by tools/generate_describe.js (with a contact sheet and a sample sheet beside it)
+data/describe/describe_weights.js  the trained describe model with its vocabulary, the curves of its training, its measures and the words' paths, written by tools/check_describe.js --save
+data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -1068,6 +1261,9 @@ tools/generate_reports.js  make the reports: a findings block and a sign-out wri
 tools/check_reports.js     train the report language model and take its measures: loss by section, the diagnosis from the prefix and from the block alone, the held-out combination, what it writes from nothing, where the diagnosis looks
 tools/generate_chat.js     make the transcripts: three styles, three phrasings of each instruction and a fourth held out, eight questions answered from the findings by the rule, the probes
 tools/check_chat.js        train the chat model and take its measures: loss by role, the answers written from the transcript up to the last ASSISTANT: by style on the trained and the held-out phrasings and by question, the agent loop, the probes
+tools/generate_describe.js make the Describe nuclei and their descriptions (a contact sheet and a sample sheet for vetting)
+tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
+tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```

@@ -22,7 +22,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { LanguageModel, mulberry32, gradientCheckLM } = require('../js/nn.js');
+const { LanguageModel, mulberry32, gradientCheckLM, wordTrails } = require('../js/nn.js');
 const R = require('../js/reports.js');
 const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
 const num = (k, d) => +arg(k, d);
@@ -52,7 +52,7 @@ const tally = (rows, label) => { const c = {}; for (const r of rows) c[r] = (c[r
 const seed0 = num('--seed', 1); // the first seed; --seeds N runs N seeds from it
 for (let seed = seed0; seed < seed0 + (LOADED ? 1 : cfg.seeds); seed++) {
   const lm = LOADED ? LanguageModel.fromJSON(LOADED) : new LanguageModel({ vocabSize: vocab.size, dim: cfg.dim, layers: cfg.layers, heads: cfg.heads, dk: cfg.dk, ffn: cfg.ffn, costInit: cfg.cost.length === 1 ? cfg.cost[0] : cfg.cost, positions: cfg.positions, clip: cfg.clip, optimizer: cfg.opt, seed });
-  const rng = mulberry32(seed * 977 + 1), order = train.map((_, i) => i), hist = [];
+  const rng = mulberry32(seed * 977 + 1), order = train.map((_, i) => i), hist = [], snaps = [{ epoch: 0, E: Float32Array.from(lm.E), out: Float32Array.from(lm.Wout) }]; // the tables after every epoch, for the word paths of the page's map
   console.log(`\n== ${LOADED ? `loaded ${load} (${LOADED.trained})` : `seed ${seed}`} · ${lm.parameterCount()} parameters · ${lm.describe()}`);
   for (let epoch = 1; epoch <= (LOADED ? 0 : cfg.epochs); epoch++) {
     const t0 = Date.now(); let loss = 0, nb = 0;
@@ -63,9 +63,10 @@ for (let seed = seed0; seed < seed0 + (LOADED ? 1 : cfg.seeds); seed++) {
     if (cfg.ground && (epoch % cfg.groundEvery === 0 || epoch === cfg.epochs)) { let ok = 0; for (const d of test.slice(0, cfg.ground)) { const b = generated(lm, d.tokens.slice(0, d.words.indexOf('MICROSCOPIC')), 220, 0, rng); if (R.classOf(R.diagnosisOf(b)) === R.classOf(d.dx)) ok++; } groundValue = ok / cfg.ground; ground = ` · from the findings and the requisition: class right ${pct(groundValue)}`; }
     const evidence = evidenceShare(lm, test.slice(0, 40)); // where the diagnosis looks: the share of its attention on the findings block, test reports
     hist.push(Object.assign({ epoch, loss: +(loss / nb).toFixed(4), testLoss: +ev.loss.toFixed(4), acc: +ev.accuracy.toFixed(4), ground: groundValue, evidence: evidence == null ? null : +evidence.block.toFixed(4), evidenceNests: evidence == null ? null : +evidence.nests.toFixed(4) }, Object.fromEntries(R.SECTIONS.map(k => [k, sec[k] == null ? null : +sec[k].toFixed(4)]))));
+    snaps.push({ epoch, E: Float32Array.from(lm.E), out: Float32Array.from(lm.Wout) });
     if (curve || epoch === cfg.epochs || epoch % 5 === 0 || epoch === 1) console.log(`epoch ${String(epoch).padStart(3)} · train loss ${(loss / nb).toFixed(3)} · test loss ${ev.loss.toFixed(3)} · next token right ${pct(ev.accuracy)} · diagnosis on the block ${evidence == null ? '–' : pct(evidence.block)} (nests line ${evidence == null ? '–' : pct(evidence.nests)}) · by section: ${R.SECTIONS.map(s => `${s} ${sec[s] == null ? '–' : sec[s].toFixed(2)}`).join(', ')} · cost/token ${costs}${ground} · ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   }
-  if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the report model', trained: `${cfg.epochs} epochs on ${train.length} reports`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4), groundN: cfg.ground || null, hist }); fs.writeFileSync(save, `window.REPORT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB) with ${hist.length} epochs of history`); }
+  if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the report model', trained: `${cfg.epochs} epochs on ${train.length} reports`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4), groundN: cfg.ground || null, hist }); out.trails = wordTrails(snaps, out.E, out.Wout, lm.V, lm.D); fs.writeFileSync(save, `window.REPORT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB) with ${hist.length} epochs of history`); }
   if (skipGen) continue;
   const t1 = Date.now();
   // the diagnosis (a) given everything up to "DIAGNOSIS:", (b) given the findings block alone, the whole report written,

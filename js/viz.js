@@ -959,6 +959,40 @@ window.Viz = (function () {
     return best;
   }
   // a field as a small tile for the trays, at half size
+  // ---- the segmentation question: a field with a class painted on every pixel, the first layer's maps, its filters
+  const segScratch = document.createElement('canvas');
+  // opt: px, w, h, scale, tint; labels (the prediction) and truth as Uint8Arrays of classes; mode 'image' | 'pred' |
+  // 'truth' | 'errors'; colors, one [r, g, b] per class; hover { x, y, rf } draws the receptive field around a pixel
+  function drawSegField(canvas, opt) {
+    const k = opt.scale || 2, W = opt.w * k, H = opt.h * k, ctx = fitCanvas(canvas, W, H), mode = opt.mode || 'pred';
+    ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(fieldToCanvas(opt.px, opt.w, opt.h, opt.tint), 0, 0, W, H);
+    const labels = mode === 'truth' ? opt.truth : mode === 'pred' || mode === 'errors' ? opt.labels : null;
+    if (labels) {
+      segScratch.width = opt.w; segScratch.height = opt.h; const sctx = segScratch.getContext('2d'), im = sctx.createImageData(opt.w, opt.h), a = Math.round(255 * (opt.alpha == null ? 0.5 : opt.alpha));
+      for (let i = 0; i < labels.length; i++) { const o = i * 4; if (mode === 'errors') { const wrong = opt.truth && labels[i] !== opt.truth[i]; if (wrong) { im.data[o] = 200; im.data[o + 1] = 40; im.data[o + 2] = 40; im.data[o + 3] = 170; } } else { const c = opt.colors[labels[i]]; im.data[o] = c[0]; im.data[o + 1] = c[1]; im.data[o + 2] = c[2]; im.data[o + 3] = a; } }
+      sctx.putImageData(im, 0, 0); ctx.drawImage(segScratch, 0, 0, W, H);
+    }
+    if (opt.membrane && mode !== 'image') { ctx.strokeStyle = 'rgba(42,120,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); opt.membrane.forEach((y, i) => (i ? ctx.lineTo(i * 8 * k, y * k) : ctx.moveTo(0, y * k))); ctx.stroke(); }
+    if (opt.hover) { const { x, y, rf } = opt.hover, r = (rf - 1) / 2; ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5; ctx.strokeRect((x - r) * k, (y - r) * k, rf * k, rf * k); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x * k, y * k, k, k); ctx.strokeStyle = 'rgba(20,20,30,0.9)'; ctx.strokeRect(x * k - 0.5, y * k - 0.5, k + 1, k + 1); }
+    ctx.imageSmoothingEnabled = true;
+    canvas._seg = { k, w: opt.w, h: opt.h };
+  }
+  function hitSegField(canvas, px, py) { const m = canvas._seg; if (!m) return null; const r = canvas.getBoundingClientRect(), x = Math.floor(px / r.width * m.w), y = Math.floor(py / r.height * m.h); return x >= 0 && y >= 0 && x < m.w && y < m.h ? { x, y } : null; }
+  // the maps of one layer, C maps of h × w, each on its own scale from 0 (dark) to its largest value, cols per row
+  function drawSegMaps(canvas, opt) {
+    const { maps, C, h, w } = opt, k = opt.scale || 1, cols = opt.cols || 4, rows = Math.ceil(C / cols), gap = 6, W = cols * (w * k + gap) - gap, H = rows * (h * k + gap + 14) - gap, ctx = fitCanvas(canvas, W, H), c = colors();
+    ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false; segScratch.width = w; segScratch.height = h; const sctx = segScratch.getContext('2d');
+    for (let m = 0; m < C; m++) { const im = sctx.createImageData(w, h), off = m * h * w; let mx = 1e-9; for (let i = 0; i < h * w; i++) mx = Math.max(mx, maps[off + i]); for (let i = 0; i < h * w; i++) { const v = Math.round(255 * (1 - Math.min(1, maps[off + i] / mx))), o = i * 4; im.data[o] = v; im.data[o + 1] = v; im.data[o + 2] = v; im.data[o + 3] = 255; } sctx.putImageData(im, 0, 0);
+      const cx = (m % cols) * (w * k + gap), cy = Math.floor(m / cols) * (h * k + gap + 14); ctx.drawImage(segScratch, cx, cy + 14, w * k, h * k); ctx.fillStyle = c.ink2; ctx.font = '11px ' + (c.mono || 'monospace'); ctx.textAlign = 'left'; ctx.fillText(`${opt.label || 'map'} ${m + 1} · max ${mx.toFixed(2)}`, cx, cy + 10); }
+    ctx.imageSmoothingEnabled = true;
+  }
+  // the filters of a layer with one input channel: cout grids of 3 × 3, red for positive weights, blue for negative
+  function drawSegFilters(canvas, opt) {
+    const { W: Wt, cout, cin } = opt, cell = opt.cell || 14, gap = 10, cols = opt.cols || cout, rows = Math.ceil(cout / cols), fw = 3 * cell, Wd = cols * (fw + gap) - gap, Hd = rows * (fw + gap + 14) - gap, ctx = fitCanvas(canvas, Wd, Hd), c = colors();
+    ctx.clearRect(0, 0, Wd, Hd); let mx = 1e-9; for (let i = 0; i < cout * cin * 9; i++) mx = Math.max(mx, Math.abs(Wt[i]));
+    for (let o = 0; o < cout; o++) { const x0 = (o % cols) * (fw + gap), y0 = Math.floor(o / cols) * (fw + gap + 14) + 14; for (let i = 0; i < 9; i++) { let v = 0; for (let ci = 0; ci < cin; ci++) v += Wt[(o * cin + ci) * 9 + i]; const col = divergingRgb(v / mx); ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fillRect(x0 + (i % 3) * cell, y0 + Math.floor(i / 3) * cell, cell - 1, cell - 1); } ctx.fillStyle = c.ink2; ctx.font = '10px ' + (c.mono || 'monospace'); ctx.textAlign = 'center'; ctx.fillText(String(o + 1), x0 + fw / 2, y0 - 4); }
+  }
   function renderFieldThumb(canvas, px, w, h, tint, cache) { // cache: an object that keeps the tile for this tint, so other trays copy it
     const W = Math.round(w / 2), H = Math.round(h / 2), key = tint ? 'he' : 'grey';
     if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
@@ -2622,8 +2656,17 @@ window.Viz = (function () {
   function drawWordMap(svg, opt) {
     const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    for (const t of opt.trails || []) for (const [x, y] of t.xy) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } // the paths stay in the frame
     const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (W - 2 * pad), sy = v => H - pad - (v - y0) / ((y1 - y0) || 1) * (H - 2 * pad);
     let g = opt.axes === false ? `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || '')}</text>` : `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/><text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
+    for (const t of opt.trails || []) { // a word's path through training: a line through its places epoch by epoch, a hollow ring at its random start, a dot at every epoch, ending where the word is now
+      const op = t.emph ? 1 : t.dim ? 0.1 : 0.55, n = t.xy.length - 1, P = t.xy.map(([x, y]) => [+sx(x).toFixed(1), +sy(y).toFixed(1)]);
+      g += `<g class="trail${t.emph ? ' emph' : ''}" style="opacity:${op}"><polyline fill="none" stroke="${t.color}" stroke-opacity="0.15" stroke-width="${t.emph ? 2 : 1}" stroke-linejoin="round" points="${P.map(q => q.join(',')).join(' ')}"/>`;
+      for (let k = 0; k < n; k++) g += `<line stroke="${t.color}" stroke-opacity="${(0.15 + 0.85 * (k + 1) / n).toFixed(2)}" stroke-width="${t.emph ? 2 : 1.1}" stroke-linecap="round" x1="${P[k][0]}" y1="${P[k][1]}" x2="${P[k + 1][0]}" y2="${P[k + 1][1]}"/>`; // the path darkens with the epochs: the early wandering faint, the last steps strong
+      g += `<circle r="${t.emph ? 3.5 : 2.6}" fill="none" stroke="${t.color}" stroke-width="1.2" cx="${P[0][0]}" cy="${P[0][1]}"/>`;
+      for (let k = 1; k < n; k++) g += `<circle r="${t.emph ? 2 : 1.4}" fill="${t.color}" fill-opacity="${(0.3 + 0.7 * k / n).toFixed(2)}" cx="${P[k][0]}" cy="${P[k][1]}"/>`;
+      g += '</g>';
+    }
     for (const p of pts) g += `<circle r="${p.label ? 4 : 3}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" style="fill:${p.color};fill-opacity:${p.label ? 0.95 : 0.65}" data-id="${p.id}"><title>${esc(p.word)}${p.note ? ' · ' + esc(p.note) : ''}</title></circle>`;
     const placed = []; // labels nudged down or up until they no longer overlap one already placed
     for (const p of pts.filter(q => q.label).sort((a, b) => sx(a.x) - sx(b.x))) {
@@ -2634,5 +2677,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

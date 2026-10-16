@@ -544,6 +544,22 @@ details.fold > ul { margin-top: 8px; }
 .thumb.report.rp-benign { border-color: var(--regular); }
 .thumb.report.rp-cis { border-color: var(--irregular); }
 .thumb.report.rp-inv { border-color: var(--bad); }
+.thumb.report.ds-thumb { height: 62px; grid-template-rows: 42px 14px; padding: 1px; align-content: start; }
+.thumb.report.ds-thumb canvas { width: 40px; height: 40px; margin: 1px auto 0; border-radius: 3px; image-rendering: auto; }
+.thumb.report.ds-thumb .dx { letter-spacing: 1px; }
+.thumb.report.ds-bland, .swatch.ring.ds-bland { border-color: var(--regular); }
+.thumb.report.ds-atyp, .swatch.ring.ds-atyp { border-color: var(--irregular); }
+.tok.tok-img { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; padding: 1px 6px 1px 2px; }
+.tok.tok-img img { width: 28px; height: 28px; border-radius: 3px; display: block; }
+.ds-side { display: flex; flex-direction: column; gap: 10px; }
+.ds-pair { display: flex; gap: 14px; flex-wrap: wrap; } .ds-pair > div { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.ds-nucleus { width: 160px; height: 160px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); image-rendering: auto; display: block; }
+.ds-traits { display: flex; flex-wrap: wrap; gap: 6px; }
+.ds-trait { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-strong); font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); }
+.ds-trait.on { border-color: var(--irregular); color: var(--ink); } .ds-trait b { font-weight: 600; }
+.ds-trait.right { box-shadow: inset 0 0 0 1px var(--good); } .ds-trait.wrong { box-shadow: inset 0 0 0 1px var(--bad); }
+.ds-trait i { font-style: normal; font-weight: 700; } .ds-trait.right i { color: var(--good); } .ds-trait.wrong i { color: var(--bad); }
+.ds-codebox { display: flex; flex-direction: column; gap: 4px; } .ds-code { display: block; max-width: 100%; height: auto; }
 .legend .swatch.ring.inv { border-color: var(--bad); }
 
 /* ---------- reports: the model's diagrams ---------- */
@@ -567,6 +583,21 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .rp-map text { font-family: var(--font-mono); font-size: 9px; fill: var(--ink-2); pointer-events: none; }
 .rp-map text.axlabel { fill: var(--ink-3); font-size: 10px; }
 .rp-map line.axis { stroke: var(--line-strong); stroke-width: 1; }
+.rp-map g.trail { pointer-events: none; }
+
+/* ---------- glossary: underlined terms, their tooltip, the list ---------- */
+.term { text-decoration: underline dotted; text-decoration-color: var(--ink-3); text-underline-offset: 3px; cursor: help; }
+#gloss-tip { position: fixed; z-index: 30; max-width: 340px; background: var(--ink); color: var(--ground); font-size: 13px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: var(--shadow); pointer-events: none; display: none; }
+#gloss-tip b { font-family: var(--font-mono); font-weight: 600; margin-right: 4px; }
+#gloss-dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 48px); padding: 18px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); font-family: var(--font-body); }
+#gloss-dialog::backdrop { background: rgba(20, 20, 30, 0.45); }
+.gloss-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 0 0 6px; }
+.gloss-head h2 { margin: 0; font-size: 20px; } .gloss-head .btn { margin-left: auto; }
+#gloss-list { columns: 2; column-gap: 28px; margin: 10px 0 0; font-size: 13.5px; line-height: 1.45; }
+#gloss-list dt { font-family: var(--font-mono); font-weight: 600; break-after: avoid; margin-top: 10px; }
+#gloss-list dt .also { font-family: var(--font-body); font-weight: 400; color: var(--ink-3); margin-left: 6px; font-size: 12px; }
+#gloss-list dd { margin: 2px 0 0; color: var(--ink-2); break-inside: avoid; }
+@media (max-width: 720px) { #gloss-list { columns: 1; } }
 .rp-text svg.rp-arcs path.hop2 { stroke: var(--irregular); stroke-dasharray: 4 3; }
 .rp-text .tok.reads2 { box-shadow: inset 0 -3px 0 rgba(235, 104, 52, 0.45); }
 
