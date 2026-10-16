@@ -697,7 +697,11 @@ the positions from report to report). With no context layer at all, the lookup t
 (recipe ⑱, `--layers 0`), the model is a bigram with positions: the test loss stops at 0.62 after 10 epochs against
 0.16, three quarters of next words still come out right because so much of a report is phrase, and the diagnosis is
 right from the findings for 33% of the test reports, the base rate of the commonest class, and for none of the
-held-out ones, since nothing in the model can read a line forty tokens back. Four heads of 32 numbers reached 73% at 15 epochs; 48 numbers per token, the
+held-out ones, since nothing in the model can read a line forty tokens back. One layer (`--layers 1`) gets the test
+loss to 0.20 in the same 10 epochs, but its diagnosis reads the microscopic prose just before it and not the block:
+none of its attention lands on the findings, against 17% with two layers at the same epoch, and from the findings and
+the requisition it is right for 30% of the test reports, under the base rate, against 64% given the whole report up
+to the diagnosis. Four heads of 32 numbers reached 73% at 15 epochs; 48 numbers per token, the
 shipped model, 96% at 30. Trained on 200 reports instead of 800 the same 32-number model reaches 69% and its test
 loss stays at 0.23 against 0.16: the data-size lesson again. Trained without the hedged reports it never hedges: on
 the five discordant test cases it writes invasion four times and carcinoma in situ once, in the confident wording it
