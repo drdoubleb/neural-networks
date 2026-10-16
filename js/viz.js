@@ -2592,6 +2592,33 @@ window.Viz = (function () {
     for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}” · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
     return null;
   }
+  // ---- calibration and deferral: the classified test cases on the axis of the network's probability, with the truth,
+  // the call threshold and the band of cases deferred; and the accuracy of the calls against the share called
+  function drawCalibrationStrip(svg, opt) {
+    const W = 400, H = 150, ml = 14, mr = 14, mt = 8, mb = 26, pw = W - ml - mr, ph = H - mt - mb, c = colors(), cases = opt.cases || [], bins = 40;
+    const sx = p => ml + p * pw, lo = 1 - opt.tau, hi = opt.tau;
+    const counts = new Array(bins).fill(0); for (const k of cases) counts[Math.min(bins - 1, Math.floor(k.p * bins))]++; const maxStack = Math.max(1, ...counts);
+    const r = Math.max(2.2, Math.min(5, (ph / maxStack - 1) / 2)); // the dots shrink so that the tallest stack fits
+    let g = `<rect x="${sx(lo).toFixed(1)}" y="${mt}" width="${(sx(hi) - sx(lo)).toFixed(1)}" height="${H - mt - mb}" fill="${c.ink3}" fill-opacity="0.10"/>`;
+    g += `<line x1="${sx(opt.threshold).toFixed(1)}" x2="${sx(opt.threshold).toFixed(1)}" y1="${mt}" y2="${H - mb}" stroke="${c.ink}" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    g += `<line x1="${ml}" x2="${W - mr}" y1="${H - mb + 0.5}" y2="${H - mb + 0.5}" stroke="${c.lineStrong}"/>`;
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) g += `<text x="${sx(t).toFixed(1)}" y="${H - mb + 14}" text-anchor="middle" font-size="9" font-family="var(--font-mono)" fill="${c.ink3}">${t}</text>`;
+    g += `<text x="${sx(0.5).toFixed(1)}" y="${H - 2}" text-anchor="middle" font-size="9" fill="${c.ink3}">P(${esc(opt.posName)}) · grey band: deferred · dashed: the call threshold</text>`;
+    const stack = new Array(bins).fill(0);
+    for (const k of cases) { const b = Math.min(bins - 1, Math.floor(k.p * bins)), n = stack[b]++, cx = sx((b + 0.5) / bins), cy = Math.max(mt + r, H - mb - r - 1 - n * (2 * r + 1)), fill = k.y ? c.irregular : c.regular;
+      g += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="${fill}" stroke="${k.wrong ? c.bad : 'none'}" stroke-width="${k.wrong ? 2 : 0}"><title>${esc(k.name)} · P = ${k.p.toFixed(2)} · truth ${esc(k.truthName)}${k.wrong ? ' · called wrong' : ''}${k.deferred ? ' · deferred' : ''}</title></circle>`; }
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
+  function drawCoverageCurve(svg, opt) {
+    const W = 400, H = 150, ml = 40, mr = 14, mt = 12, mb = 26, pw = W - ml - mr, ph = H - mt - mb, c = colors(), pts = opt.points || [];
+    const sx = v => ml + v * pw, sy = v => mt + (1 - v) * ph;
+    let g = '';
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) { g += `<line x1="${ml}" x2="${W - mr}" y1="${sy(t).toFixed(1)}" y2="${sy(t).toFixed(1)}" stroke="${c.line}"/><text x="${ml - 4}" y="${sy(t) + 3}" text-anchor="end" font-size="9" font-family="var(--font-mono)" fill="${c.ink3}">${Math.round(t * 100)}%</text>`; g += `<text x="${sx(t).toFixed(1)}" y="${H - mb + 14}" text-anchor="middle" font-size="9" font-family="var(--font-mono)" fill="${c.ink3}">${Math.round(t * 100)}%</text>`; }
+    g += `<text x="${sx(0.5).toFixed(1)}" y="${H - 2}" text-anchor="middle" font-size="9" fill="${c.ink3}">share of the test cases the network calls (the rest deferred)</text>`;
+    if (pts.length) { g += `<path d="${pts.map((p, i) => `${i ? 'L' : 'M'}${sx(p.coverage).toFixed(1)} ${sy(p.acc).toFixed(1)}`).join(' ')}" fill="none" stroke="${c.accent}" stroke-width="2"/>`; for (const p of pts) g += `<circle cx="${sx(p.coverage).toFixed(1)}" cy="${sy(p.acc).toFixed(1)}" r="2.5" fill="${c.accent}"><title>defer below ${Math.round(p.tau * 100)}% sure: ${Math.round(p.coverage * 100)}% called, ${Math.round(p.acc * 100)}% of them right</title></circle>`; }
+    if (opt.current) g += `<circle cx="${sx(opt.current.coverage).toFixed(1)}" cy="${sy(opt.current.acc).toFixed(1)}" r="6" fill="none" stroke="${c.ink}" stroke-width="2"/>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+  }
   function drawWordMap(svg, opt) {
     const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
@@ -2607,5 +2634,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

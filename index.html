@@ -257,6 +257,28 @@
         </div>
       </div>
 
+      <div class="card" id="calib-card" hidden>
+        <div class="card-head">
+          <h2>How sure is it, and when to hand the case back</h2>
+          <span class="small muted">every classified test case by the probability the network gave it · a case the network is unsure about can be deferred to the pathologist instead of called</span>
+        </div>
+        <div class="rp-two">
+          <div>
+            <div class="chart"><div class="title"><span id="calib-title">The test cases by the network’s probability, with the truth</span><span class="now" id="calib-now"></span></div><svg id="calib-strip" role="img" aria-label="Every classified test case placed by the probability the network gave the positive class, coloured by its truth, with the call threshold and the deferral band"></svg></div>
+            <p class="small muted" id="calib-note" style="margin-top:8px"></p>
+          </div>
+          <div>
+            <div class="ctl slim"><label for="defer">Defer when the network is less than <span class="val" id="defer-val">80%</span> sure</label><input type="range" id="defer" min="50" max="100" step="5" value="80"></div>
+            <div class="metrics" style="margin-top:10px">
+              <div class="metric"><span class="lbl">called</span><b id="defer-n">–</b><small id="defer-n-sub"></small></div>
+              <div class="metric"><span class="lbl">accuracy of the calls</span><b id="defer-acc">–</b><small id="defer-acc-sub"></small></div>
+              <div class="metric"><span class="lbl">deferred</span><b id="defer-d">–</b><small id="defer-d-sub"></small></div>
+            </div>
+            <div class="chart" style="margin-top:12px"><div class="title"><span>Accuracy of the calls against the share of cases called</span></div><svg id="defer-curve" role="img" aria-label="Accuracy among the cases called against the share of cases called, for every deferral setting, the current one marked"></svg></div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head">
           <h2>Test set · <span id="test-count-2"></span></h2>
@@ -905,6 +927,8 @@
             <button type="button" class="btn primary big" id="rp-train" title="run the remaining epochs (space)">▶ Train</button>
             <button type="button" class="btn" id="rp-reset" title="re-initialise the weights from the seed">↺ Reset</button>
             <button type="button" class="btn" id="rp-load" title="the same model after 30 epochs in Node: the weights that ship with the page">Load the trained model</button>
+            <button type="button" class="btn" id="rp-keep" title="save this model, its curves and its settings in this browser, so that it is still here after a reload">Keep this model</button>
+            <button type="button" class="btn" id="rp-restore" title="bring back the model kept in this browser" disabled>Restore kept</button>
           </div>
         </div>
         <div class="status" id="rp-status"></div>
@@ -966,6 +990,7 @@
           <div class="chart"><div class="title"><span>Loss per epoch by section, test reports</span><span class="now" id="rp-loss-now"></span></div><svg id="rp-loss" role="img" aria-label="Loss per epoch by section"></svg></div>
           <div class="chart"><div class="title"><span>Next word right per epoch</span><span class="now" id="rp-acc-now"></span></div><svg id="rp-acc" role="img" aria-label="Next-word accuracy per epoch"></svg></div>
           <div class="chart"><div class="title"><span id="rp-ground-title">Diagnosis right, the description written by the model</span><span class="now" id="rp-ground-now"></span></div><svg id="rp-ground" role="img" aria-label="Share of test reports whose diagnosis the model writes right from the findings and the requisition, writing the microscopic description itself, per epoch"></svg></div>
+          <div class="chart"><div class="title"><span id="rp-evidence-title">Where the diagnosis looks: its attention on the findings block</span><span class="now" id="rp-evidence-now"></span></div><svg id="rp-evidence" role="img" aria-label="Share of the diagnosis words’ attention, in the last layer, that lands on the findings block, per epoch, on test reports"></svg></div>
         </div>
         <p class="small muted" style="margin-top:8px" id="rp-curves-note"></p>
       </div>

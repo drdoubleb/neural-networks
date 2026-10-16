@@ -131,7 +131,12 @@ simply selects a question and its settings.
    In any convolutional diagram, hovering a pooled cell outlines its source block, hovering a feature-map pixel marks the
    pooled cell it feeds, and hovering a cell of a stacked weight or product map names the pooled map and cell it belongs to. Accuracy, sensitivity, specificity and a confusion matrix
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
-   them into positive and negative predictive values for a realistic population.
+   them into positive and negative predictive values for a realistic population. A *How sure is it, and when to hand
+   the case back* card places every classified test case on the axis of the probability the network gave it, coloured
+   by its truth with the wrong calls ringed, so that a well-calibrated network can be seen to put its mistakes near the
+   middle; a **deferral** slider hands the cases the network is less than so-and-so sure about back to the pathologist,
+   with the calls that remain, their accuracy and how many of the deferred cases would have been wrong, and a curve of
+   the accuracy of the calls against the share of cases called for every setting of the bar.
 For the **foundation question** the three steps are the same three, with pretraining in the middle. *Specimens* is the
 100 nuclei from all three image questions (34 / 33 / 33 of their training sets) without a single label; the tray can be
 coloured by question or by the answer to each nucleus's own question, which the model never sees. *Train* is the
@@ -710,7 +715,9 @@ has to become ⟨?⟩. *Train* trains the model live, in batches of four reports
 a minute; 48 or 32 numbers per token, position vectors on or off, the epochs, the learning rate and the seed as
 controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
 model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
-score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about). The report on
+score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about; *Keep this model*
+saves a model trained on the page in the browser, with its curves and settings, and *Restore kept* brings it back,
+after a reload too, so that a model trained before a lecture is there during it). The report on
 screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
 it did not; hover a word for the eight words the model expected there, with the actual one marked, and the words the
@@ -750,9 +757,12 @@ the next word, which carry the relationships: the states of a line together, the
 bladder together) or as their vectors at the input, laid out by t-SNE (cosine affinities at a perplexity of 20, started
 from the two-direction map and pushed a few iterations per frame, carried on after each training step) or on the two
 directions that spread the vectors most, coloured by the section each word mostly appears in: a cloud before training,
-neighbourhoods after. The curves are the test loss per epoch by section, the share of next words right, and, from the
-first epoch, the diagnosis the model writes for eight test reports from their findings and requisition, the
-description written by itself, measured a few words per frame after each epoch. *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
+neighbourhoods after. The curves are the test loss per epoch by section, the share of next words right, from the
+first epoch the diagnosis the model writes for eight test reports from their findings and requisition, the
+description written by itself, measured a few words per frame after each epoch, and, as a fourth chart, where the
+diagnosis looks: the share of the diagnosis words' attention, in the last layer, that lands on the findings block of
+sixteen test reports, which stays flat while the loss falls and rises late, with the grounding (the chat question's
+Train step draws the same four for the transcripts, the last being the answer's attention on the findings). *Test* is the sign-out: the analyser's findings of the next held-out case stand in a form of
 seven lines and go into the prompt with the case's specimen, clinical history and gross, as they would come with the
 case, so that the model writes only what a pathologist signs, the microscopic description and the diagnosis;
 *Write the report* makes it write them one word at a time at the chosen pace, each word coloured by the probability

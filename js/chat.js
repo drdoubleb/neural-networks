@@ -70,6 +70,7 @@
   }
   const CALL = /^findings\s*\(\s*\)\s*$/;
   function callOf(text) { return text && CALL.test(text) ? 'findings' : null; } // the one tool: findings()
+  function answerSpan(words) { const a = lastAssistant(words); return a && a.words.length ? [a.at, a.at + a.words.length] : null; } // the assistant's last answer, as [from, to)
   function firstAnswerIndex(words) { const a = lastAssistant(words); return a && a.words.length ? a.at : words.length - 1; } // the word the diagrams follow by default
   const classOf = text => (text ? (text.split(/[ :,.]/)[0] || '') : '');
   const same = (a, b) => R.detokenize(R.tokenize(a || '')) === R.detokenize(R.tokenize(b || '')); // the same answer, spaced as the tokenizer spaces it
@@ -79,5 +80,5 @@
     const out = []; for (let k = 0; k + 1 < words.length; k++) if (words[k] === 'ASSISTANT' && words[k + 1] === ':' && (k === 0 || words[k - 1] === R.NL || words[k - 1] === R.START)) { const ws = []; for (let j = k + 2; j < words.length; j++) { const w = words[j]; if (w === R.END || w === R.NL) break; ws.push(w); } out.push({ at: k + 2, words: ws, text: R.detokenize(ws) }); }
     return out;
   }
-  return { ROLES, HEADERS, BLOCK_LINES, PERSONA, STYLES, QUESTIONS, PROBES, rolesOf, lastAssistant, assistantLines, callOf, firstAnswerIndex, classOf, same, styleOf, answerOf, promptOf, blockOfText };
+  return { ROLES, HEADERS, BLOCK_LINES, PERSONA, STYLES, QUESTIONS, PROBES, rolesOf, lastAssistant, assistantLines, callOf, answerSpan, firstAnswerIndex, classOf, same, styleOf, answerOf, promptOf, blockOfText };
 });

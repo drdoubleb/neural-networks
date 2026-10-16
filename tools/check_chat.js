@@ -34,6 +34,7 @@ console.log(`model: dim ${cfg.dim}, ${cfg.layers} layers × ${cfg.heads} heads (
 const lm = LOADED ? LanguageModel.fromJSON(LOADED) : new LanguageModel({ vocabSize: vocab.size, dim: cfg.dim, layers: cfg.layers, heads: cfg.heads, dk: cfg.dk, ffn: cfg.ffn, costInit: cfg.cost.length === 1 ? cfg.cost[0] : cfg.cost, positions: cfg.positions, clip: cfg.clip, optimizer: cfg.opt, seed: cfg.seed });
 const rng = mulberry32(cfg.seed * 977 + 1), order = train.map((_, i) => i), hist = [];
 // the loss by role: per[i] is the loss of token i + 1, so the role is that token's
+const evidenceShare = (lm, docs) => { let s = 0, n = 0; for (const d of docs) { const span = C.answerSpan(d.words); if (!span) continue; const v = R.attentionShare(lm.forward(d.tokens), span[0], span[1], j => d.roles[j] === 'findings'); if (v != null) { s += v; n++; } } return n ? s / n : null; };
 const byRole = (docs, per) => { const sum = {}, n = {}; docs.forEach((d, k) => { for (let i = 0; i + 1 < d.tokens.length; i++) { const r = d.roles[i + 1]; sum[r] = (sum[r] || 0) + per[k][i]; n[r] = (n[r] || 0) + 1; } }); const out = {}; for (const r of C.ROLES) out[r] = n[r] ? sum[r] / n[r] : null; return out; };
 // writing: the prefix continued greedily to the end token or a newline, as the page's chat does
 const write = (prefix, max) => { const st = lm.genState(prefix), out = []; while (out.length < max) { const { token } = lm.genNext(st, { temperature: 0 }); if (token === vocab.end || token === NL) break; out.push(token); } return R.detokenize(R.decode(vocab, out)); };
@@ -49,8 +50,9 @@ for (let epoch = 1; epoch <= (LOADED ? 0 : cfg.epochs); epoch++) {
   for (let b = 0; b < order.length; b += cfg.batch) { loss += lm.trainBatch(order.slice(b, b + cfg.batch).map(i => train[i]), cfg.lr, cfg.decay); nb++; }
   const ev = lm.evaluate(test), roles = byRole(test, ev.per);
   let ground = null; if (cfg.ground && (epoch % cfg.groundEvery === 0 || epoch === cfg.epochs)) { const m = measure(test.slice(0, cfg.ground)); ground = m.exact / m.n; }
-  hist.push(Object.assign({ epoch, loss: +(loss / nb).toFixed(4), testLoss: +ev.loss.toFixed(4), acc: +ev.accuracy.toFixed(4), ground }, Object.fromEntries(C.ROLES.map(r => [r, roles[r] == null ? null : +roles[r].toFixed(4)]))));
-  if (curve || epoch === cfg.epochs || epoch % 5 === 0 || epoch === 1) console.log(`epoch ${String(epoch).padStart(3)} · train loss ${(loss / nb).toFixed(3)} · test loss ${ev.loss.toFixed(3)} · next token right ${pct(ev.accuracy)} · by role: ${C.ROLES.map(r => `${r} ${roles[r] == null ? '–' : roles[r].toFixed(2)}`).join(', ')}${ground == null ? '' : ` · answers right ${pct(ground)} of ${cfg.ground}`} · ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  const evidence = evidenceShare(lm, test.slice(0, 40)); // where the answer looks: the share of its attention on the findings, test transcripts
+  hist.push(Object.assign({ epoch, loss: +(loss / nb).toFixed(4), testLoss: +ev.loss.toFixed(4), acc: +ev.accuracy.toFixed(4), ground, evidence: evidence == null ? null : +evidence.toFixed(4) }, Object.fromEntries(C.ROLES.map(r => [r, roles[r] == null ? null : +roles[r].toFixed(4)]))));
+  if (curve || epoch === cfg.epochs || epoch % 5 === 0 || epoch === 1) console.log(`epoch ${String(epoch).padStart(3)} · train loss ${(loss / nb).toFixed(3)} · test loss ${ev.loss.toFixed(3)} · next token right ${pct(ev.accuracy)} · answer on the findings ${evidence == null ? '–' : pct(evidence)} · by role: ${C.ROLES.map(r => `${r} ${roles[r] == null ? '–' : roles[r].toFixed(2)}`).join(', ')}${ground == null ? '' : ` · answers right ${pct(ground)} of ${cfg.ground}`} · ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }
 let measures = null;
 if (!skipGen) {
