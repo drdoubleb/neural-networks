@@ -182,7 +182,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the twenty recipe buttons
+## The lecture arc: the nineteen recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
@@ -207,9 +207,10 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~90% invasion right on the test fields; three invasive fields in four found, one CIS-into-nests field in four still called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns, positions add the membrane, and the context is what tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
 | ⑯ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑰ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
-| ⑱ Reports · no context layer · the next word from the current word alone | 36,857 | test loss 0.62 after 10 epochs against 0.16 with two layers; the diagnosis right from the findings for 33% of the test reports, the base rate, and for none of the held-out ones | The lookup table and the output table with no attention between them: every next word from the current word and its position. The reports read as locally fluent nonsense, nothing can read the findings, and the fourth chart stays empty. Set the layers back to 2 and watch what attention buys. |
-| ⑲ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
-| ⑳ Segment · a class for every pixel · the window it is decided from | 700 (no context) | mean IoU 59% with no context (nest 12%), 71% with one level (nest 32%), 83% with two (nest 66%); pixels right 84%, 90% and 95% | A fully convolutional network: every weight is a 3 × 3 filter slid over the field, so the same few thousand weights paint any field. With no context a pixel's class is decided from the 5 px window around it, which cannot tell a nucleus in the epithelium from the same nucleus in a nest below the membrane: three in four nest pixels are called epithelium and the nest line of the IoU chart stays on the floor. Each level of pooling widens the window (15 px, then 35 px) until it sees the membrane. Set two levels or load the trained network, paint the held-out fields on the Test step, and hover a pixel for its probabilities and the window it was decided from. |
+| ⑱ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
+| ⑲ Segment · a class for every pixel · the window it is decided from | 700 (no context) | mean IoU 59% with no context (nest 12%), 71% with one level (nest 32%), 83% with two (nest 66%); pixels right 84%, 90% and 95% | A fully convolutional network: every weight is a 3 × 3 filter slid over the field, so the same few thousand weights paint any field. With no context a pixel's class is decided from the 5 px window around it, which cannot tell a nucleus in the epithelium from the same nucleus in a nest below the membrane: three in four nest pixels are called epithelium and the nest line of the IoU chart stays on the floor. Each level of pooling widens the window (15 px, then 35 px) until it sees the membrane. Set two levels or load the trained network, paint the held-out fields on the Test step, and hover a pixel for its probabilities and the window it was decided from. |
+
+The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
 The pixel recipes use four hidden units and four filters so that every weight map, filter and feature map stays legible on
 a laptop screen. The sliders go to eight; over eight seeds, eight units score about 81% on ⑦ (four: 79%), 87% on ⑧
@@ -701,7 +702,7 @@ model had no notion of distance (11%). Learned position vectors are what made th
 finding then sits at a known place (40% at 15 epochs, 76% at 30, 84% with a learning rate of 0.01; the block was
 made fixed-format for this, every line always there with a one-word value, where lines that came and went had shifted
 the positions from report to report). With no context layer at all, the lookup table and the output table alone
-(recipe ⑱, `--layers 0`), the model is a bigram with positions: the test loss stops at 0.62 after 10 epochs against
+(the *no context layer* link on the Reports Train step; `--layers 0`), the model is a bigram with positions: the test loss stops at 0.62 after 10 epochs against
 0.16, three quarters of next words still come out right because so much of a report is phrase, and the diagnosis is
 right from the findings for 33% of the test reports, the base rate of the commonest class, and for none of the
 held-out ones, since nothing in the model can read a line forty tokens back. One layer (`--layers 1`) gets the test
@@ -986,7 +987,7 @@ a test nucleus from its image one word at a time, ticks the four traits the mode
 the impression, and tallies the test set (all four right, and each trait); the image can be swapped for the other
 lab's scan of the same nucleus, for the scan flipped and turned, or for no image at all (a code of zeros), each a
 tally of its own, so that the stain-dependent word, the encoder's invariance and the base rates can each be shown in
-a minute. Recipe ⑲ sets it up.
+a minute. Recipe ⑱ sets it up.
 
 ## Segment: a class for every pixel
 
@@ -1049,7 +1050,7 @@ prediction, the truth or the errors in red, and hovering a pixel gives its truth
 probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
 on the field are on the cards below, and *Load the trained model* brings the shipped network with its twenty epochs
 of curves. *Test* paints the held-out fields one at a time (N for the next) with the IoU per class of each and a
-tally over the fifty. Recipe ⑳ sets it up with no context, so that the nest line's failure is the first thing seen;
+tally over the fifty. Recipe ⑲ sets it up with no context, so that the nest line's failure is the first thing seen;
 set two levels and train again, or load the trained network, for the comparison.
 
 ## The data
