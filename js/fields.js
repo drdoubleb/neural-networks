@@ -92,5 +92,40 @@
       img.src = 'data:image/png;base64,' + b64;
     });
   }
-  return { GRAIN, MASK_FILL, mulberry32, gaussianFrom, withGrain, crop, cropMasked, membraneAt, nucleiOf, encodePNGNode, decodePNGNode, decodePNGBrowser };
+  // ---- the masks of the segmentation question: a class for every pixel, from what the field keeps of its own making
+  // (the generator's nest outlines and membrane): 0 the lumen above the surface, 1 the epithelium, 2 the stroma,
+  // 3 cells below the membrane (a nest, a cord, or a single shed cell)
+  const SEG_CLASSES = ['lumen', 'epithelium', 'stroma', 'nest'];
+  function segDist(p, a, b) { const vx = b[0] - a[0], vy = b[1] - a[1], L2 = vx * vx + vy * vy, t = L2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / L2)) : 0; return Math.hypot(p[0] - a[0] - t * vx, p[1] - a[1] - t * vy); }
+  function polyDist(p, poly) { let d = Infinity; for (let i = 0; i < poly.length - 1; i++) d = Math.min(d, segDist(p, poly[i], poly[i + 1])); return d; }
+  function inPolygon(p, poly) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, yi] = poly[i], [xj, yj] = poly[j]; if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside; } return inside; }
+  // signed distance to a nest outline, negative inside, as the generator drew it: round nests and single cells are an
+  // ellipse with a faint harmonic, cords a band around polylines, jagged nests the union of closed ribbons
+  function nestSigned(nest, p) {
+    if (nest.kind === 'cords') return Math.min(...nest.paths.map(path => polyDist(p, path))) - nest.halfWidth;
+    if (nest.kind === 'round' || nest.kind === 'single') {
+      const dx = p[0] - nest.cx, dy = p[1] - nest.cy, c = Math.cos(nest.rot), s = Math.sin(nest.rot), xr = dx * c + dy * s, yr = -dx * s + dy * c, ex = xr / nest.rx, ey = yr / nest.ry;
+      const rho = Math.hypot(ex, ey), theta = Math.atan2(ey, ex), boundary = 1 + nest.amp * Math.cos(nest.k * theta + nest.phase);
+      return (rho - boundary) * Math.min(nest.rx, nest.ry);
+    }
+    let best = Infinity; for (const poly of nest.outlines || []) { const d = polyDist(p, poly), sd = inPolygon(p, poly) ? -d : d; if (sd < best) best = sd; } return best;
+  }
+  function nestBox(nest) { // a bounding box, so that most pixels need no distance at all
+    if (nest.kind === 'cords') { const pts = [].concat(...nest.paths); return { x0: Math.min(...pts.map(q => q[0])) - nest.halfWidth - 1, x1: Math.max(...pts.map(q => q[0])) + nest.halfWidth + 1, y0: Math.min(...pts.map(q => q[1])) - nest.halfWidth - 1, y1: Math.max(...pts.map(q => q[1])) + nest.halfWidth + 1 }; }
+    if (nest.kind === 'round' || nest.kind === 'single') { const r = Math.max(nest.rx, nest.ry) * (1 + Math.abs(nest.amp)) + 1; return { x0: nest.cx - r, x1: nest.cx + r, y0: nest.cy - r, y1: nest.cy + r }; }
+    const pts = [].concat(...(nest.outlines || [])); return pts.length ? { x0: Math.min(...pts.map(q => q[0])) - 1, x1: Math.max(...pts.map(q => q[0])) + 1, y0: Math.min(...pts.map(q => q[1])) - 1, y1: Math.max(...pts.map(q => q[1])) + 1 } : { x0: 0, x1: -1, y0: 0, y1: -1 };
+  }
+  function masksOf(field, w, h) {
+    const out = new Uint8Array(w * h), boxes = field.nests.map(nestBox);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const m = membraneAt(field, x + 0.5), yy = y + 0.5; let cls;
+      if (yy < m - field.surface) cls = 0; else if (yy < m) cls = 1;
+      else { cls = 2; for (let n = 0; n < field.nests.length; n++) { const b = boxes[n]; if (x + 0.5 < b.x0 || x + 0.5 > b.x1 || yy < b.y0 || yy > b.y1) continue; if (nestSigned(field.nests[n], [x + 0.5, yy]) < 0) { cls = 3; break; } } }
+      out[y * w + x] = cls;
+    }
+    return out;
+  }
+  // intersection over union per class between two label maps, and the mean over the classes present in either
+  function iou(pred, truth, K) { const inter = new Float64Array(K), uni = new Float64Array(K); for (let i = 0; i < truth.length; i++) { const t = truth[i], p = pred[i]; if (t === p) inter[t]++; uni[t]++; if (p !== t) uni[p]++; } const per = Array.from(inter, (v, k) => (uni[k] ? v / uni[k] : null)), present = per.filter(v => v != null); return { per, mean: present.length ? present.reduce((a, b) => a + b, 0) / present.length : null }; }
+  return { GRAIN, MASK_FILL, SEG_CLASSES, mulberry32, gaussianFrom, withGrain, crop, cropMasked, membraneAt, nucleiOf, encodePNGNode, decodePNGNode, decodePNGBrowser, nestSigned, masksOf, iou };
 });

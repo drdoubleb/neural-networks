@@ -875,6 +875,114 @@
     lm.layers.forEach((c, l) => { for (let h = 0; h < c.H; h++) { const o = c.beta[h]; c.beta[h] = o + eps; const lp = lossAt(); c.beta[h] = o - eps; const lm2 = lossAt(); c.beta[h] = o; cmp((lp - lm2) / (2 * eps), aBeta[l][h]); } });
     return { worst, checked };
   }
+  // ---------------------------------------------------------------------------- segmentation: a class for every pixel
+  // A tiny fully convolutional network: 3 × 3 convolutions with 'same' padding and ReLU at the image's own scale,
+  // and, for context, levels below it: max-pooling 2 × 2, two convolutions on the coarser map, nearest-neighbour
+  // upsampling and a join with the finer features (a U-Net in miniature). A 1 × 1 convolution scores every pixel for
+  // every class and the softmax over the classes, with the cross-entropy against the mask, trains it. The same
+  // weights work on a crop and on a whole field: nothing in the network knows how big its input is. Tensors are
+  // Float64Arrays laid out [channel][row][column].
+  class SegNet {
+    constructor({ channels = 8, levels = 1, classes = 4, seed = 1, optimizer = 'adam', clip = 1, classWeights = null, norm = null }) {
+      this.C = channels; this.L = levels; this.K = classes; this.seed = seed; this.optimizer = optimizer; this.clip = clip; this.classWeights = classWeights ? Float64Array.from(classWeights) : null; this.norm = norm || { mean: 0.5 };
+      const rnd = mulberry32(seed * 104729 + 11), mk = (n, fanIn) => { const s = Math.sqrt(6 / fanIn); return Float64Array.from({ length: n }, () => (rnd() * 2 - 1) * s); }; // He-uniform
+      const conv = (cin, cout) => ({ W: mk(cout * cin * 9, cin * 9), b: new Float64Array(cout), cin, cout });
+      this.enc = []; for (let l = 0; l <= levels; l++) this.enc.push([conv(l === 0 ? 1 : channels, channels), conv(channels, channels)]); // two convolutions per level, the first level on the image
+      this.dec = []; for (let l = levels - 1; l >= 0; l--) this.dec.push(conv(2 * channels, channels)); // one convolution per level on the way up, on the upsampled map joined to that level's features
+      this.head = { W: mk(classes * channels, channels), b: new Float64Array(classes), cin: channels, cout: classes };
+      this.steps = 0; this.adam = null;
+    }
+    layers() { const out = []; for (const pair of this.enc) out.push(pair[0], pair[1]); for (const d of this.dec) out.push(d); out.push(this.head); return out; }
+    parameterCount() { return this.layers().reduce((a, c) => a + c.W.length + c.b.length, 0); }
+    receptiveField() { let r = 1; for (let l = 0; l <= this.L; l++) r += 4 * Math.pow(2, l); for (let l = this.L - 1; l >= 0; l--) r += 2 * Math.pow(2, l); return r; } // every 3 × 3 convolution adds 2 at its level's scale
+    describe() { return `${this.L ? `${this.L} level${this.L > 1 ? 's' : ''} of context (pool, convolve, upsample, join)` : 'no context below the pixels'} · ${this.C} channels · 3 × 3 convolutions, ReLU · receptive field ${this.receptiveField()} px · ${this.K} classes per pixel`; }
+    // the 3 × 3 convolution with 'same' zero padding: pre-activations, and the activations after ReLU when asked
+    conv3(x, layer, H, W, relu) {
+      const { W: Wt, b, cin, cout } = layer, pre = new Float64Array(cout * H * W);
+      for (let o = 0; o < cout; o++) {
+        const po = o * H * W;
+        for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) pre[po + y * W + xx] = b[o];
+        for (let c = 0; c < cin; c++) { const wo = (o * cin + c) * 9, xc = c * H * W;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const wv = Wt[wo + (dy + 1) * 3 + dx + 1]; if (!wv) continue;
+            const y0 = Math.max(0, -dy), y1 = Math.min(H, H - dy), x0 = Math.max(0, -dx), x1 = Math.min(W, W - dx);
+            for (let y = y0; y < y1; y++) { const prow = po + y * W, xrow = xc + (y + dy) * W + dx; for (let xx = x0; xx < x1; xx++) pre[prow + xx] += wv * x[xrow + xx]; }
+          } }
+      }
+      if (!relu) return { pre, act: pre };
+      const act = new Float64Array(pre.length); for (let i = 0; i < pre.length; i++) act[i] = pre[i] > 0 ? pre[i] : 0; return { pre, act };
+    }
+    // the backward of conv3: the gradient of the weights and the bias into g, and the gradient at the input
+    conv3Back(x, layer, H, W, dOut, g) {
+      const { W: Wt, cin, cout } = layer, dX = new Float64Array(cin * H * W);
+      for (let o = 0; o < cout; o++) {
+        const po = o * H * W; let sb = 0; for (let i = 0; i < H * W; i++) sb += dOut[po + i]; g.b[o] += sb;
+        for (let c = 0; c < cin; c++) { const wo = (o * cin + c) * 9, xc = c * H * W;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const wi = wo + (dy + 1) * 3 + dx + 1, wv = Wt[wi]; let sw = 0;
+            const y0 = Math.max(0, -dy), y1 = Math.min(H, H - dy), x0 = Math.max(0, -dx), x1 = Math.min(W, W - dx);
+            for (let y = y0; y < y1; y++) { const prow = po + y * W, xrow = xc + (y + dy) * W + dx; for (let xx = x0; xx < x1; xx++) { const d = dOut[prow + xx]; sw += d * x[xrow + xx]; dX[xrow + xx] += wv * d; } }
+            g.W[wi] += sw;
+          } }
+      }
+      return dX;
+    }
+    pool2(x, C, H, W) { const h = H >> 1, w = W >> 1, v = new Float64Array(C * h * w), arg = new Int32Array(C * h * w); for (let c = 0; c < C; c++) for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let best = -Infinity, bi = -1; for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) { const i = (c * H + 2 * y + dy) * W + 2 * xx + dx; if (x[i] > best) { best = x[i]; bi = i; } } const j = (c * h + y) * w + xx; v[j] = best; arg[j] = bi; } return { v, arg, h, w }; }
+    up2(v, C, h, w, H, W) { const out = new Float64Array(C * H * W); for (let c = 0; c < C; c++) for (let y = 0; y < H; y++) { const ys = Math.min(h - 1, y >> 1); for (let xx = 0; xx < W; xx++) out[(c * H + y) * W + xx] = v[(c * h + ys) * w + Math.min(w - 1, xx >> 1)]; } return out; }
+    up2Back(d, C, h, w, H, W) { const out = new Float64Array(C * h * w); for (let c = 0; c < C; c++) for (let y = 0; y < H; y++) { const ys = Math.min(h - 1, y >> 1); for (let xx = 0; xx < W; xx++) out[(c * h + ys) * w + Math.min(w - 1, xx >> 1)] += d[(c * H + y) * W + xx]; } return out; }
+    // x: the image as one channel of H × W numbers (ink, 0 to 1); returns every level's activations and the probabilities per pixel
+    forward(x, H, W) {
+      const C = this.C, K = this.K, levels = [], input = new Float64Array(x.length); for (let i = 0; i < x.length; i++) input[i] = x[i] - this.norm.mean;
+      let cur = input, h = H, w = W, cin = 1;
+      for (let l = 0; l <= this.L; l++) { const c1 = this.conv3(cur, this.enc[l][0], h, w, true), c2 = this.conv3(c1.act, this.enc[l][1], h, w, true); const lev = { x: cur, cin, h, w, c1, c2 }; levels.push(lev); if (l < this.L) { const p = this.pool2(c2.act, C, h, w); lev.pool = p; cur = p.v; h = p.h; w = p.w; cin = C; } }
+      let top = levels[this.L].c2.act; const decs = [];
+      for (let k = 0; k < this.dec.length; k++) { const l = this.L - 1 - k, lev = levels[l], up = this.up2(top, C, levels[l + 1].h, levels[l + 1].w, lev.h, lev.w), cat = new Float64Array(2 * C * lev.h * lev.w); cat.set(lev.c2.act, 0); cat.set(up, C * lev.h * lev.w); const d = this.conv3(cat, this.dec[k], lev.h, lev.w, true); decs.push({ l, up, cat, d }); top = d.act; }
+      const N = H * W, logits = new Float64Array(K * N), probs = new Float64Array(K * N), hd = this.head;
+      for (let k = 0; k < K; k++) { const ko = k * N; for (let i = 0; i < N; i++) { let s = hd.b[k]; for (let c = 0; c < C; c++) s += hd.W[k * C + c] * top[c * N + i]; logits[ko + i] = s; } }
+      for (let i = 0; i < N; i++) { let mx = -Infinity; for (let k = 0; k < K; k++) mx = Math.max(mx, logits[k * N + i]); let Z = 0; for (let k = 0; k < K; k++) { const e = Math.exp(logits[k * N + i] - mx); probs[k * N + i] = e; Z += e; } for (let k = 0; k < K; k++) probs[k * N + i] /= Z; }
+      return { H, W, levels, decs, top, logits, probs };
+    }
+    // the mean cross-entropy over the pixels (weighted by class when the network has class weights) and the pixel accuracy
+    loss(fw, y) { const K = this.K, N = fw.H * fw.W, cw = this.classWeights; let s = 0, wsum = 0, right = 0; for (let i = 0; i < N; i++) { const t = y[i], wi = cw ? cw[t] : 1; s += -wi * Math.log(fw.probs[t * N + i] + EPS); wsum += wi; let best = 0; for (let k = 1; k < K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; if (best === t) right++; } return { loss: wsum ? s / wsum : 0, accuracy: right / N }; }
+    predict(x, H, W) { const fw = this.forward(x, H, W), N = H * W, labels = new Uint8Array(N); for (let i = 0; i < N; i++) { let best = 0; for (let k = 1; k < this.K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; labels[i] = best; } return { labels, probs: fw.probs, fw }; }
+    newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
+    // one step on a batch of samples [{ x, y, H, W }]: the mean loss before the step
+    trainBatch(samples, lr, l2 = 0) {
+      const g = this.newGradient(), C = this.C, K = this.K, cw = this.classWeights; let loss = 0;
+      for (const s of samples) {
+        const fw = this.forward(s.x, s.H, s.W), N = s.H * s.W; loss += this.loss(fw, s.y).loss;
+        let wsum = 0; for (let i = 0; i < N; i++) wsum += cw ? cw[s.y[i]] : 1;
+        const dL = new Float64Array(K * N); for (let i = 0; i < N; i++) { const t = s.y[i], wi = (cw ? cw[t] : 1) / wsum; for (let k = 0; k < K; k++) dL[k * N + i] = wi * (fw.probs[k * N + i] - (k === t ? 1 : 0)); }
+        const gi = this.layers().length - 1, gh = g[gi], hd = this.head, dTop = new Float64Array(C * N);
+        for (let k = 0; k < K; k++) { let sb = 0; for (let i = 0; i < N; i++) { const d = dL[k * N + i]; sb += d; for (let c = 0; c < C; c++) { gh.W[k * C + c] += d * fw.top[c * N + i]; dTop[c * N + i] += hd.W[k * C + c] * d; } } gh.b[k] += sb; }
+        let d = dTop; // back down the decoder
+        for (let k = fw.decs.length - 1; k >= 0; k--) { const dc = fw.decs[k], lev = fw.levels[dc.l], n = lev.h * lev.w; const dPre = new Float64Array(d.length); for (let i = 0; i < d.length; i++) dPre[i] = dc.d.pre[i] > 0 ? d[i] : 0; const dCat = this.conv3Back(dc.cat, this.dec[k], lev.h, lev.w, dPre, g[2 * (this.L + 1) + k]); lev.dSkip = dCat.subarray(0, C * n); d = this.up2Back(dCat.subarray(C * n), C, fw.levels[dc.l + 1].h, fw.levels[dc.l + 1].w, lev.h, lev.w); }
+        for (let l = this.L; l >= 0; l--) { const lev = fw.levels[l], n = lev.h * lev.w; let dAct = new Float64Array(C * n); if (l === this.L) dAct.set(d); else { const p = lev.pool; for (let j = 0; j < d.length; j++) dAct[p.arg[j]] += d[j]; } if (lev.dSkip) for (let i = 0; i < dAct.length; i++) dAct[i] += lev.dSkip[i];
+          const d2 = new Float64Array(C * n); for (let i = 0; i < d2.length; i++) d2[i] = lev.c2.pre[i] > 0 ? dAct[i] : 0; const d1a = this.conv3Back(lev.c1.act, this.enc[l][1], lev.h, lev.w, d2, g[2 * l + 1]);
+          const d1 = new Float64Array(C * n); for (let i = 0; i < d1.length; i++) d1[i] = lev.c1.pre[i] > 0 ? d1a[i] : 0; d = this.conv3Back(lev.x, this.enc[l][0], lev.h, lev.w, d1, g[2 * l]); }
+      }
+      const k = samples.length; let n2 = 0; for (const gl of g) { for (const v of gl.W) n2 += v * v; for (const v of gl.b) n2 += v * v; } this.lastGradientNorm = Math.sqrt(n2) / k;
+      if (this.clip > 0 && this.lastGradientNorm > this.clip) { const f = this.clip / this.lastGradientNorm; for (const gl of g) { for (let i = 0; i < gl.W.length; i++) gl.W[i] *= f; for (let i = 0; i < gl.b.length; i++) gl.b[i] *= f; } }
+      const layers = this.layers();
+      if (this.optimizer === 'adam') {
+        const st = this.adam || (this.adam = { t: 0, m: this.newGradient(), v: this.newGradient() }), b1 = 0.9, b2 = 0.999; st.t++; const c1 = 1 - Math.pow(b1, st.t), c2 = 1 - Math.pow(b2, st.t);
+        const step = (p, gp, m, v, decay) => { for (let i = 0; i < p.length; i++) { const gi = gp[i] / k + (decay ? l2 * p[i] : 0); m[i] = b1 * m[i] + (1 - b1) * gi; v[i] = b2 * v[i] + (1 - b2) * gi * gi; p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + 1e-8); } };
+        layers.forEach((c, i) => { step(c.W, g[i].W, st.m[i].W, st.v[i].W, 1); step(c.b, g[i].b, st.m[i].b, st.v[i].b, 0); });
+      } else layers.forEach((c, i) => { for (let j = 0; j < c.W.length; j++) c.W[j] -= lr * (g[i].W[j] / k + l2 * c.W[j]); for (let j = 0; j < c.b.length; j++) c.b[j] -= lr * g[i].b[j] / k; });
+      this.steps++;
+      return loss / k;
+    }
+    toJSON(meta) { const r = v => Array.from(v, q => +q.toPrecision(5)); return Object.assign({}, meta || {}, { channels: this.C, levels: this.L, classes: this.K, clip: this.clip, optimizer: this.optimizer, classWeights: this.classWeights ? Array.from(this.classWeights) : null, norm: this.norm, steps: this.steps, enc: this.enc.map(pair => pair.map(c => ({ W: r(c.W), b: r(c.b) }))), dec: this.dec.map(c => ({ W: r(c.W), b: r(c.b) })), head: { W: r(this.head.W), b: r(this.head.b) } }); }
+    static fromJSON(o) { const net = new SegNet({ channels: o.channels, levels: o.levels, classes: o.classes, clip: o.clip, optimizer: o.optimizer, classWeights: o.classWeights, norm: o.norm, seed: 1 }); o.enc.forEach((pair, l) => pair.forEach((c, i) => { net.enc[l][i].W.set(c.W); net.enc[l][i].b.set(c.b); })); o.dec.forEach((c, i) => { net.dec[i].W.set(c.W); net.dec[i].b.set(c.b); }); net.head.W.set(o.head.W); net.head.b.set(o.head.b); net.steps = o.steps || 0; return net; }
+  }
+  function gradientCheckSeg({ levels = 1, channels = 2, classes = 3, H = 8, W = 8, weighted = false } = {}) {
+    const net = new SegNet({ channels, levels, classes, seed: 5, optimizer: 'sgd', clip: 0, classWeights: weighted ? [1, 2, 0.5] : null, norm: { mean: 0.3 } }), rnd = mulberry32(99);
+    const samples = [0, 1].map(() => ({ x: Float64Array.from({ length: H * W }, () => rnd()), y: Uint8Array.from({ length: H * W }, () => Math.floor(rnd() * classes)), H, W })), eps = 1e-5;
+    const lossAt = () => samples.reduce((a, s) => a + net.loss(net.forward(s.x, s.H, s.W), s.y).loss, 0) / samples.length;
+    const params = []; for (const c of net.layers()) params.push(c.W, c.b);
+    const before = params.map(p => Float64Array.from(p)); net.trainBatch(samples, 1); const analytic = params.map((p, i) => before[i].map((v, j) => v - p[j])); params.forEach((p, i) => p.set(before[i]));
+    let worst = 0, checked = 0; const cmp = (num, an) => { if (Math.abs(num) > 1e-6) { checked++; worst = Math.max(worst, Math.abs(num - an) / (Math.abs(num) + Math.abs(an))); } };
+    params.forEach((p, pi) => { for (let i = 0; i < p.length; i++) { const o = p[i]; p[i] = o + eps; const lp = lossAt(); p[i] = o - eps; const lm = lossAt(); p[i] = o; cmp((lp - lm) / (2 * eps), analytic[pi][i]); } });
+    return { worst, checked };
+  }
   // ---- the two directions of a table of V rows of D numbers that spread the rows most (the first two principal
   // components, by power iteration on the covariance), with the rows projected on them, centred on the table's mean;
   // prev, two axes found earlier, fixes the signs so that a map drawn epoch after epoch does not flip
@@ -907,5 +1015,5 @@
     for (const [key, final, field] of [['in', finalE, 'E'], ['out', finalOut, 'out']]) { const axes = pca2(final, V, D, null).axes; t[key] = { axes: axes.map(a => Array.from(a, v => +v.toFixed(5))), xy: keep.map(s => Array.from(project2(s[field], V, D, axes), v => +v.toFixed(3))) }; }
     return t;
   }
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, pca2, project2, wordTrails, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, pca2, project2, wordTrails, SegNet, gradientCheckSeg, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
 });

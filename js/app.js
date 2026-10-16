@@ -22,6 +22,7 @@
     rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     dsq: { world: 'describe', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, probe: 'own', encoder: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
+    sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29 },
     fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -37,7 +38,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question', '⑯ Reports · a small language model writes the report from the findings · fluency first, grounding last', '⑰ Chat · the next-word model on transcripts · ask it about a case', '⑱ Reports · no context layer · the next word from the current word alone', '⑲ Describe · from pixels to words · the image as the first token'];
+  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question', '⑯ Reports · a small language model writes the report from the findings · fluency first, grounding last', '⑰ Chat · the next-word model on transcripts · ask it about a case', '⑱ Reports · no context layer · the next word from the current word alone', '⑲ Describe · from pixels to words · the image as the first token', '⑳ Segment · a class for every pixel · the window it is decided from'];
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -83,6 +84,7 @@
     { id: 'reports', title: 'Reports: write the report from the findings?', world: 'reports' },
     { id: 'chat', title: 'Chat: ask the model about a case?', world: 'chat' },
     { id: 'describe', title: 'Describe: from pixels to words?', world: 'describe' },
+    { id: 'segment', title: 'Segment: a class for every pixel?', world: 'segment' },
   ];
   const onClassic = step => S.world === 'classic' && S.stage === step;
   function selectQuestion(id) {
@@ -1184,6 +1186,13 @@
         rpReset(`Recipe ${RECIPE_LABELS[18]}: the lookup table and the output table with no attention between them, so every next word is predicted from the current word and its position and nothing else. Press Train: the loss falls to the floor such a model allows, the reports read as locally fluent nonsense, and the diagnosis is never right from the findings, since nothing in the model can read them; the fourth chart stays empty. Then set the context layers back to 2 and watch what attention buys.`);
         return;
       }
+      if (k === '20') { // the segment question: a class for every pixel, and the window it is decided from
+        S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
+        selectQuestion('segment'); showStage('train');
+        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[20]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 35 px, and train again, or load the trained network, which paints the nests.`); };
+        go();
+        return;
+      }
       if (k === '19') { // the describe question: from pixels to words
         S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
         selectQuestion('describe'); showStage('train');
@@ -1287,8 +1296,8 @@
       if (P && ev.key === 'ArrowRight') { ev.preventDefault(); P.next(); return; }
       if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
-      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else if (S.world === 'reports' || S.world === 'chat') { const Lx = LM(); if (Lx.running && Lx.stopAt == null) rpStop('Paused.'); else rpStart(); } else S.sl.running ? slStop('Paused.') : slStart(); }
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); else if (S.world === 'reports') rpWriteNext(); else if (S.world === 'chat') chAskNext(); else if (S.world === 'describe') dsDescribeNext(); }
+      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else if (S.world === 'reports' || S.world === 'chat' || S.world === 'describe') { const Lx = LM(); if (Lx.running && Lx.stopAt == null) rpStop('Paused.'); else rpStart(); } else if (S.world === 'segment') { if (S.sg.running) sgStop('Paused.'); else sgStart(); } else S.sl.running ? slStop('Paused.') : slStart(); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); else if (S.world === 'reports') rpWriteNext(); else if (S.world === 'chat') chAskNext(); else if (S.world === 'describe') dsDescribeNext(); else if (S.world === 'segment') sgSegmentNext(false); }
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && onClassic('train')) teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
@@ -1318,7 +1327,7 @@
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
     applyVisibility();
   }
-  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test' };
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test' };
   function showStage(name) {
     if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
@@ -1330,6 +1339,7 @@
     if (!(w === 'foundation' && name === 'train')) fmStop();
     if (!(w === 'slides' && name === 'train')) slStop();
     if (!(w === 'fields' && name === 'train')) fdStop();
+    if (!(w === 'segment' && name === 'train')) sgStop();
     if (!((w === 'reports' || w === 'chat' || w === 'describe') && name === 'train')) lmStopAll();
     if (!(w === 'reports' && name === 'test')) { rpWriteStop(); S.rp.batchWriting = false; }
     if (!(w === 'chat' && name === 'test')) { chWriteStop(); S.ch.batchWriting = false; }
@@ -1353,6 +1363,7 @@
     else if (w === 'reports') { if (name === 'data') rpEnterData(); else if (name === 'train') rpEnter(); else rpEnterTest(); }
     else if (w === 'chat') { if (name === 'data') chEnterData(); else if (name === 'train') rpEnter(); else chEnterTest(); }
     else if (w === 'describe') { if (name === 'data') dsEnterData(); else if (name === 'train') rpEnter(); else dsEnterTest(); }
+    else if (w === 'segment') { if (name === 'data') sgEnterData(); else if (name === 'train') sgEnter(); else sgEnterTest(); }
     else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
     try { history.replaceState(null, '', '#' + (w === 'classic' ? name : `${S.questionId}/${name}`)); } catch (e) { /* ignore */ }
   }
@@ -2208,7 +2219,7 @@
       const [raw, seg] = decoded[i], px = NFL.withGrain(raw, f.grainSeed, meta.grain);
       const nuclei = f.nuclei.map(n => ({ x: n[K.x], y: n[K.y], kind: meta.kinds[n[K.kind]], atypical: !!n[K.atypical], subtype: meta.subtypes[n[K.subtype]], below: !!n[K.below], nest: n[K.nest] }));
       const dist = nuclei.map(a => Float64Array.from(nuclei, b => Math.hypot(a.x - b.x, a.y - b.y) / FD.unit)), xy = nuclei.map(n => [n.x / meta.w * 2 - 1, n.y / meta.h * 2 - 1]);
-      return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, cis: fdCisOf(f), px, seg, grainSeed: f.grainSeed, membrane: f.membrane, nests: f.nests, nuclei, dist, xy, y: [fdCisOf(f), f.label], pos: [nuclei.map(n => n.atypical), nuclei.map(n => n.atypical && n.below)], codes: {}, crops: {} };
+      return { id: f.id, name: f.name, split: f.split, pattern: f.pattern, label: f.label, cis: fdCisOf(f), px, seg, grainSeed: f.grainSeed, membrane: f.membrane, surface: f.surface, nests: f.nests, nuclei, dist, xy, y: [fdCisOf(f), f.label], pos: [nuclei.map(n => n.atypical), nuclei.map(n => n.atypical && n.below)], codes: {}, crops: {} };
     };
     L.all = all.map(mk); L.train = L.all.filter(s => s.split === 'train'); L.test = L.all.filter(s => s.split === 'test'); L.byId = new Map(L.all.map(s => [s.id, s]));
     L.nNuclei = L.all.reduce((a, s) => a + s.nuclei.length, 0);
@@ -2769,6 +2780,148 @@
   // state, data, words and model, and a descriptor of what differs: the sections (the roles, for a transcript) and
   // their colours, how a document is prepared, the word the diagrams follow by default, the grounding measure taken
   // after every epoch, the Test step's view of what the model wrote, and the words of the notes.
+  // ------------------------------------------------------------------ the Segment question: a class for every pixel of a field
+  const SG = { crop: 64, batch: 2, decay: 0.0001, clip: 1, evalN: 5, colors: [[255, 255, 255], [222, 170, 200], [240, 232, 220], [60, 170, 110]], names: ['lumen', 'epithelium', 'stroma', 'nest'], lr: 0.003 };
+  const sgOnTest = () => S.world === 'segment' && S.stage === 'test';
+  function sgNote(msg) { $(sgOnTest() ? 'sg-test-note' : S.stage === 'data' ? 'sg-data-note' : 'sg-note').textContent = msg || ''; }
+  const sgClasses = () => (window.NucleusFields && window.NucleusFields.SEG_CLASSES) || SG.names;
+  // the fields are the invasion question's, loaded and decoded once by that question's loader; the masks are built here
+  function sgReady() {
+    const L = S.sg; if (L.built) return Promise.resolve(true);
+    if (L.readying) return L.readying;
+    const progress = msg => { L.progress = msg; for (const id of ['sg-note', 'sg-data-note', 'sg-test-note']) { const el = $(id); if (el) el.textContent = msg; } };
+    L.readying = (async () => {
+      try {
+        if (!fdData()) progress('Loading the fields (5.7 MB)…');
+        await fdBuild(progress);
+        const F = S.fd; L.w = F.w; L.h = F.h; L.train = F.train; L.test = F.test; L.all = F.all; L.byId = F.byId;
+        progress('Building the masks from the fields’ geometry…'); let meanInk = 0; const share = new Float64Array(4);
+        for (let i = 0; i < L.all.length; i++) { const s = L.all[i]; if (!s.mask) { s.mask = NFL.masksOf(s, L.w, L.h); s.ink = new Float64Array(s.px.length); for (let j = 0; j < s.px.length; j++) s.ink[j] = 1 - s.px[j] / 255; } if (s.split === 'train') { for (const v of s.mask) share[v]++; for (const v of s.ink) meanInk += v; } if (i % 40 === 39) await fdYield(); }
+        const tot = share.reduce((a, b) => a + b, 0); L.share = Array.from(share, v => v / tot); L.meanInk = meanInk / (L.train.length * L.w * L.h);
+        L.built = true; progress(''); return true;
+      } catch (e) { progress(`The fields did not load: ${e.message}`); return false; } finally { L.readying = null; }
+    })();
+    return L.readying;
+  }
+  function sgConfig() { const L = S.sg; return { channels: L.channels, levels: L.levels, classes: 4, seed: L.seed, clip: SG.clip, norm: { mean: +L.meanInk.toFixed(4) } }; }
+  function sgReset(reason) {
+    const L = S.sg; sgStop(); if (!L.built) return;
+    L.model = new NN.SegNet(sgConfig()); L.shipped = false; L.rng = NN.mulberry32(L.seed * 7919 + 3);
+    L.epoch = 0; L.ptr = 0; L.hist = []; L.trainLoss = null; L.lastField = null; L.fw = null; L.fwFor = null; L.trial = { next: 0, results: new Map() }; L.testSelected = null; for (const s of L.all) { s.sgPred = null; }
+    sgRecordEpoch(); sgSyncControls(); sgRenderAll();
+    if (reason) sgNote(reason);
+  }
+  function sgLoadShipped() {
+    const L = S.sg, W = window.SEG_NET; if (!W) { sgNote('The trained network did not load with the page.'); return; } sgStop(); if (!L.built) return;
+    L.model = NN.SegNet.fromJSON(W); L.shipped = true; L.levels = W.levels; L.channels = W.channels; L.rng = NN.mulberry32(L.seed * 7919 + 3);
+    const hist = Array.isArray(W.hist) ? W.hist.map(h => ({ epoch: h.epoch, loss: h.loss, testLoss: h.testLoss, acc: h.acc, meanIoU: h.meanIoU, iou: h.iou, n: h.n })) : [];
+    L.epoch = hist.length; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist; L.trainLoss = hist.length ? hist[hist.length - 1].loss : null; L.lastField = null; L.fw = null; L.fwFor = null; L.trial = { next: 0, results: new Map() }; L.testSelected = null; for (const s of L.all) { s.sgPred = null; }
+    if (!hist.length) sgRecordEpoch();
+    sgSyncControls(); sgRenderAll();
+    sgNote(`Loaded the trained network: ${W.trained}, mean IoU ${pct(W.meanIoU)} on the 50 test fields (${sgClasses().map((c, k) => `${c} ${pct(W.iou[k])}`).join(', ')}). It paints a field; go to 3 · Test, or keep training it here.`);
+  }
+  // the measures on a few test fields: loss, pixels right, IoU per class and its mean; each field keeps its prediction
+  function sgPredict(s) { const L = S.sg; if (s.sgPred && s.sgPredSteps === L.model.steps && s.sgPredModel === L.model) return s.sgPred; const p = L.model.predict(s.ink, L.h, L.w), io = NFL.iou(p.labels, s.mask, 4), l = L.model.loss(p.fw, s.mask); s.sgPred = { labels: p.labels, probs: p.probs, fw: p.fw, iou: io, loss: l.loss, acc: l.accuracy }; s.sgPredSteps = L.model.steps; s.sgPredModel = L.model; return s.sgPred; }
+  function sgMeasure(docs) { const per = new Float64Array(4), perN = new Float64Array(4); let loss = 0, acc = 0, mean = 0, nMean = 0; for (const s of docs) { const p = sgPredict(s); loss += p.loss; acc += p.acc; if (p.iou.mean != null) { mean += p.iou.mean; nMean++; } p.iou.per.forEach((v, k) => { if (v != null) { per[k] += v; perN[k]++; } }); } return { n: docs.length, loss: loss / docs.length, acc: acc / docs.length, meanIoU: nMean ? mean / nMean : null, per: Array.from(per, (v, k) => (perN[k] ? v / perN[k] : null)) }; }
+  function sgRecordEpoch() { const L = S.sg, m = sgMeasure(L.test.slice(0, SG.evalN)); L.hist.push({ epoch: L.epoch, loss: L.trainLoss, testLoss: m.loss, acc: m.acc, meanIoU: m.meanIoU, iou: m.per, n: m.n }); }
+  function sgCrop() { const L = S.sg, s = L.train[Math.floor(L.rng() * L.train.length)], n = SG.crop, x0 = Math.floor(L.rng() * (L.w - n + 1)), y0 = Math.floor(L.rng() * (L.h - n + 1)), x = new Float64Array(n * n), y = new Uint8Array(n * n); for (let r = 0; r < n; r++) { x.set(s.ink.subarray((y0 + r) * L.w + x0, (y0 + r) * L.w + x0 + n), r * n); y.set(s.mask.subarray((y0 + r) * L.w + x0, (y0 + r) * L.w + x0 + n), r * n); } L.lastField = s.id; return { x, y, H: n, W: n }; }
+  function sgStep() { // one gradient step on a batch of crops; true when the epoch ended
+    const L = S.sg, batch = []; for (let i = 0; i < SG.batch; i++) batch.push(sgCrop());
+    const loss = L.model.trainBatch(batch, SG.lr, SG.decay); L.trainLoss = L.trainLoss == null ? loss : 0.9 * L.trainLoss + 0.1 * loss; L.ptr += SG.batch; L.fw = null;
+    if (L.ptr >= L.crops) { L.ptr = 0; L.epoch++; sgRecordEpoch(); return true; }
+    return false;
+  }
+  function sgStart() { const L = S.sg; if (!L.model) return; if (L.epoch >= L.epochs) { sgNote(`Already at ${L.epochs} epochs. Raise the epoch count, or reset to train again.`); return; } L.running = true; L.lastRender = 0; sgSyncButtons(); requestAnimationFrame(sgTick); }
+  function sgStop(msg) { const L = S.sg; L.running = false; sgSyncButtons(); if (msg) sgNote(msg); }
+  function sgFinish() { const L = S.sg, last = L.hist[L.hist.length - 1], W = window.SEG_NET; sgStop(`Finished ${L.epochs} epochs of ${L.crops} crops. On ${last.n} test fields: ${pct(last.acc)} of the pixels right, mean IoU ${pct(last.meanIoU)} (${sgClasses().map((c, k) => `${c} ${last.iou[k] == null ? '–' : pct(last.iou[k])}`).join(', ')}).${W && !L.shipped ? ` The network that ships with the page, ${W.levels} level${W.levels === 1 ? '' : 's'} of context for ${W.trained.replace(/ from.*/, '')}, reaches ${pct(W.meanIoU)} on all 50.` : ''} Go to 3 · Test to paint the held-out fields.`); }
+  function sgTick(now) {
+    const L = S.sg; if (!L.running) return;
+    let ended = false; try { ended = sgStep(); if (L.ptr === 0 && L.epoch >= L.epochs) { sgFinish(); sgRender(true); return; } } catch (e) { console.error(e); sgStop('Training stopped on an error (see the console).'); return; }
+    if (ended || now - L.lastRender >= 1200) { try { sgRender(ended); } catch (e) { console.error(e); } L.lastRender = now; } else sgRenderStatus(); // the field and its maps cost a pass over the whole field: once a second while training
+    if (L.running) requestAnimationFrame(sgTick);
+  }
+  function sgStepBatch() { const L = S.sg; if (!L.model) return; sgStop(); const ended = sgStep(); sgRender(ended); }
+  function sgStepEpoch() { const L = S.sg; if (!L.model) return; sgStop(); do { sgStep(); } while (L.ptr !== 0); sgRender(true); }
+  // ---- what is on screen: the focus field, its prediction, the first layer's maps and filters, the curves, the trays
+  function sgFocus() { const L = S.sg; if (sgOnTest()) return (L.testSelected != null && L.byId.get(L.testSelected)) || L.test[0]; return (L.selected != null && L.byId.get(L.selected)) || L.train[0]; }
+  function sgSelect(id) { const L = S.sg; L.selected = id; L.hover = null; sgRenderFocus(); sgRenderTrays(); }
+  function sgNeighbour(step) { const L = S.sg, cur = sgFocus(), i = L.all.indexOf(cur); sgSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function sgLegend(el) { $(el).innerHTML = sgClasses().map((c, k) => `<span><span class="swatch" style="background:rgb(${SG.colors[k].join(',')});border:1px solid var(--line-strong)"></span>${c}</span>`).join('') + '<span><span class="swatch" style="background:rgba(42,120,214,0.7)"></span>the membrane</span>'; }
+  function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, rf: L.model.receptiveField() } : null }); return p; }
+  function sgIouText(p) { return `mean IoU <b>${p.iou.mean == null ? '–' : pct(p.iou.mean)}</b> · ${sgClasses().map((c, k) => `${c} ${p.iou.per[k] == null ? '–' : pct(p.iou.per[k])}`).join(' · ')} · ${pct(p.acc)} of the pixels right`; }
+  function sgRenderField() {
+    const L = S.sg, s = sgFocus(), p = sgDrawField('sg-canvas', s, L.view, L.hover); sgLegend('sg-legend');
+    $('sg-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name}${L.lastField === s.id ? ' · the last crops came from it' : ''}`;
+    $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveField()} px across).` : 'No network yet.';
+    const f = L.model.enc[0][0]; Viz.drawSegFilters($('sg-filters'), { W: f.W, cout: f.cout, cin: f.cin, cell: 12, cols: Math.min(8, f.cout) }); $('sg-filters-note').textContent = `The ${f.cout} filters of the first layer, numbered, 3 × 3 weights each, red positive and blue negative: edges, blobs and the like, learned from nothing. The layers behind them see only their maps.`;
+    if (p) { const lev = p.fw.levels[0]; Viz.drawSegMaps($('sg-maps'), { maps: lev.c1.act, C: L.model.C, h: lev.h, w: lev.w, scale: 1, cols: 4, label: 'map' }); }
+  }
+  function sgTip(canvasId, tipId, s, ev) { const L = S.sg, cv = $(canvasId), tip = $(tipId), r = cv.getBoundingClientRect(), hit = Viz.hitSegField(cv, ev.clientX - r.left, ev.clientY - r.top); if (!hit || !L.model) { tip.hidden = true; return null; } const p = sgPredict(s), N = L.w * L.h, i = hit.y * L.w + hit.x, probs = sgClasses().map((c, k) => `${c} ${pct(p.probs[k * N + i])}`).join(' · '); tip.hidden = false; tip.style.left = `${ev.clientX - r.left}px`; tip.style.top = `${ev.clientY - r.top}px`; tip.textContent = `(${hit.x}, ${hit.y}) · truth ${sgClasses()[s.mask[i]]} · the network says ${sgClasses()[p.labels[i]]}${p.labels[i] === s.mask[i] ? ' ✓' : ' ✗'} · ${probs}`; return hit; }
+  function sgRenderCurves() {
+    const L = S.sg, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1], hist = L.hist.map(h => Object.assign({}, h, { lumen: h.iou[0], epithelium: h.iou[1], stroma: h.iou[2], nest: h.iou[3] }));
+    Viz.drawSeries($('sg-loss'), { hist: hist.filter(h => h.loss != null || h.testLoss != null), keys: [{ key: 'loss', color: c.accent }, { key: 'testLoss', color: testCol, dash: true }], maxEpoch: L.epochs });
+    Viz.drawSeries($('sg-acc'), { hist, keys: [{ key: 'acc', color: c.accent }], maxEpoch: L.epochs, pct: true, baseline: L.share ? Math.max(...L.share) : null, baselineLabel: 'the commonest class everywhere' });
+    Viz.drawSeries($('sg-iou'), { hist, keys: [{ key: 'meanIoU', color: c.ink }, { key: 'lumen', color: '#8a8aa0' }, { key: 'epithelium', color: '#c46aa0' }, { key: 'stroma', color: '#b8a070' }, { key: 'nest', color: '#2a9a66' }], maxEpoch: L.epochs, pct: true, baseline: null });
+    $('sg-loss-now').textContent = `${last.loss == null ? '–' : last.loss.toFixed(3)} on crops · ${last.testLoss.toFixed(3)} test`; $('sg-acc-now').textContent = pct(last.acc); $('sg-iou-now').textContent = `${last.meanIoU == null ? '–' : pct(last.meanIoU)} mean · nest ${last.iou[3] == null ? '–' : pct(last.iou[3])}`;
+    $('sg-curves-note').textContent = `The loss is the cross-entropy per pixel on the crops as it trains (solid) and on ${last.n} test fields after every epoch (dashed). Pixels right is the easy number: the stroma and the epithelium are most of the field, and painting the commonest class everywhere already gets ${L.share ? pct(Math.max(...L.share)) : '–'}. The intersection over union per class is the honest one: the nest line is the hard class, small, rare, and the same cells as the epithelium above the membrane; it is where the levels of context tell.`;
+  }
+  function sgThumb(s, onClick) { const L = S.sg, b = document.createElement('button'); b.type = 'button'; b.className = 'thumb field'; b.dataset.id = s.id; b.title = `${s.name} · ${fdPattern(s).name}`; const cv = document.createElement('canvas'); b.appendChild(cv); Viz.renderFieldThumb(cv, s.px, L.w, L.h, S.tint, s.tiles || (s.tiles = {})); const badge = document.createElement('span'); badge.className = 'badge'; b.appendChild(badge); b.addEventListener('click', () => onClick(s.id)); return b; }
+  function sgTrays(kind, onClick) { const L = S.sg; if (L.trayFor[kind]) return; L.trayFor[kind] = true; const map = new Map(), fill = (id, tray) => { const el = $(id); el.innerHTML = ''; for (const s of tray) { const b = sgThumb(s, onClick); el.appendChild(b); map.set(s.id, b); } }; if (kind === 'train') { fill('sg-train-tray', L.train); fill('sg-test-tray', L.test); L.thumbs = map; $('sg-train-label').textContent = `Training fields (${L.train.length}) · crops are cut from them at random`; $('sg-test-label').textContent = `Test fields (${L.test.length}) · never trained on · the first ${SG.evalN} scored after every epoch`; } else if (kind === 'data') { fill('sg-data-train-tray', L.train); fill('sg-data-test-tray', L.test); L.dataThumbs = map; $('sg-data-train-label').textContent = `Training fields (${L.train.length})`; $('sg-data-test-label').textContent = `Test fields (${L.test.length}) · held out`; } else { fill('sg-test-results', L.test); L.testThumbs = map; $('sg-test-count').textContent = `${L.test.length} fields`; } }
+  function sgRenderTrays() { const L = S.sg, focus = sgFocus(); sgTrays('train', sgSelect); for (const [id, el] of L.thumbs) { const s = L.byId.get(id), p = s.sgPred && s.sgPredModel === L.model && s.sgPredSteps === L.model.steps ? s.sgPred : null; el.className = `thumb field${focus === s ? ' selected' : ''}${L.lastField === id && s.split === 'train' ? ' in-batch' : ''}${p ? (p.iou.mean >= 0.6 ? ' right' : ' wrong') : ''}`; const b = el.querySelector('.badge'); b.textContent = p && p.iou.mean != null ? String(Math.round(100 * p.iou.mean)) : ''; b.style.display = p ? 'block' : 'none'; } }
+  function sgRenderStatus() { const L = S.sg, m = L.model, last = L.hist[L.hist.length - 1]; $('sg-status').innerHTML = `<span>architecture <b>${esc(m.describe())}</b></span><span>parameters <b>${m.parameterCount()}</b></span><span>fields <b>${L.train.length}</b> training · <b>${L.test.length}</b> test · crops <b>${SG.crop} × ${SG.crop}</b>, ${L.crops} per epoch in batches of ${SG.batch}</span><span>epoch <b>${L.epoch}</b> / ${L.epochs}${L.shipped && L.epoch === (window.SEG_NET && window.SEG_NET.hist ? window.SEG_NET.hist.length : L.epoch) ? ' (the network that ships with the page)' : ''}</span><span>crop <b>${L.ptr === 0 ? '–' : L.ptr}</b> / ${L.crops}</span><span>loss <b>${L.trainLoss == null ? '–' : L.trainLoss.toFixed(3)}</b> crops · <b>${last ? last.testLoss.toFixed(3) : '–'}</b> test</span><span>pixels right <b>${last ? pct(last.acc) : '–'}</b> · mean IoU <b>${last && last.meanIoU != null ? pct(last.meanIoU) : '–'}</b> · nest IoU <b>${last && last.iou[3] != null ? pct(last.iou[3]) : '–'}</b> (${last ? last.n : SG.evalN} test fields)</span>`; }
+  function sgSyncButtons() { const L = S.sg; $('sg-train').textContent = L.running ? '⏸ Pause' : L.epoch >= L.epochs ? '✓ Done' : L.epoch > 0 || L.ptr > 0 ? '▶ Continue' : '▶ Train'; $('sg-train').disabled = !L.model || (!L.running && L.epoch >= L.epochs); }
+  function sgSyncControls() { const L = S.sg; document.querySelectorAll('#sg-levels-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.levels === L.levels)); document.querySelectorAll('#sg-channels-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.channels === L.channels)); document.querySelectorAll('#sg-crops-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.crops === L.crops)); document.querySelectorAll('#sg-view-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.view)); document.querySelectorAll('#sg-test-view-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.testView)); document.querySelectorAll('#sg-data-view-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.dataView)); $('sg-epochs').value = L.epochs; $('sg-epochs-val').textContent = L.epochs; $('sg-seed').value = L.seed; sgSyncButtons(); }
+  function sgRenderFocus() { sgRenderField(); }
+  function sgRender(full) { const L = S.sg; if (!L.model) return; sgRenderStatus(); sgRenderFocus(); if (full) { sgRenderCurves(); sgRenderTrays(); } sgSyncButtons(); }
+  function sgRenderAll() { const L = S.sg; if (S.world !== 'segment' || !L.built) return; if (S.stage === 'data') sgRenderData(); else if (S.stage === 'test') sgRenderTest(); else if (L.model) sgRender(true); }
+  function sgEnter() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'train') return; $('sg-blurb').innerHTML = `The network sees the pixels and nothing else: no nuclei, no membrane, no labels but the mask. Every weight is a 3 × 3 filter slid over the whole field, so the same few thousand weights paint any field of any size; with <b>no context</b> a pixel's class is decided from the ${new NN.SegNet({ levels: 0 }).receptiveField()} × ${new NN.SegNet({ levels: 0 }).receptiveField()} window around it, and each <b>level</b> of pooling below the pixels widens the window (${new NN.SegNet({ levels: 1 }).receptiveField()} px, then ${new NN.SegNet({ levels: 2 }).receptiveField()} px) at the cost of fine detail, brought back by the join with the finer map on the way up.`; if (!L.model) sgReset('Untrained: the network paints noise. Step a batch to watch one gradient step on two crops, press Train and watch the nest line of the IoU chart, or load the trained network.'); else sgRender(true); }); if (!L.built) sgNote(L.progress || 'Loading the fields…'); }
+  // ---- Specimens: the fields with their masks
+  function sgEnterData() { const L = S.sg; sgReady().then(ok => { if (ok && S.world === 'segment' && S.stage === 'data') sgRenderData(); }); if (!L.built) $('sg-data-note').textContent = L.progress || 'Loading the fields…'; }
+  function sgDataSelect(id) { S.sg.dataSelected = id; sgRenderData(); }
+  function sgDataNeighbour(step) { const L = S.sg, i = L.all.findIndex(s => s.id === L.dataSelected); sgDataSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function sgRenderData() {
+    const L = S.sg; if (!L.built) return; sgTrays('data', sgDataSelect); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id;
+    const s = L.byId.get(L.dataSelected) || L.train[0], P = fdPattern(s), shares = new Float64Array(4); for (const v of s.mask) shares[v]++;
+    $('sg-data-sub').textContent = `${L.train.length} training and ${L.test.length} test fields of ${L.w} × ${L.h} px, the invasion question’s · a class for every pixel: ${sgClasses().join(', ')}`;
+    $('sg-data-blurb').textContent = `The fields of the invasion question again, but the question is now asked of every pixel: is it lumen, epithelium, stroma, or a cell below the membrane? The masks come from the fields’ own geometry, so every field carries ${(L.w * L.h).toLocaleString()} labelled pixels; over the training fields the classes are ${sgClasses().map((c, k) => `${c} ${pct(L.share[k])}`).join(', ')}.`;
+    $('sg-data-note').textContent = '';
+    Viz.drawSegField($('sg-data-canvas'), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: null, truth: s.mask, mode: L.dataView, colors: SG.colors, alpha: 0.5, membrane: L.dataView === 'image' ? null : s.membrane }); sgLegend('sg-data-legend');
+    $('sg-data-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${P.name}`;
+    $('sg-data-caption').innerHTML = `<b>${esc(P.name)}</b> · ${esc(P.cues)}. On this field the mask is ${sgClasses().map((c, k) => `${c} ${pct(shares[k] / s.mask.length)}`).join(', ')}; ${s.nests.length ? `${s.nests.length} nest${s.nests.length > 1 ? 's' : ''}, cord${s.nests.length > 1 ? 's' : ''} or shed cell${s.nests.length > 1 ? 's' : ''} below the membrane` : 'nothing below the membrane but stroma'}. Click a field below, or step through them.`;
+    for (const [id, el] of L.dataThumbs) { const f = L.byId.get(id); el.classList.toggle('selected', id === L.dataSelected); el.classList.toggle('call-1', !!f.label); el.classList.toggle('call-0', !f.label); }
+  }
+  // ---- Test: the held-out fields, one at a time
+  function sgEnterTest() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'test') return; if (!L.model) sgReset(); sgTrays('test', sgTestSelect); sgRenderTest(); }); if (!L.built) $('sg-test-note').textContent = L.progress || 'Loading the fields…'; }
+  function sgTestClear() { const L = S.sg; L.trial = { next: 0, results: new Map() }; L.testSelected = null; sgRenderTest(); }
+  function sgSegmentNext(quiet) { const L = S.sg, T = L.trial; if (!L.model || T.next >= L.test.length) return false; const s = L.test[T.next++], p = sgPredict(s); T.results.set(s.id, p); L.testSelected = s.id; if (!quiet) sgRenderTest(); return true; }
+  function sgSegmentAll() { const L = S.sg; if (!L.model) return; const go = () => { if (sgSegmentNext(false) && S.world === 'segment' && S.stage === 'test') setTimeout(go, reducedMotion ? 0 : 60); }; go(); }
+  function sgTestSelect(id) { const L = S.sg; if (!L.trial.results.has(id)) return; L.testSelected = id; sgRenderTest(); }
+  function sgTestStats() { const L = S.sg; let n = 0, acc = 0, mean = 0, nMean = 0, nest = 0, nNest = 0; for (const [, p] of L.trial.results) { n++; acc += p.acc; if (p.iou.mean != null) { mean += p.iou.mean; nMean++; } if (p.iou.per[3] != null) { nest += p.iou.per[3]; nNest++; } } return { n, acc: n ? acc / n : null, mean: nMean ? mean / nMean : null, nest: nNest ? nest / nNest : null, nNest }; }
+  function sgRenderTest() {
+    const L = S.sg; if (!L.built || !L.model) return; sgTrays('test', sgTestSelect); sgSyncControls(); const st = sgTestStats(), T = L.trial;
+    $('sg-stat-n').textContent = `${st.n} / ${L.test.length}`; $('sg-stat-acc').textContent = st.n ? pct(st.acc) : '–'; $('sg-stat-acc-sub').textContent = st.n ? 'of the pixels, over the fields painted' : ''; $('sg-stat-iou').textContent = st.mean != null ? pct(st.mean) : '–'; $('sg-stat-iou-sub').textContent = st.n ? 'intersection over union, the classes averaged' : ''; $('sg-stat-nest').textContent = st.nest != null ? pct(st.nest) : '–'; $('sg-stat-nest-sub').textContent = st.nNest ? `the nest class’s IoU on ${st.nNest} fields with cells below` : '';
+    $('sg-segment-next').disabled = T.next >= L.test.length; $('sg-segment-all').disabled = T.next >= L.test.length; $('sg-test-warning').hidden = !(L.model.steps === 0 && !L.shipped);
+    const s = L.testSelected != null ? L.byId.get(L.testSelected) : null;
+    if (s) { const p = sgDrawField('sg-test-canvas', s, L.testView, L.testHover); sgLegend('sg-test-legend'); $('sg-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`; $('sg-test-field-note').innerHTML = `${L.testView === 'pred' ? 'The class the network gives every pixel' : L.testView === 'truth' ? 'The mask the field carries' : L.testView === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}; hover a pixel for its probabilities.`; $('sg-test-iou').innerHTML = `<div class="row"><span class="k">pixels right</span><span class="v">${pct(p.acc)}</span></div><div class="row"><span class="k">mean IoU</span><span class="v">${p.iou.mean == null ? '–' : pct(p.iou.mean)}</span></div>` + sgClasses().map((c, k) => `<div class="row"><span class="k">${c}</span><span class="v">${p.iou.per[k] == null ? 'not on this field' : pct(p.iou.per[k])}</span></div>`).join(''); }
+    else { const first = L.test[0]; Viz.drawSegField($('sg-test-canvas'), { px: first.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: null, truth: first.mask, mode: 'image', colors: SG.colors }); sgLegend('sg-test-legend'); $('sg-test-field-title').textContent = 'The field under test'; $('sg-test-field-note').textContent = 'Press Segment next field: the network paints a held-out field it never saw, and the mask it carries scores it.'; $('sg-test-iou').innerHTML = ''; }
+    for (const [id, el] of L.testThumbs) { const p = T.results.get(id); el.className = `thumb field${id === L.testSelected ? ' selected' : ''}${p ? (p.iou.mean >= 0.6 ? ' right' : ' wrong') : ''}`; const b = el.querySelector('.badge'); b.textContent = p && p.iou.mean != null ? String(Math.round(100 * p.iou.mean)) : ''; b.style.display = p ? 'block' : 'none'; }
+  }
+  function bindSegment() {
+    const L = S.sg;
+    document.querySelectorAll('#sg-levels-seg button').forEach(b => b.addEventListener('click', () => { L.levels = +b.dataset.levels; sgSyncControls(); if (L.built) sgReset(`Context: ${L.levels ? `${L.levels} level${L.levels > 1 ? 's' : ''}` : 'none'} — fresh random weights, a window of ${new NN.SegNet({ levels: L.levels }).receptiveField()} px.`); }));
+    document.querySelectorAll('#sg-channels-seg button').forEach(b => b.addEventListener('click', () => { L.channels = +b.dataset.channels; sgSyncControls(); if (L.built) sgReset(`${L.channels} channels — fresh random weights.`); }));
+    document.querySelectorAll('#sg-crops-seg button').forEach(b => b.addEventListener('click', () => { L.crops = +b.dataset.crops; L.ptr = Math.min(L.ptr, L.crops - 1); sgSyncControls(); if (L.model) sgRenderStatus(); }));
+    $('sg-epochs').addEventListener('input', ev => { L.epochs = +ev.target.value; sgSyncControls(); if (L.model) { sgRenderStatus(); sgRenderCurves(); } });
+    $('sg-seed').addEventListener('change', ev => { L.seed = Math.max(1, +ev.target.value || 1); if (L.built) sgReset(`Seed ${L.seed} — fresh random weights.`); });
+    $('sg-step-batch').addEventListener('click', sgStepBatch); $('sg-step-epoch').addEventListener('click', sgStepEpoch); $('sg-train').addEventListener('click', () => (L.running ? sgStop('Paused.') : sgStart())); $('sg-reset').addEventListener('click', () => sgReset('Weights re-initialised from the seed.')); $('sg-load').addEventListener('click', sgLoadShipped);
+    document.querySelectorAll('#sg-view-seg button').forEach(b => b.addEventListener('click', () => { L.view = b.dataset.view; sgSyncControls(); if (L.model) sgRenderField(); }));
+    document.querySelectorAll('#sg-test-view-seg button').forEach(b => b.addEventListener('click', () => { L.testView = b.dataset.view; sgSyncControls(); if (L.model) sgRenderTest(); }));
+    document.querySelectorAll('#sg-data-view-seg button').forEach(b => b.addEventListener('click', () => { L.dataView = b.dataset.view; sgSyncControls(); if (L.built) sgRenderData(); }));
+    $('sg-prev').addEventListener('click', () => sgNeighbour(-1)); $('sg-next').addEventListener('click', () => sgNeighbour(1)); $('sg-data-prev').addEventListener('click', () => sgDataNeighbour(-1)); $('sg-data-next').addEventListener('click', () => sgDataNeighbour(1));
+    const cv = $('sg-canvas'); cv.addEventListener('mousemove', ev => { if (!L.model) return; const hit = sgTip('sg-canvas', 'sg-tip', sgFocus(), ev); if (!hit && !L.hover) return; if (hit && L.hover && hit.x === L.hover.x && hit.y === L.hover.y) return; L.hover = hit; sgDrawField('sg-canvas', sgFocus(), L.view, L.hover); }); cv.addEventListener('mouseleave', () => { $('sg-tip').hidden = true; if (L.hover) { L.hover = null; if (L.model) sgDrawField('sg-canvas', sgFocus(), L.view, null); } });
+    const tv = $('sg-test-canvas'); tv.addEventListener('mousemove', ev => { const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (!s || !L.model) return; const hit = sgTip('sg-test-canvas', 'sg-test-tip', s, ev); if (!hit && !L.testHover) return; if (hit && L.testHover && hit.x === L.testHover.x && hit.y === L.testHover.y) return; L.testHover = hit; sgDrawField('sg-test-canvas', s, L.testView, L.testHover); }); tv.addEventListener('mouseleave', () => { $('sg-test-tip').hidden = true; const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (L.testHover) { L.testHover = null; if (s && L.model) sgDrawField('sg-test-canvas', s, L.testView, null); } });
+    $('sg-segment-next').addEventListener('click', () => sgSegmentNext(false)); $('sg-segment-all').addEventListener('click', sgSegmentAll); $('sg-test-clear').addEventListener('click', sgTestClear);
+  }
   // ------------------------------------------------------------------ the Describe question: from pixels to words (the Train step is the shared language-model lab)
   const DSC = window.NucleusDescribe;
   const DS_COLORS = { image: '#7c3aed', description: '#0e9f6e', impression: '#d97706' };
@@ -3912,7 +4065,7 @@
     const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); renderBackboneOptions();
+    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();
