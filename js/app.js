@@ -28,7 +28,7 @@
     epoch: 0, ptr: 0, order: [], history: [], running: false, debt: 0, lastTime: 0, lastBatch: new Set(),
     trainEval: null, testEval: null, profileAt: 0, prevW: null, applyingRecipe: false,
     selected: null, view: 'image', tint: true, revealTest: false, stage: 'data', trayColor: 'call',
-    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01, scores: {} },
+    test: { results: new Map(), next: 0, threshold: 0.5, animating: false, revealed: new Set(), prevalence: 0.01, scores: {}, defer: 0.8 },
     hover: { train: null, test: null },
     lesson: null, lastLesson: null, lessonCursor: 0,
     // the Foundation question: the miniature foundation model's pretraining (its set, encoder and run live here)
@@ -564,6 +564,28 @@
     const go = () => { if (S.test.animating) { if (S.test.player) S.test.player.skip(); setTimeout(go, 50); return; } if (S.test.next < S.ds.test.length) { classifyNext(true); setTimeout(go, reducedMotion ? 0 : 60); } };
     go();
   }
+  // how sure the network is, and when to hand the case back: the classified test cases on the axis of P(positive), the
+  // band of cases deferred when the network's probability for its more likely class is below the bar, and what the
+  // calls that remain are worth at every setting of the bar
+  function deferStats(tau) {
+    const thr = S.test.threshold; let called = 0, right = 0, deferred = 0, deferredWrong = 0;
+    for (const s of S.ds.test) { const r = S.test.results.get(s.id); if (!r || !S.test.revealed.has(s.id)) continue; const call = r.p >= thr ? 1 : 0, ok = call === s.label, sure = Math.max(r.p, 1 - r.p); if (sure < tau - 1e-9) { deferred++; if (!ok) deferredWrong++; } else { called++; if (ok) right++; } }
+    const n = called + deferred; return { n, called, right, deferred, deferredWrong, coverage: n ? called / n : 0, acc: called ? right / called : null };
+  }
+  function renderCalibration() {
+    const card = $('calib-card'), tau = S.test.defer, cur = deferStats(tau); card.hidden = !cur.n; if (!cur.n) return;
+    $('defer-val').textContent = `${Math.round(tau * 100)}%`;
+    const cases = []; for (const s of S.ds.test) { const r = S.test.results.get(s.id); if (!r || !S.test.revealed.has(s.id)) continue; const call = r.p >= S.test.threshold ? 1 : 0; cases.push({ p: r.p, y: s.label, name: s.name, truthName: className(s.label), wrong: call !== s.label, deferred: Math.max(r.p, 1 - r.p) < tau - 1e-9 }); }
+    Viz.drawCalibrationStrip($('calib-strip'), { cases, threshold: S.test.threshold, tau, posName: posName() });
+    $('calib-now').textContent = `${cur.n} classified`;
+    const pts = []; for (let t = 50; t <= 100; t += 5) { const d = deferStats(t / 100); if (d.acc != null) pts.push({ tau: t / 100, coverage: d.coverage, acc: d.acc }); }
+    Viz.drawCoverageCurve($('defer-curve'), { points: pts, current: cur.acc != null ? { coverage: cur.coverage, acc: cur.acc } : null });
+    $('defer-n').textContent = `${cur.called} / ${cur.n}`; $('defer-n-sub').textContent = `${pct(cur.coverage)} of the cases`;
+    $('defer-acc').textContent = cur.acc == null ? '–' : pct(cur.acc); $('defer-acc-sub').textContent = cur.called ? `${cur.right} of ${cur.called} right` : 'every case deferred';
+    $('defer-d').textContent = String(cur.deferred); $('defer-d-sub').textContent = cur.deferred ? `${cur.deferredWrong} of them would have been called wrong` : 'none';
+    const sure90 = deferStats(0.9), all = deferStats(0.5), wrongSure = cases.filter(k => k.wrong && Math.max(k.p, 1 - k.p) >= 0.9).length;
+    $('calib-note').textContent = `Each dot is a classified test case, placed by the probability the network gave ${posName()}, coloured by its truth; a red ring marks a call that was wrong. A well-calibrated network puts its mistakes near the middle, where it is unsure: ${all.n - all.right === 0 ? `none of the ${all.n} calls here was wrong` : all.n - all.right === 1 ? `1 of the ${all.n} calls here was wrong, ${wrongSure ? 'with' : 'without'} 90% or more confidence` : `${all.n - all.right} of the ${all.n} calls here were wrong, of which ${wrongSure} came with 90% or more confidence`}. ${sure90.called ? `The network was at least 90% sure for ${sure90.called} cases and right for ${sure90.right} of them.` : 'The network was never 90% sure.'} Handing back the cases in the grey band, those it is less than ${Math.round(tau * 100)}% sure about, leaves ${cur.called} calls${cur.acc != null ? ` that are right ${pct(cur.acc)} of the time` : ''} and ${cur.deferred} cases for the pathologist, ${cur.deferredWrong} of which the network would have got wrong. That trade is what the curve on the right draws for every setting of the bar; with ${cur.n} test cases it is a staircase, and a real evaluation would need hundreds.`;
+  }
   function testStats() {
     const thr = S.test.threshold;
     let tp = 0, tn = 0, fp = 0, fn = 0;
@@ -878,7 +900,7 @@
   function renderTestPanel() {
     renderTestTray();
     const st = testStats();
-    renderLabScores(st);
+    renderLabScores(st); renderCalibration();
     $('stat-n').textContent = `${st.n} / ${S.ds.test.length}`;
     $('stat-n-sub').textContent = `held-out ${noun(2)}${S.ds.labs && S.ds.sources.test !== 'ours' ? ` · ${SOURCE_LABELS()[S.ds.sources.test].split(':')[0]}` : ''}`;
     $('stat-acc').textContent = st.acc == null ? '–' : pct(st.acc);
@@ -1216,6 +1238,7 @@
     $('btn-classify-all').addEventListener('click', classifyAll);
     $('btn-test-reset').addEventListener('click', () => { clearTestResults(false); $('test-note').textContent = 'Test results cleared.'; renderInspector(); renderTestGraph(); });
     $('threshold').addEventListener('input', () => { S.test.threshold = +$('threshold').value; renderTestPanel(); renderInspector(); });
+    $('defer').addEventListener('input', () => { S.test.defer = +$('defer').value / 100; renderCalibration(); });
     $('prev').addEventListener('input', () => { S.test.prevalence = prevFromSlider(+$('prev').value); renderTestPanel(); });
     $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); renderInspector(); if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
     $('theme-toggle').addEventListener('click', () => {
@@ -2721,7 +2744,7 @@
   // from the words before it, and nothing else ever teaches it. The page trains it live in batches of four reports
   // (an epoch is about half a minute), measures its loss by section on test reports and, every epoch, the diagnosis
   // it writes from the findings alone on a few of them; the same model after 30 epochs in Node ships with the page.
-  const RP = { batch: 4, layers: 2, heads: 2, costs: [0.05, 0.003], positions: 200, clip: 1, decay: 0.0001, groundN: 8, evalN: 40, frameMs: 70, maxWrite: 200,
+  const RP = { batch: 4, layers: 2, heads: 2, costs: [0.05, 0.003], positions: 200, clip: 1, decay: 0.0001, groundN: 8, evalN: 40, evidenceN: 16, frameMs: 70, maxWrite: 200,
     colors: { findings: '#7c3aed', specimen: '#8a8fa8', clinical: '#b0a37a', gross: '#d4a017', microscopic: '#0e9f6e', diagnosis: '#eb6834' } };
   const RPR = window.NucleusReports;
   const CHR = window.NucleusChat;
@@ -2738,6 +2761,7 @@
       unit: 'reports', doc: 'report', heldLabel: 'never trained on', groundLabel: 'diagnosis right from the findings', groundSub: 'test reports, the description written by the model', groundChart: 'Diagnosis right, the description written by the model', groundVerb: 'Measuring the diagnosis from the findings', groundColor: RP.colors.diagnosis,
       prep: (L, r, split) => { const tokens = RPR.encode(L.vocab, r.text), words = RPR.decode(L.vocab, tokens), { sections, lines } = RPR.sectionsOf(words); return { id: r.id, name: r.name, split, case: r.case, dx: r.dx, text: r.text, tokens, words, sections, lines, cls: RPR.classOf(r.dx), dxLine: RPR.diagnosisSectionOf(words), findings: RPR.findingsOf(words) }; },
       groundPrefix: d => d.tokens.slice(0, d.words.indexOf('MICROSCOPIC')), groundStop: () => false, groundRight: (d, words) => RPR.classOf(RPR.diagnosisOf(words)) === d.cls,
+      evidenceSpan: d => RPR.diagnosisSpan(d.words), evidenceChart: 'Where the diagnosis looks: its attention on the findings block', evidenceNow: 'of its attention on the block', evidenceColor: RP.colors.findings,
       defaultWord: words => { const i = words.indexOf('DIAGNOSIS'); return i >= 0 && i + 2 < words.length ? i + 2 : words.length - 1; }, defaultWordName: 'the first word of the diagnosis',
       docTitle: r => `Report ${r.name} · ${r.split === 'train' ? 'training' : r.split === 'test' ? 'test' : 'never trained on'} · ${RPR.CLASS_NAMES[r.cls]}`,
       thumbClass: r => rpClassGroup(r.cls), thumbTitle: r => `${r.name} · ${r.dx}`, thumbLabel: r => RPR.CLASS_NAMES[r.cls], traysTitle: 'The reports',
@@ -2757,6 +2781,7 @@
       unit: 'transcripts', doc: 'transcript', trayScroll: true, heldLabel: 'held-out phrasings', groundLabel: 'answers right', groundSub: 'test transcripts, the answer written by the model', groundChart: 'Answers right, written by the model', groundVerb: 'Measuring the answers', groundColor: CH.colors.assistant,
       prep: (L, r, split) => { const tokens = RPR.encode(L.vocab, r.text), words = RPR.decode(L.vocab, tokens); return { id: r.id, name: r.name, split, case: r.case, dx: r.dx, style: r.style, line: r.line, q: r.q, qi: r.qi, answer: r.answer, text: r.text, tokens, words, sections: CHR.rolesOf(words), cls: r.style }; },
       groundPrefix: d => d.tokens.slice(0, CHR.firstAnswerIndex(d.words)), groundStop: (token, L) => token === L.nl, groundRight: (d, words) => { const a = CHR.lastAssistant(words); return !!a && CHR.same(a.text, d.answer); },
+      evidenceSpan: d => CHR.answerSpan(d.words), evidenceChart: 'Where the answer looks: its attention on the findings', evidenceNow: 'of its attention on the findings', evidenceColor: CH.colors.findings,
       defaultWord: words => CHR.firstAnswerIndex(words), defaultWordName: 'the first word of the answer',
       docTitle: r => `Transcript ${r.name} · ${r.split === 'train' ? 'training' : r.split === 'test' ? 'test' : 'held-out phrasing'} · ${r.style === 'full' ? 'full sentence' : r.style} · ${r.q}`,
       thumbClass: r => `ch-${r.style}`, thumbTitle: r => `${r.name} · ${r.q} → ${r.answer}`, thumbLabel: r => (r.style === 'full' ? 'full' : r.style), traysTitle: 'The transcripts',
@@ -2804,6 +2829,28 @@
     rpSyncControls(); rpRenderAll();
     if (reason) rpNote(reason);
   }
+  // a model trained on the page can be kept in this browser, with its curves and settings, and restored after a reload
+  const rpKeptKey = () => `nucleus-net-kept:${LMW().key}`;
+  function rpKeptInfo() { try { const raw = localStorage.getItem(rpKeptKey()); if (!raw) return null; const o = JSON.parse(raw); return { savedAt: o.savedAt, epochs: o.epochs, testLoss: o.testLoss, dim: o.dim }; } catch (e) { return null; } }
+  function rpKeep() {
+    const L = LM(), WD = LMW(); if (!L.model) return; if (L.model.steps === 0) { rpNote('Nothing to keep yet: train it first, or load the trained model.'); return; }
+    const last = L.hist[L.hist.length - 1], payload = { savedAt: new Date().toISOString(), epochs: L.epoch, testLoss: last ? +last.testLoss.toFixed(4) : null, dim: L.dim, positions: L.positions, seed: L.seed, lr: L.lr, shipped: L.shipped, hist: L.hist, model: L.model.toJSON({ words: L.vocab.words }) };
+    try { localStorage.setItem(rpKeptKey(), JSON.stringify(payload)); } catch (e) { rpNote(`Could not keep the model: the browser refused the storage (${e.name}). Try a smaller model, or free the other world’s kept model.`); return; }
+    rpSyncControls(); rpNote(`Kept: ${rpEpochs(L.epoch)}, test loss ${payload.testLoss}, with its curves. It stays in this browser; Restore kept brings it back, after a reload too.`);
+  }
+  function rpRestore() {
+    const L = LM(), WD = LMW(); let o; try { o = JSON.parse(localStorage.getItem(rpKeptKey()) || 'null'); } catch (e) { o = null; }
+    if (!o || !o.model) { rpNote('No kept model in this browser for this question.'); return; }
+    rpStop(); if (!rpBuild()) return;
+    if (!o.model.words || o.model.words.length !== L.vocab.size || o.model.words.some((w, i) => w !== L.vocab.words[i])) { rpNote('The kept model was trained on a different vocabulary than this corpus; it cannot be restored.'); return; }
+    L.model = NN.LanguageModel.fromJSON(o.model); L.shipped = false; L.dim = o.dim; L.positions = !!o.positions; L.seed = o.seed || L.seed; L.lr = o.lr || L.lr;
+    L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
+    L.epoch = o.epochs || 0; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = Array.isArray(o.hist) ? o.hist : []; L.lastBatch = []; L.trainLoss = L.hist.length ? L.hist[L.hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
+    L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false; if (L.chat) L.chat.view = null;
+    if (!L.hist.length) rpRecordEpoch(false);
+    rpSyncControls(); rpRenderAll();
+    rpNote(`Restored the model you kept on ${new Date(o.savedAt).toLocaleString()}: ${rpEpochs(L.epoch)}, test loss ${o.testLoss}${o.shipped ? ', continued from the trained model that ships with the page' : ''}. Keep training it, or go to 3 · Test.`);
+  }
   // the model trained for 30 epochs in Node, the weights that ship with the page
   function rpLoadShipped() {
     const L = LM(), WD = LMW(), W = WD.shipped(); if (!W) { rpNote('The trained model did not load with the page.'); return; } rpStop(); if (!rpBuild()) return;
@@ -2822,8 +2869,14 @@
     const L = LM(), docs = L.test.slice(0, RP.evalN), ev = L.model.evaluate(docs), rec = { epoch: L.epoch, loss: L.trainLoss, testLoss: ev.loss, acc: ev.accuracy, ground: null };
     const sum = {}, n = {}; docs.forEach((d, k) => { for (let i = 0; i + 1 < d.tokens.length; i++) { const s = d.sections[i + 1]; sum[s] = (sum[s] || 0) + ev.per[k][i]; n[s] = (n[s] || 0) + 1; } });
     for (const s of WDof(L).sections) rec[s] = n[s] ? sum[s] / n[s] : null;
+    rec.evidence = rpEvidenceShare(L); // where the diagnosis (the answer) looks: the share of its attention on the findings, on a few test documents
     L.hist.push(rec);
     if (withGround) { L.measuring = { docs: L.test.slice(0, RP.groundN), i: 0, st: null, ok: 0, rec }; if (!L.running) requestAnimationFrame(now => rpTick(now, L)); }
+  }
+  function rpEvidenceShare(L) { // the share of the diagnosis' (the answer's) attention, in the last layer with the heads averaged, that lands on the findings block, averaged over the first test documents
+    const WD = WDof(L); let s = 0, n = 0;
+    for (const d of L.test.slice(0, RP.evidenceN)) { const span = WD.evidenceSpan(d); if (!span) continue; const v = RPR.attentionShare(L.model.forward(d.tokens), span[0], span[1], j => d.sections[j] === 'findings'); if (v != null) { s += v; n++; } }
+    return n ? s / n : null;
   }
   function rpMeasureChunk(deadline, L) { // a few words of the grounding measure per frame: the model writes the description and the diagnosis of a test report from its findings and its requisition, with its cache of the words so far
     const WD = WDof(L), M = L.measuring; if (!M) return;
@@ -2895,6 +2948,7 @@
     $('rp-epochs').value = L.epochs; $('rp-epochs-val').textContent = L.epochs;
     $('rp-lr').value = rpSliderFromLr(L.lr); $('rp-lr-val').textContent = L.lr;
     $('rp-seed').value = L.seed; $('rp-load').disabled = !LMW().shipped();
+    { const k = rpKeptInfo(); $('rp-restore').disabled = !k; $('rp-restore').title = k ? `bring back the model kept in this browser on ${new Date(k.savedAt).toLocaleString()}: ${k.epochs} epochs, test loss ${k.testLoss}` : 'no model kept in this browser for this question yet'; }
     $('rp-temp').value = Math.round(L.temperature * 100); $('rp-temp-val').textContent = L.temperature.toFixed(2);
     $('rp-pace').value = L.pace; $('rp-pace-val').textContent = `${L.pace} words/s`;
     $('rp-noblock').checked = L.noblock; $('rp-data-reveal').checked = L.reveal;
@@ -2966,6 +3020,7 @@
     Viz.drawSeries($('rp-loss'), { hist: L.hist, keys, maxEpoch: L.epochs });
     Viz.drawSeries($('rp-acc'), { hist: L.hist, keys: [{ key: 'acc', color: Viz.colors().accent }], maxEpoch: L.epochs, pct: true, baseline: null });
     Viz.drawSeries($('rp-ground'), { hist: L.hist, keys: [{ key: 'ground', color: WD.groundColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-ground-title').textContent = WD.groundChart;
+    Viz.drawSeries($('rp-evidence'), { hist: L.hist, keys: [{ key: 'evidence', color: WD.evidenceColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-evidence-title').textContent = WD.evidenceChart; $('rp-evidence-now').textContent = last && last.evidence != null ? `${pct(last.evidence)} ${WD.evidenceNow}` : '';
     $('rp-legend').innerHTML = WD.sections.map(s => `<span><span class="line" style="border-top-color:${WD.colors[s]}"></span>${s}</span>`).join('');
     $('rp-loss-now').textContent = last ? `test ${last.testLoss.toFixed(3)}` : ''; $('rp-acc-now').textContent = last ? pct(last.acc) : ''; $('rp-ground-now').textContent = last && last.ground != null ? pct(last.ground) : L.measuring ? 'measuring…' : '';
     $('rp-curves-note').textContent = WD.curvesNote;
@@ -3581,7 +3636,7 @@
     $('rp-step-report').addEventListener('click', rpStepBatch); $('rp-step-epoch').addEventListener('click', rpStepEpoch);
     $('rp-train').addEventListener('click', () => (L.running && L.stopAt == null ? rpStop('Paused.') : rpStart()));
     $('rp-reset').addEventListener('click', () => rpReset('Weights re-initialised from the seed.'));
-    $('rp-load').addEventListener('click', rpLoadShipped);
+    $('rp-load').addEventListener('click', rpLoadShipped); $('rp-keep').addEventListener('click', rpKeep); $('rp-restore').addEventListener('click', rpRestore);
     $('rp-prev').addEventListener('click', () => rpNeighbour(-1)); $('rp-next').addEventListener('click', () => rpNeighbour(1));
     $('rp-data-prev').addEventListener('click', () => rpDataNeighbour(-1)); $('rp-data-next').addEventListener('click', () => rpDataNeighbour(1));
     $('rp-data-reveal').addEventListener('change', ev => rpSetReveal(ev.target.checked));

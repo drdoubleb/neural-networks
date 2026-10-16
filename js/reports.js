@@ -104,6 +104,16 @@
     return { dx, mp, text: `${dx} ${mp}` };
   }
   const CLASS_NAMES = { benign: 'benign', reactive: 'reactive', denuded: 'denuded', cis: 'CIS', suspicious: 'suspicious', invasive: 'invasive', 'invasive-mp': 'invasive, MP', other: 'other', none: 'none' };
+  // the diagnosis sentence of a report: from the word after "DIAGNOSIS :" to its first full stop, as [from, to)
+  function diagnosisSpan(words) { const i = words.indexOf('DIAGNOSIS'); if (i < 0) return null; let end = i + 2; while (end < words.length && words[end] !== '.') end++; return [i + 2, Math.min(end + 1, words.length)]; }
+  // where a run of tokens looks: the share of their attention, in the last layer with the heads averaged, that lands on
+  // the tokens isTarget picks out (fw is a LanguageModel forward pass); null when the span is empty or the model has no layers
+  function attentionShare(fw, from, to, isTarget) {
+    if (!fw.ctxs.length || to <= from) return null;
+    const c = fw.ctxs[fw.ctxs.length - 1], H = c.Ah.length; let sum = 0, n = 0;
+    for (let i = from; i < to && i < fw.tokens.length; i++) { n++; for (let j = 0; j <= i; j++) { if (!isTarget(j)) continue; for (let h = 0; h < H; h++) sum += c.Ah[h][i][j] / H; } }
+    return n ? sum / n : null;
+  }
   // a byte-pair tokenizer, the way a real model's tokenizer is built, for the page's demonstration: start from single
   // letters with a mark for the end of a word, merge the most frequent adjacent pair over the training words, repeat
   // n times; a word, seen or not, is then written in the pieces the merges made
@@ -122,5 +132,5 @@
   }
   function bpeEncode(word, bpe) { const s = [...word, BPE_EOW]; for (const [a, b] of bpe.merges) for (let i = 0; i + 1 < s.length; i++) if (s[i] === a && s[i + 1] === b) s.splice(i, 2, a + b); return s; }
   function bpeVocab(bpe) { const count = new Map(); for (const [w, f] of bpe.freq) for (const p of bpeEncode(w, bpe)) count.set(p, (count.get(p) || 0) + f); return [...count.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)); } // the pieces in use over the training words, most frequent first
-  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, classOf, blockOf, findingsOf, ruleOf, bpeLearn, bpeEncode, bpeVocab, BPE_EOW, FINDINGS, CLASS_NAMES, START, END, UNK, NL, SECTIONS, HEADERS };
+  return { tokenize, buildVocab, encode, decode, detokenize, sectionsOf, diagnosisOf, diagnosisSectionOf, diagnosisSpan, attentionShare, classOf, blockOf, findingsOf, ruleOf, bpeLearn, bpeEncode, bpeVocab, BPE_EOW, FINDINGS, CLASS_NAMES, START, END, UNK, NL, SECTIONS, HEADERS };
 });
