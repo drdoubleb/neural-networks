@@ -1,0 +1,59 @@
+#!/usr/bin/env node
+/*
+ * generate_describe.js — the nuclei of the Describe question (from pixels to words): 400 nuclei from the atypia
+ * generator, each of the four traits (enlarged, hyperchromatic, irregular outline, coarse chromatin) switched on by
+ * its own coin so that every combination occurs, and a description of each in words, templated with a little
+ * phrase variety (js/describe.js). Every fifth nucleus is a test nucleus, rendered a second time as scanned at the
+ * other lab (the weaker stain) for the Test step's probe. Writes data/describe/describe_data.js
+ * (window.LECTURE_DESCRIBE), a contact sheet of the first 100 and a sample sheet of descriptions for vetting.
+ *   node tools/generate_describe.js
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const gen = require('./generate_nuclei.js');
+const DSC = require('../js/describe.js');
+const SEED = 20261016, N = 400, TEST_EVERY = 5, SIZE = gen.SIZE;
+const OUT = path.join(__dirname, '..', 'data', 'describe');
+fs.mkdirSync(OUT, { recursive: true });
+const task = Object.assign({}, gen.TASKS.find(t => t.id === 'atypia'), { seed: SEED });
+gen.setSeed(SEED);
+const rng = gen.mulberry32(SEED + 1), pick = n => Math.floor(rng() * n);
+const records = [];
+let kTrain = 0, kTest = 0;
+for (let i = 0; i < N; i++) {
+  const traits = { enlarged: rng() < 0.5, dark: rng() < 0.5, irregular: rng() < 0.5, coarse: rng() < 0.5 };
+  const label = DSC.isAtypical(traits) ? 1 : 0;
+  const n = gen.makeOne(label, task, i, traits);
+  const tex = gen.makeValueNoise(n.look.textureCells || 7);
+  const img = gen.renderNucleus(n.shape, n.look, tex, gen.gaussian);
+  const split = i % TEST_EVERY === TEST_EVERY - 1 ? 'test' : 'train', k = split === 'train' ? ++kTrain : ++kTest;
+  const rec = { id: i, name: `${split === 'train' ? 'D' : 'Y'}${String(k).padStart(3, '0')}`, split, label, traits, subtype: DSC.subtypeOf(traits), text: DSC.describe(traits, pick), px: Buffer.from(img).toString('base64') };
+  if (split === 'test') { // the other lab's scan of the same nucleus, as the other datasets make it
+    const rngB = gen.mulberry32((SEED + 7919 * (i + 1)) >>> 0), lookB = gen.otherLabLook(n.look, rngB);
+    rec.pxB = Buffer.from(gen.renderNucleus(n.shape, lookB, tex, () => gen.gaussianFrom(rngB))).toString('base64');
+  }
+  records.push(rec);
+}
+// the contact sheet: the first 100 nuclei at twice their size, ten per row, our lab's scan
+const SCALE = 2, COLS = 10, ROWS = 10, cell = SIZE * SCALE + 2, W = COLS * cell + 2, H = ROWS * cell + 2, pix = new Uint8Array(W * H).fill(255);
+records.slice(0, COLS * ROWS).forEach((r, k) => { const px = Buffer.from(r.px, 'base64'), cx = 2 + (k % COLS) * cell, cy = 2 + Math.floor(k / COLS) * cell; for (let y = 0; y < SIZE * SCALE; y++) for (let x = 0; x < SIZE * SCALE; x++) pix[(cy + y) * W + cx + x] = px[Math.floor(y / SCALE) * SIZE + Math.floor(x / SCALE)]; });
+fs.writeFileSync(path.join(OUT, 'contact_sheet.png'), gen.encodePNG(W, H, 1, pix));
+// the sample sheet: the first 100 nuclei (the contact sheet's) with their traits and descriptions
+const flag = t => DSC.TRAITS.map(k => (t[k] ? k[0].toUpperCase() : '·')).join('');
+const sheet = ['# The Describe nuclei: the first 100 (the contact sheet, row by row) with their traits and descriptions', '', 'Traits as four letters: E enlarged, D dark (hyperchromatic), I irregular outline, C coarse chromatin; · = off.', '', '| # | name | split | traits | description |', '|---|---|---|---|---|']
+  .concat(records.slice(0, COLS * ROWS).map((r, k) => `| ${k + 1} | ${r.name} | ${r.split} | ${flag(r.traits)} | ${r.text} |`));
+fs.writeFileSync(path.join(OUT, 'sample_descriptions.md'), sheet.join('\n') + '\n');
+// counts
+const byCombo = {}; for (const r of records) { const f = flag(r.traits); byCombo[f] = (byCombo[f] || 0) + 1; }
+const vocab = DSC.buildVocab(records.filter(r => r.split === 'train').map(r => r.text));
+const meta = {
+  generated: new Date().toISOString().slice(0, 10), seed: SEED, size: SIZE, count: records.length, train: kTrain, test: kTest,
+  traits: DSC.TRAITS, traitNames: DSC.TRAIT_NAMES, words: DSC.WORDS, templates: DSC.TEMPLATES.length, vocabulary: vocab.size,
+  byCombination: byCombo, onShare: Object.fromEntries(DSC.TRAITS.map(k => [k, +(records.filter(r => r.traits[k]).length / records.length).toFixed(3)])),
+  blurb: 'Four hundred nuclei from the atypia generator, each of the four traits switched on by its own coin, so that every one of the sixteen combinations occurs; each nucleus comes with a description in words, in one of four sentence shapes with a few phrasings per trait, ending with an impression. The test nuclei are also rendered as scanned at the other lab.',
+};
+const js = `// The Describe question: ${meta.count} synthetic nuclei (${SIZE}x${SIZE} 8-bit grayscale, base64 of the raw pixel rows; px as scanned at our lab, pxB at the other lab for the test nuclei) with their traits and a description of each. Generated by tools/generate_describe.js (seed ${SEED}).\nwindow.LECTURE_DESCRIBE = ${JSON.stringify({ meta, nuclei: records })};\n`;
+fs.writeFileSync(path.join(OUT, 'describe_data.js'), js);
+console.log(`wrote ${records.length} nuclei (${kTrain} train, ${kTest} test) · vocabulary ${vocab.size} · ${(js.length / 1024).toFixed(0)} KB · combinations: ${Object.entries(byCombo).sort().map(([f, n]) => `${f} ${n}`).join(', ')}`);
+console.log(`on share: ${DSC.TRAITS.map(k => `${k} ${meta.onShare[k]}`).join(' · ')} · mean tokens per description ${(records.reduce((a, r) => a + DSC.encode(vocab, r.text).length, 0) / records.length).toFixed(1)}`);

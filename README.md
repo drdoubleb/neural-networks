@@ -906,6 +906,72 @@ held-out phrasings (*Ask all* runs the whole set); changing anything makes a pro
 rule's answer where there is one and not tallied. The three diagram cards of the reports question follow the
 transcript the model continued. The transcripts (1.8 MB) and the trained model (0.4 MB) load with the page.
 
+## Describe: from pixels to words
+
+The Describe question joins the two halves of the page: the foundation encoder that turns a nucleus into a code, and
+the language model that writes. A nucleus's code is projected into the embedding space by one learned matrix and
+stands as the first token of the document; the language model of the Reports question then writes the nucleus's
+description word by word, trained on the next word alone, as before. It is a vision-language model in miniature,
+the idea of the captioning models that put an image encoder's features in front of a language model and let the
+words attend to them, with every part small enough to watch. The nuclei and their descriptions are described under
+*The data*: 400 nuclei with the four traits chosen independently, 320 for training and 80 for test, a description
+of each in one of four sentence shapes with a few phrasings per trait, ending with an impression.
+
+**The model.** `LanguageModel` gains an optional image input (`codeDim`): a projection `Pin` (48 × 16) and a bias
+`bin` turn the code into the vector at position 0, in place of a word's row of the lookup table (the position vector
+is added as usual), and the gradient at that position flows into the projection (checked numerically with the rest
+of the model). Writing starts from the image token with its code, which the cache holds like any other token. The
+encoder is the second backbone shipped with the page (`page240-k8`: 8 filters, a code of 16, pretrained
+contrastively on the page's 240 training nuclei), frozen: pixels → ink → the backbone's standardiser → the encoder
+→ 16 numbers. The language model is the report model's recipe (48 numbers per token, 32 learned positions, two
+causal context layers of two heads, query · key of 12 with a learned distance cost per head, a 48-unit tanh
+feed-forward, Adam at 0.005, batches of 8, gradients clipped at 1) with weight decay 0.001 rather than 0.0001, since
+320 descriptions are few, on a vocabulary of 53: 26,361 parameters, trained for 20 epochs from random weights
+(about 2.5 s per epoch in Node). Reproduce with `node tools/check_describe.js --backbone page240-k8 --epochs 20
+--decay 0.001 --ground 80 --ground-every 1 --curve` (`--save data/describe/describe_weights.js` writes the shipped
+model, `--load` takes the measures on it, `--no-code` and `--shuffle-codes` run the controls below).
+
+The test loss by section as it trains (the image token's own prediction, the first word, counts with the
+description), and, after every epoch, the 80 test nuclei described from their image alone (greedily, from the image
+token and its code): the share with all four traits right, each trait's accuracy, and the share of the description
+words' attention (the last layer, heads averaged) that lands on the image token:
+
+| Epoch | Test loss | description | impression | All four traits right | enlarged | hyperchromatic | irregular | coarse | The description's attention on the image |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.820 | 1.05 | 0.14 | 0% | 96% | 45% | 30% | 8% | 6% |
+| 2 | 0.555 | 0.71 | 0.11 | 25% | 93% | 63% | 68% | 51% | 7% |
+| 3 | 0.497 | 0.63 | 0.10 | 40% | 91% | 65% | 76% | 89% | 6% |
+| 5 | 0.477 | 0.60 | 0.11 | 45% | 95% | 78% | 68% | 75% | 11% |
+| 7 | 0.449 | 0.59 | 0.05 | 60% | 100% | 84% | 78% | 93% | 9% |
+| 10 | 0.438 | 0.56 | 0.07 | 61% | 100% | 89% | 74% | 90% | 11% |
+| 15 | 0.412 | 0.53 | 0.05 | 69% | 100% | 88% | 84% | 96% | 9% |
+| 20 | 0.425 | 0.55 | 0.05 | 63% | 96% | 86% | 80% | 98% | 9% |
+
+**What the data taught.** Size comes first and free: the code carries it so plainly that the first epoch already
+names 96% of the test nuclei's sizes right, while the other three traits start at the commoner word (*pale*,
+*smooth*, *fine* for everyone: 45%, 30% and 8%). Chromatin texture is learned by the third epoch and the stain by
+the fifth; the outline is learned last and least (80% at the end), the trait that a 5 × 5 filter sees only in
+pieces. The test loss bottoms at epoch 15 and the training loss keeps falling: 320 descriptions are few, and the
+curve shows where to stop. All four traits are right for 63% of the test nuclei at the end (69% at epoch 15; 73%
+and 68% with seeds 2 and 3; 61% with 32 numbers per token and half the parameters) and the impression for 94%;
+with 80 test nuclei and one greedy description each, the shares move by several points from epoch to epoch. Two
+controls say that the words come from the image: with no code at all (the image token a plain word) the model
+writes one description for everyone (*The nucleus is large and pale, with fine chromatin and a rounded outline*)
+and is right by base rate alone (enlarged 40%, hyperchromatic 59%, irregular 64%, coarse 53%; all four 6%), and
+with every training nucleus given another nucleus's code it does no better (all four 9%). What the code carries
+decides what the description can say: with the first backbone (4 filters, a code of 8) the same recipe names coarse
+chromatin right for 73% of the test nuclei after 40 epochs and 59% to 66% after 20, against 98% with the 8-filter
+code of 16, which has room for texture, while size, stain and outline differ little between the two. The other
+lab's scans (the weaker stain) cost the trait that lives in the stain: 11 of the 33 hyperchromatic test nuclei lose
+the word, and the four traits agree with our lab's description for 65% of the nuclei, though each trait's accuracy
+barely moves (99%, 83%, 79%, 86%), the errors having moved around. The seven other views of a test nucleus (flips
+and rotations) get the same four traits as the upright view for 91% of the views: the encoder was pretrained to
+give them the same code. Only a tenth of the description's attention in the last layer lands on the image token,
+and the traits still come out right: the image is read early and what was read travels in the words between, as the
+diagnosis read the findings through the microscopic prose in the reports. At temperature 1 the descriptions keep
+their traits but the grammar slips in about one draw in three (*the, with coarsely granular chromatin clumped*):
+320 descriptions teach four sentence shapes, not the language.
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -1055,6 +1121,25 @@ your reasoning.*, *You are a helpful assistant.*) are kept for the page. The voc
 70 to 96 tokens. `js/chat.js` gives every token its role (system, user, findings, question, assistant, tool), finds
 the assistant's last answer, and says whether an assistant line is the tool call.
 
+`tools/generate_describe.js` writes the nuclei of the Describe question to `data/describe/describe_data.js` (750 KB):
+400 nuclei from the atypia generator (`tools/generate_nuclei.js`, the same shapes, stains and textures), but with
+each of the four traits (enlarged, hyperchromatic, irregular outline, coarse chromatin) switched on by its own coin,
+so that every one of the sixteen combinations occurs (15 to 41 nuclei each; 41 are bland), 320 for training and 80
+for test, the test nuclei also rendered as scanned at the other lab. Each nucleus comes with a description in words,
+written from its traits by `js/describe.js`: one of four sentence shapes (*A large, dark nucleus with an irregular
+contour and finely granular chromatin.*, *Nucleus big and densely stained; the outline is smooth and the chromatin
+coarsely granular.*, *The nucleus is small and faint, with even chromatin and a rounded outline.*, *Outline notched,
+chromatin fine; the nucleus is enlarged and pale.*), each trait in one of three or four phrasings on and off
+(enlarged, large, big against normal-sized, small, modest; hyperchromatic, dark, densely stained against pale,
+lightly stained, faint; irregular, notched, lobulated, angulated against smooth, regular, rounded; coarse, clumped,
+coarsely granular against fine, finely granular, even), and an impression, *bland* when no trait is on and
+*atypical* otherwise. The vocabulary is 53 tokens, four of them special (start, end, unknown and the image, which
+stands first in every document and carries the nucleus's code instead of a word); a description is 20 tokens on
+average. A contact sheet of the first 100 nuclei is in `data/describe/contact_sheet.png` and their descriptions with
+their traits in `data/describe/sample_descriptions.md`. `js/describe.js` also reads a written description back into
+the four traits (true, false, or unsaid when a trait is not named or named both ways) and the impression, for the
+measures and the page's ticks.
+
 ## Code map
 
 ```
@@ -1064,6 +1149,7 @@ js/features.js             measurements from pixels (browser + Node)
 js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation (browser + Node)
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
+js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram
@@ -1076,6 +1162,8 @@ data/reports/reports_data.js the reports of the language-model question in prepa
 data/reports/lm_weights.js  the trained report model with its vocabulary, the curves of its training and the words' paths (seed 1 of the shipped configuration), written by tools/check_reports.js --save
 data/chat/chat_data.js     the transcripts of the chat question: 2,400 training, 300 test and 300 held-out-phrasing transcripts written from the report corpus's cases by tools/generate_chat.js; sample_transcripts.md shows the phrasings, the questions with both answers for four cases, and one transcript of each style
 data/chat/chat_weights.js  the trained chat model with its vocabulary, the curves of its training and the words' paths, written by tools/check_chat.js --save
+data/describe/describe_data.js  the nuclei of the Describe question: 400 from the atypia generator with the four traits chosen independently, each with its description; the test nuclei as scanned at both labs; written by tools/generate_describe.js (with a contact sheet and a sample sheet beside it)
+data/describe/describe_weights.js  the trained describe model with its vocabulary, the curves of its training, its measures and the words' paths, written by tools/check_describe.js --save
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
@@ -1088,6 +1176,8 @@ tools/generate_reports.js  make the reports: a findings block and a sign-out wri
 tools/check_reports.js     train the report language model and take its measures: loss by section, the diagnosis from the prefix and from the block alone, the held-out combination, what it writes from nothing, where the diagnosis looks
 tools/generate_chat.js     make the transcripts: three styles, three phrasings of each instruction and a fourth held out, eight questions answered from the findings by the rule, the probes
 tools/check_chat.js        train the chat model and take its measures: loss by role, the answers written from the transcript up to the last ASSISTANT: by style on the trained and the held-out phrasings and by question, the agent loop, the probes
+tools/generate_describe.js make the Describe nuclei and their descriptions (a contact sheet and a sample sheet for vetting)
+tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
