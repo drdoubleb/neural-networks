@@ -633,14 +633,14 @@ given the findings with the specimen, the clinical history and the gross, as the
 the microscopic description and the diagnosis itself; the share of the first 25 test reports whose diagnosis class
 comes out right):
 
-| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right, the description written by the model |
-|---|---|---|---|---|---|---|---|---|
-| 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | |
-| 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | |
-| 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% |
-| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 72% |
-| 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% |
-| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (97% of all 100) |
+| Epoch | Test loss | findings | specimen | clinical | gross | microscopic | diagnosis | Diagnosis right, the description written by the model | The diagnosis' attention on the findings block |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 0.54 | 0.13 | 0.23 | 0.34 | 0.41 | 1.05 | 0.38 | | 10% |
+| 2 | 0.31 | 0.13 | 0.24 | 0.41 | 0.29 | 0.48 | 0.24 | | 7% |
+| 5 | 0.20 | 0.13 | 0.22 | 0.32 | 0.28 | 0.22 | 0.08 | 56% | 20% |
+| 10 | 0.16 | 0.11 | 0.23 | 0.31 | 0.27 | 0.16 | 0.02 | 72% | 17% |
+| 20 | 0.15 | 0.12 | 0.23 | 0.30 | 0.26 | 0.14 | 0.01 | 100% | 18% |
+| 30 | 0.15 | 0.11 | 0.23 | 0.31 | 0.28 | 0.14 | 0.01 | 100% (97% of all 100) | 18% |
 
 The specimen, clinical and gross losses are a floor set by the draws (which wall, which history, how many fragments:
 nothing in the report predicts them); the findings block is easy from the start (fixed lines, one value each); the
@@ -650,6 +650,11 @@ its diagnosis is right for barely half the reports at epoch 5, when its reports 
 will, and reaches 97% only at the end. Reading a finding forty to a hundred tokens back changes the loss by a few
 hundredths of a nat per token, against the phrasing the model has to guess at every token, so the loss curve is flat
 long before the model is grounded: fluency is learned first, grounding last, and the loss cannot tell them apart.
+The last column, the share of the diagnosis words' attention (last layer, heads averaged) that lands on the findings
+block of the first 40 test reports, is recorded after every epoch too and is the fourth curve of the Train step: it
+climbs from a tenth to a fifth by epoch 5 and stays there, while the grounding goes on from half to all. Looking at
+the block is learned early; what is learned late is which line of it to read, and what to make of it (at the end 8%
+of the diagnosis' attention is on the nests line and 4% on the muscularis propria line, the two that decide).
 
 **What it does with the test reports** (seed 1, the shipped model; three prompts: everything up to DIAGNOSIS:, so
 that only the diagnosis is written; the findings with the specimen, the clinical history and the gross, as they come
@@ -795,14 +800,14 @@ the `TOOL:` header line alone, fully predictable after the call, and costs nothi
 answers of the first 24 test transcripts written by the model from the transcript up to its last `ASSISTANT:`
 (exact, word for word):
 
-| Epoch | Test loss | system | user | findings | question | assistant | Answers right, written by the model |
-|---|---|---|---|---|---|---|---|
-| 1 | 0.161 | 0.14 | 0.10 | 0.13 | 0.39 | 0.27 | 25% |
-| 2 | 0.144 | 0.14 | 0.09 | 0.12 | 0.36 | 0.20 | 29% |
-| 5 | 0.133 | 0.13 | 0.10 | 0.12 | 0.35 | 0.13 | 50% |
-| 10 | 0.130 | 0.13 | 0.09 | 0.11 | 0.39 | 0.12 | 42% |
-| 20 | 0.131 | 0.14 | 0.09 | 0.11 | 0.33 | 0.14 | 46% |
-| 30 | 0.125 | 0.13 | 0.09 | 0.12 | 0.34 | 0.09 | 75% |
+| Epoch | Test loss | system | user | findings | question | assistant | Answers right, written by the model | The answer's attention on the findings |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 0.161 | 0.14 | 0.10 | 0.13 | 0.39 | 0.27 | 25% | 46% |
+| 2 | 0.144 | 0.14 | 0.09 | 0.12 | 0.36 | 0.20 | 29% | 37% |
+| 5 | 0.133 | 0.13 | 0.10 | 0.12 | 0.35 | 0.13 | 50% | 43% |
+| 10 | 0.130 | 0.13 | 0.09 | 0.11 | 0.39 | 0.12 | 42% | 40% |
+| 20 | 0.131 | 0.14 | 0.09 | 0.11 | 0.33 | 0.14 | 46% | 32% |
+| 30 | 0.125 | 0.13 | 0.09 | 0.12 | 0.34 | 0.09 | 75% | 40% |
 
 The system line, the user's line and the findings cost little from the first epoch: they repeat, and only the choice
 among phrasings and the case's findings are unpredictable. The question line stays near 0.35 nats per token, since
@@ -810,7 +815,10 @@ nothing predicts which of the eight questions comes, and that is most of the los
 the only one that matters and the last to fall, from 0.27 to 0.09, and the last column is the reports' lesson again,
 fluency first and grounding last: at epoch 5 the transcripts read as well as they ever will and half the answers are
 right; the model that answers three in four needs all 30 epochs, with a loss curve that has been flat since epoch
-10.
+10. The last column, the share of the answer's attention on the findings (last layer, heads averaged, the first 40
+test transcripts), is the fourth curve of the Train step, and here it is flat from the first epoch at about two
+fifths: with the findings most of the transcript, the answer reads them from the start, and what it learns over the
+30 epochs is not where to look but what to make of what it finds.
 
 **What it does** (seed 1, the shipped model, the test transcripts; the model is given everything up to the last
 `ASSISTANT:` and writes the answer to the end of the line):
