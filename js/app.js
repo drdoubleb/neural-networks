@@ -15,7 +15,7 @@
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
-    foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe ⑪/⑫ introduces them, and stay for the session
+    foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe 11/12 introduces them, and stay for the session
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
@@ -38,7 +38,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['', '① Leukemia · blood count · single layer', '② Leukemia · blood count · 3 ReLU units', '③ Atypia · measurements · single layer', '④ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting', '⑤ Enlargement · pixels · single layer', '⑥ Irregularity · pixels · single layer', '⑦ Irregularity · pixels · 4 ReLU + augmentation', '⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab', '⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab', '⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation', '⑪ Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth', '⑫ Irregularity · the foundation code · single layer · 10 labelled cases', '⑬ Slides · one label for 20 nuclei · attention finds the atypical ones', '⑭ Focus · four atypical cells together or scattered · the nuclei look at each other', '⑮ Fields · is it invasive? · cytology, location and arrangement · two heads, one per question', '⑯ Reports · a small language model writes the report from the findings · fluency first, grounding last', '⑰ Chat · the next-word model on transcripts · ask it about a case', '⑱ Reports · no context layer · the next word from the current word alone', '⑲ Describe · from pixels to words · the image as the first token', '⑳ Segment · a class for every pixel · the window it is decided from'];
+  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Atypia · measurements · single layer','4 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','5 · Enlargement · pixels · single layer','6 · Irregularity · pixels · single layer','7 · Irregularity · pixels · 4 ReLU + augmentation','8 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','9 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','10 · Irregularity · pixels · convolution + 4 ReLU + augmentation','11 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','12 · Irregularity · the foundation code · single layer · 10 labelled cases','13 · Slides · one label for 20 nuclei · attention finds the atypical ones','14 · Focus · four atypical cells together or scattered · the nuclei look at each other','15 · Fields · is it invasive? · cytology, location and arrangement · two heads, one per question','16 · Reports · a small language model writes the report from the findings · fluency first, grounding last','17 · Chat · the next-word model on transcripts · ask it about a case','18 · Describe · from pixels to words · the image as the first token','19 · Segment · a class for every pixel · the window it is decided from']; // the number first, in plain digits, so that it reads in the dropdown
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -1180,23 +1180,17 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
-      if (k === '18') { // the reports question without attention: the lookup table and the output table alone
-        S.rp.dim = 48; S.rp.layers = 0; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
-        selectQuestion('reports'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[18]}: the lookup table and the output table with no attention between them, so every next word is predicted from the current word and its position and nothing else. Press Train: the loss falls to the floor such a model allows, the reports read as locally fluent nonsense, and the diagnosis is never right from the findings, since nothing in the model can read them; the fourth chart stays empty. Then set the context layers back to 2 and watch what attention buys.`);
-        return;
-      }
-      if (k === '20') { // the segment question: a class for every pixel, and the window it is decided from
+      if (k === '19') { // the segment question: a class for every pixel, and the window it is decided from
         S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
         selectQuestion('segment'); showStage('train');
-        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[20]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 35 px, and train again, or load the trained network, which paints the nests.`); };
+        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 35 px, and train again, or load the trained network, which paints the nests.`); };
         go();
         return;
       }
-      if (k === '19') { // the describe question: from pixels to words
+      if (k === '18') { // the describe question: from pixels to words
         S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
         selectQuestion('describe'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[19]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
+        rpReset(`Recipe ${RECIPE_LABELS[18]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
         return;
       }
       if (k === '17') { // the chat question: the same model on transcripts
@@ -1218,7 +1212,7 @@
       if (k === '14') { // the focus question, with the context layer
         S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
         selectQuestion('slides-focus'); showStage('train');
-        slReset(`Recipe ${RECIPE_LABELS[14]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe ⑬ stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
+        slReset(`Recipe ${RECIPE_LABELS[14]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe 13 stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
       }
       if (k === '13') { // the slides question, without context
         S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
@@ -1249,7 +1243,7 @@
       showStage('train');
       if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
       if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
-      if (k === '12') note(`Recipe ${RECIPE_LABELS[12]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe ⑥ (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
+      if (k === '12') note(`Recipe ${RECIPE_LABELS[12]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 6 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
       if (k === '4') note(`Recipe ${RECIPE_LABELS[4]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
     });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
@@ -2093,7 +2087,7 @@
     }
     for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), sl = L.byId.get(id), right = !!rr && rr.call === sl.label; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call === 0); el.classList.toggle('call-1', !!rr && rr.call === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
   }
-  // the lecture introduces the slides late: the stage stays hidden until recipe ⑬, key 5 or #slides brings it in
+  // the lecture introduces the slides late: the stage stays hidden until recipe 13, key 5 or #slides brings it in
   function bindSlides() {
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.addEventListener('click', () => { const att = b.dataset.att === '1'; if (att === S.sl.attention) return; S.sl.attention = att; slReset(att ? 'Attention on: a scorer weighs the nuclei — fresh random weights.' : 'Plain average: every nucleus weighs the same and the scorer is switched off — fresh random weights.'); }));
     $('sl-units').addEventListener('change', () => { S.sl.units = +$('sl-units').value; slReset(`${S.sl.units} attention units — fresh random weights.`); });
@@ -3108,6 +3102,7 @@
       labelled: () => RP_LABELLED, mapExample: 'the states of a findings line, the numbers, the words of the diagnosis',
       untrainedNote: 'Untrained: every next word is a guess over the whole vocabulary, so the report on screen is red all over. Step a batch to watch one gradient step, press Train and watch the loss by section, or load the trained model.',
       loadedNote: 'It writes from the findings; go to 3 · Test, or keep training it here.',
+      blurb: 'A side experiment, when the context layers have been seen: <a href="#" id="rp-nocontext-link">no context layer at all</a>, the lookup table and the output table alone, so that every next word comes from the current word and its position. It sets the model up; press Train and watch what attention buys.',
       curvesNote: 'The loss is the surprise per word, in nats, on test reports the model never trains on. The specimen, clinical and gross lines sit on a floor set by the draws: nothing predicts which wall or how many fragments. The microscopic line falls as the phrasings are learned, the diagnosis line, measured with the pathologist’s description in front of the model, falls fastest of all; but the third chart, the diagnosis the model writes when it has to write the description itself, climbs long after the loss has flattened: fluency comes first, grounding last, and the loss cannot tell them apart.',
       attentionNote: n => `Rows ask, columns answer: every row is one word's shares over the words before it, scaled to its largest share, with the sections as bands along the edges and thin lines at their boundaries. The near head hugs the diagonal, reading the words just before; the far head's columns stand in the findings block, where the diagnosis is decided. The bars give each head's attention by distance back, averaged over the ${n} words; the tables, where the words of each section look on average. Hover a cell for its pair of words; the outlined row is the word the diagram follows.`,
       testView: L => { const res = L.written; if (!res || L.writing) return null; return { words: res.words, tokens: res.tokens, fw: res.fw, textEl: $('rp-test-text'), pre: 'rp-test-', chosen: true, steps: res.steps, nextEl: 'rp-test-nextword' }; },
@@ -3413,10 +3408,16 @@
   function rpRenderFocus() { rpRenderText(); }
   function rpRender(full) { const L = LM(); if (!L.model) return; rpRenderStatus(); rpRenderFocus(); if (full) { rpRenderCurves(); rpRenderTrays(); rpRenderWordMap(); } rpSyncButtons(); }
   function rpRenderAll() { const L = LM(); if (!(S.world === 'reports' || S.world === 'chat' || S.world === 'describe') || !L.built) return; if (S.stage === 'data') LMW().renderData(); else if (S.stage === 'test') LMW().renderTest(); else if (L.model) rpRender(true); }
+  function rpNoContextRecipe() { // the former recipe: the reports question without attention, from the link on its Train step
+    S.rp.dim = 48; S.rp.layers = 0; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
+    selectQuestion('reports'); showStage('train');
+    rpReset(`No context layer: the lookup table and the output table with no attention between them, so every next word is predicted from the current word and its position and nothing else. Press Train: the loss falls to the floor such a model allows, the reports read as locally fluent nonsense, and the diagnosis is never right from the findings, since nothing in the model can read them; the fourth chart stays empty. Then set the context layers back to 2 and watch what attention buys.`);
+    $('recipe-select').value = '';
+  }
   function rpEnter() {
     const L = LM(); if (!rpData()) { rpNote('The reports did not load.'); return; }
     if (!rpBuild()) return;
-    const WD = LMW(); $('rp-panel-title').textContent = WD.title; $('rp-panel-sub').textContent = WD.subtitle; L.trayFor.train = false; // the trays are this world's
+    const WD = LMW(); $('rp-panel-title').textContent = WD.title; $('rp-panel-sub').textContent = WD.subtitle; $('rp-blurb').innerHTML = WD.blurb || ''; $('rp-blurb').hidden = !WD.blurb; L.trayFor.train = false; // the trays are this world's
     L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpSyncControls();
     if (!L.model) rpReset(WD.untrainedNote);
     else rpRender(true);
@@ -4010,6 +4011,7 @@
     const L = new Proxy({}, { get: (_, k) => LM()[k], set: (_, k, v) => { LM()[k] = v; return true; } }); // the state of the world on screen, looked up at every event
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.dim; if (v === L.dim) return; L.dim = v; rpReset(`${v} numbers per token — fresh random weights.`); }));
     document.querySelectorAll('#rp-pos-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.pos === '1'; if (v === L.positions) return; L.positions = v; rpReset(v ? 'Learned position vectors: every word also carries where it is — fresh random weights.' : 'No position vectors: the layers know how far back a word is only through their distance cost — fresh random weights.'); }));
+    $('rp-blurb').addEventListener('click', e => { if (!e.target.closest('#rp-nocontext-link')) return; e.preventDefault(); rpNoContextRecipe(); });
     document.querySelectorAll('#rp-layers-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.layers; if (v === L.layers) return; L.layers = v; rpReset(v === 0 ? 'No context layer: the lookup table and the output table alone, every next word from the current word and its position — fresh random weights.' : `${v} context layer${v === 1 ? '' : 's'} — fresh random weights.`); }));
     $('rp-epochs').addEventListener('input', () => { L.epochs = +$('rp-epochs').value; $('rp-epochs-val').textContent = L.epochs; if (L.model) { rpRenderStatus(); rpRenderCurves(); } });
     $('rp-lr').addEventListener('input', () => { L.lr = rpLrFromSlider(+$('rp-lr').value); $('rp-lr-val').textContent = L.lr; });
@@ -4068,7 +4070,7 @@
     S.tasks = window.LECTURE_TASKS;
     const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
-    $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc(l)}</option>` : '')).join('');
+    $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
