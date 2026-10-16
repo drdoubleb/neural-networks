@@ -873,5 +873,37 @@
     lm.layers.forEach((c, l) => { for (let h = 0; h < c.H; h++) { const o = c.beta[h]; c.beta[h] = o + eps; const lp = lossAt(); c.beta[h] = o - eps; const lm2 = lossAt(); c.beta[h] = o; cmp((lp - lm2) / (2 * eps), aBeta[l][h]); } });
     return { worst, checked };
   }
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
+  // ---- the two directions of a table of V rows of D numbers that spread the rows most (the first two principal
+  // components, by power iteration on the covariance), with the rows projected on them, centred on the table's mean;
+  // prev, two axes found earlier, fixes the signs so that a map drawn epoch after epoch does not flip
+  function pca2(E, V, D, prev) {
+    const mean = new Float64Array(D); for (let v = 0; v < V; v++) for (let d = 0; d < D; d++) mean[d] += E[v * D + d] / V;
+    const C = new Float64Array(D * D), x = new Float64Array(D);
+    for (let v = 0; v < V; v++) { for (let d = 0; d < D; d++) x[d] = E[v * D + d] - mean[d]; for (let a = 0; a < D; a++) { const xa = x[a] / V; if (!xa) continue; const off = a * D; for (let b = 0; b < D; b++) C[off + b] += xa * x[b]; } }
+    const axis = (deflate, seed) => { let u = Float64Array.from({ length: D }, (_, d) => Math.cos(d * 1.7 + seed)); for (let it = 0; it < 80; it++) { const w = new Float64Array(D); for (let a = 0; a < D; a++) { let s = 0; const off = a * D; for (let b = 0; b < D; b++) s += C[off + b] * u[b]; w[a] = s; } if (deflate) { let dot = 0; for (let d = 0; d < D; d++) dot += w[d] * deflate[d]; for (let d = 0; d < D; d++) w[d] -= dot * deflate[d]; } let nrm = 0; for (const v of w) nrm += v * v; nrm = Math.sqrt(nrm) || 1; u = Float64Array.from(w, v => v / nrm); } return u; };
+    const u1 = axis(null, 0), u2 = axis(u1, 1);
+    for (const [u, p] of [[u1, prev && prev[0]], [u2, prev && prev[1]]]) if (p) { let dot = 0; for (let d = 0; d < D; d++) dot += u[d] * p[d]; if (dot < 0) for (let d = 0; d < D; d++) u[d] = -u[d]; }
+    const lam = u => { let s = 0; for (let a = 0; a < D; a++) { let t = 0; const off = a * D; for (let b = 0; b < D; b++) t += C[off + b] * u[b]; s += u[a] * t; } return s; };
+    let trace = 0; for (let d = 0; d < D; d++) trace += C[d * D + d];
+    const xy = project2(E, V, D, [u1, u2]), xs = new Float64Array(V), ys = new Float64Array(V); for (let v = 0; v < V; v++) { xs[v] = xy[2 * v]; ys[v] = xy[2 * v + 1]; }
+    return { x: xs, y: ys, axes: [u1, u2], share: trace > 0 ? (lam(u1) + lam(u2)) / trace : 0 };
+  }
+  // the rows of a table, centred on its mean, on two given axes: x and y interleaved, 2V numbers
+  function project2(E, V, D, axes) {
+    const mean = new Float64Array(D); for (let v = 0; v < V; v++) for (let d = 0; d < D; d++) mean[d] += E[v * D + d] / V;
+    const xy = new Float32Array(2 * V), [u1, u2] = axes;
+    for (let v = 0; v < V; v++) { let sx = 0, sy = 0; for (let d = 0; d < D; d++) { const e = E[v * D + d] - mean[d]; sx += e * u1[d]; sy += e * u2[d]; } xy[2 * v] = sx; xy[2 * v + 1] = sy; }
+    return xy;
+  }
+  // the words' way through training, for the page's word map: snapshots of the embedding table (E) and of the output
+  // table (Wout), one per epoch from epoch 0, each centred and projected on the two directions of the final tables,
+  // so that every step of a word's path lies on the axes the finished map is drawn with; the epochs kept are the
+  // first six, then every one the filter keeps, and the last
+  function wordTrails(snaps, finalE, finalOut, V, D, keepEpoch) {
+    const last = snaps[snaps.length - 1].epoch, keep = snaps.filter(s => s.epoch <= 6 || s.epoch === last || (keepEpoch ? keepEpoch(s.epoch) : s.epoch % 5 === 0 || s.epoch === 8 || s.epoch === 12));
+    const t = { epochs: keep.map(s => s.epoch) };
+    for (const [key, final, field] of [['in', finalE, 'E'], ['out', finalOut, 'out']]) { const axes = pca2(final, V, D, null).axes; t[key] = { axes: axes.map(a => Array.from(a, v => +v.toFixed(5))), xy: keep.map(s => Array.from(project2(s[field], V, D, axes), v => +v.toFixed(3))) }; }
+    return t;
+  }
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, pca2, project2, wordTrails, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
 });

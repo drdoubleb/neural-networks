@@ -15,7 +15,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { LanguageModel, mulberry32 } = require('../js/nn.js');
+const { LanguageModel, mulberry32, wordTrails } = require('../js/nn.js');
 const R = require('../js/reports.js');
 const C = require('../js/chat.js');
 const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d);
@@ -32,7 +32,7 @@ const pct = v => `${Math.round(100 * v)}%`;
 console.log(`corpus: ${train.length} training transcripts, ${test.length} test, ${reph.length} with the held-out phrasings · vocabulary ${vocab.size} · ${(train.reduce((s, d) => s + d.tokens.length, 0) / train.length).toFixed(0)} tokens per transcript`);
 console.log(`model: dim ${cfg.dim}, ${cfg.layers} layers × ${cfg.heads} heads (dk ${cfg.dk}, ffn ${cfg.ffn}), distance cost init ${cfg.cost.join('/')} per head, ${cfg.positions} learned positions · ${cfg.opt} lr ${cfg.lr}, batch ${cfg.batch}, decay ${cfg.decay}, clip ${cfg.clip}`);
 const lm = LOADED ? LanguageModel.fromJSON(LOADED) : new LanguageModel({ vocabSize: vocab.size, dim: cfg.dim, layers: cfg.layers, heads: cfg.heads, dk: cfg.dk, ffn: cfg.ffn, costInit: cfg.cost.length === 1 ? cfg.cost[0] : cfg.cost, positions: cfg.positions, clip: cfg.clip, optimizer: cfg.opt, seed: cfg.seed });
-const rng = mulberry32(cfg.seed * 977 + 1), order = train.map((_, i) => i), hist = [];
+const rng = mulberry32(cfg.seed * 977 + 1), order = train.map((_, i) => i), hist = [], snaps = [{ epoch: 0, E: Float32Array.from(lm.E), out: Float32Array.from(lm.Wout) }]; // the tables after every epoch, for the word paths of the page's map
 // the loss by role: per[i] is the loss of token i + 1, so the role is that token's
 const evidenceShare = (lm, docs) => { let s = 0, n = 0; for (const d of docs) { const span = C.answerSpan(d.words); if (!span) continue; const v = R.attentionShare(lm.forward(d.tokens), span[0], span[1], j => d.roles[j] === 'findings'); if (v != null) { s += v; n++; } } return n ? s / n : null; };
 const byRole = (docs, per) => { const sum = {}, n = {}; docs.forEach((d, k) => { for (let i = 0; i + 1 < d.tokens.length; i++) { const r = d.roles[i + 1]; sum[r] = (sum[r] || 0) + per[k][i]; n[r] = (n[r] || 0) + 1; } }); const out = {}; for (const r of C.ROLES) out[r] = n[r] ? sum[r] / n[r] : null; return out; };
@@ -52,6 +52,7 @@ for (let epoch = 1; epoch <= (LOADED ? 0 : cfg.epochs); epoch++) {
   let ground = null; if (cfg.ground && (epoch % cfg.groundEvery === 0 || epoch === cfg.epochs)) { const m = measure(test.slice(0, cfg.ground)); ground = m.exact / m.n; }
   const evidence = evidenceShare(lm, test.slice(0, 40)); // where the answer looks: the share of its attention on the findings, test transcripts
   hist.push(Object.assign({ epoch, loss: +(loss / nb).toFixed(4), testLoss: +ev.loss.toFixed(4), acc: +ev.accuracy.toFixed(4), ground, evidence: evidence == null ? null : +evidence.toFixed(4) }, Object.fromEntries(C.ROLES.map(r => [r, roles[r] == null ? null : +roles[r].toFixed(4)]))));
+  snaps.push({ epoch, E: Float32Array.from(lm.E), out: Float32Array.from(lm.Wout) });
   if (curve || epoch === cfg.epochs || epoch % 5 === 0 || epoch === 1) console.log(`epoch ${String(epoch).padStart(3)} · train loss ${(loss / nb).toFixed(3)} · test loss ${ev.loss.toFixed(3)} · next token right ${pct(ev.accuracy)} · answer on the findings ${evidence == null ? '–' : pct(evidence)} · by role: ${C.ROLES.map(r => `${r} ${roles[r] == null ? '–' : roles[r].toFixed(2)}`).join(', ')}${ground == null ? '' : ` · answers right ${pct(ground)} of ${cfg.ground}`} · ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }
 let measures = null;
@@ -76,4 +77,4 @@ if (!skipGen) {
   console.log(`\nmeasures took ${((Date.now() - t1) / 1000).toFixed(0)} s`);
   measures = { byStyle, byStyleReph, byQ, agent: { n: nA, called, right } };
 }
-if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the chat model', trained: `${cfg.epochs} epochs on ${train.length} transcripts`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4), groundN: cfg.ground || null, hist, measures }); fs.writeFileSync(save, `window.CHAT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB) with ${hist.length} epochs of history`); }
+if (save) { const ev = lm.evaluate(test), out = lm.toJSON({ name: 'the chat model', trained: `${cfg.epochs} epochs on ${train.length} transcripts`, words: vocab.words, testLoss: +ev.loss.toFixed(4), testAccuracy: +ev.accuracy.toFixed(4), groundN: cfg.ground || null, hist, measures }); out.trails = wordTrails(snaps, out.E, out.Wout, lm.V, lm.D); fs.writeFileSync(save, `window.CHAT_LM = ${JSON.stringify(out)};\n`); console.log(`saved ${save} (${(fs.statSync(save).size / 1024).toFixed(0)} KB) with ${hist.length} epochs of history`); }

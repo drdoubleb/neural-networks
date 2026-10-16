@@ -714,6 +714,17 @@ measures on the shipped weights without training), and the ablations with `--dim
 20 to 40 s per epoch and about ten seconds for the measures after training. The ablation numbers above are from
 the findings block alone, the measure the page used before its Test step was given the requisition.
 
+**The paths on the word map** (the shipped models, from their random tables to epoch 30, on the two directions of
+their final tables) are not straight: a word ends about a third of the way it travels from where it started (38% on
+the report model's output rows, 33% on the chat model's); a quarter to a third of the way is made in the first epoch
+and half by the third epoch (the report model) or the sixth (the chat model), and the rest is a slow wander over the
+remaining epochs while the loss creeps down. The words of the findings block travel least and the words of the
+microscopic prose most; rare words wander more than frequent ones (0.93 against 0.84 on the output rows, for words
+seen fewer than 20 times and 100 times or more); the one word never seen in training only shrinks toward the centre
+under weight decay. The embedding rows rearrange without spreading (an rms radius of 0.43 at the start, 0.41 at the
+end) while the output rows spread out (0.26 to 0.38), the output rows setting the size of the scores as well as their
+direction.
+
 **On the page.** The question *Reports: write the report from the findings?* (recipe ⑯, `#reports/train`) has the
 same three steps as the others. *Specimens* shows a report with its sections, and under *Reveal* the hidden case
 behind it and the rule table, with the training, test and never-trained-on reports as cards coloured by diagnosis.
@@ -730,7 +741,7 @@ a minute; 48 or 32 numbers per token, position vectors on or off, no context lay
 learning rate and the seed as controls, and *Load the trained model* for the shipped weights at any time, which also fills the curves with that
 model's own training; a run that finishes on the page says how grounded its model got next to the shipped model's
 score, since ten epochs, the default, end at the fluent-but-ungrounded stage the lecture is about; *Keep this model*
-saves a model trained on the page in the browser, with its curves and settings, and *Restore kept* brings it back,
+saves a model trained on the page in the browser, with its curves, its words' paths and settings, and *Restore kept* brings it back,
 after a reload too, so that a model trained before a lecture is there during it). The report on
 screen is coloured word
 by word by the probability the model gave each word given the words before, green when it expected it and red when
@@ -771,7 +782,11 @@ the next word, which carry the relationships: the states of a line together, the
 bladder together) or as their vectors at the input, laid out by t-SNE (cosine affinities at a perplexity of 20, started
 from the two-direction map and pushed a few iterations per frame, carried on after each training step) or on the two
 directions that spread the vectors most, coloured by the section each word mostly appears in: a cloud before training,
-neighbourhoods after. The curves are the test loss per epoch by section, the share of next words right, from the
+neighbourhoods after. *Paths* draws, on the two-direction map, each labelled word's way through training: the two
+tables are kept after every epoch from the random start, each kept table is centred and projected on the two
+directions of the table as it is now, and a word's path runs from a hollow ring at epoch 0 through a dot per epoch
+to where it stands; hover a word for its own path. The shipped models bring their paths from Node (epochs 0 to 6,
+then 8, 10, 12, 15, 20, 25 and 30), a kept model its own, projected. The curves are the test loss per epoch by section, the share of next words right, from the
 first epoch the diagnosis the model writes for eight test reports from their findings and requisition, the
 description written by itself, measured a few words per frame after each epoch, and, as a fourth chart, where the
 diagnosis looks: the share of the diagnosis words' attention, in the last layer, that lands on the findings block of
@@ -1053,9 +1068,9 @@ data/foundation/backbones.js the foundation encoder shipped with the page: its w
 data/slides/slides_data.js the slides: a pool of 240 nuclei and both questions' slides of 20 (80 and 240), written by tools/generate_slides.js
 data/fields/fields_data.js the tissue fields of the invasion question: 450 strips of bladder as grainless PNGs with their segmentation, membrane, nuclei and nests, written by tools/generate_fields.js
 data/reports/reports_data.js the reports of the language-model question in preparation: 908 synthetic bladder biopsy reports with their hidden cases, written by tools/generate_reports.js; sample_reports.md beside it is a sheet of 21 for reading
-data/reports/lm_weights.js  the trained report model with its vocabulary (seed 1 of the shipped configuration), written by tools/check_reports.js --save
+data/reports/lm_weights.js  the trained report model with its vocabulary, the curves of its training and the words' paths (seed 1 of the shipped configuration), written by tools/check_reports.js --save
 data/chat/chat_data.js     the transcripts of the chat question: 2,400 training, 300 test and 300 held-out-phrasing transcripts written from the report corpus's cases by tools/generate_chat.js; sample_transcripts.md shows the phrasings, the questions with both answers for four cases, and one transcript of each style
-data/chat/chat_weights.js  the trained chat model with its vocabulary and the curves of its training, written by tools/check_chat.js --save
+data/chat/chat_weights.js  the trained chat model with its vocabulary, the curves of its training and the words' paths, written by tools/check_chat.js --save
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)

@@ -2622,8 +2622,17 @@ window.Viz = (function () {
   function drawWordMap(svg, opt) {
     const W = opt.W || 640, H = opt.H || 400, pad = 26, pts = opt.points;
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity; for (const p of pts) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+    for (const t of opt.trails || []) for (const [x, y] of t.xy) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); } // the paths stay in the frame
     const sx = v => pad + (v - x0) / ((x1 - x0) || 1) * (W - 2 * pad), sy = v => H - pad - (v - y0) / ((y1 - y0) || 1) * (H - 2 * pad);
     let g = opt.axes === false ? `<text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || '')}</text>` : `<line class="axis" x1="${pad}" x2="${W - pad}" y1="${H - pad}" y2="${H - pad}"/><line class="axis" x1="${pad}" x2="${pad}" y1="${pad}" y2="${H - pad}"/><text class="axlabel" x="${W / 2}" y="${H - 6}" text-anchor="middle">${esc(opt.xLabel || 'first direction')}</text><text class="axlabel" transform="translate(10 ${H / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel || 'second direction')}</text>`;
+    for (const t of opt.trails || []) { // a word's path through training: a line through its places epoch by epoch, a hollow ring at its random start, a dot at every epoch, ending where the word is now
+      const op = t.emph ? 1 : t.dim ? 0.1 : 0.55, n = t.xy.length - 1, P = t.xy.map(([x, y]) => [+sx(x).toFixed(1), +sy(y).toFixed(1)]);
+      g += `<g class="trail${t.emph ? ' emph' : ''}" style="opacity:${op}"><polyline fill="none" stroke="${t.color}" stroke-opacity="0.15" stroke-width="${t.emph ? 2 : 1}" stroke-linejoin="round" points="${P.map(q => q.join(',')).join(' ')}"/>`;
+      for (let k = 0; k < n; k++) g += `<line stroke="${t.color}" stroke-opacity="${(0.15 + 0.85 * (k + 1) / n).toFixed(2)}" stroke-width="${t.emph ? 2 : 1.1}" stroke-linecap="round" x1="${P[k][0]}" y1="${P[k][1]}" x2="${P[k + 1][0]}" y2="${P[k + 1][1]}"/>`; // the path darkens with the epochs: the early wandering faint, the last steps strong
+      g += `<circle r="${t.emph ? 3.5 : 2.6}" fill="none" stroke="${t.color}" stroke-width="1.2" cx="${P[0][0]}" cy="${P[0][1]}"/>`;
+      for (let k = 1; k < n; k++) g += `<circle r="${t.emph ? 2 : 1.4}" fill="${t.color}" fill-opacity="${(0.3 + 0.7 * k / n).toFixed(2)}" cx="${P[k][0]}" cy="${P[k][1]}"/>`;
+      g += '</g>';
+    }
     for (const p of pts) g += `<circle r="${p.label ? 4 : 3}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" style="fill:${p.color};fill-opacity:${p.label ? 0.95 : 0.65}" data-id="${p.id}"><title>${esc(p.word)}${p.note ? ' · ' + esc(p.note) : ''}</title></circle>`;
     const placed = []; // labels nudged down or up until they no longer overlap one already placed
     for (const p of pts.filter(q => q.label).sort((a, b) => sx(a.x) - sx(b.x))) {

@@ -19,8 +19,8 @@
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
-    rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
-    ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null } },
+    rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
+    ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -2831,6 +2831,7 @@
     L.epoch = 0; L.ptr = 0; L.hist = []; L.lastBatch = []; L.trainLoss = null; L.lastRender = 0; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.hover = null; L.pinned = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false; // a new model: the test step starts over
+    L.trail = { steps: [], axes: null }; L.pcaAxes = null; // a new model: its words' paths start over, from this random table
     rpRecordEpoch(false);
     rpSyncControls(); rpRenderAll();
     if (reason) rpNote(reason);
@@ -2840,7 +2841,7 @@
   function rpKeptInfo() { try { const raw = localStorage.getItem(rpKeptKey()); if (!raw) return null; const o = JSON.parse(raw); return { savedAt: o.savedAt, epochs: o.epochs, testLoss: o.testLoss, dim: o.dim }; } catch (e) { return null; } }
   function rpKeep() {
     const L = LM(), WD = LMW(); if (!L.model) return; if (L.model.steps === 0) { rpNote('Nothing to keep yet: train it first, or load the trained model.'); return; }
-    const last = L.hist[L.hist.length - 1], payload = { savedAt: new Date().toISOString(), epochs: L.epoch, testLoss: last ? +last.testLoss.toFixed(4) : null, dim: L.dim, layers: L.layers, positions: L.positions, seed: L.seed, lr: L.lr, shipped: L.shipped, hist: L.hist, model: L.model.toJSON({ words: L.vocab.words }) };
+    const last = L.hist[L.hist.length - 1], payload = { savedAt: new Date().toISOString(), epochs: L.epoch, testLoss: last ? +last.testLoss.toFixed(4) : null, dim: L.dim, layers: L.layers, positions: L.positions, seed: L.seed, lr: L.lr, shipped: L.shipped, hist: L.hist, trails: rpTrailStore(L), model: L.model.toJSON({ words: L.vocab.words }) };
     try { localStorage.setItem(rpKeptKey(), JSON.stringify(payload)); } catch (e) { rpNote(`Could not keep the model: the browser refused the storage (${e.name}). Try a smaller model, or free the other world’s kept model.`); return; }
     rpSyncControls(); rpNote(`Kept: ${rpEpochs(L.epoch)}, test loss ${payload.testLoss}, with its curves. It stays in this browser; Restore kept brings it back, after a reload too.`);
   }
@@ -2853,7 +2854,8 @@
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
     L.epoch = o.epochs || 0; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = Array.isArray(o.hist) ? o.hist : []; L.lastBatch = []; L.trainLoss = L.hist.length ? L.hist[L.hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false; if (L.chat) L.chat.view = null;
-    if (!L.hist.length) rpRecordEpoch(false);
+    L.trail = rpTrailLoad(o.trails); L.pcaAxes = null;
+    if (!L.hist.length) rpRecordEpoch(false); else if (!L.trail.steps.length) rpTrailPush(L);
     rpSyncControls(); rpRenderAll();
     rpNote(`Restored the model you kept on ${new Date(o.savedAt).toLocaleString()}: ${rpEpochs(L.epoch)}, test loss ${o.testLoss}${o.shipped ? ', continued from the trained model that ships with the page' : ''}. Keep training it, or go to 3 · Test.`);
   }
@@ -2865,7 +2867,8 @@
     const hist = Array.isArray(W.hist) && W.hist.length ? W.hist.map(h => Object.assign({}, h)) : null; // the history of its training in Node, epoch by epoch, when the file carries it
     L.epoch = hist ? hist.length : 30; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist || []; L.lastBatch = []; L.trainLoss = hist ? hist[hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false;
-    if (!hist) rpRecordEpoch(true);
+    L.trail = rpTrailLoad(W.trails); L.pcaAxes = null; // the words' paths through its training in Node, when the file carries them
+    if (!hist) rpRecordEpoch(true); else if (!L.trail.steps.length) rpTrailPush(L);
     rpSyncControls(); rpRenderAll();
     rpNote(`Loaded the trained model: ${W.trained}, test loss ${W.testLoss}${hist ? ', and the curves of its training' : ''}. ${WD.loadedNote}`);
   }
@@ -2876,7 +2879,7 @@
     const sum = {}, n = {}; docs.forEach((d, k) => { for (let i = 0; i + 1 < d.tokens.length; i++) { const s = d.sections[i + 1]; sum[s] = (sum[s] || 0) + ev.per[k][i]; n[s] = (n[s] || 0) + 1; } });
     for (const s of WDof(L).sections) rec[s] = n[s] ? sum[s] / n[s] : null;
     rec.evidence = rpEvidenceShare(L); // where the diagnosis (the answer) looks: the share of its attention on the findings, on a few test documents
-    L.hist.push(rec);
+    L.hist.push(rec); rpTrailPush(L); // the tables now: one step of every word's path on the map
     if (withGround) { L.measuring = { docs: L.test.slice(0, RP.groundN), i: 0, st: null, ok: 0, rec }; if (!L.running) requestAnimationFrame(now => rpTick(now, L)); }
   }
   function rpEvidenceShare(L) { // the share of the diagnosis' (the answer's) attention, in the last layer with the heads averaged, that lands on the findings block, averaged over the first test documents
@@ -2951,7 +2954,7 @@
     document.querySelectorAll('.rp-arcs-check').forEach(cb => { cb.checked = L.arcs; });
     document.querySelectorAll('.rp-hops-check').forEach(cb => { cb.checked = L.hops; });
     document.querySelectorAll('.rp-netview-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.netView));
-    document.querySelectorAll('#rp-map-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.map === L.map.mode)); document.querySelectorAll('#rp-map-src-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.src === L.map.source));
+    document.querySelectorAll('#rp-map-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.map === L.map.mode)); document.querySelectorAll('#rp-map-src-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.src === L.map.source)); const tb = $('rp-map-trail'); if (tb) tb.checked = !!L.map.trail;
     document.querySelectorAll('#rp-cases-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.cases === L.cases));
     $('rp-epochs').value = L.epochs; $('rp-epochs-val').textContent = L.epochs;
     $('rp-lr').value = rpSliderFromLr(L.lr); $('rp-lr-val').textContent = L.lr;
@@ -3341,18 +3344,6 @@
   // the words as the model sees them: the two directions of the D that spread the V word vectors most (power iteration
   // on their covariance, the second with the first taken out); the signs follow the previous axes, so that the map does
   // not flip between renders
-  function rpPca2(E, V, D, prev) {
-    const mean = new Float64Array(D); for (let v = 0; v < V; v++) for (let d = 0; d < D; d++) mean[d] += E[v * D + d] / V;
-    const C = new Float64Array(D * D), x = new Float64Array(D);
-    for (let v = 0; v < V; v++) { for (let d = 0; d < D; d++) x[d] = E[v * D + d] - mean[d]; for (let a = 0; a < D; a++) { const xa = x[a] / V; if (!xa) continue; const off = a * D; for (let b = 0; b < D; b++) C[off + b] += xa * x[b]; } }
-    const axis = (deflate, seed) => { let u = Float64Array.from({ length: D }, (_, d) => Math.cos(d * 1.7 + seed)); for (let it = 0; it < 80; it++) { const w = new Float64Array(D); for (let a = 0; a < D; a++) { let s = 0; const off = a * D; for (let b = 0; b < D; b++) s += C[off + b] * u[b]; w[a] = s; } if (deflate) { let dot = 0; for (let d = 0; d < D; d++) dot += w[d] * deflate[d]; for (let d = 0; d < D; d++) w[d] -= dot * deflate[d]; } let nrm = 0; for (const v of w) nrm += v * v; nrm = Math.sqrt(nrm) || 1; u = Float64Array.from(w, v => v / nrm); } return u; };
-    const u1 = axis(null, 0), u2 = axis(u1, 1);
-    for (const [u, p] of [[u1, prev && prev[0]], [u2, prev && prev[1]]]) if (p) { let dot = 0; for (let d = 0; d < D; d++) dot += u[d] * p[d]; if (dot < 0) for (let d = 0; d < D; d++) u[d] = -u[d]; }
-    const lam = u => { let s = 0; for (let a = 0; a < D; a++) { let t = 0; const off = a * D; for (let b = 0; b < D; b++) t += C[off + b] * u[b]; s += u[a] * t; } return s; };
-    let trace = 0; for (let d = 0; d < D; d++) trace += C[d * D + d];
-    const xs = new Float64Array(V), ys = new Float64Array(V); for (let v = 0; v < V; v++) { let sx = 0, sy = 0; for (let d = 0; d < D; d++) { const e = E[v * D + d] - mean[d]; sx += e * u1[d]; sy += e * u2[d]; } xs[v] = sx; ys[v] = sy; }
-    return { x: xs, y: ys, axes: [u1, u2], share: trace > 0 ? (lam(u1) + lam(u2)) / trace : 0 };
-  }
   // ---- how each head decides where to look, from the followed word's position, in the chosen layer
   function rpRenderHeads(view) {
     { const card = $(`${view.pre}heads-card`); if (card) card.hidden = !view.fw.ctxs.length; if (!view.fw.ctxs.length) return; } // no context layer: no heads to show
@@ -3416,7 +3407,7 @@
     const L = LM(), m = L.model, M = L.map, V = m.V, D = m.D; if (!m || M.mode !== 'tsne') return;
     const E = rpMapVectors(); full = full || M.forModel !== m || M.V !== V || !M.Y; M.forModel = m; M.V = V;
     M.P = rpMapAffinities(E, V, D, RP_MAP_PERPLEXITY);
-    if (full) { const pca = rpPca2(E, V, D, null); let s2 = 0; for (let v = 0; v < V; v++) s2 += pca.x[v] ** 2 + pca.y[v] ** 2; const sc = Math.sqrt(s2 / (2 * V)) || 1; M.Y = new Float64Array(2 * V); for (let v = 0; v < V; v++) { M.Y[2 * v] = pca.x[v] / sc * 1e-2; M.Y[2 * v + 1] = pca.y[v] / sc * 1e-2; } M.dY = new Float64Array(2 * V); M.gains = new Float64Array(2 * V).fill(1); M.grad = new Float64Array(2 * V); M.num = new Float64Array(V * V); M.iter = 0; M.todo = RP_MAP_ITERS; }
+    if (full) { const pca = NN.pca2(E, V, D, null); let s2 = 0; for (let v = 0; v < V; v++) s2 += pca.x[v] ** 2 + pca.y[v] ** 2; const sc = Math.sqrt(s2 / (2 * V)) || 1; M.Y = new Float64Array(2 * V); for (let v = 0; v < V; v++) { M.Y[2 * v] = pca.x[v] / sc * 1e-2; M.Y[2 * v + 1] = pca.y[v] / sc * 1e-2; } M.dY = new Float64Array(2 * V); M.gains = new Float64Array(2 * V).fill(1); M.grad = new Float64Array(2 * V); M.num = new Float64Array(V * V); M.iter = 0; M.todo = RP_MAP_ITERS; }
     else { M.todo = Math.max(M.todo, 80); if (M.iter < 100) M.iter = 100; }
     if (!M.running) { M.running = true; requestAnimationFrame(() => rpMapTick(L)); }
   }
@@ -3429,18 +3420,38 @@
   function rpRenderWordMap() {
     const L = LM(), m = L.model, M = L.map; if (!$('rp-map') || !m || !L.wordSec) return;
     if (M.mode === 'tsne') { rpMapRestart(false); return; } // the frames draw it
-    const E = rpMapVectors(), pca = rpPca2(E, m.V, m.D, L.pcaAxes); L.pcaAxes = pca.axes; M.pcaShare = pca.share; M.pcaX = pca.x; M.pcaY = pca.y;
+    const E = rpMapVectors(), pca = NN.pca2(E, m.V, m.D, L.pcaAxes || (L.trail && L.trail.axes ? L.trail.axes[M.source] : null)); L.pcaAxes = pca.axes; M.pcaShare = pca.share; M.pcaX = pca.x; M.pcaY = pca.y; // the signs follow the last map, or a loaded path's axes, so that nothing flips
     rpDrawWordMap();
+  }
+  // ---- the words' way through training: the embedding table and the output table after every epoch, from the random
+  // start, and each word's path drawn on the map's two directions (the labelled words', and the hovered word's); a
+  // model that comes from a file (the shipped one, or a kept one) brings its path already projected on the two
+  // directions of its final tables, and the map's axes take their signs from those
+  function rpRuns(a) { const out = []; for (let i = 0; i < a.length; i++) { let j = i; while (j + 1 < a.length && a[j + 1] === a[j] + 1) j++; out.push(j > i + 1 ? `${a[i]}–${a[j]}` : j === i + 1 ? `${a[i]}, ${a[j]}` : `${a[i]}`); i = j; } return out.join(', '); } // 0, 1, 2, 3, 8, 10 → 0–3, 8, 10
+  function rpTrailPush(L) { if (!L.trail) L.trail = { steps: [], axes: null }; L.trail.steps.push({ epoch: L.epoch, E: Float32Array.from(L.model.E), out: Float32Array.from(L.model.Wout) }); }
+  function rpTrailLoad(t) { if (!t || !t.epochs || !t.in || !t.out) return { steps: [], axes: null }; return { steps: t.epochs.map((epoch, k) => ({ epoch, xy: { in: Float32Array.from(t.in.xy[k]), out: Float32Array.from(t.out.xy[k]) } })), axes: { in: t.in.axes.map(a => Float64Array.from(a)), out: t.out.axes.map(a => Float64Array.from(a)) } }; }
+  function rpTrailXY(L, step, source, axes) { return step.xy ? step.xy[source] : NN.project2(source === 'out' ? step.out : step.E, L.model.V, L.model.D, axes); } // one step of every word's path, on the given axes
+  function rpTrailStore(L) { // for the kept model: every step projected on the two directions of the tables as they are now (at most 40 steps), with those directions
+    const T = L.trail, m = L.model; if (!T || !T.steps.length) return null; const stride = Math.ceil(T.steps.length / 40), keep = T.steps.filter((s, k) => k % stride === 0 || k === T.steps.length - 1), out = { epochs: keep.map(s => s.epoch) };
+    for (const source of ['in', 'out']) { const axes = NN.pca2(source === 'out' ? m.Wout : m.E, m.V, m.D, (source === L.map.source && L.pcaAxes) || (T.axes && T.axes[source]) || null).axes; out[source] = { axes: axes.map(a => Array.from(a, v => +v.toFixed(5))), xy: keep.map(s => Array.from(rpTrailXY(L, s, source, axes), v => +v.toFixed(3))) }; }
+    return out;
+  }
+  function rpTrails(L, pts) { // the paths to draw: each labelled word's, and the hovered word's, every step on the axes of the map as drawn, ending at the word's place now
+    const M = L.map, T = L.trail, m = L.model; if (!M.trail || M.mode === 'tsne' || !T || T.steps.length < 2 || !L.pcaAxes) return null;
+    const steps = T.steps.map(s => rpTrailXY(L, s, M.source, L.pcaAxes)), hw = M.hoverWord, trails = [];
+    for (let v = 0; v < m.V; v++) { if (!(pts[v].label || v === hw)) continue; trails.push({ id: v, word: pts[v].word, color: pts[v].color, xy: steps.map(xy => [xy[2 * v], xy[2 * v + 1]]).concat([[pts[v].x, pts[v].y]]), emph: v === hw, dim: hw != null && v !== hw }); }
+    return trails;
   }
   function rpDrawWordMap() {
     const L = LM(), WD = LMW(), m = L.model, M = L.map, tsne = M.mode === 'tsne', xs = v => (tsne ? M.Y[2 * v] : M.pcaX[v]), ys = v => (tsne ? M.Y[2 * v + 1] : M.pcaY[v]); if (!(tsne ? M.Y : M.pcaX)) return;
     const pts = L.vocab.words.map((w, v) => ({ id: v, word: rpWordLabel(w), note: L.wordSec[v] ? `mostly in the ${L.wordSec[v]}` : 'never in the training reports', x: xs(v), y: ys(v), color: L.wordSec[v] ? WD.colors[L.wordSec[v]] : Viz.colors().ink3, label: WD.labelled().has(w) }));
-    Viz.drawWordMap($('rp-map'), tsne ? { points: pts, W: 640, H: 400, axes: false, xLabel: `t-SNE${M.todo > 0 ? ` · settling, ${M.todo} steps to go` : ''}` } : { points: pts, W: 640, H: 400 });
+    const trails = tsne ? null : rpTrails(L, pts);
+    Viz.drawWordMap($('rp-map'), tsne ? { points: pts, W: 640, H: 400, axes: false, xLabel: `t-SNE${M.todo > 0 ? ` · settling, ${M.todo} steps to go` : ''}` } : { points: pts, W: 640, H: 400, trails });
     $('rp-map-legend').innerHTML = WD.sections.map(s => `<span><span class="swatch" style="background:${WD.colors[s]}"></span>mostly in the ${s}</span>`).join('');
     const what = M.source === 'out' ? `its row of the output layer, the ${m.D} numbers the model scores it with as the next word` : `its vector at the input, ${m.D} learned numbers`;
     $('rp-map-note').textContent = tsne
       ? `Every word is ${what}; t-SNE lays the ${m.V} words out so that each keeps its neighbours from the ${m.D}-dimensional space (cosine distances, perplexity ${RP_MAP_PERPLEXITY}), starting from the two-direction map; clusters are real neighbourhoods, the distances between clusters mean little, and the layout carries on from where it was after each training step. Each word is coloured by the section it mostly appears in on the training reports. Hover a dot for its word.`
-      : `Every word is ${what}; the map is the two directions that spread the ${m.V} vectors most (${pct(M.pcaShare || 0)} of their spread), each word coloured by the section it mostly appears in on the training reports. Untrained, the vectors are random and the map a cloud; as the model trains, words used alike move together: ${WD.mapExample}. Hover a dot for its word.`;
+      : `Every word is ${what}; the map is the two directions that spread the ${m.V} vectors most (${pct(M.pcaShare || 0)} of their spread), each word coloured by the section it mostly appears in on the training reports. Untrained, the vectors are random and the map a cloud; as the model trains, words used alike move together: ${WD.mapExample}. Hover a dot for its word.${M.trail ? (trails ? ` The paths are the labelled words' way from their random start (epoch 0, the hollow ring) to where they stand now, one dot per epoch recorded (epochs ${rpRuns(L.trail.steps.map(s => s.epoch))}), on the two directions of the table as it is now; hover any word for its own path.` : (L.trail && L.trail.steps.length === 1 && L.trail.steps[0].epoch > 0 ? ' This model came without its path; from here on, every epoch trained adds a step.' : ' The paths need training: so far there is only the random start.')) : ''}`;
   }
   // ------------------------------------------------------------------ the chat question: Specimens and Test (the Train step is the shared language-model lab)
   const CH_LABELLED = new Set(['SYSTEM', 'USER', 'ASSISTANT', 'TOOL', 'FINDINGS', 'Yes', 'No', 'Suspicious', 'findings', '(', ')', 'briefly', 'brief', 'full', 'sentence', 'reason', 'diagnosis', 'invasion', 'situ', 'carcinoma', 'present', 'absent', 'involved', 'rounded', 'irregular', 'normal', 'reactive', 'atypia', 'denuded', 'mild', 'marked', 'none', 'Benign', 'Denuded', 'Urothelial', 'muscularis', 'propria', 'inflammation', 'contours', 'surface', 'nests', 'question', 'Here', 'Is', 'What', '?', '.', ':', '\n', RPR.END, RPR.START]);
@@ -3669,7 +3680,9 @@
     document.querySelectorAll('.rp-netview-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.view; if (v === L.netView) return; rpNetWalkStop(); L.netView = v; L.hoverNet = null; rpSyncControls(); const view = rpView(rpOnTest()); if (view) rpRenderNet(view); }));
     for (const pre of ['rp-', 'rp-test-', 'ch-test-']) { const b = $(`${pre}net-walk`); if (b) b.addEventListener('click', () => rpNetWalkStart(pre)); }
     for (const pre of ['rp-', 'rp-test-', 'ch-test-']) { const ch = $(`${pre}heads`); if (!ch) continue; rpBindTip(ch, $(`${pre}heads-tip`), (c, x, y) => (c._model ? Viz.hitHeadRows(c, x, y, c._model) : null), h => { L.hoverHeads = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderHeads(view); rpMarkPair(view.textEl, null, h ? h.j : null); }); }
-    document.querySelectorAll('#rp-map-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.map; if (v === L.map.mode) return; L.map.mode = v; rpSyncControls(); if (!L.model) return; if (v === 'tsne') rpMapRestart(true); else { L.map.running = false; rpRenderWordMap(); } }));
+    document.querySelectorAll('#rp-map-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.map; if (v === L.map.mode) return; L.map.mode = v; if (v === 'tsne') L.map.trail = false; rpSyncControls(); if (!L.model) return; if (v === 'tsne') rpMapRestart(true); else { L.map.running = false; rpRenderWordMap(); } }));
+    const trailBox = $('rp-map-trail'); if (trailBox) trailBox.addEventListener('change', () => { L.map.trail = trailBox.checked; if (L.map.trail && L.map.mode === 'tsne') { L.map.mode = 'pca'; L.map.running = false; } rpSyncControls(); if (L.model) rpRenderWordMap(); }); // the paths are drawn on the two directions: asking for them leaves the neighbourhoods
+    const mapSvg = $('rp-map'); if (mapSvg) { mapSvg.addEventListener('mouseover', ev => { const c = ev.target.closest('circle[data-id]'); if (!c) return; const v = +c.dataset.id; if (L.map.hoverWord === v) return; L.map.hoverWord = v; if (L.map.trail && L.map.mode !== 'tsne' && L.model) rpDrawWordMap(); }); mapSvg.addEventListener('mouseleave', () => { if (L.map.hoverWord == null) return; L.map.hoverWord = null; if (L.map.trail && L.map.mode !== 'tsne' && L.model) rpDrawWordMap(); }); }
     document.querySelectorAll('#rp-map-src-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.src; if (v === L.map.source) return; L.map.source = v; L.pcaAxes = null; rpSyncControls(); if (!L.model) return; if (L.map.mode === 'tsne') rpMapRestart(true); else rpRenderWordMap(); }));
     // from text to tokens: the pieces, the merges, a word of one's own, the chips and the table marking each other
     document.querySelectorAll('#rp-tok-seg button').forEach(b => b.addEventListener('click', () => { S.rp.tokMode = b.dataset.pieces; if (S.rp.built) rpRenderTokens(); }));
