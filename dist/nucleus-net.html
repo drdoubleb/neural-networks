@@ -8233,7 +8233,7 @@ window.Glossary = (function () {
     $('threshold').addEventListener('input', () => { S.test.threshold = +$('threshold').value; renderTestPanel(); renderInspector(); });
     $('defer').addEventListener('input', () => { S.test.defer = +$('defer').value / 100; renderCalibration(); });
     $('prev').addEventListener('input', () => { S.test.prevalence = prevFromSlider(+$('prev').value); renderTestPanel(); });
-    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); renderInspector(); if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
+    $('tint').addEventListener('change', () => { S.tint = $('tint').checked; repaintThumbs(); fmRepaint(); slRepaint(); dsRepaint(); renderInspector(); if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
     $('theme-toggle').addEventListener('click', () => {
       const root = document.documentElement;
       const dark = root.dataset.theme ? root.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -8289,7 +8289,7 @@ window.Glossary = (function () {
     $('theme-toggle').textContent = dark ? '☀ Light' : '☾ Dark';
     repaintThumbs();
     if (onClassic('train')) { renderTrainGraph(); renderProfile(true); } if (onClassic('test')) renderTestGraph();
-    fmRepaint(); slRepaint(); fdRepaint();
+    fmRepaint(); slRepaint(); fdRepaint(); dsRepaint();
     renderInspector();
   }
   // the lecture introduces the foundation model late, so its stage and controls stay out of the way until then
@@ -9906,9 +9906,13 @@ window.Glossary = (function () {
   const dsInk = px64 => NF.toInk(NF.decodeBase64(px64));
   const dsFlags = t => DSC.TRAITS.map(k => (t[k] ? k[0].toUpperCase() : '·')).join('');
   const dsTraitsText = t => { const on = DSC.TRAITS.filter(k => t[k]).map(k => DSC.TRAIT_NAMES[k]); return on.length ? on.join(', ') : 'bland, none of the four'; };
-  function dsDraw(canvas, px64) { Viz.renderThumb(canvas, NF.decodeBase64(px64), 32); }
-  function dsImageUrl(r, key) { const k = key === 'pxB' ? '_urlB' : '_url'; if (!r[k]) { const c = document.createElement('canvas'); dsDraw(c, r[key || 'px']); r[k] = c.toDataURL(); } return r[k]; }
-  function dsFlipUrl(r) { if (!r._urlF) { const c = document.createElement('canvas'); Viz.renderThumb(c, DS.dihedral(NF.decodeBase64(r.px), 32, DS_FLIP), 32); r._urlF = c.toDataURL(); } return r._urlF; }
+  function dsDraw(canvas, px64) { Viz.renderThumb(canvas, NF.decodeBase64(px64), 32, S.tint); } // in the H&E tint the other pages use, when it is on
+  function dsImageUrl(r, key) { const k = (key === 'pxB' ? '_urlB' : '_url') + (S.tint ? 'T' : 'G'); if (!r[k]) { const c = document.createElement('canvas'); dsDraw(c, r[key || 'px']); r[k] = c.toDataURL(); } return r[k]; }
+  function dsFlipUrl(r) { const k = S.tint ? '_urlFT' : '_urlFG'; if (!r[k]) { const c = document.createElement('canvas'); Viz.renderThumb(c, DS.dihedral(NF.decodeBase64(r.px), 32, DS_FLIP), 32, S.tint); r[k] = c.toDataURL(); } return r[k]; }
+  function dsRepaint() { // the tint toggled: every thumbnail again, and the step on screen
+    const L = S.dsq; if (!L.built) return; for (const map of [L.dataThumbs, L.testThumbs, L.thumbs]) if (map) for (const [id, el] of map) { const r = L.byId.get(id), cv = el.querySelector('canvas'); if (r && cv) dsDraw(cv, r.px); }
+    if (S.world !== 'describe') return; if (S.stage === 'data') dsRenderData(); else if (S.stage === 'test') dsRenderTest(); else rpRenderAll();
+  }
   function dsCodeHtml(code, title) { // the code as bars, one per number, up for positive
     if (!code) return '';
     const n = code.length, W = 176, H = 44, mid = H / 2, bw = W / n; let mx = 0; for (const v of code) mx = Math.max(mx, Math.abs(v)); mx = mx || 1;
@@ -10031,7 +10035,7 @@ window.Glossary = (function () {
     $('ds-test-title').textContent = `Nucleus ${r.name} · test · ${DS_PROBES[probe]}`;
     dsDraw($('ds-test-canvas'), r.px); const pc = $('ds-test-probe-canvas'), pw = $('ds-test-probe-wrap');
     if (probe === 'other' && r.pxB) { dsDraw(pc, r.pxB); pw.hidden = false; $('ds-test-probe-label').textContent = 'the other lab’s scan: what the model is given'; }
-    else if (probe === 'flip') { Viz.renderThumb(pc, DS.dihedral(NF.decodeBase64(r.px), 32, DS_FLIP), 32); pw.hidden = false; $('ds-test-probe-label').textContent = 'flipped and turned: what the model is given'; }
+    else if (probe === 'flip') { Viz.renderThumb(pc, DS.dihedral(NF.decodeBase64(r.px), 32, DS_FLIP), 32, S.tint); pw.hidden = false; $('ds-test-probe-label').textContent = 'flipped and turned: what the model is given'; }
     else { pw.hidden = true; $('ds-test-probe-label').textContent = ''; }
     const code = L.written ? L.written.code : dsProbeCode(L, r, probe); $('ds-test-code').innerHTML = dsCodeHtml(code, 'the code the model is given'); $('ds-test-code-label').textContent = probe === 'none' ? `no image: a code of ${enc.cl.code} zeros` : `the code the model is given: ${enc.cl.code} numbers from the frozen encoder`;
     $('ds-test-truth-traits').innerHTML = dsTraitChips(r.traits, L.written && L.truthShown ? L.written.said : undefined);
