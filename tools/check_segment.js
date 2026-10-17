@@ -38,6 +38,11 @@ let meanInk = 0; for (const f of train) for (const v of f.x) meanInk += v; meanI
 console.log(`fields: ${train.length} training, ${test.length} test, ${W} × ${H} · masks built in ${((Date.now() - t0) / 1000).toFixed(1)} s · class shares ${FL.SEG_CLASSES.map((c, k) => `${c} ${pct(share[k])}`).join(', ')} · mean ink ${meanInk.toFixed(3)}`);
 const gc = gradientCheckSeg({ levels: Math.min(2, cfg.levels), H: 16, W: 16 });
 console.log(`Segmentation gradient check (${Math.min(2, cfg.levels)} level${cfg.levels === 1 ? '' : 's'}): worst relative error ${gc.worst.toExponential(2)} over ${gc.checked} gradients`);
+{ // the pixel path (the page's diagram of the network at one pixel) agrees with the forward pass: every kernel's contributions and the bias add up to the pre-activation
+  const n = new SegNet({ channels: 4, levels: Math.min(2, cfg.levels), classes: K, seed: 5 }), h = 16, w = 24, rnd = mulberry32(9), x = Float64Array.from({ length: h * w }, () => rnd()), fw = n.forward(x, h, w); let worst = 0, cols = 0;
+  for (const [px, py] of [[0, 0], [11, 7], [23, 15], [5, 12]]) { const path = n.pixelPath(fw, px, py); for (const col of path.cols) { if (!col.contrib) continue; cols++; for (let o = 0; o < col.values.length; o++) { let s = col.layer.b[o]; for (let c = 0; c < col.cin; c++) s += col.contrib[o * col.cin + c]; worst = Math.max(worst, Math.abs(s - (col.pre ? col.pre[o] : col.values[o]))); } } }
+  console.log(`Pixel path check: worst residual ${worst.toExponential(2)} over ${cols} columns at 4 pixels (the diagram's lines add up to its circles)`);
+}
 const LOADED = load ? loadJs(load).SEG_NET : null;
 const classWeights = weighted ? Array.from(share, s => 1 / Math.sqrt(s) / K) : null;
 const net = LOADED ? SegNet.fromJSON(LOADED) : new SegNet({ channels: cfg.channels, levels: cfg.levels, classes: K, seed: cfg.seed, clip: cfg.clip, classWeights, norm: { mean: +meanInk.toFixed(4) } });

@@ -993,6 +993,84 @@ window.Viz = (function () {
     ctx.clearRect(0, 0, Wd, Hd); let mx = 1e-9; for (let i = 0; i < cout * cin * 9; i++) mx = Math.max(mx, Math.abs(Wt[i]));
     for (let o = 0; o < cout; o++) { const x0 = (o % cols) * (fw + gap), y0 = Math.floor(o / cols) * (fw + gap + 14) + 14; for (let i = 0; i < 9; i++) { let v = 0; for (let ci = 0; ci < cin; ci++) v += Wt[(o * cin + ci) * 9 + i]; const col = divergingRgb(v / mx); ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fillRect(x0 + (i % 3) * cell, y0 + Math.floor(i / 3) * cell, cell - 1, cell - 1); } ctx.fillStyle = c.ink2; ctx.font = '10px ' + (c.mono || 'monospace'); ctx.textAlign = 'center'; ctx.fillText(String(o + 1), x0 + fw / 2, y0 - 4); }
   }
+  // ---- the segmentation network unrolled at one pixel (SegNet.pixelPath): every map's channels at the pixel's place as
+  // circles, every kernel's contribution there as a line, the levels of context as bands going down and up again, a U
+  const SN_W = 860;
+  function layoutSegNet(P) {
+    const C = P.C, big = C > 8, pitch = big ? 11 : 16, r = big ? 4.5 : 6, bandDrop = big ? 76 : 60, n = P.cols.length, mL = 100, mR = 104;
+    const xs = j => mL + j * (SN_W - mL - mR) / Math.max(1, n - 1), half = C * pitch, top = 58, bandY = l => top + half + l * bandDrop, H = top + 2 * half + P.levels * bandDrop + 40;
+    const cols = P.cols.map((col, j) => { const k = col.values.length, p = k <= 4 ? pitch * 2.5 : pitch, rr = k <= 4 ? r + 2 : r, yc = bandY(col.level), circles = []; for (let i = 0; i < k; i++) circles.push({ x: xs(j), y: yc + (i - (k - 1) / 2) * p, r: rr, col: j, i }); return { x: xs(j), yc, circles, top: circles[0].y - rr, bottom: circles[k - 1].y + rr }; });
+    const lines = [];
+    P.cols.forEach((col, j) => {
+      if (col.from == null) return; const from = cols[col.from], to = cols[j];
+      if (col.kind === 'conv' || col.kind === 'head') { for (let o = 0; o < col.values.length; o++) for (let c = 0; c < col.cin; c++) lines.push({ kind: 'w', col: j, c, o, v: col.contrib[o * col.cin + c], x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[o].x, y2: to.circles[o].y }); }
+      else if (col.kind === 'join') { const skip = cols[col.skipFrom], C2 = col.values.length / 2; for (let c = 0; c < C2; c++) { lines.push({ kind: 'skip', col: j, c, o: c, x1: skip.circles[c].x, y1: skip.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y }); lines.push({ kind: 'up', col: j, c, o: C2 + c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[C2 + c].x, y2: to.circles[C2 + c].y }); } }
+      else for (let c = 0; c < col.values.length; c++) lines.push({ kind: col.kind, col: j, c, o: c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y });
+    });
+    return { cols, lines, H, bandY };
+  }
+  // m = { path (SegNet.pixelPath), classNames, classColors (rgb triples), argmax, hover ({ kind: 'unit', col, i } or { kind: 'line', col, c, o } or null), pinned }
+  function drawSegNetwork(canvas, m) {
+    const P = m.path, L = layoutSegNet(P), c = colors(), ctx = fitCanvas(canvas, SN_W, L.H); canvas._segNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (s, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(s, x, y); };
+    ctx.clearRect(0, 0, SN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, SN_W, L.H);
+    const hov = m.hover, srcOf = ln => (ln.kind === 'skip' ? P.cols[ln.col].skipFrom : P.cols[ln.col].from);
+    const touches = ln => !!hov && (hov.kind === 'line' ? hov.col === ln.col && hov.c === ln.c && hov.o === ln.o : (hov.col === ln.col && hov.i === ln.o) || (hov.col === srcOf(ln) && hov.i === ln.c));
+    text(`THE NETWORK AT PIXEL (${P.x}, ${P.y})${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
+    text('circles: the channels at the pixel\'s place (hollow: ReLU off) · lines: each kernel\'s contribution there, orange +, blue − · under each column, the window it sees', 12, 24, mono9, c.ink3);
+    for (let l = 0; l <= P.levels; l++) { const lev = P.cols.find(col => col.level === l && col.kind === 'conv'); text(`level ${l}`, 10, L.bandY(l) - 6, mono9, c.ink2, 'left', 'middle'); text(`${lev.w} × ${lev.h}${l ? ' · pooled' : ''}`, 10, L.bandY(l) + 6, mono8, c.ink3, 'left', 'middle'); }
+    // the lines, on one scale per column (its largest contribution), weak first so that the strong ones sit on top
+    const maxOf = {}; for (const ln of L.lines) if (ln.kind === 'w') maxOf[ln.col] = Math.max(maxOf[ln.col] || 1e-9, Math.abs(ln.v));
+    const rel = ln => (ln.kind === 'w' ? Math.abs(ln.v) / maxOf[ln.col] : 0.5), dim = hov ? 0.2 : 1;
+    for (const ln of L.lines.slice().sort((a, b) => rel(a) - rel(b))) {
+      const on = touches(ln), f = on ? 1 : dim;
+      if (ln.kind === 'w') { const k = rel(ln); ctx.strokeStyle = rgbStr(ln.v < 0 ? c.rgb.regular : c.rgb.irregular, (0.08 + 0.92 * k) * f); ctx.lineWidth = (0.4 + 4 * Math.pow(k, 0.9)) * (on ? 1.5 : 1); }
+      else { ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.55 * f); ctx.lineWidth = on ? 2 : 1; if (ln.kind === 'skip') ctx.setLineDash([3, 3]); }
+      ctx.beginPath(); ctx.moveTo(ln.x1, ln.y1); ctx.lineTo(ln.x2, ln.y2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // the circles: the activations on one scale per column; the signed columns (the pixel, the scores) in the diverging colours
+    P.cols.forEach((col, j) => {
+      const Lc = L.cols[j]; let mx = 1e-9; for (const v of col.values) mx = Math.max(mx, Math.abs(v));
+      col.values.forEach((v, i) => {
+        const q = Lc.circles[i], on = !!hov && hov.kind === 'unit' && hov.col === j && hov.i === i;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+        if (col.kind === 'softmax') ctx.fillStyle = rgbStr(m.classColors[i], 0.2 + 0.8 * v);
+        else if (col.signed) ctx.fillStyle = diverging(v / mx, 0.9);
+        else ctx.fillStyle = v > 0 ? rgbStr(c.rgb.accent, 0.12 + 0.88 * v / mx) : c.surface;
+        ctx.fill(); ctx.strokeStyle = on ? c.ink : c.lineStrong; ctx.lineWidth = on ? 2 : 1; ctx.stroke();
+      });
+      if (col.kind === 'join') { const h2 = col.values.length / 2, mid = (Lc.circles[h2 - 1].y + Lc.circles[h2].y) / 2; ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Lc.x - 11, mid); ctx.lineTo(Lc.x + 11, mid); ctx.stroke(); ctx.fillStyle = c.surface; ctx.fillRect(Lc.x - 40, mid - 13, 28, 26); text('skip', Lc.x - 13, mid - 6, mono8, c.ink3, 'right', 'middle'); text('up 2×', Lc.x - 13, mid + 7, mono8, c.ink3, 'right', 'middle'); }
+      text(col.kind === 'pool' ? 'pool' : col.kind === 'head' ? 'head' : col.name, Lc.x, Lc.top - 13, mono9, c.ink2, 'center', 'middle'); text(`${col.sees} px`, Lc.x, Lc.bottom + 11, mono8, c.ink3, 'center', 'middle');
+      if (col.kind === 'softmax') col.values.forEach((v, i) => text(`${m.classNames[i]} ${pctText(v)}`, Lc.x + 14, Lc.circles[i].y, i === m.argmax ? mono9 : mono8, i === m.argmax ? c.ink : c.ink3, 'left', 'middle'));
+      if (col.kind === 'head') col.values.forEach((v, i) => text(fmtSigned(v, 1), Lc.x + 11, Lc.circles[i].y, mono8, c.ink3, 'left', 'middle'));
+    });
+    text(hov && hov.text ? hov.text : 'hover a circle for its value, a line for its kernel · the pixel follows the mouse on the field; click the field to pin it', 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+  }
+  function snDist(x, y, ln) { const dx = ln.x2 - ln.x1, dy = ln.y2 - ln.y1, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((x - ln.x1) * dx + (y - ln.y1) * dy) / L2)) : 0; return Math.hypot(x - ln.x1 - t * dx, y - ln.y1 - t * dy); }
+  // what is under a point of the diagram (canvas-relative CSS pixels): a circle or a line, with a text for the tip and the 3 × 3 kernel of a line
+  function hitSegNetwork(canvas, px, py, m) {
+    const L = canvas._segNet, P = m.path; if (!L) return null; const s = SN_W / canvas.clientWidth, x = px * s, y = py * s, f3 = v => fmtSigned(v, 3), name = col => `level ${col.level} · ${col.name}`;
+    for (let j = 0; j < L.cols.length; j++) for (const q of L.cols[j].circles) if (Math.hypot(x - q.x, y - q.y) <= q.r + 4) {
+      const col = P.cols[j], i = q.i, v = col.values[i]; let t;
+      if (col.kind === 'input') t = `the pixel's ink, centred on the mean: ${f3(v)} · the first convolution reads it with its 8 neighbours`;
+      else if (col.kind === 'pool') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)} · the largest of the 2 × 2 block below it in level ${col.level - 1}'s conv 2 map · at (${col.px}, ${col.py}) of ${col.w} × ${col.h}`;
+      else if (col.kind === 'conv') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)}${col.pre[i] <= 0 ? ` (ReLU off: ${f3(col.pre[i])} before it)` : ''} · bias ${f3(col.layer.b[i])} + ${col.cin} kernel${col.cin > 1 ? 's' : ''} of 3 × 3 · at (${col.px}, ${col.py}) of ${col.w} × ${col.h} · sees ${col.sees} px`;
+      else if (col.kind === 'join') { const C2 = col.values.length / 2; t = i < C2 ? `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · copied from this level's conv 2 (the skip)` : `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · upsampled from level ${col.level + 1}, one value for the 2 × 2 pixels it covers`; }
+      else if (col.kind === 'head') t = `score for ${m.classNames[i]}: ${f3(v)} = bias ${f3(col.layer.b[i])} + Σ weight × channel over the ${col.cin} channels of the last map`;
+      else t = `${m.classNames[i]} ${pctText(v)}: e^score over the sum of the ${col.values.length} · the largest is the class painted`;
+      return { kind: 'unit', col: j, i, text: t };
+    }
+    let best = null, bd = 4; for (const ln of L.lines) { const d = snDist(x, y, ln); if (d < bd) { bd = d; best = ln; } }
+    if (!best) return null;
+    const col = P.cols[best.col]; let t, kernel = null;
+    if (best.kind === 'w') { kernel = col.kernel(best.o, best.c); t = col.kind === 'head' ? `channel ${best.c + 1} → ${m.classNames[best.o]}: weight ${f3(kernel[0])} × ${fmtNum(P.cols[col.from].values[best.c], 3)} = ${f3(best.v)}` : `${name(col)} · channel ${best.c + 1} → channel ${best.o + 1}: a kernel of 3 × 3, its contribution at this pixel ${f3(best.v)} (the 9 weights × the 9 values around the pixel)`; }
+    else if (best.kind === 'skip') t = `the skip: level ${col.level}'s conv 2 map joins the upsampled one, channel ${best.c + 1} copied as it is`;
+    else if (best.kind === 'up') t = `up 2 ×: channel ${best.c + 1} of the level below, the same value for the 2 × 2 pixels it covers`;
+    else if (best.kind === 'pool') t = `pool 2 × 2: channel ${best.c + 1}, the largest of the four values below`;
+    else t = `softmax: ${m.classNames[best.c]}'s share of e^score`;
+    return { kind: 'line', col: best.col, c: best.c, o: best.o, text: t, kernel: kernel && kernel.length === 9 ? kernel : null };
+  }
   function renderFieldThumb(canvas, px, w, h, tint, cache) { // cache: an object that keeps the tile for this tint, so other trays copy it
     const W = Math.round(w / 2), H = Math.round(h / 2), key = tint ? 'he' : 'grey';
     if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
@@ -2300,7 +2378,7 @@ window.Viz = (function () {
     text(`the model stands at “${m.qword}” (word ${m.q}) and reads the ${m.q + 1} words so far`, 12, 24, mono9, c.ink3);
     // the input: the word's vector, its position vector, their sum, and what the output layer would read off it
     const I = L.inp;
-    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(`“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
+    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(m.fromCode ? `the image’s code (${m.code.length}) × projection + bias · ${D}` : `“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
     text('+', I.xEmb + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
     if (m.pos) { strip(I.xPos, I.y, I.w, I.h, m.pos, mI, is('pos')); text(`position ${m.q} · its vector · ${D}`, I.xPos, I.y + I.h + 4, mono8, c.ink3); }
     else { empty(I.xPos, I.y, I.w, I.h, 'no position vectors'); text('the heads know distance only through their cost', I.xPos, I.y + I.h + 4, mono8, c.ink3); }
@@ -2351,7 +2429,7 @@ window.Viz = (function () {
     const L = canvas._tokenNet; if (!L) return null;
     const s = TN_W / canvas.clientWidth, x = px * s, y = py * s, I = L.inp, Hd = L.head, Cb = L.comb, O = L.outRow, f = v => fmtSigned(v, 2);
     const inBox = (x0, y0, w, h) => x >= x0 && x <= x0 + w && y >= y0 - 2 && y <= y0 + h + 2, cell = (x0, w, n) => Math.min(n - 1, Math.max(0, Math.floor((x - x0) / (w / n))));
-    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
+    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: m.fromCode ? `projected code, number ${d + 1} = ${f(m.emb[d])} · the frozen encoder’s ${m.code.length} numbers through the learned projection (${m.D} × ${m.code.length}) plus a bias, not a row of the table` : `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
     if (m.pos && inBox(I.xPos, I.y, I.w, I.h)) { const d = cell(I.xPos, I.w, m.D); return { kind: 'pos', d, text: `position ${m.q} vector ${d + 1} = ${f(m.pos[d])} · learned, one vector per position` }; }
     if (inBox(I.xIn, I.y, I.w, I.h)) { const d = cell(I.xIn, I.w, m.D); return { kind: 'x0', d, text: `input ${d + 1} = ${f(m.x0[d])}${m.pos ? ` (${f(m.emb[d])} + ${f(m.pos[d])})` : ''}` }; }
     for (let l = 0; l < m.layers.length; l++) {
@@ -2576,8 +2654,9 @@ window.Viz = (function () {
   const ET_W = 800;
   function layoutEmbTable(m) {
     const V = m.V, D = m.D, thumbRow = V > 220 ? 1 : V > 110 ? 2 : 3, thumb = { x: 12, y: 40, w: 96, h: V * thumbRow, cw: 96 / D, row: thumbRow };
-    const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = m.pos ? 3 : 1, nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
-    return { thumb, rows, nbY, nbH, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22) };
+    const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = (m.pos ? 3 : 1) + (m.img ? 1 : 0), nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
+    const pin = m.img ? { x: thumb.x, y: thumb.y + thumb.h + 44, cw: thumb.w / m.img.C, rh: 4, C: m.img.C } : null;
+    return { thumb, rows, nbY, nbH, pin, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22, pin ? pin.y + D * pin.rh + 16 : 0) };
   }
   function drawEmbeddingTable(canvas, m) {
     const L = layoutEmbTable(m), c = colors(), ctx = fitCanvas(canvas, ET_W, L.H), { thumb, rows } = L, V = m.V, D = m.D, E = m.E, hov = m.hover;
@@ -2594,23 +2673,37 @@ window.Viz = (function () {
     ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(thumb.x - 0.5, thumb.y - 0.5, thumb.w + 1, thumb.h + 1);
     const tick = (v, color, long) => { const y = thumb.y + v * thumb.row + thumb.row / 2; ctx.strokeStyle = color; ctx.lineWidth = long ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(thumb.x + thumb.w + 2, y); ctx.lineTo(thumb.x + thumb.w + (long ? 10 : 6), y); ctx.stroke(); };
     for (const n of m.neighbours) tick(n.v, c.accent, false);
-    tick(m.v, c.ink, true); { const y = thumb.y + m.v * thumb.row + thumb.row / 2; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(thumb.x - 2, y); ctx.lineTo(thumb.x + thumb.w + 2, y); ctx.stroke(); }
+    if (!m.img) { tick(m.v, c.ink, true); { const y = thumb.y + m.v * thumb.row + thumb.row / 2; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(thumb.x - 2, y); ctx.lineTo(thumb.x + thumb.w + 2, y); ctx.stroke(); } }
     if (hov && hov.kind === 'thumb') tick(hov.v, c.ink2, true);
-    text('this word', thumb.x + thumb.w + 13, thumb.y + m.v * thumb.row - 5, mono9, c.ink3);
+    if (!m.img) text('this word', thumb.x + thumb.w + 13, thumb.y + m.v * thumb.row - 5, mono9, c.ink3);
+    if (m.img) { // the learned projection beside the table: a matrix of D rows (the vector) × C columns (the code)
+      const P = L.pin, C = P.C; let pm = 1e-9; for (const w of m.img.Pin) pm = Math.max(pm, Math.abs(w));
+      for (let d = 0; d < D; d++) for (let k = 0; k < C; k++) { ctx.fillStyle = diverging(m.img.Pin[d * C + k] / pm); ctx.fillRect(P.x + k * P.cw, P.y + d * P.rh, P.cw, P.rh); }
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(P.x - 0.5, P.y - 0.5, C * P.cw + 1, D * P.rh + 1);
+      if (hov && hov.kind === 'pin') { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(P.x + hov.k * P.cw - 1, P.y + hov.d * P.rh - 1, P.cw + 2, P.rh + 2); }
+      text(`the projection · ${D} × ${C}`, P.x, P.y - 26, capFont, c.ink3); text('learned with the model', P.x, P.y - 13, mono9, c.ink3);
+    }
     // the followed word's row, the position vector, the sum
     const cells = (x, y, code, hovD) => { for (let d = 0; d < D; d++) { ctx.fillStyle = diverging(code[d] / mx); ctx.fillRect(x + d * rows.cw, y, rows.cw - 1, rows.h); } if (hovD != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x + hovD * rows.cw - 1.5, y - 1.5, rows.cw + 2, rows.h + 3); } };
     const label = (t, y, color) => text(t, rows.labelX, y + rows.h / 2, mono, color || c.ink, 'right', 'middle');
     const hd = key => (hov && hov.kind === 'cell' && hov.row === key ? hov.d : null);
-    const emb = E.subarray(m.v * D, (m.v + 1) * D);
-    text(`row ${m.v} of the table, looked up for “${cut(m.word, 24)}”`, rows.xs, 20, capFont, c.ink3);
-    label(`“${cut(m.word, 14)}” row ${m.v}`, rows.y); cells(rows.xs, rows.y, emb, hd('word'));
+    const emb = m.img ? m.img.vec : E.subarray(m.v * D, (m.v + 1) * D), y1 = rows.y + (m.img ? rows.pitch : 0);
+    if (m.img) { // the code on its own scale, then the projected vector on the table's
+      const C = m.img.C, cw = rows.w / C; let cm = 1e-9; for (const v of m.img.code) cm = Math.max(cm, Math.abs(v));
+      text(`the image token: no row of the table · the encoder’s code of ${C} × the projection + bias`, rows.xs, 20, capFont, c.ink3);
+      label(`the code · ${C}`, rows.y); for (let k = 0; k < C; k++) { ctx.fillStyle = diverging(m.img.code[k] / cm); ctx.fillRect(rows.xs + k * cw, rows.y, cw - 1, rows.h); } if (hd('code') != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(rows.xs + hd('code') * cw - 1.5, rows.y - 1.5, cw + 2, rows.h + 3); }
+      label('× projection + bias', y1, c.ink2); cells(rows.xs, y1, emb, hd('word'));
+    } else {
+      text(`row ${m.v} of the table, looked up for “${cut(m.word, 24)}”`, rows.xs, 20, capFont, c.ink3);
+      label(`“${cut(m.word, 14)}” row ${m.v}`, rows.y); cells(rows.xs, rows.y, emb, hd('word'));
+    }
     if (m.pos) {
       const sum = Float64Array.from(emb, (x, d) => x + m.pos[d]);
-      label(`+ position ${m.posIndex}`, rows.y + rows.pitch, c.ink2); cells(rows.xs, rows.y + rows.pitch, m.pos, hd('pos'));
-      label('= into the network', rows.y + 2 * rows.pitch, c.ink2); cells(rows.xs, rows.y + 2 * rows.pitch, sum, hd('sum'));
+      label(`+ position ${m.posIndex}`, y1 + rows.pitch, c.ink2); cells(rows.xs, y1 + rows.pitch, m.pos, hd('pos'));
+      label('= into the network', y1 + 2 * rows.pitch, c.ink2); cells(rows.xs, y1 + 2 * rows.pitch, sum, hd('sum'));
     }
     // the nearest rows
-    text(`the ${m.neighbours.length} rows nearest to it, by cosine${m.trained ? '' : ' · random before training'}`, rows.xs, L.nbY - 16, capFont, c.ink3);
+    text(`the ${m.neighbours.length} rows nearest to ${m.img ? 'the projected code' : 'it'}, by cosine${m.trained ? '' : ' · random before training'}`, rows.xs, L.nbY - 16, capFont, c.ink3);
     m.neighbours.forEach((n, k) => { const y = L.nbY + k * L.nbH, on = hov && hov.kind === 'nb' && hov.k === k; label(`${cut(n.word, 14)} ${n.cos.toFixed(2)}`, y, on ? c.ink : c.ink2); cells(rows.xs, y, E.subarray(n.v * D, (n.v + 1) * D), on ? hov.d : null); if (on) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1; ctx.strokeRect(rows.xs - 2.5, y - 2.5, rows.w + 4, rows.h + 5); } });
     text(`red positive, blue negative, one scale for the whole table (±${mx.toFixed(2)})`, rows.xs, L.H - 13, mono9, c.ink3);
   }
@@ -2619,11 +2712,16 @@ window.Viz = (function () {
     const s = ET_W / canvas.clientWidth, x = px * s, y = py * s, { thumb, rows } = L, D = m.D, f = v => fmtSigned(v, 2), E = m.E;
     if (x >= thumb.x - 2 && x <= thumb.x + thumb.w + 12 && y >= thumb.y && y < thumb.y + thumb.h) { const v = Math.min(m.V - 1, Math.max(0, Math.floor((y - thumb.y) / thumb.row))); return { kind: 'thumb', v, text: `row ${v}: “${m.words[v]}”${m.counts ? ` · ${m.counts[v]} times in training` : ''}` }; }
     const inStrip = y0 => y >= y0 - 2 && y <= y0 + rows.h + 2, dOf = () => Math.min(D - 1, Math.max(0, Math.floor((x - rows.xs) / rows.cw))), inX = x >= rows.xs - 2 && x <= rows.xs + rows.w + 2, inLabel = x >= rows.labelX - 130 && x < rows.xs;
-    const emb = E.subarray(m.v * D, (m.v + 1) * D);
-    if (inX && inStrip(rows.y)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `“${m.word}” number ${d + 1} of ${D} = ${f(emb[d])} · learned, looked up by the word’s row` }; }
-    if (m.pos && inX && inStrip(rows.y + rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'pos', d, text: `position ${m.posIndex} number ${d + 1} = ${f(m.pos[d])} · learned, one row per position` }; }
-    if (m.pos && inX && inStrip(rows.y + 2 * rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'sum', d, text: `into the network, number ${d + 1} = ${f(emb[d] + m.pos[d])} (${f(emb[d])} + ${f(m.pos[d])})` }; }
-    for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}” · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
+    const emb = m.img ? m.img.vec : E.subarray(m.v * D, (m.v + 1) * D), y1 = rows.y + (m.img ? rows.pitch : 0);
+    if (m.img) {
+      const C = m.img.C, P = L.pin;
+      if (inX && inStrip(rows.y)) { const k = Math.min(C - 1, Math.max(0, Math.floor((x - rows.xs) / (rows.w / C)))); return { kind: 'cell', row: 'code', d: k, text: `the code, number ${k + 1} of ${C} = ${f(m.img.code[k])} · from the frozen encoder, never changed by this training` }; }
+      if (P && x >= P.x && x < P.x + C * P.cw && y >= P.y && y < P.y + D * P.rh) { const d = Math.floor((y - P.y) / P.rh), k = Math.floor((x - P.x) / P.cw); return { kind: 'pin', d, k, text: `projection weight (${d + 1}, ${k + 1}) = ${f(m.img.Pin[d * C + k])} · code number ${k + 1} into vector number ${d + 1} · learned` }; }
+      if (inX && inStrip(y1)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `projected, number ${d + 1} of ${D} = ${f(emb[d])} · Σ over the ${C} code numbers × the projection’s row + bias ${f(m.img.bin[d])}` }; }
+    } else if (inX && inStrip(rows.y)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `“${m.word}” number ${d + 1} of ${D} = ${f(emb[d])} · learned, looked up by the word’s row` }; }
+    if (m.pos && inX && inStrip(y1 + rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'pos', d, text: `position ${m.posIndex} number ${d + 1} = ${f(m.pos[d])} · learned, one row per position` }; }
+    if (m.pos && inX && inStrip(y1 + 2 * rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'sum', d, text: `into the network, number ${d + 1} = ${f(emb[d] + m.pos[d])} (${f(emb[d])} + ${f(m.pos[d])})` }; }
+    for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to ${m.img ? 'the projected code' : `“${m.word}”`} · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
     return null;
   }
   // ---- calibration and deferral: the classified test cases on the axis of the network's probability, with the truth,
@@ -2677,5 +2775,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

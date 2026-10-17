@@ -982,7 +982,12 @@ code, the code becomes the first token, the model writes. *Train* is the shared 
 question's Train step on the descriptions, the image token first in every document, the loss by section, the test
 nuclei described after every epoch with all four traits right or not as the third chart, and the share of the
 description's attention on the image token as the fourth; the diagrams read the image token like any word before
-them, and *Load the trained model* brings the shipped model with its curves and its words' paths. *Test* describes
+them, and hovering or clicking a word of the description follows it in the cards (what the model expected there,
+whom it read, the lines over the text), on the Train step and on the Test step alike. Standing at the image token, the
+lookup card shows what that token really is: no row of the table, but the frozen encoder's code of sixteen numbers
+through the learned projection (48 × 16) plus a bias, with the rows the projected code lands nearest to, and the
+network card's first strip is that projected code. *Load the trained model* brings the shipped model with its curves
+and its words' paths. *Test* describes
 a test nucleus from its image one word at a time, ticks the four traits the model named against the generator's and
 the impression, and tallies the test set (all four right, and each trait); the image can be swapped for the other
 lab's scan of the same nucleus, for the scan flipped and turned, or for no image at all (a code of zeros), each a
@@ -1048,7 +1053,12 @@ on two crops, an epoch of 100, 200 or 400 crops scores five test fields and fill
 and on the test fields, pixels right, the IoU per class), the focus field is painted after every epoch as the
 prediction, the truth or the errors in red, and hovering a pixel gives its truth, the network's class, the four
 probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
-on the field are on the cards below, and *Load the trained model* brings the shipped network with its twenty epochs
+on the field are on the cards below, with the network itself unrolled at one pixel: every map's channels at the
+pixel's place as circles (hollow where the ReLU is off, at the pooled coordinates on the deeper levels), every
+kernel's contribution there as a line (orange positive, blue negative, the lines of a column adding up with the bias
+to its circles), the levels as bands going down and up again, the skip and the upsampling into each join, the head's
+score per class and the softmax, with the window each column sees; the pixel follows the mouse on the field and a
+click pins it, and hovering a circle or a line gives its value, or the kernel's nine weights. *Load the trained model* brings the shipped network with its twenty epochs
 of curves. *Test* paints the held-out fields one at a time (N for the next) with the IoU per class of each and a
 tally over the fifty. Recipe ⑲ sets it up with no context, so that the nest line's failure is the first thing seen;
 set two levels and train again, or load the trained network, for the comparison.
@@ -1231,13 +1241,13 @@ measures and the page's ticks.
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation, with an image code as its first token; the segmentation network, 3 × 3 convolutions with levels of pooling and upsampling and a class for every pixel (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation, with an image code as its first token; the segmentation network, 3 × 3 convolutions with levels of pooling and upsampling and a class for every pixel, unrolled at one pixel for the diagram (browser + Node)
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
-js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network
+js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network, and the network unrolled at one pixel (circles for the channels, lines for the kernels' contributions)
 js/glossary.js             the glossary: one definition per recurring term, underlined where it first appears in a paragraph (re-marked as the page rewrites its notes), a tooltip on hover, the whole list behind the masthead's Glossary button
 js/app.js                  state, task switch, training loop, the three steps of every question (the blood counts and nuclei; the foundation model's pretraining loop and probes; the slides' attention loop and test walk-through), the code input and its encoders, the inspector, unit heatmap, prevalence
 data/foundation/backbones.js the foundation encoder shipped with the page: its weights and input standardiser, written by tools/pretrain_backbone.js
