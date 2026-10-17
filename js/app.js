@@ -3059,7 +3059,7 @@
   function dsWriteFinish() {
     const L = S.dsq, W = L.writing; if (!W) return; const res = dsResult(W);
     L.writing = null; $('ds-describe').textContent = 'Describe'; L.written = res; L.truthShown = true;
-    res.view = { words: res.words, tokens: res.tokens, fw: res.fw, textEl: $('ds-test-text'), pre: 'ds-test-', chosen: true, steps: res.steps, nextEl: 'ds-test-nextword' };
+    res.view = { words: res.words, tokens: res.tokens, fw: res.fw, code: res.code || null, textEl: $('ds-test-text'), pre: 'ds-test-', chosen: true, steps: res.steps, nextEl: 'ds-test-nextword' };
     L.trial.results.set(dsKey(res.probe, res.docId), res); const i = L.test.findIndex(d => d.id === res.docId); if (i === L.trial.next) L.trial.next = i + 1;
     dsRenderTest();
   }
@@ -3525,16 +3525,18 @@
   // ---- the lookup table on the Train step: the embedding matrix, the followed word's row with its position vector, and the rows nearest to it
   function rpRenderEmbedding(view) {
     const L = LM(), m = L.model, canvas = $('rp-emb'); if (!canvas || !m || !view) return;
-    const i = rpFocusWord(view), v = view.tokens[i], D = m.D, V = m.V, E = m.E, row = E.subarray(v * D, (v + 1) * D);
+    const i = rpFocusWord(view), v = view.tokens[i], D = m.D, V = m.V, E = m.E, img = i === 0 && view.code && m.Pin ? { code: view.code, Pin: m.Pin, bin: m.bin, C: m.C, vec: rpProjectedCode(m, view.code) } : null, row = img ? img.vec : E.subarray(v * D, (v + 1) * D);
     let nr = 0; for (const x of row) nr += x * x; nr = Math.sqrt(nr) || 1e-9;
     const sims = []; for (let u = 0; u < V; u++) { if (u === v) continue; let dot = 0, nu = 0; const off = u * D; for (let d = 0; d < D; d++) { dot += E[off + d] * row[d]; nu += E[off + d] * E[off + d]; } sims.push({ v: u, cos: dot / (nr * (Math.sqrt(nu) || 1e-9)) }); }
     sims.sort((a, b) => b.cos - a.cos);
-    const nb = sims.slice(0, 8).map(x => ({ v: x.v, cos: x.cos, word: rpWordLabel(L.vocab.words[x.v]) })), word = rpWordLabel(view.words[i]);
-    const model = { E, V, D, v, word, words: L.vocab.words.map(rpWordLabel), pos: m.Pos && i < m.P ? m.Pos.subarray(i * D, (i + 1) * D) : null, posIndex: i, neighbours: nb, hover: L.hoverEmb || null, trained: m.steps > 0, counts: L.wordCount || null };
+    const nb = sims.slice(0, 8).map(x => ({ v: x.v, cos: x.cos, word: rpWordLabel(L.vocab.words[x.v]) })), word = img ? 'the image token' : rpWordLabel(view.words[i]);
+    const model = { E, V, D, v, word, words: L.vocab.words.map(rpWordLabel), pos: m.Pos && i < m.P ? m.Pos.subarray(i * D, (i + 1) * D) : null, posIndex: i, neighbours: nb, hover: L.hoverEmb || null, trained: m.steps > 0, counts: L.wordCount || null, img };
     canvas._model = model; Viz.drawEmbeddingTable(canvas, model);
     $('rp-emb-title').textContent = `The lookup table: every word is a row of ${D} numbers · “${word}”`;
     const three = nb.slice(0, 3).map(x => `“${x.word}”`).join(', ');
-    $('rp-emb-note').textContent = m.steps === 0
+    $('rp-emb-note').textContent = img
+      ? `The image token has no row of the table. Its vector is the frozen encoder’s code of ${img.C} numbers through a learned projection of ${D} × ${img.C} plus a bias${model.pos ? ', with the row of position 0 added' : ''}: that projected vector is the only thing the model ever sees of the image, and the projection is the one part of the join that training changes (the encoder stays frozen). The rows it lands nearest to${m.steps === 0 ? ' are random before training' : ' are what the image means to the model'}: ${three}. Hover the code, the projected vector or a row for its numbers.`
+      : m.steps === 0
       ? `Row ${v} is all that “${word}” is to the model: ${D} numbers, looked up by the word’s number and nothing else${model.pos ? `, with the row of position ${i} from a second table of ${m.P} rows added before the first layer` : ''}. Before training the table is random numbers from the seed, so the rows nearest to “${word}” are random words: ${three}. Every step moves the rows of the words in the batch, pulled towards whatever makes their next words more probable. Train, or load the trained model, and watch the neighbours become the states of a line, the numbers, the words of a phrase. Today’s large models keep no position table: they fold the position into each head’s match as a rotation, so that only the distance between two words counts; the toy’s distance cost per head is the small cousin of that idea.`
       : `Row ${v} is all that “${word}” is to the model: ${D} numbers, looked up by the word’s number and nothing else${model.pos ? `, with the row of position ${i} from a second table of ${m.P} rows added before the first layer` : ''}. Training moved the rows: two words that have to predict the same next words end up with similar rows, because the output layer scores them the same way, which is why the rows nearest to “${word}” are now ${three}. The output layer is a third table of the same shape read the other way, a score for every word from the last vector, and it is what the map below draws by default. Hover a cell for its value, a row for its word; the row hovered is marked on the text above. Today’s large models keep no position table: they fold the position into each head’s match as a rotation, so that only the distance between two words counts; the toy’s distance cost per head is the small cousin of that idea.`;
   }
@@ -3656,12 +3658,13 @@
   function rpView(onTest) { // what the diagrams draw from: the report on screen, or the report the model wrote
     const L = LM(); if (!L.model || !L.built) return null;
     if (onTest) return LMW().testView(L);
-    const r = rpFocus(); return { words: r.words, tokens: r.tokens, fw: rpForward(r), textEl: $('rp-text'), pre: 'rp-', chosen: false, steps: null, nextEl: null };
+    const r = rpFocus(); return { words: r.words, tokens: r.tokens, fw: rpForward(r), code: r.code || null, textEl: $('rp-text'), pre: 'rp-', chosen: false, steps: null, nextEl: null };
   }
-  function rpFocusWord(view) { const L = LM(), i = L.hover != null ? L.hover : L.pinned != null ? L.pinned : rpDefaultWord(view.words); return Math.max(1, Math.min(view.words.length - 1, i)); }
+  function rpFocusWord(view) { const L = LM(), i = L.hover != null ? L.hover : L.pinned != null ? L.pinned : rpDefaultWord(view.words); return Math.max(view.code ? 0 : 1, Math.min(view.words.length - 1, i)); } // 0 is the image token, which the lookup card can show; the other cards then stand at it, looking at the first word
+  function rpStandWord(view) { return Math.max(1, rpFocusWord(view)); }
   function rpFollowWord(onTest) { // every panel follows one word: hovered, else kept, else the first word of the diagnosis
     const L = LM(), view = rpView(onTest); if (!view) return;
-    const i = rpFocusWord(view), soft = L.hover == null && L.pinned == null;
+    const i = rpStandWord(view), soft = L.hover == null && L.pinned == null;
     rpHighlight(view.textEl, view.fw, i, { soft });
     if (onTest && view.nextEl) { const s = view.steps.find(x => x.at === i); $(view.nextEl).innerHTML = s ? rpNextWordHtml(s.probs, null, s.token, `word ${view.steps.indexOf(s) + 1} it wrote, “${rpWordLabel(view.words[i])}”: what the model chose from`) : rpNextWordHtml(view.fw.probs[i - 1], view.tokens[i], null, `before “${rpWordLabel(view.words[i])}”, given in the prompt: what the model expected`); }
     else rpRenderNextWord(soft ? null : i);
@@ -3694,9 +3697,10 @@
   }
   function rpMarkPair(el, i, j) { el.querySelectorAll('.tok.att-q, .tok.att-k').forEach(s => s.classList.remove('att-q', 'att-k')); if (i != null) { const a = el.querySelector(`.tok[data-i="${i}"]`); if (a) a.classList.add('att-q'); } if (j != null) { const b = el.querySelector(`.tok[data-i="${j}"]`); if (b) b.classList.add('att-k'); } }
   // how the word was chosen: the numbers of position q = i − 1 on their way through the model, prepared for the drawing
+  function rpProjectedCode(m, code) { const D = m.D, C = m.C, out = new Float64Array(D); for (let d = 0; d < D; d++) { let s = m.bin[d]; const o = d * C; for (let c = 0; c < C; c++) s += m.Pin[o + c] * code[c]; out[d] = s; } return out; } // the image token's vector: the code through the learned projection, plus its bias
   function rpRenderNet(view) {
-    const L = LM(), m = L.model, i = rpFocusWord(view), q = i - 1, fw = view.fw, D = m.D, dk = m.dk, H = m.H, canvas = $(`${view.pre}net`), chosen = !!view.chosen && !!view.steps && view.steps.some(x => x.at === i); if (!canvas || q < 0 || q >= fw.tokens.length) return; // chosen: the model wrote this word; a word of the prompt was given, and the diagram says what the model expected there
-    const tq = view.tokens[q], emb = m.E.subarray(tq * D, (tq + 1) * D), pos = m.Pos && q < m.P ? m.Pos.subarray(q * D, (q + 1) * D) : null;
+    const L = LM(), m = L.model, i = rpStandWord(view), q = i - 1, fw = view.fw, D = m.D, dk = m.dk, H = m.H, canvas = $(`${view.pre}net`), chosen = !!view.chosen && !!view.steps && view.steps.some(x => x.at === i); if (!canvas || q < 0 || q >= fw.tokens.length) return; // chosen: the model wrote this word; a word of the prompt was given, and the diagram says what the model expected there
+    const tq = view.tokens[q], fromCode = q === 0 && !!view.code && !!m.Pin, emb = fromCode ? rpProjectedCode(m, view.code) : m.E.subarray(tq * D, (tq + 1) * D), pos = m.Pos && q < m.P ? m.Pos.subarray(q * D, (q + 1) * D) : null;
     const lens = x => { const z = new Float64Array(m.V); let mx = -Infinity; for (let v = 0; v < m.V; v++) { let s = m.bout[v]; const off = v * D; for (let d = 0; d < D; d++) s += m.Wout[off + d] * x[d]; z[v] = s; mx = Math.max(mx, s); } let Z = 0; for (let v = 0; v < m.V; v++) { z[v] = Math.exp(z[v] - mx); Z += z[v]; } const idx = Array.from(z.keys()).sort((a, b) => z[b] - z[a]).slice(0, 3); return idx.map(v => ({ word: rpWordLabel(L.vocab.words[v]), p: z[v] / Z })); };
     const layers = fw.ctxs.map((c, l) => {
       const lay = m.layers[l], HM = H * dk, heard = new Float64Array(D); for (let d = 0; d < D; d++) { let s = lay.bo[d]; const off = d * HM; for (let e = 0; e < HM; e++) s += lay.Wo[off + e] * c.C[q][e]; heard[d] = s; }
@@ -3704,7 +3708,7 @@
       return { heads, heard, hidden: c.U[q], W: { Wq: lay.Wq, Wo: lay.Wo, W1: lay.W1, W2: lay.W2 }, after: c.Xp[q], out: c.Y[q], lens: lens(c.Y[q]) };
     });
     const probs = fw.probs[q], target = view.tokens[i], idx = Array.from(probs.keys()).sort((a, b) => probs[b] - probs[a]).slice(0, 6); if (!idx.includes(target)) idx.push(target);
-    const model = { i, q, n: view.words.length, V: m.V, D, dk, word: rpWordLabel(view.words[i]), qword: rpWordLabel(view.words[q]), arch: `${m.V} words → vector of ${D}${m.P ? ' + position' : ''} → ${m.layers.length} × (${H} heads of ${dk} + feed-forward ${m.F}) → softmax over ${m.V} words`, emb, pos, x0: fw.X[q], lens0: lens(fw.X[q]), layers, out: idx.map(v => ({ v, word: rpWordLabel(L.vocab.words[v]), p: probs[v], target: v === target })), Wout: m.Wout, chosen, walk: L.netWalk && L.netWalk.pre === view.pre ? { at: L.netWalk.at, t: L.netWalk.t } : null, hover: L.hoverNet && L.hoverNet.pre === view.pre ? L.hoverNet : null };
+    const model = { i, q, n: view.words.length, V: m.V, D, dk, word: rpWordLabel(view.words[i]), qword: rpWordLabel(view.words[q]), arch: `${m.V} words → vector of ${D}${m.P ? ' + position' : ''} → ${m.layers.length} × (${H} heads of ${dk} + feed-forward ${m.F}) → softmax over ${m.V} words`, emb, pos, fromCode, code: fromCode ? view.code : null, x0: fw.X[q], lens0: lens(fw.X[q]), layers, out: idx.map(v => ({ v, word: rpWordLabel(L.vocab.words[v]), p: probs[v], target: v === target })), Wout: m.Wout, chosen, walk: L.netWalk && L.netWalk.pre === view.pre ? { at: L.netWalk.at, t: L.netWalk.t } : null, hover: L.hoverNet && L.hoverNet.pre === view.pre ? L.hoverNet : null };
     canvas._model = model; if (L.netView === 'graph') Viz.drawTokenGraph(canvas, model); else Viz.drawTokenNetwork(canvas, model);
     const title = $(`${view.pre}net-title`); if (title) title.textContent = `How “${model.word}” was ${chosen ? 'chosen' : 'expected'}${view.chosen && !chosen ? ' (given in the prompt)' : ''}`;
     const note = $(`${view.pre}net-note`); if (note) note.textContent = L.netView === 'graph'
@@ -3745,7 +3749,7 @@
   // ---- how each head decides where to look, from the followed word's position, in the chosen layer
   function rpRenderHeads(view) {
     { const card = $(`${view.pre}heads-card`); if (card) card.hidden = !view.fw.ctxs.length; if (!view.fw.ctxs.length) return; } // no context layer: no heads to show
-    const L = LM(), m = L.model, fw = view.fw, i = rpFocusWord(view), q = i - 1, l = Math.min(L.layer, fw.ctxs.length - 1), c = fw.ctxs[l], dk = m.dk, sc = 1 / Math.sqrt(dk), n = q + 1, canvas = $(`${view.pre}heads`); if (!canvas || q < 0) return;
+    const L = LM(), m = L.model, fw = view.fw, i = rpStandWord(view), q = i - 1, l = Math.min(L.layer, fw.ctxs.length - 1), c = fw.ctxs[l], dk = m.dk, sc = 1 / Math.sqrt(dk), n = q + 1, canvas = $(`${view.pre}heads`); if (!canvas || q < 0) return;
     const sections = LMW().sectionsOf(view.words), words = view.words.slice(0, n).map(rpWordLabel);
     const heads = Array.from({ length: m.H }, (_, h) => {
       const o = h * dk, cost = c.costs[h], match = new Float64Array(n), costs = new Float64Array(n), score = new Float64Array(n), share = Float64Array.from(c.Ah[h][q].subarray(0, n)), matchOnly = new Float64Array(n); let mx = -Infinity;
@@ -4066,7 +4070,7 @@
     document.querySelectorAll('.rp-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; rpSyncControls(); if (L.model) { if (rpOnTest()) LMW().renderTest(); else rpRenderFocus(); } }));
     document.querySelectorAll('.rp-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; rpSyncControls(); if (L.model) { if (rpOnTest()) LMW().renderTest(); else rpRenderFocus(); } }));
     // hovering a word on either report follows it: what the model expected there, and whom it read
-    for (const [id, onTest] of [['rp-text', false], ['rp-test-text', true], ['ch-test-text', true]]) {
+    for (const [id, onTest] of [['rp-text', false], ['rp-test-text', true], ['ch-test-text', true], ['ds-test-text', true]]) {
       const el = $(id), tokAt = ev => { const t = ev.target.closest('.tok'); return t && el.contains(t) ? +t.dataset.i : null; };
       el.addEventListener('mousemove', ev => { const i = tokAt(ev); if (i === L.hover) return; L.hover = i; if (L.model) rpFollowWord(onTest); });
       el.addEventListener('mouseleave', () => { if (L.hover == null) return; L.hover = null; if (L.model) rpFollowWord(onTest); });

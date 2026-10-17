@@ -982,7 +982,12 @@ code, the code becomes the first token, the model writes. *Train* is the shared 
 question's Train step on the descriptions, the image token first in every document, the loss by section, the test
 nuclei described after every epoch with all four traits right or not as the third chart, and the share of the
 description's attention on the image token as the fourth; the diagrams read the image token like any word before
-them, and *Load the trained model* brings the shipped model with its curves and its words' paths. *Test* describes
+them, and hovering or clicking a word of the description follows it in the cards (what the model expected there,
+whom it read, the lines over the text), on the Train step and on the Test step alike. Standing at the image token, the
+lookup card shows what that token really is: no row of the table, but the frozen encoder's code of sixteen numbers
+through the learned projection (48 × 16) plus a bias, with the rows the projected code lands nearest to, and the
+network card's first strip is that projected code. *Load the trained model* brings the shipped model with its curves
+and its words' paths. *Test* describes
 a test nucleus from its image one word at a time, ticks the four traits the model named against the generator's and
 the impression, and tallies the test set (all four right, and each trait); the image can be swapped for the other
 lab's scan of the same nucleus, for the scan flipped and turned, or for no image at all (a code of zeros), each a

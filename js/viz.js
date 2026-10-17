@@ -2378,7 +2378,7 @@ window.Viz = (function () {
     text(`the model stands at “${m.qword}” (word ${m.q}) and reads the ${m.q + 1} words so far`, 12, 24, mono9, c.ink3);
     // the input: the word's vector, its position vector, their sum, and what the output layer would read off it
     const I = L.inp;
-    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(`“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
+    strip(I.xEmb, I.y, I.w, I.h, m.emb, mI, is('emb')); text(m.fromCode ? `the image’s code (${m.code.length}) × projection + bias · ${D}` : `“${cut(m.qword, 14)}” · its vector · ${D}`, I.xEmb, I.y + I.h + 4, mono8, c.ink3);
     text('+', I.xEmb + I.w + 15, I.y + I.h / 2, mono, c.ink2, 'center', 'middle');
     if (m.pos) { strip(I.xPos, I.y, I.w, I.h, m.pos, mI, is('pos')); text(`position ${m.q} · its vector · ${D}`, I.xPos, I.y + I.h + 4, mono8, c.ink3); }
     else { empty(I.xPos, I.y, I.w, I.h, 'no position vectors'); text('the heads know distance only through their cost', I.xPos, I.y + I.h + 4, mono8, c.ink3); }
@@ -2429,7 +2429,7 @@ window.Viz = (function () {
     const L = canvas._tokenNet; if (!L) return null;
     const s = TN_W / canvas.clientWidth, x = px * s, y = py * s, I = L.inp, Hd = L.head, Cb = L.comb, O = L.outRow, f = v => fmtSigned(v, 2);
     const inBox = (x0, y0, w, h) => x >= x0 && x <= x0 + w && y >= y0 - 2 && y <= y0 + h + 2, cell = (x0, w, n) => Math.min(n - 1, Math.max(0, Math.floor((x - x0) / (w / n))));
-    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
+    if (inBox(I.xEmb, I.y, I.w, I.h)) { const d = cell(I.xEmb, I.w, m.D); return { kind: 'emb', d, text: m.fromCode ? `projected code, number ${d + 1} = ${f(m.emb[d])} · the frozen encoder’s ${m.code.length} numbers through the learned projection (${m.D} × ${m.code.length}) plus a bias, not a row of the table` : `“${m.qword}” vector ${d + 1} = ${f(m.emb[d])} · learned, one vector per word` }; }
     if (m.pos && inBox(I.xPos, I.y, I.w, I.h)) { const d = cell(I.xPos, I.w, m.D); return { kind: 'pos', d, text: `position ${m.q} vector ${d + 1} = ${f(m.pos[d])} · learned, one vector per position` }; }
     if (inBox(I.xIn, I.y, I.w, I.h)) { const d = cell(I.xIn, I.w, m.D); return { kind: 'x0', d, text: `input ${d + 1} = ${f(m.x0[d])}${m.pos ? ` (${f(m.emb[d])} + ${f(m.pos[d])})` : ''}` }; }
     for (let l = 0; l < m.layers.length; l++) {
@@ -2654,8 +2654,9 @@ window.Viz = (function () {
   const ET_W = 800;
   function layoutEmbTable(m) {
     const V = m.V, D = m.D, thumbRow = V > 220 ? 1 : V > 110 ? 2 : 3, thumb = { x: 12, y: 40, w: 96, h: V * thumbRow, cw: 96 / D, row: thumbRow };
-    const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = m.pos ? 3 : 1, nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
-    return { thumb, rows, nbY, nbH, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22) };
+    const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = (m.pos ? 3 : 1) + (m.img ? 1 : 0), nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
+    const pin = m.img ? { x: thumb.x, y: thumb.y + thumb.h + 44, cw: thumb.w / m.img.C, rh: 4, C: m.img.C } : null;
+    return { thumb, rows, nbY, nbH, pin, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22, pin ? pin.y + D * pin.rh + 16 : 0) };
   }
   function drawEmbeddingTable(canvas, m) {
     const L = layoutEmbTable(m), c = colors(), ctx = fitCanvas(canvas, ET_W, L.H), { thumb, rows } = L, V = m.V, D = m.D, E = m.E, hov = m.hover;
@@ -2672,23 +2673,37 @@ window.Viz = (function () {
     ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(thumb.x - 0.5, thumb.y - 0.5, thumb.w + 1, thumb.h + 1);
     const tick = (v, color, long) => { const y = thumb.y + v * thumb.row + thumb.row / 2; ctx.strokeStyle = color; ctx.lineWidth = long ? 1.5 : 1; ctx.beginPath(); ctx.moveTo(thumb.x + thumb.w + 2, y); ctx.lineTo(thumb.x + thumb.w + (long ? 10 : 6), y); ctx.stroke(); };
     for (const n of m.neighbours) tick(n.v, c.accent, false);
-    tick(m.v, c.ink, true); { const y = thumb.y + m.v * thumb.row + thumb.row / 2; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(thumb.x - 2, y); ctx.lineTo(thumb.x + thumb.w + 2, y); ctx.stroke(); }
+    if (!m.img) { tick(m.v, c.ink, true); { const y = thumb.y + m.v * thumb.row + thumb.row / 2; ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(thumb.x - 2, y); ctx.lineTo(thumb.x + thumb.w + 2, y); ctx.stroke(); } }
     if (hov && hov.kind === 'thumb') tick(hov.v, c.ink2, true);
-    text('this word', thumb.x + thumb.w + 13, thumb.y + m.v * thumb.row - 5, mono9, c.ink3);
+    if (!m.img) text('this word', thumb.x + thumb.w + 13, thumb.y + m.v * thumb.row - 5, mono9, c.ink3);
+    if (m.img) { // the learned projection beside the table: a matrix of D rows (the vector) × C columns (the code)
+      const P = L.pin, C = P.C; let pm = 1e-9; for (const w of m.img.Pin) pm = Math.max(pm, Math.abs(w));
+      for (let d = 0; d < D; d++) for (let k = 0; k < C; k++) { ctx.fillStyle = diverging(m.img.Pin[d * C + k] / pm); ctx.fillRect(P.x + k * P.cw, P.y + d * P.rh, P.cw, P.rh); }
+      ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.strokeRect(P.x - 0.5, P.y - 0.5, C * P.cw + 1, D * P.rh + 1);
+      if (hov && hov.kind === 'pin') { ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(P.x + hov.k * P.cw - 1, P.y + hov.d * P.rh - 1, P.cw + 2, P.rh + 2); }
+      text(`the projection · ${D} × ${C}`, P.x, P.y - 26, capFont, c.ink3); text('learned with the model', P.x, P.y - 13, mono9, c.ink3);
+    }
     // the followed word's row, the position vector, the sum
     const cells = (x, y, code, hovD) => { for (let d = 0; d < D; d++) { ctx.fillStyle = diverging(code[d] / mx); ctx.fillRect(x + d * rows.cw, y, rows.cw - 1, rows.h); } if (hovD != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(x + hovD * rows.cw - 1.5, y - 1.5, rows.cw + 2, rows.h + 3); } };
     const label = (t, y, color) => text(t, rows.labelX, y + rows.h / 2, mono, color || c.ink, 'right', 'middle');
     const hd = key => (hov && hov.kind === 'cell' && hov.row === key ? hov.d : null);
-    const emb = E.subarray(m.v * D, (m.v + 1) * D);
-    text(`row ${m.v} of the table, looked up for “${cut(m.word, 24)}”`, rows.xs, 20, capFont, c.ink3);
-    label(`“${cut(m.word, 14)}” row ${m.v}`, rows.y); cells(rows.xs, rows.y, emb, hd('word'));
+    const emb = m.img ? m.img.vec : E.subarray(m.v * D, (m.v + 1) * D), y1 = rows.y + (m.img ? rows.pitch : 0);
+    if (m.img) { // the code on its own scale, then the projected vector on the table's
+      const C = m.img.C, cw = rows.w / C; let cm = 1e-9; for (const v of m.img.code) cm = Math.max(cm, Math.abs(v));
+      text(`the image token: no row of the table · the encoder’s code of ${C} × the projection + bias`, rows.xs, 20, capFont, c.ink3);
+      label(`the code · ${C}`, rows.y); for (let k = 0; k < C; k++) { ctx.fillStyle = diverging(m.img.code[k] / cm); ctx.fillRect(rows.xs + k * cw, rows.y, cw - 1, rows.h); } if (hd('code') != null) { ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect(rows.xs + hd('code') * cw - 1.5, rows.y - 1.5, cw + 2, rows.h + 3); }
+      label('× projection + bias', y1, c.ink2); cells(rows.xs, y1, emb, hd('word'));
+    } else {
+      text(`row ${m.v} of the table, looked up for “${cut(m.word, 24)}”`, rows.xs, 20, capFont, c.ink3);
+      label(`“${cut(m.word, 14)}” row ${m.v}`, rows.y); cells(rows.xs, rows.y, emb, hd('word'));
+    }
     if (m.pos) {
       const sum = Float64Array.from(emb, (x, d) => x + m.pos[d]);
-      label(`+ position ${m.posIndex}`, rows.y + rows.pitch, c.ink2); cells(rows.xs, rows.y + rows.pitch, m.pos, hd('pos'));
-      label('= into the network', rows.y + 2 * rows.pitch, c.ink2); cells(rows.xs, rows.y + 2 * rows.pitch, sum, hd('sum'));
+      label(`+ position ${m.posIndex}`, y1 + rows.pitch, c.ink2); cells(rows.xs, y1 + rows.pitch, m.pos, hd('pos'));
+      label('= into the network', y1 + 2 * rows.pitch, c.ink2); cells(rows.xs, y1 + 2 * rows.pitch, sum, hd('sum'));
     }
     // the nearest rows
-    text(`the ${m.neighbours.length} rows nearest to it, by cosine${m.trained ? '' : ' · random before training'}`, rows.xs, L.nbY - 16, capFont, c.ink3);
+    text(`the ${m.neighbours.length} rows nearest to ${m.img ? 'the projected code' : 'it'}, by cosine${m.trained ? '' : ' · random before training'}`, rows.xs, L.nbY - 16, capFont, c.ink3);
     m.neighbours.forEach((n, k) => { const y = L.nbY + k * L.nbH, on = hov && hov.kind === 'nb' && hov.k === k; label(`${cut(n.word, 14)} ${n.cos.toFixed(2)}`, y, on ? c.ink : c.ink2); cells(rows.xs, y, E.subarray(n.v * D, (n.v + 1) * D), on ? hov.d : null); if (on) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1; ctx.strokeRect(rows.xs - 2.5, y - 2.5, rows.w + 4, rows.h + 5); } });
     text(`red positive, blue negative, one scale for the whole table (±${mx.toFixed(2)})`, rows.xs, L.H - 13, mono9, c.ink3);
   }
@@ -2697,11 +2712,16 @@ window.Viz = (function () {
     const s = ET_W / canvas.clientWidth, x = px * s, y = py * s, { thumb, rows } = L, D = m.D, f = v => fmtSigned(v, 2), E = m.E;
     if (x >= thumb.x - 2 && x <= thumb.x + thumb.w + 12 && y >= thumb.y && y < thumb.y + thumb.h) { const v = Math.min(m.V - 1, Math.max(0, Math.floor((y - thumb.y) / thumb.row))); return { kind: 'thumb', v, text: `row ${v}: “${m.words[v]}”${m.counts ? ` · ${m.counts[v]} times in training` : ''}` }; }
     const inStrip = y0 => y >= y0 - 2 && y <= y0 + rows.h + 2, dOf = () => Math.min(D - 1, Math.max(0, Math.floor((x - rows.xs) / rows.cw))), inX = x >= rows.xs - 2 && x <= rows.xs + rows.w + 2, inLabel = x >= rows.labelX - 130 && x < rows.xs;
-    const emb = E.subarray(m.v * D, (m.v + 1) * D);
-    if (inX && inStrip(rows.y)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `“${m.word}” number ${d + 1} of ${D} = ${f(emb[d])} · learned, looked up by the word’s row` }; }
-    if (m.pos && inX && inStrip(rows.y + rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'pos', d, text: `position ${m.posIndex} number ${d + 1} = ${f(m.pos[d])} · learned, one row per position` }; }
-    if (m.pos && inX && inStrip(rows.y + 2 * rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'sum', d, text: `into the network, number ${d + 1} = ${f(emb[d] + m.pos[d])} (${f(emb[d])} + ${f(m.pos[d])})` }; }
-    for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}” · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
+    const emb = m.img ? m.img.vec : E.subarray(m.v * D, (m.v + 1) * D), y1 = rows.y + (m.img ? rows.pitch : 0);
+    if (m.img) {
+      const C = m.img.C, P = L.pin;
+      if (inX && inStrip(rows.y)) { const k = Math.min(C - 1, Math.max(0, Math.floor((x - rows.xs) / (rows.w / C)))); return { kind: 'cell', row: 'code', d: k, text: `the code, number ${k + 1} of ${C} = ${f(m.img.code[k])} · from the frozen encoder, never changed by this training` }; }
+      if (P && x >= P.x && x < P.x + C * P.cw && y >= P.y && y < P.y + D * P.rh) { const d = Math.floor((y - P.y) / P.rh), k = Math.floor((x - P.x) / P.cw); return { kind: 'pin', d, k, text: `projection weight (${d + 1}, ${k + 1}) = ${f(m.img.Pin[d * C + k])} · code number ${k + 1} into vector number ${d + 1} · learned` }; }
+      if (inX && inStrip(y1)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `projected, number ${d + 1} of ${D} = ${f(emb[d])} · Σ over the ${C} code numbers × the projection’s row + bias ${f(m.img.bin[d])}` }; }
+    } else if (inX && inStrip(rows.y)) { const d = dOf(); return { kind: 'cell', row: 'word', d, text: `“${m.word}” number ${d + 1} of ${D} = ${f(emb[d])} · learned, looked up by the word’s row` }; }
+    if (m.pos && inX && inStrip(y1 + rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'pos', d, text: `position ${m.posIndex} number ${d + 1} = ${f(m.pos[d])} · learned, one row per position` }; }
+    if (m.pos && inX && inStrip(y1 + 2 * rows.pitch)) { const d = dOf(); return { kind: 'cell', row: 'sum', d, text: `into the network, number ${d + 1} = ${f(emb[d] + m.pos[d])} (${f(emb[d])} + ${f(m.pos[d])})` }; }
+    for (let k = 0; k < m.neighbours.length; k++) { const y0 = L.nbY + k * L.nbH; if (!inStrip(y0)) continue; const n = m.neighbours[k]; if (inX) { const d = dOf(); return { kind: 'nb', k, v: n.v, d, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to ${m.img ? 'the projected code' : `“${m.word}”`} · number ${d + 1} = ${f(E[n.v * D + d])}` }; } if (inLabel) return { kind: 'nb', k, v: n.v, text: `“${n.word}” (row ${n.v}) · cosine ${n.cos.toFixed(2)} to “${m.word}”${m.counts ? ` · ${m.counts[n.v]} times in training` : ''}` }; }
     return null;
   }
   // ---- calibration and deferral: the classified test cases on the axis of the network's probability, with the truth,
