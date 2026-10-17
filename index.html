@@ -1429,6 +1429,11 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
         </div>
       </div>
       <div class="card">
+        <div class="card-head"><h2>The network, for one pixel</h2><span class="small muted">every map at the pixel's place: the channels as circles, the kernels' contributions as lines · the pixel follows the mouse on the field, click to pin it</span></div>
+        <div class="net-wrap"><canvas id="sg-net" width="860" height="460" aria-label="The segmentation network unrolled at one pixel: circles for the channels of every map at that pixel, lines for the kernels' contributions"></canvas><div class="tip" id="sg-net-tip" hidden></div></div>
+        <p class="small muted" id="sg-net-note" style="margin-top:6px"></p>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>The first layer's maps on this field</h2><span class="small muted">each filter's response, dark where strong · the network looks at these, never at the pixels again</span></div>
         <div class="net-wrap"><canvas id="sg-maps" width="720" height="300" aria-label="The maps of the first layer on the field"></canvas></div>
       </div>
@@ -1479,6 +1484,11 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
           <div><div class="net-wrap"><canvas id="sg-test-canvas" width="528" height="384" aria-label="The field under test with the network's prediction, the truth or the errors"></canvas><div class="tip" id="sg-test-tip" hidden></div></div><div class="legend" id="sg-test-legend" style="margin-top:8px"></div></div>
           <div><p class="small muted" id="sg-test-field-note"></p><div class="rp-case" id="sg-test-iou" style="margin-top:10px"></div></div>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The network, for one pixel of the field under test</h2><span class="small muted">the same circles and lines, on the field being painted · hover the field to follow a pixel, click to pin it</span></div>
+        <div class="net-wrap"><canvas id="sg-test-net" width="860" height="460" aria-label="The segmentation network unrolled at one pixel of the field under test"></canvas><div class="tip" id="sg-test-net-tip" hidden></div></div>
+        <p class="small muted" id="sg-test-net-note" style="margin-top:6px"></p>
       </div>
       <div class="card">
         <div class="card-head">

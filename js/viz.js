@@ -993,6 +993,84 @@ window.Viz = (function () {
     ctx.clearRect(0, 0, Wd, Hd); let mx = 1e-9; for (let i = 0; i < cout * cin * 9; i++) mx = Math.max(mx, Math.abs(Wt[i]));
     for (let o = 0; o < cout; o++) { const x0 = (o % cols) * (fw + gap), y0 = Math.floor(o / cols) * (fw + gap + 14) + 14; for (let i = 0; i < 9; i++) { let v = 0; for (let ci = 0; ci < cin; ci++) v += Wt[(o * cin + ci) * 9 + i]; const col = divergingRgb(v / mx); ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fillRect(x0 + (i % 3) * cell, y0 + Math.floor(i / 3) * cell, cell - 1, cell - 1); } ctx.fillStyle = c.ink2; ctx.font = '10px ' + (c.mono || 'monospace'); ctx.textAlign = 'center'; ctx.fillText(String(o + 1), x0 + fw / 2, y0 - 4); }
   }
+  // ---- the segmentation network unrolled at one pixel (SegNet.pixelPath): every map's channels at the pixel's place as
+  // circles, every kernel's contribution there as a line, the levels of context as bands going down and up again, a U
+  const SN_W = 860;
+  function layoutSegNet(P) {
+    const C = P.C, big = C > 8, pitch = big ? 11 : 16, r = big ? 4.5 : 6, bandDrop = big ? 76 : 60, n = P.cols.length, mL = 100, mR = 104;
+    const xs = j => mL + j * (SN_W - mL - mR) / Math.max(1, n - 1), half = C * pitch, top = 58, bandY = l => top + half + l * bandDrop, H = top + 2 * half + P.levels * bandDrop + 40;
+    const cols = P.cols.map((col, j) => { const k = col.values.length, p = k <= 4 ? pitch * 2.5 : pitch, rr = k <= 4 ? r + 2 : r, yc = bandY(col.level), circles = []; for (let i = 0; i < k; i++) circles.push({ x: xs(j), y: yc + (i - (k - 1) / 2) * p, r: rr, col: j, i }); return { x: xs(j), yc, circles, top: circles[0].y - rr, bottom: circles[k - 1].y + rr }; });
+    const lines = [];
+    P.cols.forEach((col, j) => {
+      if (col.from == null) return; const from = cols[col.from], to = cols[j];
+      if (col.kind === 'conv' || col.kind === 'head') { for (let o = 0; o < col.values.length; o++) for (let c = 0; c < col.cin; c++) lines.push({ kind: 'w', col: j, c, o, v: col.contrib[o * col.cin + c], x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[o].x, y2: to.circles[o].y }); }
+      else if (col.kind === 'join') { const skip = cols[col.skipFrom], C2 = col.values.length / 2; for (let c = 0; c < C2; c++) { lines.push({ kind: 'skip', col: j, c, o: c, x1: skip.circles[c].x, y1: skip.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y }); lines.push({ kind: 'up', col: j, c, o: C2 + c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[C2 + c].x, y2: to.circles[C2 + c].y }); } }
+      else for (let c = 0; c < col.values.length; c++) lines.push({ kind: col.kind, col: j, c, o: c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y });
+    });
+    return { cols, lines, H, bandY };
+  }
+  // m = { path (SegNet.pixelPath), classNames, classColors (rgb triples), argmax, hover ({ kind: 'unit', col, i } or { kind: 'line', col, c, o } or null), pinned }
+  function drawSegNetwork(canvas, m) {
+    const P = m.path, L = layoutSegNet(P), c = colors(), ctx = fitCanvas(canvas, SN_W, L.H); canvas._segNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (s, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(s, x, y); };
+    ctx.clearRect(0, 0, SN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, SN_W, L.H);
+    const hov = m.hover, srcOf = ln => (ln.kind === 'skip' ? P.cols[ln.col].skipFrom : P.cols[ln.col].from);
+    const touches = ln => !!hov && (hov.kind === 'line' ? hov.col === ln.col && hov.c === ln.c && hov.o === ln.o : (hov.col === ln.col && hov.i === ln.o) || (hov.col === srcOf(ln) && hov.i === ln.c));
+    text(`THE NETWORK AT PIXEL (${P.x}, ${P.y})${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
+    text('circles: the channels at the pixel\'s place (hollow: ReLU off) · lines: each kernel\'s contribution there, orange +, blue − · under each column, the window it sees', 12, 24, mono9, c.ink3);
+    for (let l = 0; l <= P.levels; l++) { const lev = P.cols.find(col => col.level === l && col.kind === 'conv'); text(`level ${l}`, 10, L.bandY(l) - 6, mono9, c.ink2, 'left', 'middle'); text(`${lev.w} × ${lev.h}${l ? ' · pooled' : ''}`, 10, L.bandY(l) + 6, mono8, c.ink3, 'left', 'middle'); }
+    // the lines, on one scale per column (its largest contribution), weak first so that the strong ones sit on top
+    const maxOf = {}; for (const ln of L.lines) if (ln.kind === 'w') maxOf[ln.col] = Math.max(maxOf[ln.col] || 1e-9, Math.abs(ln.v));
+    const rel = ln => (ln.kind === 'w' ? Math.abs(ln.v) / maxOf[ln.col] : 0.5), dim = hov ? 0.2 : 1;
+    for (const ln of L.lines.slice().sort((a, b) => rel(a) - rel(b))) {
+      const on = touches(ln), f = on ? 1 : dim;
+      if (ln.kind === 'w') { const k = rel(ln); ctx.strokeStyle = rgbStr(ln.v < 0 ? c.rgb.regular : c.rgb.irregular, (0.08 + 0.92 * k) * f); ctx.lineWidth = (0.4 + 4 * Math.pow(k, 0.9)) * (on ? 1.5 : 1); }
+      else { ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.55 * f); ctx.lineWidth = on ? 2 : 1; if (ln.kind === 'skip') ctx.setLineDash([3, 3]); }
+      ctx.beginPath(); ctx.moveTo(ln.x1, ln.y1); ctx.lineTo(ln.x2, ln.y2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // the circles: the activations on one scale per column; the signed columns (the pixel, the scores) in the diverging colours
+    P.cols.forEach((col, j) => {
+      const Lc = L.cols[j]; let mx = 1e-9; for (const v of col.values) mx = Math.max(mx, Math.abs(v));
+      col.values.forEach((v, i) => {
+        const q = Lc.circles[i], on = !!hov && hov.kind === 'unit' && hov.col === j && hov.i === i;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+        if (col.kind === 'softmax') ctx.fillStyle = rgbStr(m.classColors[i], 0.2 + 0.8 * v);
+        else if (col.signed) ctx.fillStyle = diverging(v / mx, 0.9);
+        else ctx.fillStyle = v > 0 ? rgbStr(c.rgb.accent, 0.12 + 0.88 * v / mx) : c.surface;
+        ctx.fill(); ctx.strokeStyle = on ? c.ink : c.lineStrong; ctx.lineWidth = on ? 2 : 1; ctx.stroke();
+      });
+      if (col.kind === 'join') { const h2 = col.values.length / 2, mid = (Lc.circles[h2 - 1].y + Lc.circles[h2].y) / 2; ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Lc.x - 11, mid); ctx.lineTo(Lc.x + 11, mid); ctx.stroke(); ctx.fillStyle = c.surface; ctx.fillRect(Lc.x - 40, mid - 13, 28, 26); text('skip', Lc.x - 13, mid - 6, mono8, c.ink3, 'right', 'middle'); text('up 2×', Lc.x - 13, mid + 7, mono8, c.ink3, 'right', 'middle'); }
+      text(col.kind === 'pool' ? 'pool' : col.kind === 'head' ? 'head' : col.name, Lc.x, Lc.top - 13, mono9, c.ink2, 'center', 'middle'); text(`${col.sees} px`, Lc.x, Lc.bottom + 11, mono8, c.ink3, 'center', 'middle');
+      if (col.kind === 'softmax') col.values.forEach((v, i) => text(`${m.classNames[i]} ${pctText(v)}`, Lc.x + 14, Lc.circles[i].y, i === m.argmax ? mono9 : mono8, i === m.argmax ? c.ink : c.ink3, 'left', 'middle'));
+      if (col.kind === 'head') col.values.forEach((v, i) => text(fmtSigned(v, 1), Lc.x + 11, Lc.circles[i].y, mono8, c.ink3, 'left', 'middle'));
+    });
+    text(hov && hov.text ? hov.text : 'hover a circle for its value, a line for its kernel · the pixel follows the mouse on the field; click the field to pin it', 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+  }
+  function snDist(x, y, ln) { const dx = ln.x2 - ln.x1, dy = ln.y2 - ln.y1, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((x - ln.x1) * dx + (y - ln.y1) * dy) / L2)) : 0; return Math.hypot(x - ln.x1 - t * dx, y - ln.y1 - t * dy); }
+  // what is under a point of the diagram (canvas-relative CSS pixels): a circle or a line, with a text for the tip and the 3 × 3 kernel of a line
+  function hitSegNetwork(canvas, px, py, m) {
+    const L = canvas._segNet, P = m.path; if (!L) return null; const s = SN_W / canvas.clientWidth, x = px * s, y = py * s, f3 = v => fmtSigned(v, 3), name = col => `level ${col.level} · ${col.name}`;
+    for (let j = 0; j < L.cols.length; j++) for (const q of L.cols[j].circles) if (Math.hypot(x - q.x, y - q.y) <= q.r + 4) {
+      const col = P.cols[j], i = q.i, v = col.values[i]; let t;
+      if (col.kind === 'input') t = `the pixel's ink, centred on the mean: ${f3(v)} · the first convolution reads it with its 8 neighbours`;
+      else if (col.kind === 'pool') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)} · the largest of the 2 × 2 block below it in level ${col.level - 1}'s conv 2 map · at (${col.px}, ${col.py}) of ${col.w} × ${col.h}`;
+      else if (col.kind === 'conv') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)}${col.pre[i] <= 0 ? ` (ReLU off: ${f3(col.pre[i])} before it)` : ''} · bias ${f3(col.layer.b[i])} + ${col.cin} kernel${col.cin > 1 ? 's' : ''} of 3 × 3 · at (${col.px}, ${col.py}) of ${col.w} × ${col.h} · sees ${col.sees} px`;
+      else if (col.kind === 'join') { const C2 = col.values.length / 2; t = i < C2 ? `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · copied from this level's conv 2 (the skip)` : `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · upsampled from level ${col.level + 1}, one value for the 2 × 2 pixels it covers`; }
+      else if (col.kind === 'head') t = `score for ${m.classNames[i]}: ${f3(v)} = bias ${f3(col.layer.b[i])} + Σ weight × channel over the ${col.cin} channels of the last map`;
+      else t = `${m.classNames[i]} ${pctText(v)}: e^score over the sum of the ${col.values.length} · the largest is the class painted`;
+      return { kind: 'unit', col: j, i, text: t };
+    }
+    let best = null, bd = 4; for (const ln of L.lines) { const d = snDist(x, y, ln); if (d < bd) { bd = d; best = ln; } }
+    if (!best) return null;
+    const col = P.cols[best.col]; let t, kernel = null;
+    if (best.kind === 'w') { kernel = col.kernel(best.o, best.c); t = col.kind === 'head' ? `channel ${best.c + 1} → ${m.classNames[best.o]}: weight ${f3(kernel[0])} × ${fmtNum(P.cols[col.from].values[best.c], 3)} = ${f3(best.v)}` : `${name(col)} · channel ${best.c + 1} → channel ${best.o + 1}: a kernel of 3 × 3, its contribution at this pixel ${f3(best.v)} (the 9 weights × the 9 values around the pixel)`; }
+    else if (best.kind === 'skip') t = `the skip: level ${col.level}'s conv 2 map joins the upsampled one, channel ${best.c + 1} copied as it is`;
+    else if (best.kind === 'up') t = `up 2 ×: channel ${best.c + 1} of the level below, the same value for the 2 × 2 pixels it covers`;
+    else if (best.kind === 'pool') t = `pool 2 × 2: channel ${best.c + 1}, the largest of the four values below`;
+    else t = `softmax: ${m.classNames[best.c]}'s share of e^score`;
+    return { kind: 'line', col: best.col, c: best.c, o: best.o, text: t, kernel: kernel && kernel.length === 9 ? kernel : null };
+  }
   function renderFieldThumb(canvas, px, w, h, tint, cache) { // cache: an object that keeps the tile for this tint, so other trays copy it
     const W = Math.round(w / 2), H = Math.round(h / 2), key = tint ? 'he' : 'grey';
     if (canvas.width !== W) { canvas.width = W; canvas.height = H; }
@@ -2677,5 +2755,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

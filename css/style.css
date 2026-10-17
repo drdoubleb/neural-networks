@@ -651,3 +651,6 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .rp-try { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
 .rp-try input { font-family: var(--font-mono); font-size: 12px; padding: 4px 6px; width: 150px; }
 .rp-try .arrow { color: var(--ink-3); }
+/* the 3 × 3 kernel of a hovered line of the segmentation network, in the tip */
+.kgrid { display: inline-grid; grid-template-columns: repeat(3, 8px); gap: 1px; vertical-align: middle; margin-left: 6px; }
+.kgrid i { display: block; width: 8px; height: 8px; border-radius: 1px; }

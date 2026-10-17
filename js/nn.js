@@ -943,6 +943,40 @@
     // the mean cross-entropy over the pixels (weighted by class when the network has class weights) and the pixel accuracy
     loss(fw, y) { const K = this.K, N = fw.H * fw.W, cw = this.classWeights; let s = 0, wsum = 0, right = 0; for (let i = 0; i < N; i++) { const t = y[i], wi = cw ? cw[t] : 1; s += -wi * Math.log(fw.probs[t * N + i] + EPS); wsum += wi; let best = 0; for (let k = 1; k < K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; if (best === t) right++; } return { loss: wsum ? s / wsum : 0, accuracy: right / N }; }
     predict(x, H, W) { const fw = this.forward(x, H, W), N = H * W, labels = new Uint8Array(N); for (let i = 0; i < N; i++) { let best = 0; for (let k = 1; k < this.K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; labels[i] = best; } return { labels, probs: fw.probs, fw }; }
+    // the network unrolled at one pixel, for a diagram: every map's channels at the pixel's place (pooled coordinates
+    // at the deeper levels), and what every kernel contributed there (the 9 weights × the 9 values around the pixel),
+    // so that the bias and the contributions add up to the pre-activation; the columns run from the pixel through
+    // every level (conv, conv, then the pool that leads down), the joins and up-convolutions back up, the head and the softmax
+    pixelPath(fw, x, y) {
+      const C = this.C, K = this.K, cols = [], convTwo = [];
+      const pos = l => { const lev = fw.levels[l]; return { px: Math.min(lev.w - 1, x >> l), py: Math.min(lev.h - 1, y >> l) }; };
+      const take = (arr, n, h, w, px, py) => Float64Array.from({ length: n }, (_, ch) => arr[(ch * h + py) * w + px]);
+      const contrib3 = (inp, layer, h, w, px, py) => { const { W: Wt, cin, cout } = layer, out = new Float64Array(cout * cin); for (let o = 0; o < cout; o++) for (let c = 0; c < cin; c++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const yy = py + dy; if (yy < 0 || yy >= h) continue; for (let dx = -1; dx <= 1; dx++) { const xx = px + dx; if (xx < 0 || xx >= w) continue; s += Wt[(o * cin + c) * 9 + (dy + 1) * 3 + dx + 1] * inp[(c * h + yy) * w + xx]; } } out[o * cin + c] = s; } return out; };
+      const kernelOf = layer => (o, c) => Array.from(layer.W.subarray((o * layer.cin + c) * 9, (o * layer.cin + c) * 9 + 9));
+      let rf = 1; const lev0 = fw.levels[0];
+      const patch = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; patch.push(yy < 0 || yy >= lev0.h || xx < 0 || xx >= lev0.w ? 0 : lev0.x[yy * lev0.w + xx]); }
+      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: rf });
+      for (let l = 0; l <= this.L; l++) {
+        const lev = fw.levels[l], { px, py } = pos(l), l1 = this.enc[l][0], l2 = this.enc[l][1];
+        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: rf });
+        convTwo[l] = cols.length - 1;
+      }
+      for (let k = 0; k < fw.decs.length; k++) {
+        const d = fw.decs[k], l = d.l, lev = fw.levels[l], { px, py } = pos(l), layer = this.dec[k];
+        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: rf });
+      }
+      const N = fw.H * fw.W, i0 = y * fw.W + x, hd = this.head, top = cols[cols.length - 1].values, hc = new Float64Array(K * C);
+      for (let k = 0; k < K; k++) for (let c = 0; c < C; c++) hc[k * C + c] = hd.W[k * C + c] * top[c];
+      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: rf });
+      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: rf });
+      return { x, y, cols, C, K, levels: this.L, rf };
+    }
     newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
     // one step on a batch of samples [{ x, y, H, W }]: the mean loss before the step
     trainBatch(samples, lr, l2 = 0) {

@@ -662,6 +662,9 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .rp-try { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: 13px; }
 .rp-try input { font-family: var(--font-mono); font-size: 12px; padding: 4px 6px; width: 150px; }
 .rp-try .arrow { color: var(--ink-3); }
+/* the 3 × 3 kernel of a hovered line of the segmentation network, in the tip */
+.kgrid { display: inline-grid; grid-template-columns: repeat(3, 8px); gap: 1px; vertical-align: middle; margin-left: 6px; }
+.kgrid i { display: block; width: 8px; height: 8px; border-radius: 1px; }
 
 </style>
 </head>
@@ -2084,6 +2087,11 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
         </div>
       </div>
       <div class="card">
+        <div class="card-head"><h2>The network, for one pixel</h2><span class="small muted">every map at the pixel's place: the channels as circles, the kernels' contributions as lines · the pixel follows the mouse on the field, click to pin it</span></div>
+        <div class="net-wrap"><canvas id="sg-net" width="860" height="460" aria-label="The segmentation network unrolled at one pixel: circles for the channels of every map at that pixel, lines for the kernels' contributions"></canvas><div class="tip" id="sg-net-tip" hidden></div></div>
+        <p class="small muted" id="sg-net-note" style="margin-top:6px"></p>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>The first layer's maps on this field</h2><span class="small muted">each filter's response, dark where strong · the network looks at these, never at the pixels again</span></div>
         <div class="net-wrap"><canvas id="sg-maps" width="720" height="300" aria-label="The maps of the first layer on the field"></canvas></div>
       </div>
@@ -2134,6 +2142,11 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
           <div><div class="net-wrap"><canvas id="sg-test-canvas" width="528" height="384" aria-label="The field under test with the network's prediction, the truth or the errors"></canvas><div class="tip" id="sg-test-tip" hidden></div></div><div class="legend" id="sg-test-legend" style="margin-top:8px"></div></div>
           <div><p class="small muted" id="sg-test-field-note"></p><div class="rp-case" id="sg-test-iou" style="margin-top:10px"></div></div>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>The network, for one pixel of the field under test</h2><span class="small muted">the same circles and lines, on the field being painted · hover the field to follow a pixel, click to pin it</span></div>
+        <div class="net-wrap"><canvas id="sg-test-net" width="860" height="460" aria-label="The segmentation network unrolled at one pixel of the field under test"></canvas><div class="tip" id="sg-test-net-tip" hidden></div></div>
+        <p class="small muted" id="sg-test-net-note" style="margin-top:6px"></p>
       </div>
       <div class="card">
         <div class="card-head">
@@ -3876,6 +3889,40 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
     // the mean cross-entropy over the pixels (weighted by class when the network has class weights) and the pixel accuracy
     loss(fw, y) { const K = this.K, N = fw.H * fw.W, cw = this.classWeights; let s = 0, wsum = 0, right = 0; for (let i = 0; i < N; i++) { const t = y[i], wi = cw ? cw[t] : 1; s += -wi * Math.log(fw.probs[t * N + i] + EPS); wsum += wi; let best = 0; for (let k = 1; k < K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; if (best === t) right++; } return { loss: wsum ? s / wsum : 0, accuracy: right / N }; }
     predict(x, H, W) { const fw = this.forward(x, H, W), N = H * W, labels = new Uint8Array(N); for (let i = 0; i < N; i++) { let best = 0; for (let k = 1; k < this.K; k++) if (fw.probs[k * N + i] > fw.probs[best * N + i]) best = k; labels[i] = best; } return { labels, probs: fw.probs, fw }; }
+    // the network unrolled at one pixel, for a diagram: every map's channels at the pixel's place (pooled coordinates
+    // at the deeper levels), and what every kernel contributed there (the 9 weights × the 9 values around the pixel),
+    // so that the bias and the contributions add up to the pre-activation; the columns run from the pixel through
+    // every level (conv, conv, then the pool that leads down), the joins and up-convolutions back up, the head and the softmax
+    pixelPath(fw, x, y) {
+      const C = this.C, K = this.K, cols = [], convTwo = [];
+      const pos = l => { const lev = fw.levels[l]; return { px: Math.min(lev.w - 1, x >> l), py: Math.min(lev.h - 1, y >> l) }; };
+      const take = (arr, n, h, w, px, py) => Float64Array.from({ length: n }, (_, ch) => arr[(ch * h + py) * w + px]);
+      const contrib3 = (inp, layer, h, w, px, py) => { const { W: Wt, cin, cout } = layer, out = new Float64Array(cout * cin); for (let o = 0; o < cout; o++) for (let c = 0; c < cin; c++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const yy = py + dy; if (yy < 0 || yy >= h) continue; for (let dx = -1; dx <= 1; dx++) { const xx = px + dx; if (xx < 0 || xx >= w) continue; s += Wt[(o * cin + c) * 9 + (dy + 1) * 3 + dx + 1] * inp[(c * h + yy) * w + xx]; } } out[o * cin + c] = s; } return out; };
+      const kernelOf = layer => (o, c) => Array.from(layer.W.subarray((o * layer.cin + c) * 9, (o * layer.cin + c) * 9 + 9));
+      let rf = 1; const lev0 = fw.levels[0];
+      const patch = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; patch.push(yy < 0 || yy >= lev0.h || xx < 0 || xx >= lev0.w ? 0 : lev0.x[yy * lev0.w + xx]); }
+      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: rf });
+      for (let l = 0; l <= this.L; l++) {
+        const lev = fw.levels[l], { px, py } = pos(l), l1 = this.enc[l][0], l2 = this.enc[l][1];
+        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: rf });
+        convTwo[l] = cols.length - 1;
+      }
+      for (let k = 0; k < fw.decs.length; k++) {
+        const d = fw.decs[k], l = d.l, lev = fw.levels[l], { px, py } = pos(l), layer = this.dec[k];
+        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: rf });
+        rf += 2 * (1 << l);
+        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: rf });
+      }
+      const N = fw.H * fw.W, i0 = y * fw.W + x, hd = this.head, top = cols[cols.length - 1].values, hc = new Float64Array(K * C);
+      for (let k = 0; k < K; k++) for (let c = 0; c < C; c++) hc[k * C + c] = hd.W[k * C + c] * top[c];
+      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: rf });
+      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: rf });
+      return { x, y, cols, C, K, levels: this.L, rf };
+    }
     newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
     // one step on a batch of samples [{ x, y, H, W }]: the mean loss before the step
     trainBatch(samples, lr, l2 = 0) {
@@ -5121,6 +5168,84 @@ window.Viz = (function () {
     const { W: Wt, cout, cin } = opt, cell = opt.cell || 14, gap = 10, cols = opt.cols || cout, rows = Math.ceil(cout / cols), fw = 3 * cell, Wd = cols * (fw + gap) - gap, Hd = rows * (fw + gap + 14) - gap, ctx = fitCanvas(canvas, Wd, Hd), c = colors();
     ctx.clearRect(0, 0, Wd, Hd); let mx = 1e-9; for (let i = 0; i < cout * cin * 9; i++) mx = Math.max(mx, Math.abs(Wt[i]));
     for (let o = 0; o < cout; o++) { const x0 = (o % cols) * (fw + gap), y0 = Math.floor(o / cols) * (fw + gap + 14) + 14; for (let i = 0; i < 9; i++) { let v = 0; for (let ci = 0; ci < cin; ci++) v += Wt[(o * cin + ci) * 9 + i]; const col = divergingRgb(v / mx); ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; ctx.fillRect(x0 + (i % 3) * cell, y0 + Math.floor(i / 3) * cell, cell - 1, cell - 1); } ctx.fillStyle = c.ink2; ctx.font = '10px ' + (c.mono || 'monospace'); ctx.textAlign = 'center'; ctx.fillText(String(o + 1), x0 + fw / 2, y0 - 4); }
+  }
+  // ---- the segmentation network unrolled at one pixel (SegNet.pixelPath): every map's channels at the pixel's place as
+  // circles, every kernel's contribution there as a line, the levels of context as bands going down and up again, a U
+  const SN_W = 860;
+  function layoutSegNet(P) {
+    const C = P.C, big = C > 8, pitch = big ? 11 : 16, r = big ? 4.5 : 6, bandDrop = big ? 76 : 60, n = P.cols.length, mL = 100, mR = 104;
+    const xs = j => mL + j * (SN_W - mL - mR) / Math.max(1, n - 1), half = C * pitch, top = 58, bandY = l => top + half + l * bandDrop, H = top + 2 * half + P.levels * bandDrop + 40;
+    const cols = P.cols.map((col, j) => { const k = col.values.length, p = k <= 4 ? pitch * 2.5 : pitch, rr = k <= 4 ? r + 2 : r, yc = bandY(col.level), circles = []; for (let i = 0; i < k; i++) circles.push({ x: xs(j), y: yc + (i - (k - 1) / 2) * p, r: rr, col: j, i }); return { x: xs(j), yc, circles, top: circles[0].y - rr, bottom: circles[k - 1].y + rr }; });
+    const lines = [];
+    P.cols.forEach((col, j) => {
+      if (col.from == null) return; const from = cols[col.from], to = cols[j];
+      if (col.kind === 'conv' || col.kind === 'head') { for (let o = 0; o < col.values.length; o++) for (let c = 0; c < col.cin; c++) lines.push({ kind: 'w', col: j, c, o, v: col.contrib[o * col.cin + c], x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[o].x, y2: to.circles[o].y }); }
+      else if (col.kind === 'join') { const skip = cols[col.skipFrom], C2 = col.values.length / 2; for (let c = 0; c < C2; c++) { lines.push({ kind: 'skip', col: j, c, o: c, x1: skip.circles[c].x, y1: skip.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y }); lines.push({ kind: 'up', col: j, c, o: C2 + c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[C2 + c].x, y2: to.circles[C2 + c].y }); } }
+      else for (let c = 0; c < col.values.length; c++) lines.push({ kind: col.kind, col: j, c, o: c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y });
+    });
+    return { cols, lines, H, bandY };
+  }
+  // m = { path (SegNet.pixelPath), classNames, classColors (rgb triples), argmax, hover ({ kind: 'unit', col, i } or { kind: 'line', col, c, o } or null), pinned }
+  function drawSegNetwork(canvas, m) {
+    const P = m.path, L = layoutSegNet(P), c = colors(), ctx = fitCanvas(canvas, SN_W, L.H); canvas._segNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (s, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(s, x, y); };
+    ctx.clearRect(0, 0, SN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, SN_W, L.H);
+    const hov = m.hover, srcOf = ln => (ln.kind === 'skip' ? P.cols[ln.col].skipFrom : P.cols[ln.col].from);
+    const touches = ln => !!hov && (hov.kind === 'line' ? hov.col === ln.col && hov.c === ln.c && hov.o === ln.o : (hov.col === ln.col && hov.i === ln.o) || (hov.col === srcOf(ln) && hov.i === ln.c));
+    text(`THE NETWORK AT PIXEL (${P.x}, ${P.y})${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
+    text('circles: the channels at the pixel\'s place (hollow: ReLU off) · lines: each kernel\'s contribution there, orange +, blue − · under each column, the window it sees', 12, 24, mono9, c.ink3);
+    for (let l = 0; l <= P.levels; l++) { const lev = P.cols.find(col => col.level === l && col.kind === 'conv'); text(`level ${l}`, 10, L.bandY(l) - 6, mono9, c.ink2, 'left', 'middle'); text(`${lev.w} × ${lev.h}${l ? ' · pooled' : ''}`, 10, L.bandY(l) + 6, mono8, c.ink3, 'left', 'middle'); }
+    // the lines, on one scale per column (its largest contribution), weak first so that the strong ones sit on top
+    const maxOf = {}; for (const ln of L.lines) if (ln.kind === 'w') maxOf[ln.col] = Math.max(maxOf[ln.col] || 1e-9, Math.abs(ln.v));
+    const rel = ln => (ln.kind === 'w' ? Math.abs(ln.v) / maxOf[ln.col] : 0.5), dim = hov ? 0.2 : 1;
+    for (const ln of L.lines.slice().sort((a, b) => rel(a) - rel(b))) {
+      const on = touches(ln), f = on ? 1 : dim;
+      if (ln.kind === 'w') { const k = rel(ln); ctx.strokeStyle = rgbStr(ln.v < 0 ? c.rgb.regular : c.rgb.irregular, (0.08 + 0.92 * k) * f); ctx.lineWidth = (0.4 + 4 * Math.pow(k, 0.9)) * (on ? 1.5 : 1); }
+      else { ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.55 * f); ctx.lineWidth = on ? 2 : 1; if (ln.kind === 'skip') ctx.setLineDash([3, 3]); }
+      ctx.beginPath(); ctx.moveTo(ln.x1, ln.y1); ctx.lineTo(ln.x2, ln.y2); ctx.stroke(); ctx.setLineDash([]);
+    }
+    // the circles: the activations on one scale per column; the signed columns (the pixel, the scores) in the diverging colours
+    P.cols.forEach((col, j) => {
+      const Lc = L.cols[j]; let mx = 1e-9; for (const v of col.values) mx = Math.max(mx, Math.abs(v));
+      col.values.forEach((v, i) => {
+        const q = Lc.circles[i], on = !!hov && hov.kind === 'unit' && hov.col === j && hov.i === i;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+        if (col.kind === 'softmax') ctx.fillStyle = rgbStr(m.classColors[i], 0.2 + 0.8 * v);
+        else if (col.signed) ctx.fillStyle = diverging(v / mx, 0.9);
+        else ctx.fillStyle = v > 0 ? rgbStr(c.rgb.accent, 0.12 + 0.88 * v / mx) : c.surface;
+        ctx.fill(); ctx.strokeStyle = on ? c.ink : c.lineStrong; ctx.lineWidth = on ? 2 : 1; ctx.stroke();
+      });
+      if (col.kind === 'join') { const h2 = col.values.length / 2, mid = (Lc.circles[h2 - 1].y + Lc.circles[h2].y) / 2; ctx.strokeStyle = c.lineStrong; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(Lc.x - 11, mid); ctx.lineTo(Lc.x + 11, mid); ctx.stroke(); ctx.fillStyle = c.surface; ctx.fillRect(Lc.x - 40, mid - 13, 28, 26); text('skip', Lc.x - 13, mid - 6, mono8, c.ink3, 'right', 'middle'); text('up 2×', Lc.x - 13, mid + 7, mono8, c.ink3, 'right', 'middle'); }
+      text(col.kind === 'pool' ? 'pool' : col.kind === 'head' ? 'head' : col.name, Lc.x, Lc.top - 13, mono9, c.ink2, 'center', 'middle'); text(`${col.sees} px`, Lc.x, Lc.bottom + 11, mono8, c.ink3, 'center', 'middle');
+      if (col.kind === 'softmax') col.values.forEach((v, i) => text(`${m.classNames[i]} ${pctText(v)}`, Lc.x + 14, Lc.circles[i].y, i === m.argmax ? mono9 : mono8, i === m.argmax ? c.ink : c.ink3, 'left', 'middle'));
+      if (col.kind === 'head') col.values.forEach((v, i) => text(fmtSigned(v, 1), Lc.x + 11, Lc.circles[i].y, mono8, c.ink3, 'left', 'middle'));
+    });
+    text(hov && hov.text ? hov.text : 'hover a circle for its value, a line for its kernel · the pixel follows the mouse on the field; click the field to pin it', 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+  }
+  function snDist(x, y, ln) { const dx = ln.x2 - ln.x1, dy = ln.y2 - ln.y1, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((x - ln.x1) * dx + (y - ln.y1) * dy) / L2)) : 0; return Math.hypot(x - ln.x1 - t * dx, y - ln.y1 - t * dy); }
+  // what is under a point of the diagram (canvas-relative CSS pixels): a circle or a line, with a text for the tip and the 3 × 3 kernel of a line
+  function hitSegNetwork(canvas, px, py, m) {
+    const L = canvas._segNet, P = m.path; if (!L) return null; const s = SN_W / canvas.clientWidth, x = px * s, y = py * s, f3 = v => fmtSigned(v, 3), name = col => `level ${col.level} · ${col.name}`;
+    for (let j = 0; j < L.cols.length; j++) for (const q of L.cols[j].circles) if (Math.hypot(x - q.x, y - q.y) <= q.r + 4) {
+      const col = P.cols[j], i = q.i, v = col.values[i]; let t;
+      if (col.kind === 'input') t = `the pixel's ink, centred on the mean: ${f3(v)} · the first convolution reads it with its 8 neighbours`;
+      else if (col.kind === 'pool') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)} · the largest of the 2 × 2 block below it in level ${col.level - 1}'s conv 2 map · at (${col.px}, ${col.py}) of ${col.w} × ${col.h}`;
+      else if (col.kind === 'conv') t = `${name(col)} · channel ${i + 1}: ${fmtNum(v, 3)}${col.pre[i] <= 0 ? ` (ReLU off: ${f3(col.pre[i])} before it)` : ''} · bias ${f3(col.layer.b[i])} + ${col.cin} kernel${col.cin > 1 ? 's' : ''} of 3 × 3 · at (${col.px}, ${col.py}) of ${col.w} × ${col.h} · sees ${col.sees} px`;
+      else if (col.kind === 'join') { const C2 = col.values.length / 2; t = i < C2 ? `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · copied from this level's conv 2 (the skip)` : `join at level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · upsampled from level ${col.level + 1}, one value for the 2 × 2 pixels it covers`; }
+      else if (col.kind === 'head') t = `score for ${m.classNames[i]}: ${f3(v)} = bias ${f3(col.layer.b[i])} + Σ weight × channel over the ${col.cin} channels of the last map`;
+      else t = `${m.classNames[i]} ${pctText(v)}: e^score over the sum of the ${col.values.length} · the largest is the class painted`;
+      return { kind: 'unit', col: j, i, text: t };
+    }
+    let best = null, bd = 4; for (const ln of L.lines) { const d = snDist(x, y, ln); if (d < bd) { bd = d; best = ln; } }
+    if (!best) return null;
+    const col = P.cols[best.col]; let t, kernel = null;
+    if (best.kind === 'w') { kernel = col.kernel(best.o, best.c); t = col.kind === 'head' ? `channel ${best.c + 1} → ${m.classNames[best.o]}: weight ${f3(kernel[0])} × ${fmtNum(P.cols[col.from].values[best.c], 3)} = ${f3(best.v)}` : `${name(col)} · channel ${best.c + 1} → channel ${best.o + 1}: a kernel of 3 × 3, its contribution at this pixel ${f3(best.v)} (the 9 weights × the 9 values around the pixel)`; }
+    else if (best.kind === 'skip') t = `the skip: level ${col.level}'s conv 2 map joins the upsampled one, channel ${best.c + 1} copied as it is`;
+    else if (best.kind === 'up') t = `up 2 ×: channel ${best.c + 1} of the level below, the same value for the 2 × 2 pixels it covers`;
+    else if (best.kind === 'pool') t = `pool 2 × 2: channel ${best.c + 1}, the largest of the four values below`;
+    else t = `softmax: ${m.classNames[best.c]}'s share of e^score`;
+    return { kind: 'line', col: best.col, c: best.c, o: best.o, text: t, kernel: kernel && kernel.length === 9 ? kernel : null };
   }
   function renderFieldThumb(canvas, px, w, h, tint, cache) { // cache: an object that keeps the tile for this tint, so other trays copy it
     const W = Math.round(w / 2), H = Math.round(h / 2), key = tint ? 'he' : 'grey';
@@ -6806,7 +6931,7 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();
 
 </script>
@@ -6992,7 +7117,7 @@ window.Glossary = (function () {
     rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     dsq: { world: 'describe', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, probe: 'own', encoder: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
-    sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29 },
+    sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, testHoverNet: null },
     fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -9814,13 +9939,48 @@ window.Glossary = (function () {
   function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, rf: L.model.receptiveField() } : null }); return p; }
   function sgIouText(p) { return `mean IoU <b>${p.iou.mean == null ? '–' : pct(p.iou.mean)}</b> · ${sgClasses().map((c, k) => `${c} ${p.iou.per[k] == null ? '–' : pct(p.iou.per[k])}`).join(' · ')} · ${pct(p.acc)} of the pixels right`; }
   function sgRenderField() {
-    const L = S.sg, s = sgFocus(), p = sgDrawField('sg-canvas', s, L.view, L.hover); sgLegend('sg-legend');
+    const L = S.sg, s = sgFocus(), p = sgDrawField('sg-canvas', s, L.view, sgFieldHover(false)); sgLegend('sg-legend');
     $('sg-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name}${L.lastField === s.id ? ' · the last crops came from it' : ''}`;
     $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveField()} px across).` : 'No network yet.';
     const f = L.model.enc[0][0]; Viz.drawSegFilters($('sg-filters'), { W: f.W, cout: f.cout, cin: f.cin, cell: 12, cols: Math.min(8, f.cout) }); $('sg-filters-note').textContent = `The ${f.cout} filters of the first layer, numbered, 3 × 3 weights each, red positive and blue negative: edges, blobs and the like, learned from nothing. The layers behind them see only their maps.`;
     if (p) { const lev = p.fw.levels[0]; Viz.drawSegMaps($('sg-maps'), { maps: lev.c1.act, C: L.model.C, h: lev.h, w: lev.w, scale: 1, cols: 4, label: 'map' }); }
+    sgRenderNet(false);
   }
   function sgTip(canvasId, tipId, s, ev) { const L = S.sg, cv = $(canvasId), tip = $(tipId), r = cv.getBoundingClientRect(), hit = Viz.hitSegField(cv, ev.clientX - r.left, ev.clientY - r.top); if (!hit || !L.model) { tip.hidden = true; return null; } const p = sgPredict(s), N = L.w * L.h, i = hit.y * L.w + hit.x, probs = sgClasses().map((c, k) => `${c} ${pct(p.probs[k * N + i])}`).join(' · '); tip.hidden = false; tip.style.left = `${ev.clientX - r.left}px`; tip.style.top = `${ev.clientY - r.top}px`; tip.textContent = `(${hit.x}, ${hit.y}) · truth ${sgClasses()[s.mask[i]]} · the network says ${sgClasses()[p.labels[i]]}${p.labels[i] === s.mask[i] ? ' ✓' : ' ✗'} · ${probs}`; return hit; }
+  // ---- the network unrolled at one pixel: the pixel under the mouse on the field (a click pins it), every map's channels
+  // at its place as circles and every kernel's contribution there as lines, on the Train step for the focus field and on
+  // the Test step for the field under test
+  function sgFieldHover(onTest) { const L = S.sg; return onTest ? (L.testHover || (L.testPixelPinned ? L.testPixel : null)) : (L.hover || (L.pixelPinned ? L.pixel : null)); }
+  function sgPixelOf(onTest) { const L = S.sg, key = onTest ? 'testPixel' : 'pixel'; if (!L[key]) L[key] = { x: L.w >> 1, y: L.h >> 1 }; return L[key]; }
+  function sgNetModel(onTest) {
+    const L = S.sg, s = onTest ? (L.testSelected != null ? L.byId.get(L.testSelected) : null) : sgFocus(); if (!s || !L.model) return null;
+    const p = sgPredict(s), q = sgPixelOf(onTest), path = L.model.pixelPath(p.fw, q.x, q.y), probs = path.cols[path.cols.length - 1].values; let argmax = 0; for (let k = 1; k < probs.length; k++) if (probs[k] > probs[argmax]) argmax = k;
+    return { s, p, path, model: { path, classNames: sgClasses(), classColors: SG.colors, argmax, hover: onTest ? L.testHoverNet : L.hoverNet, pinned: onTest ? L.testPixelPinned : L.pixelPinned } };
+  }
+  function sgRenderNet(onTest) {
+    const L = S.sg, cv = $(onTest ? 'sg-test-net' : 'sg-net'), note = $(onTest ? 'sg-test-net-note' : 'sg-net-note'), M = sgNetModel(onTest);
+    if (!M) { cv._segNet = null; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); note.textContent = onTest ? 'The network at one pixel of the field under test appears once a field has been painted.' : ''; return; }
+    Viz.drawSegNetwork(cv, M.model);
+    const q = sgPixelOf(onTest), i = q.y * L.w + q.x, cls = sgClasses(), P = M.path, pinned = onTest ? L.testPixelPinned : L.pixelPinned;
+    note.innerHTML = `Pixel (${q.x}, ${q.y}) of field ${esc(M.s.name)}${pinned ? ', pinned: click the field to release it' : ': hover the field to follow another pixel, click to pin one'}. Truth <b>${cls[M.s.mask[i]]}</b>, the network says <b>${cls[M.p.labels[i]]}</b>${M.p.labels[i] === M.s.mask[i] ? ' ✓' : ' ✗'}. ${P.cols.length} columns: the pixel; at every level two 3 × 3 convolutions, with the 2 × 2 pool that leads down to the next; on the way up, at every level, the join of the upsampled map with the level’s own and one more convolution; the head’s score per class; the softmax. The window a column sees grows from 1 px to ${P.rf} px along the way, and the circles stand at the pixel’s place in each map, which the pooling makes coarser.`;
+  }
+  function sgNetHover(onTest, hit) { const L = S.sg; if (onTest) L.testHoverNet = hit; else L.hoverNet = hit; const M = sgNetModel(onTest); if (M) Viz.drawSegNetwork($(onTest ? 'sg-test-net' : 'sg-net'), M.model); }
+  function sgNetTip(onTest, ev) {
+    const L = S.sg, cv = $(onTest ? 'sg-test-net' : 'sg-net'), tip = $(onTest ? 'sg-test-net-tip' : 'sg-net-tip'), M = sgNetModel(onTest); if (!M) return;
+    const r = cv.getBoundingClientRect(), hit = Viz.hitSegNetwork(cv, ev.clientX - r.left, ev.clientY - r.top, M.model), prev = onTest ? L.testHoverNet : L.hoverNet;
+    if (!hit) { if (prev) { tip.hidden = true; sgNetHover(onTest, null); } return; }
+    tip.hidden = false; tip.style.left = `${ev.clientX - r.left}px`; tip.style.top = `${ev.clientY - r.top}px`;
+    if (prev && prev.kind === hit.kind && prev.col === hit.col && prev.i === hit.i && prev.c === hit.c && prev.o === hit.o) return;
+    let mx = 1e-9; if (hit.kernel) for (const w of hit.kernel) mx = Math.max(mx, Math.abs(w));
+    tip.innerHTML = esc(hit.text) + (hit.kernel ? ` <span class="kgrid">${hit.kernel.map(w => `<i style="background:${Viz.diverging(w / mx, 1)}"></i>`).join('')}</span>` : '');
+    sgNetHover(onTest, hit);
+  }
+  function sgFollowPixel(onTest, hit, pin) { // the field hovered (or clicked): the diagram follows, unless the pixel is pinned
+    const L = S.sg, pinKey = onTest ? 'testPixelPinned' : 'pixelPinned', key = onTest ? 'testPixel' : 'pixel';
+    if (pin) { L[pinKey] = !L[pinKey]; L[key] = { x: hit.x, y: hit.y }; }
+    else { if (L[pinKey] || (L[key] && L[key].x === hit.x && L[key].y === hit.y)) return; L[key] = { x: hit.x, y: hit.y }; }
+    sgRenderNet(onTest);
+  }
   function sgRenderCurves() {
     const L = S.sg, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1], hist = L.hist.map(h => Object.assign({}, h, { lumen: h.iou[0], epithelium: h.iou[1], stroma: h.iou[2], nest: h.iou[3] }));
     Viz.drawSeries($('sg-loss'), { hist: hist.filter(h => h.loss != null || h.testLoss != null), keys: [{ key: 'loss', color: c.accent }, { key: 'testLoss', color: testCol, dash: true }], maxEpoch: L.epochs });
@@ -9866,8 +10026,9 @@ window.Glossary = (function () {
     $('sg-stat-n').textContent = `${st.n} / ${L.test.length}`; $('sg-stat-acc').textContent = st.n ? pct(st.acc) : '–'; $('sg-stat-acc-sub').textContent = st.n ? 'of the pixels, over the fields painted' : ''; $('sg-stat-iou').textContent = st.mean != null ? pct(st.mean) : '–'; $('sg-stat-iou-sub').textContent = st.n ? 'intersection over union, the classes averaged' : ''; $('sg-stat-nest').textContent = st.nest != null ? pct(st.nest) : '–'; $('sg-stat-nest-sub').textContent = st.nNest ? `the nest class’s IoU on ${st.nNest} fields with cells below` : '';
     $('sg-segment-next').disabled = T.next >= L.test.length; $('sg-segment-all').disabled = T.next >= L.test.length; $('sg-test-warning').hidden = !(L.model.steps === 0 && !L.shipped);
     const s = L.testSelected != null ? L.byId.get(L.testSelected) : null;
-    if (s) { const p = sgDrawField('sg-test-canvas', s, L.testView, L.testHover); sgLegend('sg-test-legend'); $('sg-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`; $('sg-test-field-note').innerHTML = `${L.testView === 'pred' ? 'The class the network gives every pixel' : L.testView === 'truth' ? 'The mask the field carries' : L.testView === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}; hover a pixel for its probabilities.`; $('sg-test-iou').innerHTML = `<div class="row"><span class="k">pixels right</span><span class="v">${pct(p.acc)}</span></div><div class="row"><span class="k">mean IoU</span><span class="v">${p.iou.mean == null ? '–' : pct(p.iou.mean)}</span></div>` + sgClasses().map((c, k) => `<div class="row"><span class="k">${c}</span><span class="v">${p.iou.per[k] == null ? 'not on this field' : pct(p.iou.per[k])}</span></div>`).join(''); }
+    if (s) { const p = sgDrawField('sg-test-canvas', s, L.testView, sgFieldHover(true)); sgLegend('sg-test-legend'); $('sg-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`; $('sg-test-field-note').innerHTML = `${L.testView === 'pred' ? 'The class the network gives every pixel' : L.testView === 'truth' ? 'The mask the field carries' : L.testView === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}; hover a pixel for its probabilities.`; $('sg-test-iou').innerHTML = `<div class="row"><span class="k">pixels right</span><span class="v">${pct(p.acc)}</span></div><div class="row"><span class="k">mean IoU</span><span class="v">${p.iou.mean == null ? '–' : pct(p.iou.mean)}</span></div>` + sgClasses().map((c, k) => `<div class="row"><span class="k">${c}</span><span class="v">${p.iou.per[k] == null ? 'not on this field' : pct(p.iou.per[k])}</span></div>`).join(''); }
     else { const first = L.test[0]; Viz.drawSegField($('sg-test-canvas'), { px: first.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: null, truth: first.mask, mode: 'image', colors: SG.colors }); sgLegend('sg-test-legend'); $('sg-test-field-title').textContent = 'The field under test'; $('sg-test-field-note').textContent = 'Press Segment next field: the network paints a held-out field it never saw, and the mask it carries scores it.'; $('sg-test-iou').innerHTML = ''; }
+    sgRenderNet(true);
     for (const [id, el] of L.testThumbs) { const p = T.results.get(id); el.className = `thumb field${id === L.testSelected ? ' selected' : ''}${p ? (p.iou.mean >= 0.6 ? ' right' : ' wrong') : ''}`; const b = el.querySelector('.badge'); b.textContent = p && p.iou.mean != null ? String(Math.round(100 * p.iou.mean)) : ''; b.style.display = p ? 'block' : 'none'; }
   }
   function bindSegment() {
@@ -9882,8 +10043,12 @@ window.Glossary = (function () {
     document.querySelectorAll('#sg-test-view-seg button').forEach(b => b.addEventListener('click', () => { L.testView = b.dataset.view; sgSyncControls(); if (L.model) sgRenderTest(); }));
     document.querySelectorAll('#sg-data-view-seg button').forEach(b => b.addEventListener('click', () => { L.dataView = b.dataset.view; sgSyncControls(); if (L.built) sgRenderData(); }));
     $('sg-prev').addEventListener('click', () => sgNeighbour(-1)); $('sg-next').addEventListener('click', () => sgNeighbour(1)); $('sg-data-prev').addEventListener('click', () => sgDataNeighbour(-1)); $('sg-data-next').addEventListener('click', () => sgDataNeighbour(1));
-    const cv = $('sg-canvas'); cv.addEventListener('mousemove', ev => { if (!L.model) return; const hit = sgTip('sg-canvas', 'sg-tip', sgFocus(), ev); if (!hit && !L.hover) return; if (hit && L.hover && hit.x === L.hover.x && hit.y === L.hover.y) return; L.hover = hit; sgDrawField('sg-canvas', sgFocus(), L.view, L.hover); }); cv.addEventListener('mouseleave', () => { $('sg-tip').hidden = true; if (L.hover) { L.hover = null; if (L.model) sgDrawField('sg-canvas', sgFocus(), L.view, null); } });
-    const tv = $('sg-test-canvas'); tv.addEventListener('mousemove', ev => { const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (!s || !L.model) return; const hit = sgTip('sg-test-canvas', 'sg-test-tip', s, ev); if (!hit && !L.testHover) return; if (hit && L.testHover && hit.x === L.testHover.x && hit.y === L.testHover.y) return; L.testHover = hit; sgDrawField('sg-test-canvas', s, L.testView, L.testHover); }); tv.addEventListener('mouseleave', () => { $('sg-test-tip').hidden = true; const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (L.testHover) { L.testHover = null; if (s && L.model) sgDrawField('sg-test-canvas', s, L.testView, null); } });
+    const cv = $('sg-canvas'); cv.addEventListener('mousemove', ev => { if (!L.model) return; const hit = sgTip('sg-canvas', 'sg-tip', sgFocus(), ev); if (!hit && !L.hover) return; if (hit && L.hover && hit.x === L.hover.x && hit.y === L.hover.y) return; L.hover = hit; sgDrawField('sg-canvas', sgFocus(), L.view, L.hover); if (hit) sgFollowPixel(false, hit, false); }); cv.addEventListener('mouseleave', () => { $('sg-tip').hidden = true; if (L.hover) { L.hover = null; if (L.model) sgDrawField('sg-canvas', sgFocus(), L.view, sgFieldHover(false)); } });
+    cv.addEventListener('click', ev => { if (!L.model) return; const r = cv.getBoundingClientRect(), hit = Viz.hitSegField(cv, ev.clientX - r.left, ev.clientY - r.top); if (hit) { sgFollowPixel(false, hit, true); sgDrawField('sg-canvas', sgFocus(), L.view, sgFieldHover(false)); } });
+    const nv = $('sg-net'); nv.addEventListener('mousemove', ev => sgNetTip(false, ev)); nv.addEventListener('mouseleave', () => { $('sg-net-tip').hidden = true; if (L.hoverNet) sgNetHover(false, null); });
+    const tv = $('sg-test-canvas'); tv.addEventListener('mousemove', ev => { const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (!s || !L.model) return; const hit = sgTip('sg-test-canvas', 'sg-test-tip', s, ev); if (!hit && !L.testHover) return; if (hit && L.testHover && hit.x === L.testHover.x && hit.y === L.testHover.y) return; L.testHover = hit; sgDrawField('sg-test-canvas', s, L.testView, L.testHover); if (hit) sgFollowPixel(true, hit, false); }); tv.addEventListener('mouseleave', () => { $('sg-test-tip').hidden = true; const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (L.testHover) { L.testHover = null; if (s && L.model) sgDrawField('sg-test-canvas', s, L.testView, sgFieldHover(true)); } });
+    tv.addEventListener('click', ev => { const s = L.testSelected != null ? L.byId.get(L.testSelected) : null; if (!s || !L.model) return; const r = tv.getBoundingClientRect(), hit = Viz.hitSegField(tv, ev.clientX - r.left, ev.clientY - r.top); if (hit) { sgFollowPixel(true, hit, true); sgDrawField('sg-test-canvas', s, L.testView, sgFieldHover(true)); } });
+    const tnv = $('sg-test-net'); tnv.addEventListener('mousemove', ev => sgNetTip(true, ev)); tnv.addEventListener('mouseleave', () => { $('sg-test-net-tip').hidden = true; if (L.testHoverNet) sgNetHover(true, null); });
     $('sg-segment-next').addEventListener('click', () => sgSegmentNext(false)); $('sg-segment-all').addEventListener('click', sgSegmentAll); $('sg-test-clear').addEventListener('click', sgTestClear);
   }
   // ------------------------------------------------------------------ the Describe question: from pixels to words (the Train step is the shared language-model lab)
