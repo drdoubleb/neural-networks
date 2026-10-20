@@ -203,7 +203,7 @@
       mixed: 'The test set mixes the labs at random.',
       byClass: `The test set is split by class the same way, so it carries the same shortcut: a network that reads the stain will look perfect on it.`,
     }[te];
-    return `${train} ${test}${S.normalize !== 'off' && S.mode !== 'features' ? ` Stain normalisation is on (${S.normalize === 'lab' ? 'each lab’s typical background and nucleus levels, measured from its scans without any label, are matched to ours' : 'each scan is rescaled by its own background and nucleus levels'}), so the network sees comparable images.` : ''}`;
+    return `${train} ${test}${S.normalize !== 'off' && S.mode !== 'features' ? ` Stain normalisation is on (${S.normalize === 'lab' ? 'each lab’s typical background and nucleus levels, measured over all of its scans, the test scans among them, without reading a label, are matched to ours: adaptation to a new lab from its unlabelled images, as a lab calibrates to a new scanner' : 'each scan is rescaled by its own background and nucleus levels'}), so the network sees comparable images.` : ''}`;
   }
   function renderSources() {
     const labs = !!S.ds.labs;
@@ -355,7 +355,7 @@
   // ------------------------------------------------------------------ the lesson: one case teaches the network
   // A walk-through of one gradient step on a training case in six steps (five without a hidden layer):
   //   1 forward pass   values flow from the inputs to the output, hop by hop
-  //   2 loss           call against truth; the error is the slope of the loss at the output
+  //   2 loss           call against truth; the error is the slope of the loss against the score (the output before the sigmoid)
   //   3 backward pass  blame flows back to every hidden unit (skipped without hidden units)
   //   4 gradients      every weight's gradient = blame at its end × activity at its start
   //   5 update         the weights actually move: w ← w − learning rate × gradient (drawn as a morph)
@@ -518,7 +518,7 @@
         : 'The filters last. A filter was used at every position of the image, so its gradient adds up over every position that got blame: the blame there × the 5×5 image patch under the filter. Filter 1 goes position by position (the window on the image, the arithmetic under it: patch → × blame → Σ so far), the other filters all at once. The step, −learning rate × Σ, settles over each filter until the update folds it in.';
       const texts = {
         forward: sub ? `${sub.text}${sub.phase === 'final' ? ' ' + verdict : ''}` : `${forwardText()} ${verdict}`,
-        loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
+        loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>, −log of the probability it gave the truth. Drawn against the score z (the output before the sigmoid), its slope at this score is the error, call − truth = p − y = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: (conv && convBlame) || (hidden > 1
           ? 'How much is each hidden unit to blame? The error flows back one layer at a time along each connection as blame × weight (thick = large; blue: the unit should come down, orange: go up). A unit adds up what arrives, and ReLU passes it on only if the unit was on: an off unit’s blame is 0. Each pill shows the arithmetic.'
           : 'How much is each hidden unit to blame? The error flows back along each connection as error × weight (thick = large; blue: the unit should come down, orange: go up). ReLU passes it on only if the unit was on, so a unit that was off gets blame 0. Each pill shows the arithmetic.'),
@@ -588,8 +588,9 @@
     $('defer-n').textContent = `${cur.called} / ${cur.n}`; $('defer-n-sub').textContent = `${pct(cur.coverage)} of the cases`;
     $('defer-acc').textContent = cur.acc == null ? '–' : pct(cur.acc); $('defer-acc-sub').textContent = cur.called ? `${cur.right} of ${cur.called} right` : 'every case deferred';
     $('defer-d').textContent = String(cur.deferred); $('defer-d-sub').textContent = cur.deferred ? `${cur.deferredWrong} of them would have been called wrong` : 'none';
-    const sure90 = deferStats(0.9), all = deferStats(0.5), wrongSure = cases.filter(k => k.wrong && Math.max(k.p, 1 - k.p) >= 0.9).length;
-    $('calib-note').textContent = `Each dot is a classified test case, placed by the probability the network gave ${posName()}, coloured by its truth; a red ring marks a call that was wrong. A well-calibrated network puts its mistakes near the middle, where it is unsure: ${all.n - all.right === 0 ? `none of the ${all.n} calls here was wrong` : all.n - all.right === 1 ? `1 of the ${all.n} calls here was wrong, ${wrongSure ? 'with' : 'without'} 90% or more confidence` : `${all.n - all.right} of the ${all.n} calls here were wrong, of which ${wrongSure} came with 90% or more confidence`}. ${sure90.called ? `The network was at least 90% sure for ${sure90.called} cases and right for ${sure90.right} of them.` : 'The network was never 90% sure.'} Handing back the cases in the grey band, those it is less than ${Math.round(tau * 100)}% sure about, leaves ${cur.called} calls${cur.acc != null ? ` that are right ${pct(cur.acc)} of the time` : ''} and ${cur.deferred} cases for the pathologist, ${cur.deferredWrong} of which the network would have got wrong. That trade is what the curve on the right draws for every setting of the bar; with ${cur.n} test cases it is a staircase, and a real evaluation would need hundreds.`;
+    const all = deferStats(0.5), wrongSure = cases.filter(k => k.wrong && Math.max(k.p, 1 - k.p) >= 0.9).length;
+    const bands = [[0.5, 0.7, '50 to 70%', 60], [0.7, 0.9, '70 to 90%', 80], [0.9, 1.01, '90 to 100%', 95]].map(([lo, hi, name, mid]) => { const b = cases.filter(k => { const s = Math.max(k.p, 1 - k.p); return s >= lo - 1e-9 && s < hi; }); return { name, mid, n: b.length, right: b.filter(k => !k.wrong).length }; }).filter(b => b.n);
+    $('calib-note').textContent = `Each dot is a classified test case, placed by the probability the network gave ${posName()}, coloured by its truth; a red ring marks a call that was wrong. Calibration is whether the probabilities mean what they say: of the calls made at 90% confidence about 90% should be right, so a calibrated network’s mistakes are rare at the ends and commoner towards the middle, in the proportion the probabilities promise, and a confident mistake is allowed as often as the confidence says. ${all.n - all.right === 0 ? `none of the ${all.n} calls here was wrong` : all.n - all.right === 1 ? `1 of the ${all.n} calls here was wrong, ${wrongSure ? 'with' : 'without'} 90% or more confidence` : `${all.n - all.right} of the ${all.n} calls here were wrong, of which ${wrongSure} came with 90% or more confidence`}. By band of confidence: ${bands.map(b => `${b.name}, ${b.right} of ${b.n} right (about ${b.mid}% if calibrated)`).join('; ')}; the margins are wide on so few cases. Handing back the cases in the grey band, those it is less than ${Math.round(tau * 100)}% sure about, leaves ${cur.called} calls${cur.acc != null ? ` that are right ${pct(cur.acc)} of the time` : ''} and ${cur.deferred} cases for the pathologist, ${cur.deferredWrong} of which the network would have got wrong. That trade is what the curve on the right draws for every setting of the bar; with ${cur.n} test cases it is a staircase, and a real evaluation would need hundreds.`;
   }
   function testStats() {
     const thr = S.test.threshold;
@@ -829,7 +830,7 @@
     P.schedule();
   }
   function renderCharts() {
-    let stopAt = null; // the epoch of the lowest test loss so far: where early stopping on a held-out set would have stopped
+    let stopAt = null; // the epoch of the lowest test loss so far: where early stopping would have stopped (on a validation set in practice; the page has only the two sets, so the test set stands in, and the legend says so)
     if (S.peek && S.history.length > 3) { let best = S.history[0]; for (const h of S.history) if (h.testLoss < best.testLoss) best = h; if (best.epoch > 0 && best.epoch < S.history[S.history.length - 1].epoch) stopAt = best.epoch; }
     const ceiling = S.labelNoise > 0 ? 1 - S.labelNoise : null;
     Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs, stopAt });
@@ -979,7 +980,7 @@
         const sal = new Float64Array(g.length);
         for (let i = 0; i < g.length; i++) sal[i] = g[i] * x[i];
         Viz.renderEvidence(cv, s.px, s.size, sal, S.tint);
-        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (weight × input at each pixel).`;
+        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (${!S.net.conv && S.net.hidden.length === 0 ? 'weight × input at each pixel' : 'gradient × input at each pixel: the network linearised at this nucleus'}).`;
       } else if (S.mode === 'code') { // the classifier's evidence on the code, carried back through the frozen encoder to the pixels
         const enc = codeEncoder(), gCode = S.net.inputGradient(x, fw), dRaw = new Float64Array(gCode.length);
         for (let i = 0; i < gCode.length; i++) dRaw[i] = gCode[i] / S.inputs.std.scale[i];
@@ -1010,8 +1011,10 @@
       $('pbar-thr').style.left = (thr * 100).toFixed(1) + '%';
       const g = S.net.inputGradient(x, fw);
       let sum = 0; for (let i = 0; i < g.length; i++) sum += g[i] * x[i];
-      const exact = !S.net.conv && S.net.hidden.length === 0;
-      $('evidence-sum').innerHTML = `evidence Σ(weight × input) ${exact ? '=' : '≈'} ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}${exact ? '' : '<br><span class="muted">(with hidden layers or a convolution the per-input evidence is a linear approximation)</span>'}`;
+      const exact = !S.net.conv && S.net.hidden.length === 0, rest = fw.z - sum, curved = S.net.hidden.length > 0 && S.net.activation !== 'relu';
+      $('evidence-sum').innerHTML = exact
+        ? `evidence Σ(weight × input) = ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}`
+        : `evidence Σ(gradient × input) = ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; the rest ${Viz.fmtSigned(rest, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}<br><span class="muted">(with hidden layers or a convolution the evidence is gradient × input, the network linearised at this case, and the output bias alone does not complete the score: the rest is what the biases along the active paths add, the output bias ${Viz.fmtSigned(S.net.bo, 2)} among them${curved ? `, and the curve of the ${S.net.activation} units` : ''})</span>`;
     }
 
     // measurement / blood-count table
@@ -1184,7 +1187,7 @@
       if (k === '19') { // the segment question: a class for every pixel, and the window it is decided from
         S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
         selectQuestion('segment'); showStage('train');
-        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 35 px, and train again, or load the trained network, which paints the nests.`); };
+        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 36 to 40 px, and train again, or load the trained network, which paints the nests.`); };
         go();
         return;
       }
@@ -2842,12 +2845,12 @@
   function sgSelect(id) { const L = S.sg; L.selected = id; L.hover = null; sgRenderFocus(); sgRenderTrays(); }
   function sgNeighbour(step) { const L = S.sg, cur = sgFocus(), i = L.all.indexOf(cur); sgSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function sgLegend(el) { $(el).innerHTML = sgClasses().map((c, k) => `<span><span class="swatch" style="background:rgb(${SG.colors[k].join(',')});border:1px solid var(--line-strong)"></span>${c}</span>`).join('') + '<span><span class="swatch" style="background:rgba(42,120,214,0.7)"></span>the membrane</span>'; }
-  function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, rf: L.model.receptiveField() } : null }); return p; }
+  function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, box: L.model.support(hover.x, hover.y, L.h, L.w) } : null }); return p; }
   function sgIouText(p) { return `mean IoU <b>${p.iou.mean == null ? '–' : pct(p.iou.mean)}</b> · ${sgClasses().map((c, k) => `${c} ${p.iou.per[k] == null ? '–' : pct(p.iou.per[k])}`).join(' · ')} · ${pct(p.acc)} of the pixels right`; }
   function sgRenderField() {
     const L = S.sg, s = sgFocus(), p = sgDrawField('sg-canvas', s, L.view, sgFieldHover(false)); sgLegend('sg-legend');
     $('sg-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name}${L.lastField === s.id ? ' · the last crops came from it' : ''}`;
-    $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveField()} px across).` : 'No network yet.';
+    $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveFieldText()} across).` : 'No network yet.';
     const f = L.model.enc[0][0]; Viz.drawSegFilters($('sg-filters'), { W: f.W, cout: f.cout, cin: f.cin, cell: 12, cols: Math.min(8, f.cout) }); $('sg-filters-note').textContent = `The ${f.cout} filters of the first layer, numbered, 3 × 3 weights each, red positive and blue negative: edges, blobs and the like, learned from nothing. The layers behind them see only their maps.`;
     if (p) { const lev = p.fw.levels[0]; Viz.drawSegMaps($('sg-maps'), { maps: lev.c1.act, C: L.model.C, h: lev.h, w: lev.w, scale: 1, cols: 4, label: 'map' }); }
     sgRenderNet(false);
@@ -2868,7 +2871,7 @@
     if (!M) { cv._segNet = null; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); note.textContent = onTest ? 'The network at one pixel of the field under test appears once a field has been painted.' : ''; return; }
     Viz.drawSegNetwork(cv, M.model);
     const q = sgPixelOf(onTest), i = q.y * L.w + q.x, cls = sgClasses(), P = M.path, pinned = onTest ? L.testPixelPinned : L.pixelPinned;
-    note.innerHTML = `Pixel (${q.x}, ${q.y}) of field ${esc(M.s.name)}${pinned ? ', pinned: click the field to release it' : ': hover the field to follow another pixel, click to pin one'}. Truth <b>${cls[M.s.mask[i]]}</b>, the network says <b>${cls[M.p.labels[i]]}</b>${M.p.labels[i] === M.s.mask[i] ? ' ✓' : ' ✗'}. ${P.cols.length} columns: the pixel; at every level two 3 × 3 convolutions, with the 2 × 2 pool that leads down to the next; on the way up, at every level, the join of the upsampled map with the level’s own and one more convolution; the head’s score per class; the softmax. The window a column sees grows from 1 px to ${P.rf} px along the way, and the circles stand at the pixel’s place in each map, which the pooling makes coarser.`;
+    note.innerHTML = `Pixel (${q.x}, ${q.y}) of field ${esc(M.s.name)}${pinned ? ', pinned: click the field to release it' : ': hover the field to follow another pixel, click to pin one'}. Truth <b>${cls[M.s.mask[i]]}</b>, the network says <b>${cls[M.p.labels[i]]}</b>${M.p.labels[i] === M.s.mask[i] ? ' ✓' : ' ✗'}. ${P.cols.length} columns: the pixel; at every level two 3 × 3 convolutions, with the 2 × 2 pool that leads down to the next; on the way up, at every level, the join of the upsampled map with the level’s own and one more convolution; the head’s score per class; the softmax. The window a column sees grows from 1 px to ${P.cols[P.cols.length - 1].sees} px along the way (the exact box, drawn on the field, depends on where the pixel falls on the pooling grid), and the circles stand at the pixel’s place in each map, which the pooling makes coarser.`;
   }
   function sgNetHover(onTest, hit) { const L = S.sg; if (onTest) L.testHoverNet = hit; else L.hoverNet = hit; const M = sgNetModel(onTest); if (M) Viz.drawSegNetwork($(onTest ? 'sg-test-net' : 'sg-net'), M.model); }
   function sgNetTip(onTest, ev) {
@@ -2904,7 +2907,7 @@
   function sgRenderFocus() { sgRenderField(); }
   function sgRender(full) { const L = S.sg; if (!L.model) return; sgRenderStatus(); sgRenderFocus(); if (full) { sgRenderCurves(); sgRenderTrays(); } sgSyncButtons(); }
   function sgRenderAll() { const L = S.sg; if (S.world !== 'segment' || !L.built) return; if (S.stage === 'data') sgRenderData(); else if (S.stage === 'test') sgRenderTest(); else if (L.model) sgRender(true); }
-  function sgEnter() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'train') return; $('sg-blurb').innerHTML = `The network sees the pixels and nothing else: no nuclei, no membrane, no labels but the mask. Every weight is a 3 × 3 filter slid over the whole field, so the same few thousand weights paint any field of any size; with <b>no context</b> a pixel's class is decided from the ${new NN.SegNet({ levels: 0 }).receptiveField()} × ${new NN.SegNet({ levels: 0 }).receptiveField()} window around it, and each <b>level</b> of pooling below the pixels widens the window (${new NN.SegNet({ levels: 1 }).receptiveField()} px, then ${new NN.SegNet({ levels: 2 }).receptiveField()} px) at the cost of fine detail, brought back by the join with the finer map on the way up.`; if (!L.model) sgReset('Untrained: the network paints noise. Step a batch to watch one gradient step on two crops, press Train and watch the nest line of the IoU chart, or load the trained network.'); else sgRender(true); }); if (!L.built) sgNote(L.progress || 'Loading the fields…'); }
+  function sgEnter() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'train') return; $('sg-blurb').innerHTML = `The network sees the pixels and nothing else: no nuclei, no membrane, no labels but the mask. Every weight is a 3 × 3 filter slid over the whole field, so the same few thousand weights paint any field of any size; with <b>no context</b> a pixel's class is decided from the ${new NN.SegNet({ levels: 0 }).receptiveField()} × ${new NN.SegNet({ levels: 0 }).receptiveField()} window around it, and each <b>level</b> of pooling below the pixels widens the window (${new NN.SegNet({ levels: 1 }).receptiveFieldText()}, then ${new NN.SegNet({ levels: 2 }).receptiveFieldText()}: the exact span depends on where the pixel falls on the pooling grid) at the cost of fine detail, brought back by the join with the finer map on the way up.`; if (!L.model) sgReset('Untrained: the network paints noise. Step a batch to watch one gradient step on two crops, press Train and watch the nest line of the IoU chart, or load the trained network.'); else sgRender(true); }); if (!L.built) sgNote(L.progress || 'Loading the fields…'); }
   // ---- Specimens: the fields with their masks
   function sgEnterData() { const L = S.sg; sgReady().then(ok => { if (ok && S.world === 'segment' && S.stage === 'data') sgRenderData(); }); if (!L.built) $('sg-data-note').textContent = L.progress || 'Loading the fields…'; }
   function sgDataSelect(id) { S.sg.dataSelected = id; sgRenderData(); }
@@ -2939,7 +2942,7 @@
   }
   function bindSegment() {
     const L = S.sg;
-    document.querySelectorAll('#sg-levels-seg button').forEach(b => b.addEventListener('click', () => { L.levels = +b.dataset.levels; sgSyncControls(); if (L.built) sgReset(`Context: ${L.levels ? `${L.levels} level${L.levels > 1 ? 's' : ''}` : 'none'} — fresh random weights, a window of ${new NN.SegNet({ levels: L.levels }).receptiveField()} px.`); }));
+    document.querySelectorAll('#sg-levels-seg button').forEach(b => b.addEventListener('click', () => { L.levels = +b.dataset.levels; sgSyncControls(); if (L.built) sgReset(`Context: ${L.levels ? `${L.levels} level${L.levels > 1 ? 's' : ''}` : 'none'} — fresh random weights, a window of ${new NN.SegNet({ levels: L.levels }).receptiveFieldText()}.`); }));
     document.querySelectorAll('#sg-channels-seg button').forEach(b => b.addEventListener('click', () => { L.channels = +b.dataset.channels; sgSyncControls(); if (L.built) sgReset(`${L.channels} channels — fresh random weights.`); }));
     document.querySelectorAll('#sg-crops-seg button').forEach(b => b.addEventListener('click', () => { L.crops = +b.dataset.crops; L.ptr = Math.min(L.ptr, L.crops - 1); sgSyncControls(); if (L.model) sgRenderStatus(); }));
     $('sg-epochs').addEventListener('input', ev => { L.epochs = +ev.target.value; sgSyncControls(); if (L.model) { sgRenderStatus(); sgRenderCurves(); } });
@@ -4173,7 +4176,8 @@
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); bindTrainedModels();
-    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js renderBackboneOptions();
+    renderBackboneOptions();
+    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();

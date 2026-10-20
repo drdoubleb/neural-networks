@@ -85,7 +85,8 @@ simply selects a question and its settings.
    difference is laid over each weight map, the product map forms cell by cell and is set aside, a scan line
    sums it with orange cells against blue, and the bias and the ReLU, or the sigmoid at the output, finish the unit;
    the first unit runs slowly, the rest together); (2) the loss, the call against
-   the truth on a scale beside the output, with the loss curve above it and the error (p − y) as its slope; (3) the
+   the truth on a scale beside the output, with the loss against the score above it and the error (p − y) as its slope
+   there; (3) the
    backward pass, the error wiping back along each connection as error × weight (thick = large, blue: the unit should
    come down, orange: go up), one layer at a time, and a pill on each unit spelling out what arrived and what ReLU let
    through (a unit that was switched off gets none); (4) the gradients, blame at one end of a connection × activity at
@@ -111,8 +112,9 @@ simply selects a question and its settings.
    heatmap shows **what each unit responds to**: its mean activation for each hidden subtype, its weight to the output
    and the inputs it weighs most, and the training tray can be coloured by the most active unit instead of by the call.
    Learning curves plot loss and accuracy per epoch, with the test set "peeking" to show over-fitting; when peeking, a
-   dotted line marks the epoch of the lowest test loss so far (where early stopping on a held-out set would have
-   stopped), and with label noise on, a dashed line marks the honest ceiling of training accuracy. *Label noise* in the
+   dotted line marks the epoch of the lowest test loss so far (where early stopping would have stopped; in practice
+   the stopping epoch is chosen on a validation set split from the training data, so that the test set stays untouched,
+   and the legend says that the test set stands in here), and with label noise on, a dashed line marks the honest ceiling of training accuracy. *Label noise* in the
    advanced settings flips a share of the training labels, as a second pathologist might have called them; the trays and
    the inspector then show the label each case was given, and a checkbox marks the mislabelled ones. A *Labelled
    cases* control (4, 10, 20, 40 or all) withholds the labels of the rest of the training set: those cases stay in the
@@ -138,8 +140,8 @@ simply selects a question and its settings.
    accumulate; a decision-threshold slider shows the sensitivity/specificity trade-off, and a **prevalence** slider turns
    them into positive and negative predictive values for a realistic population. A *How sure is it, and when to hand
    the case back* card places every classified test case on the axis of the probability the network gave it, coloured
-   by its truth with the wrong calls ringed, so that a well-calibrated network can be seen to put its mistakes near the
-   middle; a **deferral** slider hands the cases the network is less than so-and-so sure about back to the pathologist,
+   by its truth with the wrong calls ringed, and tallies the calls by band of confidence against what a calibrated
+   network would get (of the calls made at 90% confidence, about 90% right); a **deferral** slider hands the cases the network is less than so-and-so sure about back to the pathologist,
    with the calls that remain, their accuracy and how many of the deferred cases would have been wrong, and a curve of
    the accuracy of the calls against the share of cases called for every setting of the bar.
 For the **foundation question** the three steps are the same three, with pretraining in the middle. *Specimens* is the
@@ -232,8 +234,10 @@ Two teaching points come out of this:
   the difference image blue across its whole interior (the inspector's pair of scans shows the call flipping on the same
   nucleus). The measurements recipe loses twenty points because darkness and texture are read off the raw scan. The
   convolution barely drops, because its filters read edges. The remedy is **stain normalisation** (Advanced settings):
-  *per lab*, each lab's typical background and nucleus levels, measured from its scans without any label, are matched to
-  ours, the toy version of matching a slide's colour statistics to a reference slide; *per image*, each scan is rescaled
+  *per lab*, each lab's typical background and nucleus levels, measured over all of its scans (the test scans among
+  them) without reading a label, are matched to ours, the toy version of matching a slide's colour statistics to a
+  reference slide, and a form of adaptation to the new lab from its unlabelled images, as a lab calibrates to a new
+  scanner; *per image*, each scan is rescaled
   by its own levels, which also throws away hyperchromasia as a feature. Normalised, every pixel recipe scores as well at
   the other lab as at home. The walk-throughs then show the normalised scan in the preprocessing row.
 - **Shortcut learning (recipe ⑨).** The 4 + 4 network of ⑧, trained on a set where every irregular nucleus was scanned
@@ -284,7 +288,8 @@ flipped (a fixed set of 20, so the lecture is reproducible whatever the seed). T
 the majority of right labels, so the test accuracy, scored against the true labels, peaks early; then it memorises the
 mislabelled cases one by one, training accuracy climbs past the **honest ceiling** of 75%, and the test curve falls while
 the test loss rises. Tick *Mark the mislabelled cases* and watch the ✗ badges on them disappear as they are memorised.
-The dotted **lowest test loss** marker shows where early stopping would have stopped. Weight decay, fewer units, or
+The dotted **lowest test loss** marker shows where early stopping would have stopped (on a validation set in practice;
+here the test set stands in). Weight decay, fewer units, or
 stopping early all soften it; the labels stay wrong.
 
 Mean of three seeds (`node tools/check_training.js`): test accuracy peaks at 97% (epochs 2 to 14) and ends at
@@ -1010,7 +1015,8 @@ size, a 64 × 64 crop in training and the whole 176 × 128 field at test. Two co
 own scale decide each pixel's class from the 5 × 5 window around it; each **level of context** below them pools the
 maps 2 × 2 (the maximum), convolves twice at the coarser scale, upsamples the result (nearest neighbour) and joins it
 to the finer map before two more convolutions, a U-Net in miniature, so that the window a pixel is decided from widens
-to 15 px with one level and 35 px with two while the join keeps the fine edges. A 1 × 1 convolution gives four scores
+to 16 px with one level and 36 to 40 px with two (the exact span depends on where the pixel falls on the pooling grid,
+since the nearest-neighbour upsampling reads the coarser entry the pixel falls in) while the join keeps the fine edges. A 1 × 1 convolution gives four scores
 per pixel and a softmax the probabilities; the loss is the cross-entropy per pixel, optionally weighted by 1/√(class
 share) so that the rare lumen and nests count; Adam at 0.003 on batches of 4 random crops of 64 × 64 from the
 training fields, 400 crops per epoch, weight decay 0.0001, gradients clipped at 1, the ink centred on its mean
@@ -1025,17 +1031,17 @@ of predictions).
 | Context | Window | Parameters | Pixels right | Mean IoU | Lumen | Epithelium | Stroma | Nest | Of the nest pixels, called epithelium |
 |---|---|---|---|---|---|---|---|---|---|
 | none | 5 px | 700 | 84% | 59% | 62% | 69% | 94% | 12% | 75% |
-| 1 level | 15 px | 3,028 | 90% | 71% | 76% | 79% | 98% | 32% | 56% |
-| 2 levels | 35 px | 5,356 | 95% | 81% | 68% | 88% | 98% | 66% | 4% |
-| 2 levels, pixels weighted by 1/√share (the shipped network) | 35 px | 5,356 | 95% | 83% | 79% | 89% | 97% | 66% | 5% |
+| 1 level | 16 px | 3,028 | 90% | 71% | 76% | 79% | 98% | 32% | 56% |
+| 2 levels | 36–40 px | 5,356 | 95% | 81% | 68% | 88% | 98% | 66% | 4% |
+| 2 levels, pixels weighted by 1/√share (the shipped network) | 36–40 px | 5,356 | 95% | 83% | 79% | 89% | 97% | 66% | 5% |
 
 Pixels right is the easy number: the stroma and the epithelium are 81% of the field and the stroma is a plain
 texture, so even the 5 px window gets 84%, and the stroma's IoU is 94% at every depth. The intersection over union per
 class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane looks exactly like
 the nucleus above it in the epithelium, the same cells from the same generator, so the only thing that separates the
 two classes is where the pixel lies relative to the membrane, which a 5 px window cannot see: with no context three in
-four nest pixels are called epithelium and the nest IoU is 12%. One level (15 px) halves the confusion; two levels
-(35 px, enough to see the membrane from most of a nest) send 90% of the nest pixels to the nest class. The weighting
+four nest pixels are called epithelium and the nest IoU is 12%. One level (16 px) halves the confusion; two levels
+(36 to 40 px, enough to see the membrane from most of a nest) send 90% of the nest pixels to the nest class. The weighting
 lifts the lumen, a thin strip of 5% of the pixels, from 68% to 79% and the mean to 83% without costing the rest, and
 that is the network that ships. The nest's remaining 66% is mostly a scoring artefact of the carcinoma in situ fields:
 eight of the ten have no nest at all, and a few hundred stray nest pixels on each (49 to 1,252 of 22,528) count as an

@@ -900,8 +900,28 @@
     }
     layers() { const out = []; for (const pair of this.enc) out.push(pair[0], pair[1]); for (const d of this.dec) out.push(d); out.push(this.head); return out; }
     parameterCount() { return this.layers().reduce((a, c) => a + c.W.length + c.b.length, 0); }
-    receptiveField() { let r = 1; for (let l = 0; l <= this.L; l++) r += 4 * Math.pow(2, l); for (let l = this.L - 1; l >= 0; l--) r += 2 * Math.pow(2, l); return r; } // every 3 × 3 convolution adds 2 at its level's scale
-    describe() { return `${this.L ? `${this.L} level${this.L > 1 ? 's' : ''} of context (pool, convolve, upsample, join)` : 'no context below the pixels'} · ${this.C} channels · 3 × 3 convolutions, ReLU · receptive field ${this.receptiveField()} px · ${this.K} classes per pixel`; }
+    // the window of image pixels along one axis that the entries lo..hi of a map depend on, map by map as forward()
+    // names them: E1 and E2 a level's two convolutions, P the pool that leads down to a level, J the join of a level's
+    // features with the map upsampled from below, D the decoder's map at a level (its up-convolution over the join; at
+    // the deepest level the encoder's own output). A pooled entry reads two above it, and nearest-neighbour upsampling
+    // reads the entry lo >> 1 below, so the window depends on where the pixel falls on the pooling grid
+    windows() {
+      const L = this.L, u = (p, q) => [Math.min(p[0], q[0]), Math.max(p[1], q[1])];
+      const E1 = (l, lo, hi) => (l === 0 ? [lo - 1, hi + 1] : P(l, lo - 1, hi + 1));
+      const E2 = (l, lo, hi) => (l === 0 ? [lo - 2, hi + 2] : P(l, lo - 2, hi + 2));
+      const P = (l, lo, hi) => E2(l - 1, 2 * lo, 2 * hi + 1);
+      const D = (l, lo, hi) => (l === L ? E2(l, lo, hi) : J(l, lo - 1, hi + 1));
+      const J = (l, lo, hi) => u(E2(l, lo, hi), D(l + 1, lo >> 1, hi >> 1));
+      return { E1, E2, P, D, J };
+    }
+    // the pixels a pixel's class is decided from: a rectangle, not always centred on the pixel, clipped to the field
+    support(x, y, H, W) { const { D } = this.windows(), a = D(0, x, x), b = D(0, y, y); return { x0: Math.max(0, a[0]), x1: Math.min(W - 1, a[1]), y0: Math.max(0, b[0]), y1: Math.min(H - 1, b[1]) }; }
+    // the receptive field: the span of that window away from the field's edge, smallest and largest over the pixel's
+    // place on the pooling grid (5 px with no context, 16 with one level, 36 to 40 with two), and the largest alone
+    receptiveFieldRange() { const { D } = this.windows(), n = 1 << this.L, p0 = 8 * n; let lo = Infinity, hi = -Infinity; for (let p = p0; p < p0 + n; p++) { const w = D(0, p, p), s = w[1] - w[0] + 1; lo = Math.min(lo, s); hi = Math.max(hi, s); } return [lo, hi]; }
+    receptiveField() { return this.receptiveFieldRange()[1]; }
+    receptiveFieldText() { const [lo, hi] = this.receptiveFieldRange(); return lo === hi ? `${hi} px` : `${lo} to ${hi} px`; }
+    describe() { return `${this.L ? `${this.L} level${this.L > 1 ? 's' : ''} of context (pool, convolve, upsample, join)` : 'no context below the pixels'} · ${this.C} channels · 3 × 3 convolutions, ReLU · receptive field ${this.receptiveFieldText()} · ${this.K} classes per pixel`; }
     // the 3 × 3 convolution with 'same' zero padding: pre-activations, and the activations after ReLU when asked
     conv3(x, layer, H, W, relu) {
       const { W: Wt, b, cin, cout } = layer, pre = new Float64Array(cout * H * W);
@@ -959,29 +979,26 @@
       const take = (arr, n, h, w, px, py) => Float64Array.from({ length: n }, (_, ch) => arr[(ch * h + py) * w + px]);
       const contrib3 = (inp, layer, h, w, px, py) => { const { W: Wt, cin, cout } = layer, out = new Float64Array(cout * cin); for (let o = 0; o < cout; o++) for (let c = 0; c < cin; c++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const yy = py + dy; if (yy < 0 || yy >= h) continue; for (let dx = -1; dx <= 1; dx++) { const xx = px + dx; if (xx < 0 || xx >= w) continue; s += Wt[(o * cin + c) * 9 + (dy + 1) * 3 + dx + 1] * inp[(c * h + yy) * w + xx]; } } out[o * cin + c] = s; } return out; };
       const kernelOf = layer => (o, c) => Array.from(layer.W.subarray((o * layer.cin + c) * 9, (o * layer.cin + c) * 9 + 9));
-      let rf = 1; const lev0 = fw.levels[0];
+      const Wn = this.windows(), seesOf = (f, l, px, py) => { const a = f(l, px, px), b = f(l, py, py), sx = a[1] - a[0] + 1, sy = b[1] - b[0] + 1; return sx === sy ? String(sx) : sx + ' × ' + sy; }, lev0 = fw.levels[0];
       const patch = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; patch.push(yy < 0 || yy >= lev0.h || xx < 0 || xx >= lev0.w ? 0 : lev0.x[yy * lev0.w + xx]); }
-      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: rf });
+      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: '1' });
       for (let l = 0; l <= this.L; l++) {
         const lev = fw.levels[l], { px, py } = pos(l), l1 = this.enc[l][0], l2 = this.enc[l][1];
-        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: rf });
+        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: seesOf(Wn.P, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: seesOf(Wn.E1, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: seesOf(Wn.E2, l, px, py) });
         convTwo[l] = cols.length - 1;
       }
       for (let k = 0; k < fw.decs.length; k++) {
         const d = fw.decs[k], l = d.l, lev = fw.levels[l], { px, py } = pos(l), layer = this.dec[k];
-        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: rf });
+        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: seesOf(Wn.J, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: seesOf(Wn.D, l, px, py) });
       }
       const N = fw.H * fw.W, i0 = y * fw.W + x, hd = this.head, top = cols[cols.length - 1].values, hc = new Float64Array(K * C);
       for (let k = 0; k < K; k++) for (let c = 0; c < C; c++) hc[k * C + c] = hd.W[k * C + c] * top[c];
-      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: rf });
-      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: rf });
-      return { x, y, cols, C, K, levels: this.L, rf };
+      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: seesOf(Wn.D, 0, x, y) });
+      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: seesOf(Wn.D, 0, x, y) });
+      return { x, y, cols, C, K, levels: this.L, rf: this.receptiveField() };
     }
     newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
     // one step on a batch of samples [{ x, y, H, W }]: the mean loss before the step
