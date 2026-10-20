@@ -1063,6 +1063,21 @@ of curves. *Test* paints the held-out fields one at a time (N for the next) with
 tally over the fifty. Recipe ⑲ sets it up with no context, so that the nest line's failure is the first thing seen;
 set two levels and train again, or load the trained network, for the comparison.
 
+## The trained models that ship
+
+Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
+training: the model that the recipe trains, with the curves of its training, comes back in an instant and the Test
+step works from it. The language models and the segmentation network ship from their Node trainers (above). The
+others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
+recipe (1 to 10 and 12), the 4 · Foundation stage, both slide questions with and without the context layer and with
+attention pooling or a plain average, and the field model with and without positions and the context layers, presses
+Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
+curves. A loaded model is therefore exactly what pressing Train gives with the recipe's settings and seed, and the
+curves it fills are that run's own. The file is `data/trained/trained_models.js` (`window.TRAINED_MODELS`); the
+classic button enables when a recipe is selected (the shipped models are the recipes' own settings), the slide and
+field buttons when the controls match a shipped configuration with the shipped encoder, and all of them say in their
+tooltip which model they bring. Reproduce with `node tools/export_models.js` (playwright-core and a Chromium; `--only classic|foundation|slides|fields` redoes one part).
+
 ## The data
 
 `tools/generate_cbc.js` (no dependencies) draws the 200 blood counts from a fixed seed into `data/leukemia/`
@@ -1241,7 +1256,7 @@ measures and the page's ticks.
 index.html                 the page
 css/style.css              tokens (light + dark) and components
 js/features.js             measurements from pixels (browser + Node)
-js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation, with an image code as its first token; the segmentation network, 3 × 3 convolutions with levels of pooling and upsampling and a class for every pixel, unrolled at one pixel for the diagram (browser + Node)
+js/nn.js                   the network: optional convolution, 0–2 dense layers, hand-written backprop, weight decay, one-case lessons, JSON in and out; the contrastive encoder (with weights that ship as JSON) and an autoencoder for the foundation model; attention over a slide of nuclei, and one layer of self-attention with a learned distance cost for the context; the report language model, causal context layers over the words with Adam and generation, with an image code as its first token; the segmentation network, 3 × 3 convolutions with levels of pooling and upsampling and a class for every pixel, unrolled at one pixel for the diagram (browser + Node)
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
@@ -1259,6 +1274,7 @@ data/chat/chat_data.js     the transcripts of the chat question: 2,400 training,
 data/chat/chat_weights.js  the trained chat model with its vocabulary, the curves of its training and the words' paths, written by tools/check_chat.js --save
 data/describe/describe_data.js  the nuclei of the Describe question: 400 from the atypia generator with the four traits chosen independently, each with its description; the test nuclei as scanned at both labs; written by tools/generate_describe.js (with a contact sheet and a sample sheet beside it)
 data/describe/describe_weights.js  the trained describe model with its vocabulary, the curves of its training, its measures and the words' paths, written by tools/check_describe.js --save
+data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
@@ -1274,6 +1290,7 @@ tools/generate_chat.js     make the transcripts: three styles, three phrasings o
 tools/check_chat.js        train the chat model and take its measures: loss by role, the answers written from the transcript up to the last ASSISTANT: by style on the trained and the held-out phrasings and by question, the agent loop, the probes
 tools/generate_describe.js make the Describe nuclei and their descriptions (a contact sheet and a sample sheet for vetting)
 tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
+tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html

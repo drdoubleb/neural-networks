@@ -124,6 +124,7 @@
             <button type="button" class="btn" id="btn-step-epoch" title="one pass through every training case">Step epoch</button>
             <button type="button" class="btn primary big" id="btn-train" title="run the remaining epochs (space)">▶ Complete training</button>
             <button type="button" class="btn" id="btn-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="btn-load" title="the model this recipe trains, trained once on this page and shipped with it, with the curves of its training" disabled>Load the trained model</button>
           </div>
         </div>
         <div class="status" id="status"></div>
@@ -331,6 +332,7 @@
             <button type="button" class="btn" id="fm-step-epoch" title="one pass through the 100 nuclei">Step epoch</button>
             <button type="button" class="btn primary big" id="fm-train" title="run the remaining epochs">▶ Pretrain</button>
             <button type="button" class="btn" id="fm-reset" title="re-initialise the encoder from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="fm-load" title="the encoder this stage pretrains, seed 1 for 100 epochs, pretrained once on this page and shipped with the curves of its pretraining">Load the trained model</button>
           </div>
         </div>
         <div class="status" id="fm-status"></div>
@@ -466,6 +468,7 @@
             <button type="button" class="btn" id="sl-step-epoch" title="one pass through the 60 training slides">Step epoch</button>
             <button type="button" class="btn primary big" id="sl-train" title="run the remaining epochs (space)">▶ Train</button>
             <button type="button" class="btn" id="sl-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="sl-load" title="the model these settings train, trained once on this page and shipped with the curves of its training">Load the trained model</button>
           </div>
         </div>
         <div class="status" id="sl-status"></div>
@@ -701,6 +704,7 @@
             <button type="button" class="btn" id="fd-step-epoch" title="one pass through the 400 training fields">Step epoch</button>
             <button type="button" class="btn primary big" id="fd-train" title="run the remaining epochs (space)">▶ Train</button>
             <button type="button" class="btn" id="fd-reset" title="re-initialise the weights from the seed">↺ Reset</button>
+            <button type="button" class="btn" id="fd-load" title="the model these settings train, trained once on this page and shipped with the curves of its training">Load the trained model</button>
           </div>
         </div>
         <div class="status" id="fd-status"></div>
@@ -1567,6 +1571,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="data/describe/describe_data.js"></script>
 <script src="data/describe/describe_weights.js"></script>
 <script src="data/fields/seg_weights.js"></script>
+<script src="data/trained/trained_models.js"></script>
 <script src="js/features.js"></script>
 <script src="js/fields.js"></script>
 <script src="js/reports.js"></script>

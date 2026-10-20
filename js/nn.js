@@ -81,6 +81,8 @@
       this.bo = 0;
       this.steps = 0;
     }
+    toJSON(meta) { const r = v => Array.from(v, q => +q.toPrecision(6)); return Object.assign({}, meta || {}, { kind: 'net', D: this.D, size: this.size, conv: this.conv, hidden: this.hidden, activation: this.activation, seed: this.seed, steps: this.steps, Wc: this.Wc ? r(this.Wc) : null, bc: this.bc ? r(this.bc) : null, W: this.W.map(r), b: this.b.map(r), Wo: r(this.Wo), bo: +(+this.bo).toPrecision(6) }); }
+    static fromJSON(o) { const net = new Net({ inputSize: o.D, imageSize: o.size, conv: o.conv, hidden: o.hidden, activation: o.activation, seed: o.seed }); if (o.Wc && net.Wc) { net.Wc.set(o.Wc); net.bc.set(o.bc); } o.W.forEach((w, l) => net.W[l].set(w)); o.b.forEach((b, l) => net.b[l].set(b)); net.Wo.set(o.Wo); net.bo = o.bo; net.steps = o.steps || 0; return net; }
     get H() { return this.hidden.length ? this.hidden[0] : 0; }           // first hidden layer width (0 = none)
     get featureCount() { return this.sizes[0]; }                          // inputs to the first dense layer
 
@@ -393,6 +395,8 @@
       this.W1 = mk(ffn * D, 0.3); this.b1 = new Float64Array(ffn); this.W2 = mk(D * ffn, 0.1); this.b2 = new Float64Array(D);
       this.beta = Float64Array.from({ length: heads }, (_, h) => { const c = Array.isArray(costInit) ? costInit[h] : costInit; return c > 0 ? Math.log(Math.expm1(c)) : -8; }); // softplus(beta) is each head's cost per unit of distance, when distanceBias is on (one value, or one per head; 0 starts the cost at nothing, softplus(−8), and lets it grow)
     }
+    toJSON() { const r = v => Array.from(v, q => +q.toPrecision(6)); return { D: this.D, dk: this.dk, heads: this.H, ffn: this.F, distanceBias: this.distanceBias, excludeSelf: this.excludeSelf, causal: this.causal, relative: this.relative, seed: this.seed, Wq: r(this.Wq), bq: r(this.bq), Wk: r(this.Wk), bk: r(this.bk), Wv: r(this.Wv), bv: r(this.bv), Wo: r(this.Wo), bo: r(this.bo), W1: r(this.W1), b1: r(this.b1), W2: r(this.W2), b2: r(this.b2), beta: r(this.beta) }; }
+    static fromJSON(o) { const c = new ContextLayer({ inputSize: o.D, dk: o.dk, ffn: o.ffn, heads: o.heads, distanceBias: o.distanceBias, excludeSelf: o.excludeSelf, causal: o.causal, relative: o.relative, seed: o.seed }); for (const k of ['Wq', 'bq', 'Wk', 'bk', 'Wv', 'bv', 'Wo', 'bo', 'W1', 'b1', 'W2', 'b2', 'beta']) c[k].set(o[k]); return c; }
     // X: the slide's tokens (rows of D numbers); dist: n × n distances between them (only with the distance bias).
     // With several heads, every head has its own query, key and value maps and its own distance cost, and their
     // messages are concatenated before the output projection. S, A and cost are the first head's (what a single-head
@@ -641,6 +645,8 @@
       this.scorer = this.scorers[0]; this.head = this.heads[0];
       this.steps = 0;
     }
+    toJSON(meta) { return Object.assign({}, meta || {}, { kind: 'mil', D: this.D, A: this.A, attention: this.attention, K: this.K, clip: this.clip, seed: this.seed, steps: this.steps, layers: this.layers.map(l => l.toJSON()), scorers: this.scorers.map(n => n.toJSON()), heads: this.heads.map(n => n.toJSON()) }); }
+    static fromJSON(o) { const m = new AttentionMIL({ inputSize: o.D, attentionUnits: o.A, attention: o.attention, context: null, outputs: o.K, clip: o.clip, seed: o.seed }); m.layers = o.layers.map(l => ContextLayer.fromJSON(l)); m.context = m.layers[0] || null; m.scorers = o.scorers.map(n => Net.fromJSON(n)); m.heads = o.heads.map(n => Net.fromJSON(n)); m.scorer = m.scorers[0]; m.head = m.heads[0]; m.steps = o.steps || 0; return m; }
     // H: the slide's instances; dist: their distances (with a distance bias); xy: their positions (with relative
     // messages). Returns the context (ctx: the first
     // layer's forward, ctxs: every layer's), the tokens after context (T), and per output (outs[k]) the scores, the
