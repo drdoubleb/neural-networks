@@ -87,7 +87,7 @@
     let labStats = null;
     if (labs) {
       for (const split of ['train', 'test']) for (const label of [0, 1]) specimens.filter(s => s.split === split && s.label === label).forEach((s, k) => { s.mixLab = k % 2 ? 'B' : 'A'; });
-      labStats = {}; // each lab's typical stain levels over all of its scans
+      labStats = {}; // each lab's typical stain levels over all of its scans, the test scans among them: a statistic of the images, no label read
       for (const lab of ['A', 'B']) { let bg = 0, nuc = 0; for (const s of specimens) { bg += s.variants[lab].levels.bg; nuc += s.variants[lab].levels.nuc; } labStats[lab] = { bg: bg / specimens.length, nuc: nuc / specimens.length }; }
     }
     return {

@@ -962,7 +962,7 @@ window.Viz = (function () {
   // ---- the segmentation question: a field with a class painted on every pixel, the first layer's maps, its filters
   const segScratch = document.createElement('canvas');
   // opt: px, w, h, scale, tint; labels (the prediction) and truth as Uint8Arrays of classes; mode 'image' | 'pred' |
-  // 'truth' | 'errors'; colors, one [r, g, b] per class; hover { x, y, rf } draws the receptive field around a pixel
+  // 'truth' | 'errors'; colors, one [r, g, b] per class; hover { x, y, box } draws the window the pixel is decided from (box: x0, x1, y0, y1)
   function drawSegField(canvas, opt) {
     const k = opt.scale || 2, W = opt.w * k, H = opt.h * k, ctx = fitCanvas(canvas, W, H), mode = opt.mode || 'pred';
     ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
@@ -974,7 +974,7 @@ window.Viz = (function () {
       sctx.putImageData(im, 0, 0); ctx.drawImage(segScratch, 0, 0, W, H);
     }
     if (opt.membrane && mode !== 'image') { ctx.strokeStyle = 'rgba(42,120,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); opt.membrane.forEach((y, i) => (i ? ctx.lineTo(i * 8 * k, y * k) : ctx.moveTo(0, y * k))); ctx.stroke(); }
-    if (opt.hover) { const { x, y, rf } = opt.hover, r = (rf - 1) / 2; ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5; ctx.strokeRect((x - r) * k, (y - r) * k, rf * k, rf * k); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x * k, y * k, k, k); ctx.strokeStyle = 'rgba(20,20,30,0.9)'; ctx.strokeRect(x * k - 0.5, y * k - 0.5, k + 1, k + 1); }
+    if (opt.hover) { const { x, y, box } = opt.hover; ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5; ctx.strokeRect(box.x0 * k, box.y0 * k, (box.x1 - box.x0 + 1) * k, (box.y1 - box.y0 + 1) * k); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x * k, y * k, k, k); ctx.strokeStyle = 'rgba(20,20,30,0.9)'; ctx.strokeRect(x * k - 0.5, y * k - 0.5, k + 1, k + 1); }
     ctx.imageSmoothingEnabled = true;
     canvas._seg = { k, w: opt.w, h: opt.h };
   }
@@ -1789,7 +1789,7 @@ window.Viz = (function () {
     ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`error = p − y = ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
     ctx.fillStyle = c.ink3; ctx.fillText(`loss ${les.loss.toFixed(2)}`, out.x, out.y + out.r + 74);
-    drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the call, with the point plotted: its slope there is the error
+    drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the score, with the point plotted: its slope there is the error
     if (ph === 'check' && les.pAfter != null && les.reveal >= hops) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 90); }
     if (ph === 'loss') { banner('loss: how wrong was the call?', 0); return; }
     if (ph === 'check') return; // the replay shows the forward pass alone: the blame and the gradients are behind it
@@ -2052,18 +2052,22 @@ window.Viz = (function () {
     ctx.fillStyle = c.ink3;
     ctx.fillText(`Δ = −${les.lr} × Σ · ${nDone} of ${nAll}`, at.x, at.y + gw + 19);
   }
-  // the loss against the call: −log p for a positive case, −log(1 − p) for a negative one, with the point plotted
+  // the loss against the score z (the output before the sigmoid): −log σ(z) for a positive case, −log(1 − σ(z)) for a
+  // negative one, with the point plotted and the tangent there, whose slope is the error p − y
   function drawLossGlyph(ctx, c, cx, cy, y, p) {
-    const w = 36, h = 20, x0 = cx - w / 2, y0 = cy + h / 2, lossOf = q => (y ? -Math.log(q) : -Math.log(1 - q)), top = lossOf(0.03);
+    const w = 36, h = 20, x0 = cx - w / 2, y0 = cy + h / 2, Z = 4, lossOf = z => Math.log(1 + Math.exp(y ? -z : z)), top = lossOf(y ? -Z : Z);
+    const xOf = z => x0 + (z + Z) / (2 * Z) * w, yOf = z => y0 - h * lossOf(z) / top;
     ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
     ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath();
-    for (let i = 0; i <= w; i++) { const q = 0.03 + 0.94 * i / w, yy = y0 - h * Math.min(1, lossOf(q) / top); i ? ctx.lineTo(x0 + i, yy) : ctx.moveTo(x0 + i, yy); }
+    for (let i = 0; i <= w; i++) { const z = -Z + 2 * Z * i / w; i ? ctx.lineTo(xOf(z), yOf(z)) : ctx.moveTo(xOf(z), yOf(z)); }
     ctx.stroke();
-    const q = Math.max(0.03, Math.min(0.97, p)), px = x0 + (q - 0.03) / 0.94 * w, py = y0 - h * Math.min(1, lossOf(q) / top);
+    const pc = Math.max(1e-6, Math.min(1 - 1e-6, p)), z = Math.max(-Z, Math.min(Z, Math.log(pc / (1 - pc)))), px = xOf(z), py = yOf(z);
+    const slope = (1 / (1 + Math.exp(-z)) - y) * (h / top) / (w / (2 * Z)); // the error p − y, in the glyph's pixels per pixel
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px - 7, py + 7 * slope); ctx.lineTo(px + 7, py - 7 * slope); ctx.stroke();
     ctx.fillStyle = y ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
     ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText(y ? '−log p' : '−log(1−p)', cx, cy - h / 2 - 3);
-    ctx.textBaseline = 'top'; ctx.fillText('0', x0, y0 + 2); ctx.fillText('p', cx, y0 + 2); ctx.fillText('1', x0 + w, y0 + 2);
+    ctx.fillText(y ? '−log σ(z)' : '−log(1−σ(z))', cx, cy - h / 2 - 3);
+    ctx.textBaseline = 'top'; ctx.fillText(`−${Z}`, x0, y0 + 2); ctx.fillText('z', cx, y0 + 2); ctx.fillText(`+${Z}`, x0 + w, y0 + 2);
   }
   function pill(ctx, x, y, text, col, c) {
     ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;

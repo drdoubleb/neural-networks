@@ -877,7 +877,7 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
             <span id="curves-legend-test" hidden><span class="line test"></span>test set (peeking)</span>
             <span><span class="line chance"></span>chance</span>
             <span id="curves-legend-ceiling" hidden><span class="line ceiling"></span>honest ceiling: the share of labels that are right</span>
-            <span id="curves-legend-stop" hidden><span class="line stop"></span>lowest test loss so far (where early stopping would stop)</span>
+            <span id="curves-legend-stop" hidden><span class="line stop"></span>lowest test loss so far: where early stopping would stop (on a validation set in practice, never the test set)</span>
           </div>
         </div>
         <div class="curves">
@@ -2064,7 +2064,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
         </div>
         <p class="prose small" id="sg-blurb"></p>
         <div class="bar-row">
-          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sg-levels-seg"><button type="button" data-levels="0" title="two 3 × 3 convolutions at the pixels' own scale: a window of 5 px">none</button><button type="button" data-levels="1" title="one level down: pool 2 × 2, convolve, upsample, join: a window of 15 px">1 level</button><button type="button" data-levels="2" class="is-active" title="two levels down: a window of 35 px, wide enough to see the membrane">2 levels</button></div></div>
+          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sg-levels-seg"><button type="button" data-levels="0" title="two 3 × 3 convolutions at the pixels' own scale: a window of 5 px">none</button><button type="button" data-levels="1" title="one level down: pool 2 × 2, convolve, upsample, join: a window of 16 px">1 level</button><button type="button" data-levels="2" class="is-active" title="two levels down: a window of 36 to 40 px, wide enough to see the membrane">2 levels</button></div></div>
           <div class="ctl"><span class="lbl">Channels</span><div class="seg" id="sg-channels-seg"><button type="button" data-channels="8" class="is-active">8</button><button type="button" data-channels="16">16</button></div></div>
           <div class="ctl"><span class="lbl">Crops per epoch</span><div class="seg" id="sg-crops-seg"><button type="button" data-crops="100" class="is-active" title="100 random crops of 64 × 64 from the training fields">100</button><button type="button" data-crops="200">200</button><button type="button" data-crops="400">400</button></div></div>
           <div class="ctl slim"><label for="sg-epochs">Epochs <span class="val" id="sg-epochs-val">15</span></label><input type="range" id="sg-epochs" min="1" max="60" step="1" value="15"></div>
@@ -3858,8 +3858,28 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
     }
     layers() { const out = []; for (const pair of this.enc) out.push(pair[0], pair[1]); for (const d of this.dec) out.push(d); out.push(this.head); return out; }
     parameterCount() { return this.layers().reduce((a, c) => a + c.W.length + c.b.length, 0); }
-    receptiveField() { let r = 1; for (let l = 0; l <= this.L; l++) r += 4 * Math.pow(2, l); for (let l = this.L - 1; l >= 0; l--) r += 2 * Math.pow(2, l); return r; } // every 3 × 3 convolution adds 2 at its level's scale
-    describe() { return `${this.L ? `${this.L} level${this.L > 1 ? 's' : ''} of context (pool, convolve, upsample, join)` : 'no context below the pixels'} · ${this.C} channels · 3 × 3 convolutions, ReLU · receptive field ${this.receptiveField()} px · ${this.K} classes per pixel`; }
+    // the window of image pixels along one axis that the entries lo..hi of a map depend on, map by map as forward()
+    // names them: E1 and E2 a level's two convolutions, P the pool that leads down to a level, J the join of a level's
+    // features with the map upsampled from below, D the decoder's map at a level (its up-convolution over the join; at
+    // the deepest level the encoder's own output). A pooled entry reads two above it, and nearest-neighbour upsampling
+    // reads the entry lo >> 1 below, so the window depends on where the pixel falls on the pooling grid
+    windows() {
+      const L = this.L, u = (p, q) => [Math.min(p[0], q[0]), Math.max(p[1], q[1])];
+      const E1 = (l, lo, hi) => (l === 0 ? [lo - 1, hi + 1] : P(l, lo - 1, hi + 1));
+      const E2 = (l, lo, hi) => (l === 0 ? [lo - 2, hi + 2] : P(l, lo - 2, hi + 2));
+      const P = (l, lo, hi) => E2(l - 1, 2 * lo, 2 * hi + 1);
+      const D = (l, lo, hi) => (l === L ? E2(l, lo, hi) : J(l, lo - 1, hi + 1));
+      const J = (l, lo, hi) => u(E2(l, lo, hi), D(l + 1, lo >> 1, hi >> 1));
+      return { E1, E2, P, D, J };
+    }
+    // the pixels a pixel's class is decided from: a rectangle, not always centred on the pixel, clipped to the field
+    support(x, y, H, W) { const { D } = this.windows(), a = D(0, x, x), b = D(0, y, y); return { x0: Math.max(0, a[0]), x1: Math.min(W - 1, a[1]), y0: Math.max(0, b[0]), y1: Math.min(H - 1, b[1]) }; }
+    // the receptive field: the span of that window away from the field's edge, smallest and largest over the pixel's
+    // place on the pooling grid (5 px with no context, 16 with one level, 36 to 40 with two), and the largest alone
+    receptiveFieldRange() { const { D } = this.windows(), n = 1 << this.L, p0 = 8 * n; let lo = Infinity, hi = -Infinity; for (let p = p0; p < p0 + n; p++) { const w = D(0, p, p), s = w[1] - w[0] + 1; lo = Math.min(lo, s); hi = Math.max(hi, s); } return [lo, hi]; }
+    receptiveField() { return this.receptiveFieldRange()[1]; }
+    receptiveFieldText() { const [lo, hi] = this.receptiveFieldRange(); return lo === hi ? `${hi} px` : `${lo} to ${hi} px`; }
+    describe() { return `${this.L ? `${this.L} level${this.L > 1 ? 's' : ''} of context (pool, convolve, upsample, join)` : 'no context below the pixels'} · ${this.C} channels · 3 × 3 convolutions, ReLU · receptive field ${this.receptiveFieldText()} · ${this.K} classes per pixel`; }
     // the 3 × 3 convolution with 'same' zero padding: pre-activations, and the activations after ReLU when asked
     conv3(x, layer, H, W, relu) {
       const { W: Wt, b, cin, cout } = layer, pre = new Float64Array(cout * H * W);
@@ -3917,29 +3937,26 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
       const take = (arr, n, h, w, px, py) => Float64Array.from({ length: n }, (_, ch) => arr[(ch * h + py) * w + px]);
       const contrib3 = (inp, layer, h, w, px, py) => { const { W: Wt, cin, cout } = layer, out = new Float64Array(cout * cin); for (let o = 0; o < cout; o++) for (let c = 0; c < cin; c++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const yy = py + dy; if (yy < 0 || yy >= h) continue; for (let dx = -1; dx <= 1; dx++) { const xx = px + dx; if (xx < 0 || xx >= w) continue; s += Wt[(o * cin + c) * 9 + (dy + 1) * 3 + dx + 1] * inp[(c * h + yy) * w + xx]; } } out[o * cin + c] = s; } return out; };
       const kernelOf = layer => (o, c) => Array.from(layer.W.subarray((o * layer.cin + c) * 9, (o * layer.cin + c) * 9 + 9));
-      let rf = 1; const lev0 = fw.levels[0];
+      const Wn = this.windows(), seesOf = (f, l, px, py) => { const a = f(l, px, px), b = f(l, py, py), sx = a[1] - a[0] + 1, sy = b[1] - b[0] + 1; return sx === sy ? String(sx) : sx + ' × ' + sy; }, lev0 = fw.levels[0];
       const patch = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = y + dy, xx = x + dx; patch.push(yy < 0 || yy >= lev0.h || xx < 0 || xx >= lev0.w ? 0 : lev0.x[yy * lev0.w + xx]); }
-      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: rf });
+      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: x, py: y, values: Float64Array.of(lev0.x[y * lev0.w + x]), patch, signed: true, sees: '1' });
       for (let l = 0; l <= this.L; l++) {
         const lev = fw.levels[l], { px, py } = pos(l), l1 = this.enc[l][0], l2 = this.enc[l][1];
-        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: rf });
+        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: seesOf(Wn.P, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: seesOf(Wn.E1, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: seesOf(Wn.E2, l, px, py) });
         convTwo[l] = cols.length - 1;
       }
       for (let k = 0; k < fw.decs.length; k++) {
         const d = fw.decs[k], l = d.l, lev = fw.levels[l], { px, py } = pos(l), layer = this.dec[k];
-        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: rf });
-        rf += 2 * (1 << l);
-        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: rf });
+        cols.push({ kind: 'join', level: l, name: 'join', h: lev.h, w: lev.w, px, py, values: take(d.cat, 2 * C, lev.h, lev.w, px, py), from: cols.length - 1, skipFrom: convTwo[l], sees: seesOf(Wn.J, l, px, py) });
+        cols.push({ kind: 'conv', level: l, name: 'up-conv', h: lev.h, w: lev.w, px, py, values: take(d.d.act, C, lev.h, lev.w, px, py), pre: take(d.d.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(d.cat, layer, lev.h, lev.w, px, py), cin: layer.cin, layer, kernel: kernelOf(layer), sees: seesOf(Wn.D, l, px, py) });
       }
       const N = fw.H * fw.W, i0 = y * fw.W + x, hd = this.head, top = cols[cols.length - 1].values, hc = new Float64Array(K * C);
       for (let k = 0; k < K; k++) for (let c = 0; c < C; c++) hc[k * C + c] = hd.W[k * C + c] * top[c];
-      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: rf });
-      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: rf });
-      return { x, y, cols, C, K, levels: this.L, rf };
+      cols.push({ kind: 'head', level: 0, name: 'head 1 × 1', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.logits[k * N + i0]), from: cols.length - 1, contrib: hc, cin: C, layer: hd, kernel: (o, c) => [hd.W[o * C + c]], signed: true, sees: seesOf(Wn.D, 0, x, y) });
+      cols.push({ kind: 'softmax', level: 0, name: 'softmax', h: fw.H, w: fw.W, px: x, py: y, values: Float64Array.from({ length: K }, (_, k) => fw.probs[k * N + i0]), from: cols.length - 1, sees: seesOf(Wn.D, 0, x, y) });
+      return { x, y, cols, C, K, levels: this.L, rf: this.receptiveField() };
     }
     newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
     // one step on a batch of samples [{ x, y, H, W }]: the mean loss before the step
@@ -4107,7 +4124,7 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
     let labStats = null;
     if (labs) {
       for (const split of ['train', 'test']) for (const label of [0, 1]) specimens.filter(s => s.split === split && s.label === label).forEach((s, k) => { s.mixLab = k % 2 ? 'B' : 'A'; });
-      labStats = {}; // each lab's typical stain levels over all of its scans
+      labStats = {}; // each lab's typical stain levels over all of its scans, the test scans among them: a statistic of the images, no label read
       for (const lab of ['A', 'B']) { let bg = 0, nuc = 0; for (const s of specimens) { bg += s.variants[lab].levels.bg; nuc += s.variants[lab].levels.nuc; } labStats[lab] = { bg: bg / specimens.length, nuc: nuc / specimens.length }; }
     }
     return {
@@ -5156,7 +5173,7 @@ window.Viz = (function () {
   // ---- the segmentation question: a field with a class painted on every pixel, the first layer's maps, its filters
   const segScratch = document.createElement('canvas');
   // opt: px, w, h, scale, tint; labels (the prediction) and truth as Uint8Arrays of classes; mode 'image' | 'pred' |
-  // 'truth' | 'errors'; colors, one [r, g, b] per class; hover { x, y, rf } draws the receptive field around a pixel
+  // 'truth' | 'errors'; colors, one [r, g, b] per class; hover { x, y, box } draws the window the pixel is decided from (box: x0, x1, y0, y1)
   function drawSegField(canvas, opt) {
     const k = opt.scale || 2, W = opt.w * k, H = opt.h * k, ctx = fitCanvas(canvas, W, H), mode = opt.mode || 'pred';
     ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
@@ -5168,7 +5185,7 @@ window.Viz = (function () {
       sctx.putImageData(im, 0, 0); ctx.drawImage(segScratch, 0, 0, W, H);
     }
     if (opt.membrane && mode !== 'image') { ctx.strokeStyle = 'rgba(42,120,214,0.7)'; ctx.lineWidth = 1; ctx.beginPath(); opt.membrane.forEach((y, i) => (i ? ctx.lineTo(i * 8 * k, y * k) : ctx.moveTo(0, y * k))); ctx.stroke(); }
-    if (opt.hover) { const { x, y, rf } = opt.hover, r = (rf - 1) / 2; ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5; ctx.strokeRect((x - r) * k, (y - r) * k, rf * k, rf * k); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x * k, y * k, k, k); ctx.strokeStyle = 'rgba(20,20,30,0.9)'; ctx.strokeRect(x * k - 0.5, y * k - 0.5, k + 1, k + 1); }
+    if (opt.hover) { const { x, y, box } = opt.hover; ctx.strokeStyle = 'rgba(20,20,30,0.85)'; ctx.lineWidth = 1.5; ctx.strokeRect(box.x0 * k, box.y0 * k, (box.x1 - box.x0 + 1) * k, (box.y1 - box.y0 + 1) * k); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.fillRect(x * k, y * k, k, k); ctx.strokeStyle = 'rgba(20,20,30,0.9)'; ctx.strokeRect(x * k - 0.5, y * k - 0.5, k + 1, k + 1); }
     ctx.imageSmoothingEnabled = true;
     canvas._seg = { k, w: opt.w, h: opt.h };
   }
@@ -5983,7 +6000,7 @@ window.Viz = (function () {
     ctx.font = monoS; ctx.fillStyle = pushCol; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText(`error = p − y = ${fmtSigned(les.error, 2)} ${up ? '↑' : '↓'}`, out.x, out.y + out.r + 58);
     ctx.fillStyle = c.ink3; ctx.fillText(`loss ${les.loss.toFixed(2)}`, out.x, out.y + out.r + 74);
-    drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the call, with the point plotted: its slope there is the error
+    drawLossGlyph(ctx, c, bx, top - 30, les.y, pv); // the loss against the score, with the point plotted: its slope there is the error
     if (ph === 'check' && les.pAfter != null && les.reveal >= hops) { const dp = les.pBefore.toFixed(2) === les.pAfter.toFixed(2) ? 3 : 2; ctx.fillStyle = c.ink2; ctx.fillText(`${les.pBefore.toFixed(dp)} → ${les.pAfter.toFixed(dp)}`, out.x, out.y + out.r + 90); }
     if (ph === 'loss') { banner('loss: how wrong was the call?', 0); return; }
     if (ph === 'check') return; // the replay shows the forward pass alone: the blame and the gradients are behind it
@@ -6246,18 +6263,22 @@ window.Viz = (function () {
     ctx.fillStyle = c.ink3;
     ctx.fillText(`Δ = −${les.lr} × Σ · ${nDone} of ${nAll}`, at.x, at.y + gw + 19);
   }
-  // the loss against the call: −log p for a positive case, −log(1 − p) for a negative one, with the point plotted
+  // the loss against the score z (the output before the sigmoid): −log σ(z) for a positive case, −log(1 − σ(z)) for a
+  // negative one, with the point plotted and the tangent there, whose slope is the error p − y
   function drawLossGlyph(ctx, c, cx, cy, y, p) {
-    const w = 36, h = 20, x0 = cx - w / 2, y0 = cy + h / 2, lossOf = q => (y ? -Math.log(q) : -Math.log(1 - q)), top = lossOf(0.03);
+    const w = 36, h = 20, x0 = cx - w / 2, y0 = cy + h / 2, Z = 4, lossOf = z => Math.log(1 + Math.exp(y ? -z : z)), top = lossOf(y ? -Z : Z);
+    const xOf = z => x0 + (z + Z) / (2 * Z) * w, yOf = z => y0 - h * lossOf(z) / top;
     ctx.strokeStyle = c.ink3; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + w, y0); ctx.stroke();
     ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.beginPath();
-    for (let i = 0; i <= w; i++) { const q = 0.03 + 0.94 * i / w, yy = y0 - h * Math.min(1, lossOf(q) / top); i ? ctx.lineTo(x0 + i, yy) : ctx.moveTo(x0 + i, yy); }
+    for (let i = 0; i <= w; i++) { const z = -Z + 2 * Z * i / w; i ? ctx.lineTo(xOf(z), yOf(z)) : ctx.moveTo(xOf(z), yOf(z)); }
     ctx.stroke();
-    const q = Math.max(0.03, Math.min(0.97, p)), px = x0 + (q - 0.03) / 0.94 * w, py = y0 - h * Math.min(1, lossOf(q) / top);
+    const pc = Math.max(1e-6, Math.min(1 - 1e-6, p)), z = Math.max(-Z, Math.min(Z, Math.log(pc / (1 - pc)))), px = xOf(z), py = yOf(z);
+    const slope = (1 / (1 + Math.exp(-z)) - y) * (h / top) / (w / (2 * Z)); // the error p − y, in the glyph's pixels per pixel
+    ctx.strokeStyle = c.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px - 7, py + 7 * slope); ctx.lineTo(px + 7, py - 7 * slope); ctx.stroke();
     ctx.fillStyle = y ? c.irregular : c.regular; ctx.beginPath(); ctx.arc(px, py, 3, 0, Math.PI * 2); ctx.fill();
     ctx.font = `500 9px "IBM Plex Mono", ui-monospace, monospace`; ctx.fillStyle = c.ink3; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-    ctx.fillText(y ? '−log p' : '−log(1−p)', cx, cy - h / 2 - 3);
-    ctx.textBaseline = 'top'; ctx.fillText('0', x0, y0 + 2); ctx.fillText('p', cx, y0 + 2); ctx.fillText('1', x0 + w, y0 + 2);
+    ctx.fillText(y ? '−log σ(z)' : '−log(1−σ(z))', cx, cy - h / 2 - 3);
+    ctx.textBaseline = 'top'; ctx.fillText(`−${Z}`, x0, y0 + 2); ctx.fillText('z', cx, y0 + 2); ctx.fillText(`+${Z}`, x0 + w, y0 + 2);
   }
   function pill(ctx, x, y, text, col, c) {
     ctx.font = `600 9.5px "IBM Plex Mono", ui-monospace, monospace`;
@@ -7014,7 +7035,7 @@ window.Glossary = (function () {
     { t: 'overfitting', also: ['overfit', 'overfits', 'overfitted'], d: 'Learning the training cases themselves, their noise and their quirks, rather than the rule behind them: the training loss keeps falling while the test loss turns up.' },
     { t: 'regularisation', also: ['regularise', 'regularised', 'regulariser'], d: 'Anything that holds a network back from fitting the training cases too closely: weight decay, augmentation, a smaller network, stopping early.' },
     { t: 'augmentation', also: ['augment', 'augmented'], d: 'Making more training cases from the ones there are, by changes that keep the label: here the seven other flips and rotations of every image.' },
-    { t: 'early stopping', d: 'Stopping training where the test loss is lowest, before the network goes on to fit the training cases’ noise.' },
+    { t: 'early stopping', d: 'Stopping training at the epoch where the loss on held-out cases is lowest, before the network goes on to fit the training cases’ noise. Done properly, those cases are a validation set split from the training data, not the test set, which is kept untouched for the final score; this page has only the two sets, so its test set stands in.' },
     { t: 'label noise', d: 'Labels that are wrong in the training set. A network learns them too, up to a point, and its ceiling drops.' },
     { t: 'test set', also: ['test cases', 'test reports', 'test transcripts', 'test nuclei'], d: 'Cases set aside before training and never trained on, to measure what the network learned rather than what it memorised.' },
     { t: 'held-out', also: ['held out', 'held-out cases', 'held-out reports'], d: 'Cases, or a whole combination of findings, kept out of training on purpose, to ask what the network does with something it has never seen.' },
@@ -7336,7 +7357,7 @@ window.Glossary = (function () {
       mixed: 'The test set mixes the labs at random.',
       byClass: `The test set is split by class the same way, so it carries the same shortcut: a network that reads the stain will look perfect on it.`,
     }[te];
-    return `${train} ${test}${S.normalize !== 'off' && S.mode !== 'features' ? ` Stain normalisation is on (${S.normalize === 'lab' ? 'each lab’s typical background and nucleus levels, measured from its scans without any label, are matched to ours' : 'each scan is rescaled by its own background and nucleus levels'}), so the network sees comparable images.` : ''}`;
+    return `${train} ${test}${S.normalize !== 'off' && S.mode !== 'features' ? ` Stain normalisation is on (${S.normalize === 'lab' ? 'each lab’s typical background and nucleus levels, measured over all of its scans, the test scans among them, without reading a label, are matched to ours: adaptation to a new lab from its unlabelled images, as a lab calibrates to a new scanner' : 'each scan is rescaled by its own background and nucleus levels'}), so the network sees comparable images.` : ''}`;
   }
   function renderSources() {
     const labs = !!S.ds.labs;
@@ -7488,7 +7509,7 @@ window.Glossary = (function () {
   // ------------------------------------------------------------------ the lesson: one case teaches the network
   // A walk-through of one gradient step on a training case in six steps (five without a hidden layer):
   //   1 forward pass   values flow from the inputs to the output, hop by hop
-  //   2 loss           call against truth; the error is the slope of the loss at the output
+  //   2 loss           call against truth; the error is the slope of the loss against the score (the output before the sigmoid)
   //   3 backward pass  blame flows back to every hidden unit (skipped without hidden units)
   //   4 gradients      every weight's gradient = blame at its end × activity at its start
   //   5 update         the weights actually move: w ← w − learning rate × gradient (drawn as a morph)
@@ -7651,7 +7672,7 @@ window.Glossary = (function () {
         : 'The filters last. A filter was used at every position of the image, so its gradient adds up over every position that got blame: the blame there × the 5×5 image patch under the filter. Filter 1 goes position by position (the window on the image, the arithmetic under it: patch → × blame → Σ so far), the other filters all at once. The step, −learning rate × Σ, settles over each filter until the update folds it in.';
       const texts = {
         forward: sub ? `${sub.text}${sub.phase === 'final' ? ' ' + verdict : ''}` : `${forwardText()} ${verdict}`,
-        loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>. Its slope at the output is the error, call − truth = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
+        loss: `How wrong was it? Cross-entropy loss <b>${les.res.loss.toFixed(2)}</b>, −log of the probability it gave the truth. Drawn against the score z (the output before the sigmoid), its slope at this score is the error, call − truth = p − y = ${p} − ${les.y} = <b>${e}</b>: ${les.res.error > 0 ? 'too high, so the score must come down' : 'too low, so the score must go up'}.`,
         blame: (conv && convBlame) || (hidden > 1
           ? 'How much is each hidden unit to blame? The error flows back one layer at a time along each connection as blame × weight (thick = large; blue: the unit should come down, orange: go up). A unit adds up what arrives, and ReLU passes it on only if the unit was on: an off unit’s blame is 0. Each pill shows the arithmetic.'
           : 'How much is each hidden unit to blame? The error flows back along each connection as error × weight (thick = large; blue: the unit should come down, orange: go up). ReLU passes it on only if the unit was on, so a unit that was off gets blame 0. Each pill shows the arithmetic.'),
@@ -7721,8 +7742,9 @@ window.Glossary = (function () {
     $('defer-n').textContent = `${cur.called} / ${cur.n}`; $('defer-n-sub').textContent = `${pct(cur.coverage)} of the cases`;
     $('defer-acc').textContent = cur.acc == null ? '–' : pct(cur.acc); $('defer-acc-sub').textContent = cur.called ? `${cur.right} of ${cur.called} right` : 'every case deferred';
     $('defer-d').textContent = String(cur.deferred); $('defer-d-sub').textContent = cur.deferred ? `${cur.deferredWrong} of them would have been called wrong` : 'none';
-    const sure90 = deferStats(0.9), all = deferStats(0.5), wrongSure = cases.filter(k => k.wrong && Math.max(k.p, 1 - k.p) >= 0.9).length;
-    $('calib-note').textContent = `Each dot is a classified test case, placed by the probability the network gave ${posName()}, coloured by its truth; a red ring marks a call that was wrong. A well-calibrated network puts its mistakes near the middle, where it is unsure: ${all.n - all.right === 0 ? `none of the ${all.n} calls here was wrong` : all.n - all.right === 1 ? `1 of the ${all.n} calls here was wrong, ${wrongSure ? 'with' : 'without'} 90% or more confidence` : `${all.n - all.right} of the ${all.n} calls here were wrong, of which ${wrongSure} came with 90% or more confidence`}. ${sure90.called ? `The network was at least 90% sure for ${sure90.called} cases and right for ${sure90.right} of them.` : 'The network was never 90% sure.'} Handing back the cases in the grey band, those it is less than ${Math.round(tau * 100)}% sure about, leaves ${cur.called} calls${cur.acc != null ? ` that are right ${pct(cur.acc)} of the time` : ''} and ${cur.deferred} cases for the pathologist, ${cur.deferredWrong} of which the network would have got wrong. That trade is what the curve on the right draws for every setting of the bar; with ${cur.n} test cases it is a staircase, and a real evaluation would need hundreds.`;
+    const all = deferStats(0.5), wrongSure = cases.filter(k => k.wrong && Math.max(k.p, 1 - k.p) >= 0.9).length;
+    const bands = [[0.5, 0.7, '50 to 70%', 60], [0.7, 0.9, '70 to 90%', 80], [0.9, 1.01, '90 to 100%', 95]].map(([lo, hi, name, mid]) => { const b = cases.filter(k => { const s = Math.max(k.p, 1 - k.p); return s >= lo - 1e-9 && s < hi; }); return { name, mid, n: b.length, right: b.filter(k => !k.wrong).length }; }).filter(b => b.n);
+    $('calib-note').textContent = `Each dot is a classified test case, placed by the probability the network gave ${posName()}, coloured by its truth; a red ring marks a call that was wrong. Calibration is whether the probabilities mean what they say: of the calls made at 90% confidence about 90% should be right, so a calibrated network’s mistakes are rare at the ends and commoner towards the middle, in the proportion the probabilities promise, and a confident mistake is allowed as often as the confidence says. ${all.n - all.right === 0 ? `none of the ${all.n} calls here was wrong` : all.n - all.right === 1 ? `1 of the ${all.n} calls here was wrong, ${wrongSure ? 'with' : 'without'} 90% or more confidence` : `${all.n - all.right} of the ${all.n} calls here were wrong, of which ${wrongSure} came with 90% or more confidence`}. By band of confidence: ${bands.map(b => `${b.name}, ${b.right} of ${b.n} right (about ${b.mid}% if calibrated)`).join('; ')}; the margins are wide on so few cases. Handing back the cases in the grey band, those it is less than ${Math.round(tau * 100)}% sure about, leaves ${cur.called} calls${cur.acc != null ? ` that are right ${pct(cur.acc)} of the time` : ''} and ${cur.deferred} cases for the pathologist, ${cur.deferredWrong} of which the network would have got wrong. That trade is what the curve on the right draws for every setting of the bar; with ${cur.n} test cases it is a staircase, and a real evaluation would need hundreds.`;
   }
   function testStats() {
     const thr = S.test.threshold;
@@ -7962,7 +7984,7 @@ window.Glossary = (function () {
     P.schedule();
   }
   function renderCharts() {
-    let stopAt = null; // the epoch of the lowest test loss so far: where early stopping on a held-out set would have stopped
+    let stopAt = null; // the epoch of the lowest test loss so far: where early stopping would have stopped (on a validation set in practice; the page has only the two sets, so the test set stands in, and the legend says so)
     if (S.peek && S.history.length > 3) { let best = S.history[0]; for (const h of S.history) if (h.testLoss < best.testLoss) best = h; if (best.epoch > 0 && best.epoch < S.history[S.history.length - 1].epoch) stopAt = best.epoch; }
     const ceiling = S.labelNoise > 0 ? 1 - S.labelNoise : null;
     Viz.drawCurves($('chart-loss'), { history: S.history, key: 'loss', showTest: S.peek, maxEpoch: S.epochs, stopAt });
@@ -8112,7 +8134,7 @@ window.Glossary = (function () {
         const sal = new Float64Array(g.length);
         for (let i = 0; i < g.length; i++) sal[i] = g[i] * x[i];
         Viz.renderEvidence(cv, s.px, s.size, sal, S.tint);
-        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (weight × input at each pixel).`;
+        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (${!S.net.conv && S.net.hidden.length === 0 ? 'weight × input at each pixel' : 'gradient × input at each pixel: the network linearised at this nucleus'}).`;
       } else if (S.mode === 'code') { // the classifier's evidence on the code, carried back through the frozen encoder to the pixels
         const enc = codeEncoder(), gCode = S.net.inputGradient(x, fw), dRaw = new Float64Array(gCode.length);
         for (let i = 0; i < gCode.length; i++) dRaw[i] = gCode[i] / S.inputs.std.scale[i];
@@ -8143,8 +8165,10 @@ window.Glossary = (function () {
       $('pbar-thr').style.left = (thr * 100).toFixed(1) + '%';
       const g = S.net.inputGradient(x, fw);
       let sum = 0; for (let i = 0; i < g.length; i++) sum += g[i] * x[i];
-      const exact = !S.net.conv && S.net.hidden.length === 0;
-      $('evidence-sum').innerHTML = `evidence Σ(weight × input) ${exact ? '=' : '≈'} ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}${exact ? '' : '<br><span class="muted">(with hidden layers or a convolution the per-input evidence is a linear approximation)</span>'}`;
+      const exact = !S.net.conv && S.net.hidden.length === 0, rest = fw.z - sum, curved = S.net.hidden.length > 0 && S.net.activation !== 'relu';
+      $('evidence-sum').innerHTML = exact
+        ? `evidence Σ(weight × input) = ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; bias ${Viz.fmtSigned(S.net.bo, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}`
+        : `evidence Σ(gradient × input) = ${Viz.fmtSigned(sum, 2)} &nbsp;·&nbsp; the rest ${Viz.fmtSigned(rest, 2)} &nbsp;→&nbsp; z ${Viz.fmtSigned(fw.z, 2)} &nbsp;→&nbsp; P = 1 / (1 + e<sup>−z</sup>) = ${fw.p.toFixed(3)}<br><span class="muted">(with hidden layers or a convolution the evidence is gradient × input, the network linearised at this case, and the output bias alone does not complete the score: the rest is what the biases along the active paths add, the output bias ${Viz.fmtSigned(S.net.bo, 2)} among them${curved ? `, and the curve of the ${S.net.activation} units` : ''})</span>`;
     }
 
     // measurement / blood-count table
@@ -8317,7 +8341,7 @@ window.Glossary = (function () {
       if (k === '19') { // the segment question: a class for every pixel, and the window it is decided from
         S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
         selectQuestion('segment'); showStage('train');
-        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 35 px, and train again, or load the trained network, which paints the nests.`); };
+        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest looks like a nucleus in the epithelium, and no 5-px window can tell where the membrane runs. Then set the context to 2 levels, a window of 36 to 40 px, and train again, or load the trained network, which paints the nests.`); };
         go();
         return;
       }
@@ -9975,12 +9999,12 @@ window.Glossary = (function () {
   function sgSelect(id) { const L = S.sg; L.selected = id; L.hover = null; sgRenderFocus(); sgRenderTrays(); }
   function sgNeighbour(step) { const L = S.sg, cur = sgFocus(), i = L.all.indexOf(cur); sgSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function sgLegend(el) { $(el).innerHTML = sgClasses().map((c, k) => `<span><span class="swatch" style="background:rgb(${SG.colors[k].join(',')});border:1px solid var(--line-strong)"></span>${c}</span>`).join('') + '<span><span class="swatch" style="background:rgba(42,120,214,0.7)"></span>the membrane</span>'; }
-  function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, rf: L.model.receptiveField() } : null }); return p; }
+  function sgDrawField(canvasId, s, view, hover) { const L = S.sg, p = L.model ? sgPredict(s) : null; Viz.drawSegField($(canvasId), { px: s.px, w: L.w, h: L.h, scale: 3, tint: S.tint, labels: p ? p.labels : null, truth: s.mask, mode: view === 'pred' && !p ? 'image' : view, colors: SG.colors, alpha: 0.5, membrane: view === 'image' ? null : s.membrane, hover: hover && L.model ? { x: hover.x, y: hover.y, box: L.model.support(hover.x, hover.y, L.h, L.w) } : null }); return p; }
   function sgIouText(p) { return `mean IoU <b>${p.iou.mean == null ? '–' : pct(p.iou.mean)}</b> · ${sgClasses().map((c, k) => `${c} ${p.iou.per[k] == null ? '–' : pct(p.iou.per[k])}`).join(' · ')} · ${pct(p.acc)} of the pixels right`; }
   function sgRenderField() {
     const L = S.sg, s = sgFocus(), p = sgDrawField('sg-canvas', s, L.view, sgFieldHover(false)); sgLegend('sg-legend');
     $('sg-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name}${L.lastField === s.id ? ' · the last crops came from it' : ''}`;
-    $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveField()} px across).` : 'No network yet.';
+    $('sg-field-note').innerHTML = p ? `${L.view === 'pred' ? 'The class the network gives every pixel, over the field' : L.view === 'truth' ? 'The mask the field carries' : L.view === 'errors' ? 'The pixels the network gets wrong, in red' : 'The field as scanned'}. On this field: ${sgIouText(p)}. Hover a pixel for its probabilities and the window the network sees around it (${L.model.receptiveFieldText()} across).` : 'No network yet.';
     const f = L.model.enc[0][0]; Viz.drawSegFilters($('sg-filters'), { W: f.W, cout: f.cout, cin: f.cin, cell: 12, cols: Math.min(8, f.cout) }); $('sg-filters-note').textContent = `The ${f.cout} filters of the first layer, numbered, 3 × 3 weights each, red positive and blue negative: edges, blobs and the like, learned from nothing. The layers behind them see only their maps.`;
     if (p) { const lev = p.fw.levels[0]; Viz.drawSegMaps($('sg-maps'), { maps: lev.c1.act, C: L.model.C, h: lev.h, w: lev.w, scale: 1, cols: 4, label: 'map' }); }
     sgRenderNet(false);
@@ -10001,7 +10025,7 @@ window.Glossary = (function () {
     if (!M) { cv._segNet = null; cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); note.textContent = onTest ? 'The network at one pixel of the field under test appears once a field has been painted.' : ''; return; }
     Viz.drawSegNetwork(cv, M.model);
     const q = sgPixelOf(onTest), i = q.y * L.w + q.x, cls = sgClasses(), P = M.path, pinned = onTest ? L.testPixelPinned : L.pixelPinned;
-    note.innerHTML = `Pixel (${q.x}, ${q.y}) of field ${esc(M.s.name)}${pinned ? ', pinned: click the field to release it' : ': hover the field to follow another pixel, click to pin one'}. Truth <b>${cls[M.s.mask[i]]}</b>, the network says <b>${cls[M.p.labels[i]]}</b>${M.p.labels[i] === M.s.mask[i] ? ' ✓' : ' ✗'}. ${P.cols.length} columns: the pixel; at every level two 3 × 3 convolutions, with the 2 × 2 pool that leads down to the next; on the way up, at every level, the join of the upsampled map with the level’s own and one more convolution; the head’s score per class; the softmax. The window a column sees grows from 1 px to ${P.rf} px along the way, and the circles stand at the pixel’s place in each map, which the pooling makes coarser.`;
+    note.innerHTML = `Pixel (${q.x}, ${q.y}) of field ${esc(M.s.name)}${pinned ? ', pinned: click the field to release it' : ': hover the field to follow another pixel, click to pin one'}. Truth <b>${cls[M.s.mask[i]]}</b>, the network says <b>${cls[M.p.labels[i]]}</b>${M.p.labels[i] === M.s.mask[i] ? ' ✓' : ' ✗'}. ${P.cols.length} columns: the pixel; at every level two 3 × 3 convolutions, with the 2 × 2 pool that leads down to the next; on the way up, at every level, the join of the upsampled map with the level’s own and one more convolution; the head’s score per class; the softmax. The window a column sees grows from 1 px to ${P.cols[P.cols.length - 1].sees} px along the way (the exact box, drawn on the field, depends on where the pixel falls on the pooling grid), and the circles stand at the pixel’s place in each map, which the pooling makes coarser.`;
   }
   function sgNetHover(onTest, hit) { const L = S.sg; if (onTest) L.testHoverNet = hit; else L.hoverNet = hit; const M = sgNetModel(onTest); if (M) Viz.drawSegNetwork($(onTest ? 'sg-test-net' : 'sg-net'), M.model); }
   function sgNetTip(onTest, ev) {
@@ -10037,7 +10061,7 @@ window.Glossary = (function () {
   function sgRenderFocus() { sgRenderField(); }
   function sgRender(full) { const L = S.sg; if (!L.model) return; sgRenderStatus(); sgRenderFocus(); if (full) { sgRenderCurves(); sgRenderTrays(); } sgSyncButtons(); }
   function sgRenderAll() { const L = S.sg; if (S.world !== 'segment' || !L.built) return; if (S.stage === 'data') sgRenderData(); else if (S.stage === 'test') sgRenderTest(); else if (L.model) sgRender(true); }
-  function sgEnter() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'train') return; $('sg-blurb').innerHTML = `The network sees the pixels and nothing else: no nuclei, no membrane, no labels but the mask. Every weight is a 3 × 3 filter slid over the whole field, so the same few thousand weights paint any field of any size; with <b>no context</b> a pixel's class is decided from the ${new NN.SegNet({ levels: 0 }).receptiveField()} × ${new NN.SegNet({ levels: 0 }).receptiveField()} window around it, and each <b>level</b> of pooling below the pixels widens the window (${new NN.SegNet({ levels: 1 }).receptiveField()} px, then ${new NN.SegNet({ levels: 2 }).receptiveField()} px) at the cost of fine detail, brought back by the join with the finer map on the way up.`; if (!L.model) sgReset('Untrained: the network paints noise. Step a batch to watch one gradient step on two crops, press Train and watch the nest line of the IoU chart, or load the trained network.'); else sgRender(true); }); if (!L.built) sgNote(L.progress || 'Loading the fields…'); }
+  function sgEnter() { const L = S.sg; sgReady().then(ok => { if (!ok || S.world !== 'segment' || S.stage !== 'train') return; $('sg-blurb').innerHTML = `The network sees the pixels and nothing else: no nuclei, no membrane, no labels but the mask. Every weight is a 3 × 3 filter slid over the whole field, so the same few thousand weights paint any field of any size; with <b>no context</b> a pixel's class is decided from the ${new NN.SegNet({ levels: 0 }).receptiveField()} × ${new NN.SegNet({ levels: 0 }).receptiveField()} window around it, and each <b>level</b> of pooling below the pixels widens the window (${new NN.SegNet({ levels: 1 }).receptiveFieldText()}, then ${new NN.SegNet({ levels: 2 }).receptiveFieldText()}: the exact span depends on where the pixel falls on the pooling grid) at the cost of fine detail, brought back by the join with the finer map on the way up.`; if (!L.model) sgReset('Untrained: the network paints noise. Step a batch to watch one gradient step on two crops, press Train and watch the nest line of the IoU chart, or load the trained network.'); else sgRender(true); }); if (!L.built) sgNote(L.progress || 'Loading the fields…'); }
   // ---- Specimens: the fields with their masks
   function sgEnterData() { const L = S.sg; sgReady().then(ok => { if (ok && S.world === 'segment' && S.stage === 'data') sgRenderData(); }); if (!L.built) $('sg-data-note').textContent = L.progress || 'Loading the fields…'; }
   function sgDataSelect(id) { S.sg.dataSelected = id; sgRenderData(); }
@@ -10072,7 +10096,7 @@ window.Glossary = (function () {
   }
   function bindSegment() {
     const L = S.sg;
-    document.querySelectorAll('#sg-levels-seg button').forEach(b => b.addEventListener('click', () => { L.levels = +b.dataset.levels; sgSyncControls(); if (L.built) sgReset(`Context: ${L.levels ? `${L.levels} level${L.levels > 1 ? 's' : ''}` : 'none'} — fresh random weights, a window of ${new NN.SegNet({ levels: L.levels }).receptiveField()} px.`); }));
+    document.querySelectorAll('#sg-levels-seg button').forEach(b => b.addEventListener('click', () => { L.levels = +b.dataset.levels; sgSyncControls(); if (L.built) sgReset(`Context: ${L.levels ? `${L.levels} level${L.levels > 1 ? 's' : ''}` : 'none'} — fresh random weights, a window of ${new NN.SegNet({ levels: L.levels }).receptiveFieldText()}.`); }));
     document.querySelectorAll('#sg-channels-seg button').forEach(b => b.addEventListener('click', () => { L.channels = +b.dataset.channels; sgSyncControls(); if (L.built) sgReset(`${L.channels} channels — fresh random weights.`); }));
     document.querySelectorAll('#sg-crops-seg button').forEach(b => b.addEventListener('click', () => { L.crops = +b.dataset.crops; L.ptr = Math.min(L.ptr, L.crops - 1); sgSyncControls(); if (L.model) sgRenderStatus(); }));
     $('sg-epochs').addEventListener('input', ev => { L.epochs = +ev.target.value; sgSyncControls(); if (L.model) { sgRenderStatus(); sgRenderCurves(); } });
@@ -11306,7 +11330,8 @@ window.Glossary = (function () {
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); bindTrainedModels();
-    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js renderBackboneOptions();
+    renderBackboneOptions();
+    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();

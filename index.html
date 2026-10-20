@@ -219,7 +219,7 @@
             <span id="curves-legend-test" hidden><span class="line test"></span>test set (peeking)</span>
             <span><span class="line chance"></span>chance</span>
             <span id="curves-legend-ceiling" hidden><span class="line ceiling"></span>honest ceiling: the share of labels that are right</span>
-            <span id="curves-legend-stop" hidden><span class="line stop"></span>lowest test loss so far (where early stopping would stop)</span>
+            <span id="curves-legend-stop" hidden><span class="line stop"></span>lowest test loss so far: where early stopping would stop (on a validation set in practice, never the test set)</span>
           </div>
         </div>
         <div class="curves">
@@ -1406,7 +1406,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
         </div>
         <p class="prose small" id="sg-blurb"></p>
         <div class="bar-row">
-          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sg-levels-seg"><button type="button" data-levels="0" title="two 3 × 3 convolutions at the pixels' own scale: a window of 5 px">none</button><button type="button" data-levels="1" title="one level down: pool 2 × 2, convolve, upsample, join: a window of 15 px">1 level</button><button type="button" data-levels="2" class="is-active" title="two levels down: a window of 35 px, wide enough to see the membrane">2 levels</button></div></div>
+          <div class="ctl"><span class="lbl">Context</span><div class="seg" id="sg-levels-seg"><button type="button" data-levels="0" title="two 3 × 3 convolutions at the pixels' own scale: a window of 5 px">none</button><button type="button" data-levels="1" title="one level down: pool 2 × 2, convolve, upsample, join: a window of 16 px">1 level</button><button type="button" data-levels="2" class="is-active" title="two levels down: a window of 36 to 40 px, wide enough to see the membrane">2 levels</button></div></div>
           <div class="ctl"><span class="lbl">Channels</span><div class="seg" id="sg-channels-seg"><button type="button" data-channels="8" class="is-active">8</button><button type="button" data-channels="16">16</button></div></div>
           <div class="ctl"><span class="lbl">Crops per epoch</span><div class="seg" id="sg-crops-seg"><button type="button" data-crops="100" class="is-active" title="100 random crops of 64 × 64 from the training fields">100</button><button type="button" data-crops="200">200</button><button type="button" data-crops="400">400</button></div></div>
           <div class="ctl slim"><label for="sg-epochs">Epochs <span class="val" id="sg-epochs-val">15</span></label><input type="range" id="sg-epochs" min="1" max="60" step="1" value="15"></div>
