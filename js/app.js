@@ -242,6 +242,7 @@
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
     S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
     if (!S.applyingRecipe) $('recipe-select').value = '';
+    syncClassicLoad();
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
     clearTestResults(false);
@@ -1238,7 +1239,7 @@
       syncControls();
       resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
       S.applyingRecipe = false;
-      $('recipe-select').value = k;
+      $('recipe-select').value = k; syncClassicLoad();
       renderDataTrays(); renderScatter(); renderInspector();
       showStage('train');
       if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
@@ -1814,7 +1815,7 @@
   }
   function slNeighbour(step) { const L = S.sl, cur = slFocus(), i = L.all.indexOf(cur); slSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function slSyncButtons() { const L = S.sl; $('sl-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
-  function slSyncControls() {
+  function slSyncControls() { syncSlLoad();
     const L = S.sl;
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.att === '1') === L.attention));
     document.querySelectorAll('#sl-context-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.context));
@@ -2360,7 +2361,7 @@
   function fdFreeze(on) { const L = S.fd; if (on) { if (L.frozen == null && L.selected == null && L.built) L.frozen = fdFocus().id; } else if (L.frozen != null) { L.frozen = null; if (L.model && L.running) fdRenderFocus(); } }
   function fdNeighbour(step) { const L = S.fd, cur = fdFocus(), i = L.all.indexOf(cur); fdSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function fdSyncButtons() { const L = S.fd; $('fd-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
-  function fdSyncControls() {
+  function fdSyncControls() { syncFdLoad();
     const L = S.fd;
     document.querySelectorAll('#fd-pos-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.pos === '1') === L.pos));
     document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.ctx));
@@ -4051,6 +4052,62 @@
     for (const id of ['ch-line-text', 'ch-question-text']) $(id).addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); chAsk(); } });
     $('ch-case-prev').addEventListener('click', () => chCaseStep(-1)); $('ch-case-next').addEventListener('click', () => chCaseStep(1));
   }
+  // ---- the trained models that ship with the page for every lesson (data/trained/trained_models.js, written by
+  // tools/export_models.js from this very page): a recipe's model with the curves of its training, loaded in place of
+  // training; the language models and the segmentation network have their own files and buttons
+  const trained = () => window.TRAINED_MODELS || null;
+  const encKeyOf = () => (S.backbone !== 'page' ? `shipped:${S.backbone}` : `page:${S.fm.gen || 0}`); // the encoder behind the slides' and fields' tokens, without building it
+  function classicShipped() { const k = $('recipe-select').value, T = trained(); return k && T && T.classic && T.classic[k] ? { k, entry: T.classic[k] } : null; }
+  function syncClassicLoad() { const b = $('btn-load'); if (!b) return; const sh = classicShipped(); b.disabled = !sh; b.title = sh ? `${sh.entry.trained}: the weights that ship with the page, with the curves of that run` : 'pick a recipe from the masthead: the trained models ship one per recipe, for the recipe\'s own settings'; }
+  function loadTrainedClassic() {
+    const sh = classicShipped(); if (!sh) { note('Pick a recipe from the masthead first: the trained models ship one per recipe.'); return; }
+    stopTraining(); const e = sh.entry, net = NN.Net.fromJSON(e.model);
+    if (net.D !== S.inputs.inputSize) { note('The settings on screen no longer match the recipe; pick it again from the masthead, then load.'); return; }
+    S.net = net; S.epoch = e.epochs; S.epochs = Math.max(S.epochs, e.epochs); S.ptr = 0; S.debt = 0; S.history = e.hist.map(h => Object.assign({}, h)); S.lastBatch = new Set(); S.prevW = null;
+    S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
+    clearTestResults(false); evaluateAll(); renderTraining(true); $('recipe-select').value = sh.k; syncClassicLoad();
+    const last = S.history[S.history.length - 1];
+    note(`Loaded the trained model: ${e.trained}. Train accuracy ${pct(last.acc)}, test accuracy ${pct(last.testAcc)} after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or reset to train it yourself.`);
+  }
+  function fmLoadShipped() {
+    const F = S.fm, T = trained(), e = T && T.foundation; if (!e) { fmNote('No pretrained encoder ships for this stage.'); return; }
+    F.labs = e.labs !== false; F.seed = e.seed; F.epochs = Math.max(F.epochs, e.epochs); fmReset(); // the set, its standardiser and a fresh encoder to compare with
+    F.cl = NN.Contrastive.fromJSON(e.model); F.gen = (F.gen || 0) + 1; F.hist = e.hist.map(h => Object.assign({}, h)); F.epoch = e.epochs; F.ptr = 0; F.debt = 0; F.codes = null; F.batchCache = null;
+    fmSyncControls(); fmRender(true);
+    const last = F.hist[F.hist.length - 1];
+    fmNote(`Loaded the pretrained encoder: ${e.trained}. Held-out pair accuracy ${pct(last.pairAcc)} after ${e.epochs} epochs; the curves are its own. Go to 3 · Test to see what its code is worth, or keep pretraining it here.`);
+  }
+  function slShippedKey() { const L = S.sl; return `${L.question}|ctx${L.context ? 1 : 0}|att${L.attention ? 1 : 0}|u${L.units}|${encKeyOf()}`; }
+  function slShipped() { const T = trained(); return T && T.slides ? T.slides[slShippedKey()] || null : null; }
+  function syncSlLoad() { const b = $('sl-load'); if (!b) return; const e = slShipped(); b.disabled = !e; b.title = e ? `${e.trained}: the weights that ship with the page, with the curves of that run` : 'the shipped slide models cover both questions, with and without the context layer, attention pooling or a plain average, with 4 units and the shipped encoder: set those to load one'; }
+  function slLoadShipped() {
+    const L = S.sl, e = slShipped(); if (!e) { slNote('No trained model ships for these settings: both questions ship with and without the context layer, with attention pooling or a plain average, 4 units, the shipped encoder.'); return; }
+    slStop(); if (!slBuild()) return; slEncode(); L.seed = e.seed; L.epochs = Math.max(L.epochs, e.epochs);
+    L.model = NN.AttentionMIL.fromJSON(e.model); L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
+    L.epoch = e.epochs; L.ptr = 0; L.debt = 0; L.hist = e.hist.map(h => Object.assign({}, h)); L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.hoverDecide = null;
+    L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelQuestion = L.loaded;
+    slSyncControls(); slRenderAll();
+    const last = L.hist[L.hist.length - 1];
+    slNote(`Loaded the trained model: ${e.trained}. Test accuracy ${pct(last.testAcc)} after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or keep training it here.`);
+  }
+  function fdShippedKey() { const L = S.fd; return `${L.crop}|pos${L.pos ? 1 : 0}|ctx${L.ctx ? 1 : 0}|u${L.units}|${encKeyOf()}`; }
+  function fdShipped() { const T = trained(); return T && T.fields ? T.fields[fdShippedKey()] || null : null; }
+  function syncFdLoad() { const b = $('fd-load'); if (!b) return; const e = fdShipped(); b.disabled = !e; b.title = e ? `${e.trained}: the weights that ship with the page, with the curves of that run` : 'the shipped field models cover crops masked to the nucleus, with and without positions and with and without the context layers, 4 units and the shipped encoder: set those to load one'; }
+  function fdLoadShipped() {
+    const L = S.fd, e = fdShipped(); if (!e) { fdNote('No trained model ships for these settings: crops masked to the nucleus, with or without positions and the context layers, 4 units, the shipped encoder.'); return; }
+    fdStop(); if (!L.built || L.encKey !== `${L.crop}|${codeEncoder().key}`) { fdReady().then(ok => { if (ok && S.world === 'fields') fdLoadShipped(); }); return; }
+    fdTokens(); L.seed = e.seed; L.epochs = Math.max(L.epochs, e.epochs);
+    L.model = NN.AttentionMIL.fromJSON(e.model); L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
+    L.epoch = e.epochs; L.ptr = 0; L.debt = 0; L.hist = e.hist.map(h => Object.assign({}, h)); L.lastField = null; L.hoverNucleus = null; L.pinned = null; L.frozen = null; L.hoverAtt = null; L.hoverDecide = null; L.hoverUnrolled = null;
+    L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
+    fdSyncControls(); fdRenderAll();
+    const last = L.hist[L.hist.length - 1];
+    fdNote(`Loaded the trained model: ${e.trained}. Test accuracy ${pct(last.testAcc)} for invasion and ${pct(last.testAccCis)} for CIS after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or keep training it here.`);
+  }
+  function bindTrainedModels() {
+    $('btn-load').addEventListener('click', loadTrainedClassic); $('fm-load').addEventListener('click', fmLoadShipped); $('sl-load').addEventListener('click', slLoadShipped); $('fd-load').addEventListener('click', fdLoadShipped);
+    $('fm-load').disabled = !(trained() && trained().foundation); syncClassicLoad(); syncSlLoad(); syncFdLoad();
+  }
   function bindReports() {
     const L = new Proxy({}, { get: (_, k) => LM()[k], set: (_, k, v) => { LM()[k] = v; return true; } }); // the state of the world on screen, looked up at every event
     document.querySelectorAll('#rp-dim-seg button').forEach(b => b.addEventListener('click', () => { const v = +b.dataset.dim; if (v === L.dim) return; L.dim = v; rpReset(`${v} numbers per token — fresh random weights.`); }));
@@ -4115,7 +4172,8 @@
     const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); renderBackboneOptions();
+    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); bindTrainedModels();
+    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js renderBackboneOptions();
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();
