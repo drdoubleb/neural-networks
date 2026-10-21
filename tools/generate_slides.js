@@ -77,7 +77,7 @@ function makeFocusSlide(label, split) {
 }
 const focusSlides = split => { const n = split === "train" ? FOCUS_TRAIN : FOCUS_TEST, out = []; for (let i = 0; i < n; i++) out.push(makeFocusSlide(i % 2, split)); return pickF(out, n); };
 const focusTrain = focusSlides('train').map((s, i) => Object.assign({ id: i, name: `F${String(i + 1).padStart(3, "0")}`, split: 'train' }, s));
-const focusTest = focusSlides('test').map((s, i) => Object.assign({ id: TRAIN_SLIDES + i, name: `Y${String(i + 1).padStart(2, '0')}`, split: 'test' }, s));
+const focusTest = focusSlides('test').map((s, i) => Object.assign({ id: focusTrain.length + i, name: `Y${String(i + 1).padStart(2, '0')}`, split: 'test' }, s)); // ids unique across the question: the focus question has more training slides than the atypia one
 const focusMeta = {
   seed: SEED, size: SIZE, perSlide: PER_SLIDE, cols: COLS, question: 'A focus of atypical cells?', short: 'A focus', positions: true,
   classes: [{ key: 'scattered', name: 'Scattered atypical cells' }, { key: 'focus', name: 'A focus of atypical cells' }],
