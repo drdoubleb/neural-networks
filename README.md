@@ -1080,8 +1080,9 @@ attention pooling or a plain average, and the field model with and without posit
 Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
 curves. A loaded model is therefore exactly what pressing Train gives with the recipe's settings and seed, and the
 curves it fills are that run's own. The file is `data/trained/trained_models.js` (`window.TRAINED_MODELS`); the
-classic button enables when a recipe is selected (the shipped models are the recipes' own settings), the slide and
-field buttons when the controls match a shipped configuration with the shipped encoder, and all of them say in their
+classic button enables when the settings on screen are a recipe's (the masthead's recipe menu shows which, and the
+page starts on recipe 1; the shipped models are the recipes' own settings), the slide and field buttons when the
+controls match a shipped configuration with the shipped encoder, and all of them say in their
 tooltip which model they bring. Reproduce with `node tools/export_models.js` (playwright-core and a Chromium; `--only classic|foundation|slides|fields` redoes one part).
 
 ## The data

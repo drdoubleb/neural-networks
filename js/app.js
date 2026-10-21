@@ -241,7 +241,7 @@
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
     S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
-    if (!S.applyingRecipe) $('recipe-select').value = '';
+    if (!S.applyingRecipe) $('recipe-select').value = matchingRecipe() || ''; // the masthead shows the recipe these settings are, if they are one
     syncClassicLoad();
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -1764,8 +1764,9 @@
     slSyncControls(); slRenderAll();
     if (reason) slNote(reason);
   }
+  function slEvaluate() { const L = S.sl; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test); } // the calls on both sets: the trays, the summary and the curves read them
   function slRecordEpoch() {
-    const L = S.sl; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test);
+    const L = S.sl; slEvaluate();
     L.hist.push({ epoch: L.epoch, loss: L.trainEval.loss, acc: L.trainEval.accuracy, testLoss: L.testEval.loss, testAcc: L.testEval.accuracy, mass: L.trainEval.culpritMass, testMass: L.testEval.culpritMass });
   }
   function slStep() { // one gradient step on the next training slide of the epoch's order
@@ -2300,8 +2301,9 @@
     if (reason) fdNote(reason);
   }
   function fdModelKey() { const L = S.fd; return `${L.encKey}|${L.pos}|${L.ctx}`; }
+  function fdEvaluate() { const L = S.fd; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test); } // the calls on both sets: the trays, the summary and the curves read them
   function fdRecordEpoch() {
-    const L = S.fd; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test);
+    const L = S.fd; fdEvaluate();
     const tr = L.trainEval.outputs, te = L.testEval.outputs;
     L.hist.push({ epoch: L.epoch, loss: tr[0].loss + tr[1].loss, testLoss: te[0].loss + te[1].loss, acc: tr[1].accuracy, testAcc: te[1].accuracy, accCis: tr[0].accuracy, testAccCis: te[0].accuracy, mass: tr[1].culpritMass, testMass: te[1].culpritMass, massCis: tr[0].culpritMass, testMassCis: te[0].culpritMass });
   }
@@ -4060,7 +4062,12 @@
   // training; the language models and the segmentation network have their own files and buttons
   const trained = () => window.TRAINED_MODELS || null;
   const encKeyOf = () => (S.backbone !== 'page' ? `shipped:${S.backbone}` : `page:${S.fm.gen || 0}`); // the encoder behind the slides' and fields' tokens, without building it
-  function classicShipped() { const k = $('recipe-select').value, T = trained(); return k && T && T.classic && T.classic[k] ? { k, entry: T.classic[k] } : null; }
+  // the recipe the classic settings on screen are, if they are one: speed and the test-curve peek aside, which change no weight
+  function matchingRecipe() {
+    if (S.world !== 'classic' || (S.excluded && S.excluded.size)) return null;
+    return Object.keys(RECIPES).find(k => { const { task, ...settings } = RECIPES[k], want = Object.assign({}, LAB_SETTINGS, settings); delete want.speed; delete want.peek; return task === S.taskId && Object.keys(want).every(key => S[key] === want[key]) && (S.mode !== 'code' || S.backbone !== 'page'); }) || null;
+  }
+  function classicShipped() { const T = trained(); if (!T || !T.classic) return null; const k = $('recipe-select').value || matchingRecipe(); return k && T.classic[k] ? { k, entry: T.classic[k] } : null; }
   function syncClassicLoad() { const b = $('btn-load'); if (!b) return; const sh = classicShipped(); b.disabled = !sh; b.title = sh ? `${sh.entry.trained}: the weights that ship with the page, with the curves of that run` : 'pick a recipe from the masthead: the trained models ship one per recipe, for the recipe\'s own settings'; }
   function loadTrainedClassic() {
     const sh = classicShipped(); if (!sh) { note('Pick a recipe from the masthead first: the trained models ship one per recipe.'); return; }
@@ -4089,7 +4096,7 @@
     L.model = NN.AttentionMIL.fromJSON(e.model); L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
     L.epoch = e.epochs; L.ptr = 0; L.debt = 0; L.hist = e.hist.map(h => Object.assign({}, h)); L.lastSlide = null; L.hoverNucleus = null; L.hoverAtt = null; L.hoverDecide = null;
     L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelQuestion = L.loaded;
-    slSyncControls(); slRenderAll();
+    slEvaluate(); slSyncControls(); slRenderAll();
     const last = L.hist[L.hist.length - 1];
     slNote(`Loaded the trained model: ${e.trained}. Test accuracy ${pct(last.testAcc)} after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or keep training it here.`);
   }
@@ -4103,7 +4110,7 @@
     L.model = NN.AttentionMIL.fromJSON(e.model); L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
     L.epoch = e.epochs; L.ptr = 0; L.debt = 0; L.hist = e.hist.map(h => Object.assign({}, h)); L.lastField = null; L.hoverNucleus = null; L.pinned = null; L.frozen = null; L.hoverAtt = null; L.hoverDecide = null; L.hoverUnrolled = null;
     L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
-    fdSyncControls(); fdRenderAll();
+    fdEvaluate(); fdSyncControls(); fdRenderAll();
     const last = L.hist[L.hist.length - 1];
     fdNote(`Loaded the trained model: ${e.trained}. Test accuracy ${pct(last.testAcc)} for invasion and ${pct(last.testAccCis)} for CIS after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or keep training it here.`);
   }
