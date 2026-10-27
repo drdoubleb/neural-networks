@@ -36,7 +36,7 @@ const existing = () => { if (!fs.existsSync(FILE)) return null; const w = {}; ne
   const want = part => !only || only === part;
   const t00 = Date.now(), stamp = () => `${((Date.now() - t00) / 1000).toFixed(0)} s`;
 
-  if (want('classic')) for (const k of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12]) {
+  if (want('classic')) for (const k of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 13]) {
     await page.selectOption('#recipe-select', String(k));
     await until(() => { const S = window.NUCLEUS_NET.state; return !S.applyingRecipe && S.net && S.epoch === 0 && !S.running; });
     await run(() => { window.NUCLEUS_NET.state.speed = 1e6; });

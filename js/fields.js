@@ -127,5 +127,19 @@
   }
   // intersection over union per class between two label maps, and the mean over the classes present in either
   function iou(pred, truth, K) { const inter = new Float64Array(K), uni = new Float64Array(K); for (let i = 0; i < truth.length; i++) { const t = truth[i], p = pred[i]; if (t === p) inter[t]++; uni[t]++; if (p !== t) uni[p]++; } const per = Array.from(inter, (v, k) => (uni[k] ? v / uni[k] : null)), present = per.filter(v => v != null); return { per, mean: present.length ? present.reduce((a, b) => a + b, 0) / present.length : null }; }
-  return { GRAIN, MASK_FILL, SEG_CLASSES, mulberry32, gaussianFrom, withGrain, crop, cropMasked, membraneAt, nucleiOf, encodePNGNode, decodePNGNode, decodePNGBrowser, nestSigned, masksOf, iou };
+  // ---- the fields end to end: the pixels the convolutional models read, their augmentation, and the cells' truth
+  // the field at half resolution as ink in 0..1 (1 − grey / 255, the 2 × 2 mean)
+  function halfInk(px, w, h) { const W = w >> 1, H = h >> 1, out = new Float64Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { let s = 0; for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) s += 1 - px[(2 * y + dy) * w + 2 * x + dx] / 255; out[y * W + x] = s / 4; } return out; }
+  // a training field as the end-to-end models see it: a mirror half the time, upside down half the time when asked (a
+  // slide comes in every orientation; these fields are drawn with the lumen up), and a shift of a pixel or two each way,
+  // the edge filled with `fill` (the training fields' mean ink); the pixels, and what was done to them
+  function augmentField(x, w, h, rng, { upsideDown = true, fill = 0 } = {}) {
+    const mirror = rng() < 0.5, vflip = upsideDown && rng() < 0.5, sx = Math.round(gaussianFrom(rng) * 2), sy = Math.round(gaussianFrom(rng) * 1), out = new Float64Array(w * h);
+    for (let y = 0; y < h; y++) for (let xx = 0; xx < w; xx++) { let X = xx - sx, Y = y - sy; if (mirror) X = w - 1 - X; if (vflip) Y = h - 1 - Y; out[y * w + xx] = X < 0 || X >= w || Y < 0 || Y >= h ? fill : x[Y * w + X]; }
+    return { x: out, mirror, vflip, sx, sy };
+  }
+  // which cells of a gh × gw grid over a w × h field hold an atypical nucleus, and an atypical nucleus below the
+  // membrane: what the CIS head and the invasion head are judged against when the tokens are cells
+  function cellTruth(nuclei, w, h, gh, gw) { const cis = new Array(gh * gw).fill(false), inv = new Array(gh * gw).fill(false); for (const n of nuclei) { const i = Math.min(gh - 1, Math.floor(n.y / h * gh)) * gw + Math.min(gw - 1, Math.floor(n.x / w * gw)); if (n.atypical) cis[i] = true; if (n.atypical && n.below) inv[i] = true; } return [cis, inv]; }
+  return { GRAIN, MASK_FILL, SEG_CLASSES, mulberry32, gaussianFrom, withGrain, crop, cropMasked, membraneAt, nucleiOf, encodePNGNode, decodePNGNode, decodePNGBrowser, nestSigned, masksOf, iou, halfInk, augmentField, cellTruth };
 });

@@ -57,11 +57,12 @@ const MODELS = {
   ctx: { name: 'context without positions (distances inside the attention)', pos: false, ctx: true },
   full: { name: 'positions and context', pos: true, ctx: true },
 };
-// a training field seen in a mirror half the time, its positions jittered by about a pixel: the same nuclei, the same
+// a training field seen in a mirror half the time and upside down half the time (a slide comes in every orientation;
+// these fields are drawn with the lumen up), its positions jittered by about a pixel: the same nuclei, the same
 // distances, another field for the position inputs (nothing changes for a model without positions)
 function augmented(sl, D, rng) {
-  const flip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = h[D - 1] + 0.015 * g(); return o; });
+  const flip = rng() < 0.5 ? -1 : 1, vflip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = vflip * h[D - 1] + 0.015 * g(); return o; });
   return Object.assign({}, sl, { H, xy: H.map(h => [h[D - 2], h[D - 1]]) }); // the relative offsets follow the mirrored, jittered positions
 }
 function run(P, M, seed) {
@@ -82,7 +83,7 @@ for (const key of models) {
   const M = MODELS[key]; if (!M) { console.log(`unknown model ${key}`); continue; }
   const P = prepared[M.pos] || (prepared[M.pos] = prepare(M.pos)), t0 = Date.now();
   const runs = Array.from({ length: nSeeds }, (_, i) => run(P, M, i + 1)), last = runs.map(r => r.hist[r.hist.length - 1]), mil = runs[0].mil;
-  console.log(`=== ${key}: ${M.name}\n    ${mil.describe()} · ${mil.parameterCount()} parameters · each nucleus: its code${M.pos ? ' + its position' : ''} (${P.D} numbers) · lr ${lr}, decay ${decay}, ${epochs} epochs${augment && M.pos ? ', mirrored and jittered while training' : ''}, mean of ${nSeeds} seeds, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  console.log(`=== ${key}: ${M.name}\n    ${mil.describe()} · ${mil.parameterCount()} parameters · each nucleus: its code${M.pos ? ' + its position' : ''} (${P.D} numbers) · lr ${lr}, decay ${decay}, ${epochs} epochs${augment && M.pos ? ', mirrored, turned upside down and jittered while training' : ''}, mean of ${nSeeds} seeds, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   if (curve) { console.log('    epoch   train CIS · invasion   test CIS · invasion   test loss'); for (const h of runs[0].hist) { const at = runs.map(r => r.hist.find(x => x.e === h.e)); console.log(`    ${String(h.e).padStart(5)}   ${pc(mean(at, x => x.tr.outputs[0].accuracy))} · ${pc(mean(at, x => x.tr.outputs[1].accuracy))}       ${pc(mean(at, x => x.te.outputs[0].accuracy))} · ${pc(mean(at, x => x.te.outputs[1].accuracy))}      ${mean(at, x => x.te.outputs[0].loss + x.te.outputs[1].loss).toFixed(2)}`); } }
   FLAGS.forEach((flag, k) => console.log(`    ${flag.padEnd(9)} test accuracy ${pc(mean(last, x => x.te.outputs[k].accuracy))} (${last.map(x => Math.round(x.te.outputs[k].accuracy * 100)).join('/')}) · training ${pc(mean(last, x => x.tr.outputs[k].accuracy))} · its head's attention on the ${k ? 'atypical nuclei below the membrane' : 'atypical nuclei'} of a positive test field ${pc(mean(last, x => x.te.outputs[k].culpritMass))}`));
   if (M.ctx) console.log(`    learned distance cost per nucleus diameter: ${runs.map(r => r.mil.layers.map((c, l) => `layer ${l + 1} ${Array.from(c.beta, b => Math.log1p(Math.exp(b)).toFixed(2)).join('/')}`).join(', ')).join(' · ')}`);

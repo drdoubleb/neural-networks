@@ -15,7 +15,7 @@
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
-    foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe 11/12 introduces them, and stay for the session
+    foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe 12/13 introduces them, and stay for the session
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
     // the Fields question: is it invasive? two attention heads over the nuclei of a field, with positions and context
@@ -23,7 +23,7 @@
     ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     dsq: { world: 'describe', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, probe: 'own', encoder: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, testHoverNet: null },
-    fd: { built: false, model: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
+    fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
     inputs: null, inputCache: new Map(), net: null,
@@ -38,7 +38,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Atypia · measurements · single layer','4 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','5 · Enlargement · pixels · single layer','6 · Irregularity · pixels · single layer','7 · Irregularity · pixels · 4 ReLU + augmentation','8 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','9 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','10 · Irregularity · pixels · convolution + 4 ReLU + augmentation','11 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','12 · Irregularity · the foundation code · single layer · 10 labelled cases','13 · Slides · one label for 20 nuclei · attention finds the atypical ones','14 · Focus · four atypical cells together or scattered · the nuclei look at each other','15 · Fields · is it invasive? · cytology, location and arrangement · two heads, one per question','16 · Reports · a small language model writes the report from the findings · fluency first, grounding last','17 · Chat · the next-word model on transcripts · ask it about a case','18 · Describe · from pixels to words · the image as the first token','19 · Segment · a class for every pixel · the window it is decided from']; // the number first, in plain digits, so that it reads in the dropdown
+  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Atypia · measurements · single layer','4 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','5 · Enlargement · pixels · single layer','6 · Irregularity · pixels · single layer','7 · Irregularity · pixels · 4 ReLU + augmentation','8 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','9 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','10 · Irregularity · pixels · convolution + 4 ReLU + augmentation','11 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its cells','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Slides · one label for 20 nuclei · attention finds the atypical ones','15 · Focus · four atypical cells together or scattered · the nuclei look at each other','16 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','17 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its cells','18 · Reports · a small language model writes the report from the findings · fluency first, grounding last','19 · Chat · the next-word model on transcripts · ask it about a case','20 · Describe · from pixels to words · the image as the first token','21 · Segment · a class for every pixel · the window it is decided from']; // the number first, in plain digits, so that it reads in the dropdown
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -51,7 +51,7 @@
     8: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 4, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6 },
     9: { task: 'irregularity', mode: 'pixels',   h1: 4, h2: 4, convK: 0, activation: 'relu', lr: 0.02, batch: 8, epochs: 60,  augment: true,  l2: 0.01, peek: true,  speed: 6, trainLab: 'byClass', testLab: 'byClass' },
     10: { task: 'irregularity', mode: 'pixels',  h1: 4, h2: 0, convK: 4, activation: 'relu', lr: 0.02, batch: 8, epochs: 30,  augment: true,  l2: 0,    peek: true,  speed: 4 },
-    12: { task: 'irregularity', mode: 'code',    h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60,  augment: false, l2: 0,    peek: true,  speed: 4, labelled: 10, seed: 8 }, // seed 8: the untrained network starts near chance (a random weighting of the code already classifies, right or wrong by the seed)
+    13: { task: 'irregularity', mode: 'code',    h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.1,  batch: 8, epochs: 60,  augment: false, l2: 0,    peek: true,  speed: 4, labelled: 10, seed: 8 }, // seed 8: the untrained network starts near chance (a random weighting of the code already classifies, right or wrong by the seed)
   };
   // the source modes, in the order of the selects; the class-split one names the positive class
   const SOURCE_LABELS = () => ({ ours: 'our lab', other: 'the other lab (weaker stain)', mixed: 'both labs, mixed at random', byClass: `split by class: ${posName()} from the other lab` });
@@ -1184,50 +1184,60 @@
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => {
       const k = $('recipe-select').value; if (!k) return;
-      if (k === '19') { // the segment question: a class for every pixel, and the window it is decided from
+      if (k === '21') { // the segment question: a class for every pixel, and the window it is decided from
         S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
         selectQuestion('segment'); showStage('train');
-        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[19]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest is drawn like a nucleus in the epithelium, and a 5-px window, smaller than one nucleus, cannot see how the nuclei are packed (rows 17 to 20 px apart in the urothelium, touching in a nest). Then set the context to 2 levels, a window of 36 to 40 px that takes in three or four nuclei with their gaps, and train again, or load the trained network, which paints the nests.`); };
+        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[21]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest is drawn like a nucleus in the epithelium, and a 5-px window, smaller than one nucleus, cannot see how the nuclei are packed (rows 17 to 20 px apart in the urothelium, touching in a nest). Then set the context to 2 levels, a window of 36 to 40 px that takes in three or four nuclei with their gaps, and train again, or load the trained network, which paints the nests.`); };
         go();
         return;
       }
-      if (k === '18') { // the describe question: from pixels to words
+      if (k === '20') { // the describe question: from pixels to words
         S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
         selectQuestion('describe'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[18]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
+        rpReset(`Recipe ${RECIPE_LABELS[20]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
         return;
       }
-      if (k === '17') { // the chat question: the same model on transcripts
+      if (k === '19') { // the chat question: the same model on transcripts
         S.ch.dim = 48; S.ch.positions = true; S.ch.epochs = 10; S.ch.lr = 0.005; S.ch.seed = 1; S.ch.reveal = false;
         selectQuestion('chat'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[17]}: 2,400 transcripts, the next word alone. Press Train and watch the loss by role: the system line and the findings cost almost nothing within an epoch or two, the question stays high since nothing predicts which one comes, and the assistant line, the only one that matters, falls last; the third chart asks the model for the answer of 8 test transcripts after every epoch. Or load the trained model and go to 3 · Test to ask it yourself, in the trained phrasings and in your own.`);
+        rpReset(`Recipe ${RECIPE_LABELS[19]}: 2,400 transcripts, the next word alone. Press Train and watch the loss by role: the system line and the findings cost almost nothing within an epoch or two, the question stays high since nothing predicts which one comes, and the assistant line, the only one that matters, falls last; the third chart asks the model for the answer of 8 test transcripts after every epoch. Or load the trained model and go to 3 · Test to ask it yourself, in the trained phrasings and in your own.`);
         return;
       }
-      if (k === '16') { // the reports question: the small language model
+      if (k === '18') { // the reports question: the small language model
         S.rp.dim = 48; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
         selectQuestion('reports'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[16]}: 800 reports, no rule ever given, only the next word. Press Train and watch the loss by section: the gross falls first, the microscopic description next, and the diagnosis reads as certain from the fifth epoch while the third chart, the diagnosis written from the findings alone, is still climbing. Load the trained model when you have seen enough, then go to 3 · Test and flip a finding.`); return;
+        rpReset(`Recipe ${RECIPE_LABELS[18]}: 800 reports, no rule ever given, only the next word. Press Train and watch the loss by section: the gross falls first, the microscopic description next, and the diagnosis reads as certain from the fifth epoch while the third chart, the diagnosis written from the findings alone, is still climbing. Load the trained model when you have seen enough, then go to 3 · Test and flip a finding.`); return;
       }
-      if (k === '15') { // the fields question: the full model
-        S.fd.pos = true; S.fd.ctx = true; S.fd.crop = 'nucleus'; S.fd.epochs = 60; S.fd.speed = 8; S.fd.seed = 1; S.fd.reveal = false;
-        selectQuestion('fields'); showStage('train');
-        fdReset(`Recipe ${RECIPE_LABELS[15]}: 400 fields of bladder, five patterns, two labels each and no nucleus ever labelled. Press Train and watch the mimic table: cytology alone gets the first three rows, positions add the membrane, and the context is what tells a round nest from an angulated one. Then switch a cue off and train again.`); return;
+      if (k === '17') { // the fields question end to end: the shallow convolutional network under the attention heads
+        S.fd.kind = 'shallow'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.cellView = 'attention'; S.fd.head = 1;
+        selectQuestion('fields'); showStage('train'); fdSyncControls();
+        fdReset(`Recipe ${RECIPE_LABELS[17]}: the same fields and labels, the pixels alone, and an encoder too shallow to see the membrane from a nest: every cell sees 58 px around it. The two attention heads over its ${(S.fd.w ? (S.fd.w >> 3) * (S.fd.h >> 3) : 352)} cells have to find the few that matter. Load the trained model (an epoch is a minute here) and watch the invasion head’s attention land on the cells below the membrane; then compare the mimic table with recipe 11, where a plain average had to do.`); return;
       }
-      if (k === '14') { // the focus question, with the context layer
+      if (k === '16') { // the fields question: the full model, the nuclei as tokens
+        S.fd.kind = 'nuclei'; S.fd.pos = true; S.fd.ctx = true; S.fd.crop = 'nucleus'; S.fd.epochs = 60; S.fd.speed = 8; S.fd.seed = 1; S.fd.reveal = false;
+        selectQuestion('fields'); showStage('train'); fdSyncControls();
+        fdReset(`Recipe ${RECIPE_LABELS[16]}: 400 fields of bladder, five patterns, two labels each and no nucleus ever labelled. Press Train and watch the mimic table: cytology alone gets the first three rows; the training fields are mirrored and turned upside down at random, as a slide comes, so a position alone cannot say below the membrane, and it is the context, every nucleus reading its neighbours, that finds the membrane and tells a round nest from an angulated one. Then switch a cue off and train again.`); return;
+      }
+      if (k === '15') { // the focus question, with the context layer
         S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
         selectQuestion('slides-focus'); showStage('train');
-        slReset(`Recipe ${RECIPE_LABELS[14]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe 13 stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
+        slReset(`Recipe ${RECIPE_LABELS[15]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe 14 stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
       }
-      if (k === '13') { // the slides question, without context
+      if (k === '14') { // the slides question, without context
         S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
         selectQuestion('slides-atypia'); showStage('train');
-        slReset(`Recipe ${RECIPE_LABELS[13]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
+        slReset(`Recipe ${RECIPE_LABELS[14]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
         return;
       }
-      if (k === '11') { // the foundation question
+      if (k === '11') { // the fields question end to end: a deep convolutional network on the pixels alone, no attention
+        S.fd.kind = 'deep'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.head = 1;
+        selectQuestion('fields'); showStage('train'); fdSyncControls();
+        fdReset(`Recipe ${RECIPE_LABELS[11]}: 400 fields of bladder, five patterns, two labels each, and nothing but the pixels: no nucleus found, no code, no coordinates. Three levels of 3 × 3 filters, a plain average of the cells, a single layer per question. Press Train (an epoch is a minute here) or load the trained model, and watch the mimic table and the evidence map: the network finds the invasion without being told what a nucleus is, from 400 fields, as long as it is deep enough to see a nest and the membrane from one cell.`); return;
+      }
+      if (k === '12') { // the foundation question
         S.fm.labs = true; S.fm.epochs = 100; S.fm.speed = 4;
         selectQuestion('foundation'); showStage('train');
-        fmReset(`Recipe ${RECIPE_LABELS[11]}: 100 nuclei from all three questions, no labels. Press Pretrain and watch the right-hand curve: a single layer on the code gets better at every question, though the code was never told what any of them asks.`);
+        fmReset(`Recipe ${RECIPE_LABELS[12]}: 100 nuclei from all three questions, no labels. Press Pretrain and watch the right-hand curve: a single layer on the code gets better at every question, though the code was never told what any of them asks.`);
         return;
       }
       const { task: taskId, ...settings } = RECIPES[k];
@@ -1247,7 +1257,7 @@
       showStage('train');
       if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
       if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
-      if (k === '12') note(`Recipe ${RECIPE_LABELS[12]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 6 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
+      if (k === '13') note(`Recipe ${RECIPE_LABELS[13]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 6 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
       if (k === '4') note(`Recipe ${RECIPE_LABELS[4]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
     });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
@@ -2092,7 +2102,7 @@
     }
     for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), sl = L.byId.get(id), right = !!rr && rr.call === sl.label; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call === 0); el.classList.toggle('call-1', !!rr && rr.call === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
   }
-  // the lecture introduces the slides late: the stage stays hidden until recipe 13, key 5 or #slides brings it in
+  // the lecture introduces the slides late: the stage stays hidden until recipe 14, key 5 or #slides brings it in
   function bindSlides() {
     document.querySelectorAll('#sl-pool-seg button').forEach(b => b.addEventListener('click', () => { const att = b.dataset.att === '1'; if (att === S.sl.attention) return; S.sl.attention = att; slReset(att ? 'Attention on: a scorer weighs the nuclei — fresh random weights.' : 'Plain average: every nucleus weighs the same and the scorer is switched off — fresh random weights.'); }));
     $('sl-units').addEventListener('change', () => { S.sl.units = +$('sl-units').value; slReset(`${S.sl.units} attention units — fresh random weights.`); });
@@ -2187,13 +2197,29 @@
   // segmentation, plus its position), two layers of self-attention let the nuclei look at each other, and two attention
   // heads over the same tokens answer the two questions. The fields (5.7 MB) load on demand, the first time the
   // question is opened, from the page's data folder or, failing that, from the published page.
-  const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'], names: ['CIS', 'invasion'],
+  const FD = { unit: 16, dk: 8, ffn: 8, layers: 2, heads: 1, costInit: 1.5, batch: 1, cnnBatch: 4, jitter: 0.015, cisPatterns: ['cis', 'cisvbn', 'inv'], names: ['CIS', 'invasion'],
     sources: ['data/fields/fields_data.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/fields/fields_data.js', 'https://drdoubleb.github.io/neural-networks/data/fields/fields_data.js'] }; // the page's own folder, then a mirror of the repository, then the published page
   const NFL = window.NucleusFields;
   function fdNote(msg) { $(fdOnTest() ? 'fd-test-note' : 'fd-note').textContent = msg || ''; } // the note of the step on screen
   function fdData() { const D = window.LECTURE_FIELDS; return D && D.meta ? D : null; }
   const fdCisOf = f => (FD.cisPatterns.includes(f.pattern) ? 1 : 0);
   const fdPattern = f => S.fd.meta.patterns.find(p => p.key === f.pattern);
+  // the three models on the fields: the nuclei as tokens (recipe 16: the frozen code of every nucleus, its position,
+  // the context layers), and two end-to-end networks that read the pixels alone, no nucleus found, no code, no
+  // coordinate: the deep convolutional network with a plain average of its cells (recipe 11) and the shallow one with
+  // the two attention heads over its cells (recipe 17). The end-to-end models take the field at half resolution,
+  // mirrored and turned upside down at random while training, in batches of four, and are scored on the training
+  // fields from those batches (a forward pass over 400 fields would cost a dozen seconds per epoch)
+  const FDK = { nuclei: { word: 'nuclei as tokens' }, deep: { word: 'deep convolution, plain average', levels: 3, pooling: 'average' }, shallow: { word: 'shallow convolution, attention over the cells', levels: 2, pooling: 'attention' } };
+  const fdIsCnn = () => S.fd.kind !== 'nuclei';
+  const fdHalfSize = () => ({ w: S.fd.w >> 1, h: S.fd.h >> 1 });
+  const fdHalf = s => NFL.halfInk(s.px, S.fd.w, S.fd.h); // computed when needed: 450 fields of 22,528 numbers are too much to keep
+  function fdMeanInk() { const L = S.fd; if (L.meanInk == null) { let m = 0; for (const s of L.train) for (const v of fdHalf(s)) m += v; const { w, h } = fdHalfSize(); L.meanInk = m / (L.train.length * w * h); } return L.meanInk; }
+  function fdCellTruth(s) { const L = S.fd, { gh, gw } = L.model.grid(fdHalfSize().h, fdHalfSize().w), key = `${gh}x${gw}`; s.cellPos = s.cellPos || {}; return s.cellPos[key] || (s.cellPos[key] = NFL.cellTruth(s.nuclei, L.w, L.h, gh, gw)); }
+  function fdCellShare() { const L = S.fd, { gh, gw } = L.model.grid(fdHalfSize().h, fdHalfSize().w); return [0, 1].map(k => { const pos = L.train.filter(s => s.y[k]); return pos.reduce((a, s) => a + fdCellTruth(s)[k].filter(Boolean).length / (gh * gw), 0) / pos.length; }); } // what uniform attention over the cells gives each head's culprits
+  const fdCnnSamples = fields => fields.map(s => ({ x: fdHalf(s), y: s.y, pos: fdCellTruth(s) }));
+  const fdNewSums = () => ({ n: 0, loss: 0, correct: [0, 0] });
+  const fdCellMode = () => (S.fd.kind === 'deep' ? 'evidence' : S.fd.cellView); // the deep model's heads weigh every cell the same: only the evidence is worth a tint
   // the fields' file, fetched once, from the first source that answers
   function fdLoad() {
     const L = S.fd; if (fdData()) return Promise.resolve(fdData());
@@ -2227,9 +2253,19 @@
     for (const [id, tray] of [['fd-train-tray', L.train], ['fd-test-tray', L.test]]) { const el = $(id); el.innerHTML = ''; for (const s of tray) { const b = fdThumb(s, fdSelect); el.appendChild(b); L.thumbs.set(s.id, b); } }
     $('fd-train-label').textContent = `Training fields (${L.train.length}: ${meta.patterns.map(p => `${L.train.filter(s => s.pattern === p.key).length} ${p.short.toLowerCase()}`).join(', ')})`;
     $('fd-test-label').textContent = `Test fields (${L.test.length}) · never trained on, scored as it goes`;
-    $('fd-blurb').innerHTML = `<strong>${esc(meta.question)}</strong> ${esc(meta.blurb)} Every nucleus becomes its <strong>code</strong> from the frozen foundation encoder, for a crop masked to the nucleus by the field’s segmentation (cytology and nothing else), plus its <strong>position</strong>; two layers of self-attention let the nuclei look at each other, each with a learned cost per nucleus diameter of distance; then <strong>two attention heads</strong> over the same nuclei, one per question, each with its own scorer, weighted average and single layer. Only the field’s two labels train it. Switch a cue off and watch the mimic table: which pattern fools a model that lacks it.`;
+    fdRenderBlurb();
     L.built = true;
     return true;
+  }
+  function fdRenderBlurb() {
+    const L = S.fd, meta = L.meta; if (!meta) return;
+    const head = `<strong>${esc(meta.question)}</strong> ${esc(meta.blurb)} `;
+    if (L.kind === 'deep') { $('fd-train-title').textContent = 'Fields: a convolutional network on the pixels alone'; $('fd-train-sub').textContent = 'no nucleus found, no code, no coordinates · a plain average of the cells · a single layer per question';
+      $('fd-blurb').innerHTML = head + `This model is what a pathology image network usually is: a <strong>convolutional network over the pixels</strong>, nothing else. The field goes in at half resolution; three levels of two 3 × 3 filters with a 2 × 2 pool between them, and two more at the bottom, turn it into a grid of <strong>cells</strong>, each 8 numbers that describe 16 × 16 px of field, about one nucleus, and what the filters saw up to 122 px around it. A <strong>plain average</strong> of the cells and a single layer per question make the two calls. No nucleus is segmented, no code pretrained, no coordinate fed; while it trains, every field is mirrored and turned upside down at random, so that it cannot learn that the lumen is at the top. Only the field’s two labels train it, in batches of four.`; }
+    else if (L.kind === 'shallow') { $('fd-train-title').textContent = 'Fields: a shallow convolutional network, and attention over its cells'; $('fd-train-sub').textContent = 'no nucleus found, no code, no coordinates · two attention heads over the cells, one per question';
+      $('fd-blurb').innerHTML = head + `The same end-to-end network with one level fewer: two levels of 3 × 3 filters and a last pair, so that every <strong>cell</strong> covers 8 × 8 px of field, half a nucleus, and sees at most 58 px around it, three or four nuclei across, too little to see the membrane from a nest. The <strong>two attention heads</strong> of the nuclei model sit over the cells instead of a plain average, one per question, each with its scorer, softmax and single layer: the attention has to find the cells that matter among ${(L.w >> 3) * (L.h >> 3)}. Again no nucleus is segmented, no code pretrained, no coordinate fed; the training fields are mirrored and turned upside down at random, in batches of four. Hover a cell for its share and its evidence.`; }
+    else { $('fd-train-title').textContent = 'Fields: two calls from one field'; $('fd-train-sub').textContent = 'cytology · location · arrangement · two attention heads, one per question';
+      $('fd-blurb').innerHTML = head + `Every nucleus becomes its <strong>code</strong> from the frozen foundation encoder, for a crop masked to the nucleus by the field’s segmentation (cytology and nothing else), plus its <strong>position</strong>; two layers of self-attention let the nuclei look at each other, each with a learned cost per nucleus diameter of distance; then <strong>two attention heads</strong> over the same nuclei, one per question, each with its own scorer, weighted average and single layer. Only the field’s two labels train it. The nuclei come from a perfect segmenter, the fields’ own geometry, so that the lesson is about the tokens and not about finding them; the two field labels are the only labels. Switch a cue off and watch the mimic table: which pattern fools a model that lacks it.`; }
   }
   function fdThumb(s, onClick) {
     const L = S.fd, b = document.createElement('button'); b.type = 'button'; b.className = 'thumb field'; b.dataset.id = s.id; b.title = `${s.name} · ${fdPattern(s).name}`;
@@ -2291,34 +2327,52 @@
   function fdReset(reason) {
     const L = S.fd; fdStop();
     if (!L.built || L.encKey !== `${L.crop}|${codeEncoder().key}`) { fdReady().then(ok => { if (ok && S.world === 'fields') fdReset(reason); }); return; }
-    fdTokens();
-    L.model = new NN.AttentionMIL(fdModelConfig());
-    L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i);
+    fdTokens(); L.scoring = null;
+    L.model = fdIsCnn() ? new NN.FieldNet({ channels: 8, levels: FDK[L.kind].levels, pooling: FDK[L.kind].pooling, attentionUnits: L.units, outputs: 2, clip: L.clip, seed: L.seed, mean: fdMeanInk() }) : new NN.AttentionMIL(fdModelConfig());
+    L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i); L.cnnProbs = L.train.map(() => null); L.epochSums = fdNewSums(); L.stopAtEpoch = null; L.lastBatch = null; L.hoverCell = null; L.fwc = null;
     L.epoch = 0; L.ptr = 0; L.debt = 0; L.hist = []; L.lastField = null; L.hoverNucleus = null; L.pinned = null; L.frozen = null; L.hoverAtt = null; L.hoverDecide = null; L.hoverUnrolled = null;
     L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
     fdRecordEpoch();
     fdSyncControls(); fdRenderAll();
     if (reason) fdNote(reason);
   }
-  function fdModelKey() { const L = S.fd; return `${L.encKey}|${L.pos}|${L.ctx}`; }
-  function fdEvaluate() { const L = S.fd; L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test); } // the calls on both sets: the trays, the summary and the curves read them
+  function fdModelKey() { const L = S.fd; return fdIsCnn() ? L.kind : `${L.encKey}|${L.pos}|${L.ctx}`; }
+  // the calls on both sets: the trays, the summary and the curves read them. An end-to-end model is scored on the
+  // test fields by a forward pass and on the training fields from the batches it trained on (augmented as it saw
+  // them), or from the pass that fdScoreTraining makes after a load
+  function fdEvaluate() {
+    const L = S.fd; if (!fdIsCnn()) { L.trainEval = L.model.evaluate(L.train); L.testEval = L.model.evaluate(L.test); return; }
+    const { w, h } = fdHalfSize(), E = L.epochSums; L.testEval = L.model.evaluate(fdCnnSamples(L.test), h, w);
+    L.trainEval = { outputs: [0, 1].map(k => ({ loss: E.n ? E.loss / E.n / 2 : null, accuracy: E.n ? E.correct[k] / E.n : null, probs: L.train.map((s, i) => (L.cnnProbs[i] ? L.cnnProbs[i][k] : null)), culpritMass: null })) };
+  }
   function fdRecordEpoch() {
     const L = S.fd; fdEvaluate();
     const tr = L.trainEval.outputs, te = L.testEval.outputs;
+    if (fdIsCnn()) { const E = L.epochSums; L.hist.push({ epoch: L.epoch, loss: E.n ? E.loss / E.n : null, testLoss: te[0].loss + te[1].loss, acc: tr[1].accuracy, testAcc: te[1].accuracy, accCis: tr[0].accuracy, testAccCis: te[0].accuracy, mass: null, testMass: te[1].culpritMass, massCis: null, testMassCis: te[0].culpritMass }); L.epochSums = fdNewSums(); return; }
     L.hist.push({ epoch: L.epoch, loss: tr[0].loss + tr[1].loss, testLoss: te[0].loss + te[1].loss, acc: tr[1].accuracy, testAcc: te[1].accuracy, accCis: tr[0].accuracy, testAccCis: te[0].accuracy, mass: tr[1].culpritMass, testMass: te[1].culpritMass, massCis: tr[0].culpritMass, testMassCis: te[0].culpritMass });
   }
-  // a training field seen in a mirror half the time, its positions jittered by about a pixel (only with positions)
+  // a training field seen in a mirror half the time and upside down half the time (a slide comes in every
+  // orientation; these fields are drawn with the lumen up), its positions jittered by about a pixel (only with
+  // positions: the distances do not change)
   function fdAugmented(sl) {
-    const L = S.fd, D = L.D, rng = L.rng, flip = rng() < 0.5 ? -1 : 1, g = () => NFL.gaussianFrom(rng);
-    const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + FD.jitter * g(); o[D - 1] = h[D - 1] + FD.jitter * g(); return o; });
+    const L = S.fd, D = L.D, rng = L.rng, flip = rng() < 0.5 ? -1 : 1, vflip = rng() < 0.5 ? -1 : 1, g = () => NFL.gaussianFrom(rng);
+    const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + FD.jitter * g(); o[D - 1] = vflip * h[D - 1] + FD.jitter * g(); return o; });
     return Object.assign({}, sl, { H });
   }
-  function fdStep() { // one gradient step on the next training field of the epoch's order
+  function fdStep() { // one gradient step on the next training field of the epoch's order (a batch of four fields for an end-to-end model)
     const L = S.fd, n = L.train.length;
     if (L.ptr === 0) { const o = L.order; for (let i = o.length - 1; i > 0; i--) { const j = Math.floor(L.rng() * (i + 1)); [o[i], o[j]] = [o[j], o[i]]; } }
-    const i = L.order[L.ptr], s = L.train[i];
-    L.model.trainBatch([L.pos ? fdAugmented(s) : s], L.lr, L.decay);
-    L.lastField = s.id; L.ptr++;
+    if (fdIsCnn()) {
+      const { w, h } = fdHalfSize(), idx = L.order.slice(L.ptr, L.ptr + FD.cnnBatch), fields = idx.map(i => L.train[i]), mean = fdMeanInk();
+      const r = L.model.trainBatch(fields.map(s => ({ x: NFL.augmentField(fdHalf(s), w, h, L.rng, { upsideDown: true, fill: mean }).x, y: s.y })), h, w), E = L.epochSums;
+      E.n += fields.length; E.loss += r.loss * fields.length;
+      r.probs.forEach((p, j) => { L.cnnProbs[idx[j]] = p; p.forEach((q, k) => { if ((q >= 0.5 ? 1 : 0) === fields[j].y[k]) E.correct[k]++; }); });
+      L.lastBatch = new Set(fields.map(q => q.id)); L.lastField = fields[fields.length - 1].id; L.ptr += fields.length; L.fwc = null; L.trainScored = 'batches'; L.scoring = null;
+    } else {
+      const i = L.order[L.ptr], s = L.train[i];
+      L.model.trainBatch([L.pos ? fdAugmented(s) : s], L.lr, L.decay);
+      L.lastField = s.id; L.lastBatch = null; L.ptr++;
+    }
     let ended = false;
     if (L.ptr >= n) { L.ptr = 0; L.epoch++; fdRecordEpoch(); ended = true; }
     return ended;
@@ -2332,10 +2386,18 @@
   function fdStop(msg) { const L = S.fd; L.running = false; if (L.walk) fdWalkStop(); if (L.dwalk) fdDecideWalkStop(); fdSyncButtons(); if (msg) fdNote(msg); }
   function fdFinish() {
     const L = S.fd, last = L.hist[L.hist.length - 1], rates = fdMimicRates(L.testEval);
+    if (fdIsCnn()) { fdStop(`Finished ${L.epochs} epochs on the pixels and the fields' two labels alone. On the test fields: CIS right ${pct(last.testAccCis)}, invasion right ${pct(last.testAcc)}; ${pct(rates.inv[1])} of the invasive fields found, ${pct(rates.cisvbn[1])} of the CIS-into-nests fields called invasive.${L.kind === 'shallow' ? ` The invasion head puts ${pct(last.testMass)} of its attention on the cells holding an atypical nucleus below the membrane (uniform: ${pct(fdCellShare()[1])}).` : ''}`); return; }
     fdStop(`Finished ${L.epochs} epochs on the fields' two labels alone. On the test fields: CIS right ${pct(last.testAccCis)}, invasion right ${pct(last.testAcc)}; ${pct(rates.inv[1])} of the invasive fields found, ${pct(rates.cisvbn[1])} of the CIS-into-nests fields called invasive. The invasion head puts ${pct(last.testMass)} of its attention on the atypical nuclei below the membrane of an invasive test field (uniform: ${pct(L.share[1])}).`);
   }
   function fdTick(now) {
     const L = S.fd; if (!L.running) return;
+    if (fdIsCnn()) { // one batch per frame: a batch of four fields through the convolutions and back is a tenth of a second or more
+      const ended = fdStep();
+      if (L.ptr === 0 && L.epoch >= L.epochs) fdFinish(); else if (ended && L.stopAtEpoch != null && L.epoch >= L.stopAtEpoch) { L.stopAtEpoch = null; fdStop(`Epoch ${L.epoch} complete.`); }
+      if (ended || now - L.lastRender >= 250) { try { fdRender(ended); } catch (e) { console.error(e); } L.lastRender = now; }
+      if (L.running) requestAnimationFrame(fdTick);
+      return;
+    }
     const dt = Math.min(0.1, (now - L.lastTime) / 1000); L.lastTime = now;
     const spe = L.train.length;
     L.debt += dt * L.speed * spe;
@@ -2349,8 +2411,8 @@
     if (did && (ended || now - L.lastRender >= 120)) { try { fdRender(ended); } catch (e) { console.error(e); } L.lastRender = now; }
     if (L.running) requestAnimationFrame(fdTick);
   }
-  function fdStepField() { const L = S.fd; if (!L.model) return; fdStop(); const ended = fdStep(); fdRender(true); const s = L.byId.get(L.lastField); fdNote(ended ? `Epoch ${L.epoch} complete.` : `One gradient step on field ${s.name} (${fdPattern(s).name}): step ${L.ptr} of ${L.train.length}.`); }
-  function fdStepEpoch() { const L = S.fd; if (!L.model) return; fdStop(); do { fdStep(); } while (L.ptr !== 0); fdRender(true); fdNote(`Epoch ${L.epoch} complete.`); }
+  function fdStepField() { const L = S.fd; if (!L.model) return; fdStop(); const ended = fdStep(); fdRender(true); const s = L.byId.get(L.lastField); fdNote(ended ? `Epoch ${L.epoch} complete.` : fdIsCnn() ? `One gradient step on a batch of ${L.lastBatch.size} fields (${[...L.lastBatch].map(id => L.byId.get(id).name).join(', ')}), each mirrored or turned upside down at random: batch ${Math.ceil(L.ptr / FD.cnnBatch)} of ${Math.ceil(L.train.length / FD.cnnBatch)}.` : `One gradient step on field ${s.name} (${fdPattern(s).name}): step ${L.ptr} of ${L.train.length}.`); }
+  function fdStepEpoch() { const L = S.fd; if (!L.model) return; fdStop(); if (fdIsCnn()) { if (L.epoch >= L.epochs) { fdNote(`Already at ${L.epochs} epochs. Raise the epoch count, or reset to train again.`); return; } L.stopAtEpoch = L.epoch + 1; fdStart(); fdNote(`Running one epoch: ${Math.ceil(L.train.length / FD.cnnBatch)} batches of ${FD.cnnBatch} fields, one per frame.`); return; } do { fdStep(); } while (L.ptr !== 0); fdRender(true); fdNote(`Epoch ${L.epoch} complete.`); }
   function fdSelect(id) { const L = S.fd; L.selected = id === L.selected ? null : id; L.hoverNucleus = null; L.pinned = null; fdRenderFocus(); fdRenderTrays(); }
   const fdOnTest = () => S.world === 'fields' && S.stage === 'test';
   function fdTestResult() { const L = S.fd; return L.testSelected != null ? L.trial.results.get(L.testSelected) : null; } // the call already made for the field under test, if any
@@ -2367,7 +2429,16 @@
   function fdNeighbour(step) { const L = S.fd, cur = fdFocus(), i = L.all.indexOf(cur); fdSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
   function fdSyncButtons() { const L = S.fd; $('fd-train').textContent = L.running ? '⏸ Pause' : L.epoch > 0 ? '▶ Continue' : '▶ Train'; }
   function fdSyncControls() { syncFdLoad();
-    const L = S.fd;
+    const L = S.fd, cnn = fdIsCnn();
+    document.querySelectorAll('#fd-kind-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.kind === L.kind));
+    for (const id of ['fd-pos-seg', 'fd-ctx-seg', 'fd-crop-seg', 'fd-backbone', 'fd-speed']) $(id).closest('.ctl').hidden = cnn;
+    $('fd-step-field').textContent = cnn ? 'Step batch' : 'Step field'; $('fd-step-field').title = cnn ? `one gradient step on the next batch of ${FD.cnnBatch} training fields` : 'one gradient step on the next training field';
+    $('fd-step-epoch').title = cnn ? `one pass through the ${L.train ? L.train.length : 400} training fields, a batch per frame` : 'one pass through the 400 training fields';
+    $('fd-unrolled-card').hidden = cnn; $('fd-scorer-card').hidden = L.kind === 'deep'; $('fd-conv-card').hidden = !cnn; $('fd-cells-ctl').hidden = L.kind !== 'shallow'; $('fd-mass').closest('.chart').hidden = L.kind === 'deep';
+    $('fd-mass-title').textContent = cnn ? 'Invasion head’s attention on the cells holding an atypical nucleus below the membrane' : 'Invasion head’s attention on the atypical nuclei below the membrane';
+    document.querySelectorAll('#fd-cellview-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.cellView));
+    document.querySelectorAll('#fd-cnn-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
+    fdRenderBlurb();
     document.querySelectorAll('#fd-pos-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.pos === '1') === L.pos));
     document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.classList.toggle('is-active', (b.dataset.ctx === '1') === L.ctx));
     document.querySelectorAll('#fd-crop-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.crop === L.crop));
@@ -2375,8 +2446,8 @@
     document.querySelectorAll('#fd-layer-seg button, #fd-ctx-layer-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.layer === L.layer));
     document.querySelectorAll('#fd-head-seg button').forEach(b => b.classList.toggle('is-active', +b.dataset.head === L.head));
     document.querySelectorAll('#fd-attview-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.view === L.attView));
-    $('fd-context-card').hidden = !L.ctx; $('fd-decide-card').hidden = !L.ctx;
-    $('fd-links-ctl').hidden = !L.ctx; $('fd-links-min').value = Math.round(L.linksMin * 100); $('fd-links-min-val').textContent = pct(L.linksMin); $('fd-links-min').disabled = !L.linksAll;
+    $('fd-context-card').hidden = cnn || !L.ctx; $('fd-decide-card').hidden = cnn || !L.ctx;
+    $('fd-links-ctl').hidden = cnn || !L.ctx; $('fd-links-min').value = Math.round(L.linksMin * 100); $('fd-links-min-val').textContent = pct(L.linksMin); $('fd-links-min').disabled = !L.linksAll;
     $('fd-epochs').value = L.epochs; $('fd-epochs-val').textContent = L.epochs;
     $('fd-speed').value = sliderFromSpeed(L.speed); $('fd-speed-val').textContent = `${L.speed} epochs/s`;
     $('fd-seed').value = L.seed; for (const id of ['fd-reveal', 'fd-data-reveal', 'fd-test-reveal']) $(id).checked = L.reveal;
@@ -2386,7 +2457,15 @@
   // ---- rendering
   const fdModelWord = () => { const L = S.fd; return L.pos && L.ctx ? 'positions and context' : L.pos ? 'codes with positions, no context' : L.ctx ? 'context without positions' : 'a bag of codes: no positions, no context'; };
   function fdRenderStatus() {
-    const L = S.fd, last = L.hist[L.hist.length - 1], m = L.model;
+    const L = S.fd, last = L.hist[L.hist.length - 1], m = L.model, f3 = v => (v == null ? '–' : v.toFixed(3)), pc = v => (v == null ? '–' : pct(v));
+    if (fdIsCnn()) { const { w, h } = fdHalfSize(), G = m.grid(h, w), rf = m.receptiveField() * 2, src = L.trainScored === 'pass' ? 'training fields' : 'training batches, augmented', share = L.kind === 'shallow' ? fdCellShare() : null;
+      $('fd-status').innerHTML =
+        `<span>architecture <b>${esc(m.describe(h, w))}</b></span><span>parameters <b>${m.parameterCount()}</b></span>` +
+        `<span>model <b>${FDK[L.kind].word}</b> · cells <b>${G.gw} × ${G.gh}</b>, each ${L.w / G.gw} × ${L.h / G.gh} px of field, decided from up to ${rf} × ${rf} px around it · input <b>the pixels alone</b>, mirrored and turned upside down at random while training</span>` +
+        `<span>fields <b>${L.train.length}</b> training · <b>${L.test.length}</b> test</span><span>epoch <b>${L.epoch}</b> / ${L.epochs}</span><span>batch <b>${L.ptr === 0 ? '–' : Math.ceil(L.ptr / FD.cnnBatch)}</b> / ${Math.ceil(L.train.length / FD.cnnBatch)}</span>` +
+        `<span>loss <b>${f3(last.loss)}</b> ${src.split(',')[0]} · <b>${f3(last.testLoss)}</b> test</span><span>CIS right <b>${pc(last.accCis)}</b> ${src} · <b>${pc(last.testAccCis)}</b> test</span><span>invasion right <b>${pc(last.acc)}</b> ${src} · <b>${pc(last.testAcc)}</b> test (peeking)</span>` +
+        (share ? `<span>attention on the culprit cells <b>${pc(last.testMassCis)}</b> CIS head · <b>${pc(last.testMass)}</b> invasion head (test fields; uniform: ${pct(share[0])} · ${pct(share[1])})</span>` : '');
+      return; }
     $('fd-status').innerHTML =
       `<span>architecture <b>every nucleus → code (${L.codeD} numbers, from ${esc(L.encDescribe)})${L.pos ? ' + its position' : ''} → ${esc(m.describe())}</b></span>` +
       `<span>parameters <b>${m.parameterCount()}</b></span><span>model <b>${fdModelWord()}</b> · crops <b>${L.crop === 'nucleus' ? 'masked to the nucleus' : 'with the surroundings'}</b></span>` +
@@ -2394,12 +2473,23 @@
       `<span>loss <b>${last.loss.toFixed(3)}</b></span><span>CIS right <b>${pct(last.accCis)}</b> training · <b>${pct(last.testAccCis)}</b> test</span><span>invasion right <b>${pct(last.acc)}</b> training · <b>${pct(last.testAcc)}</b> test (peeking)</span>` +
       `<span>attention on the culprits <b>${pct(last.massCis)}</b> CIS head · <b>${pct(last.mass)}</b> invasion head (test fields; uniform: ${pct(L.share[0])} · ${pct(L.share[1])})</span>`;
   }
-  function fdFocusForward() { const L = S.fd, s = fdFocus(), r = fdOnTest() ? fdTestResult() : null; return { s, fw: r ? r.fw : L.model.forward(s.H, s.dist, s.xy) }; } // on the Test step, the call as it was made
+  function fdFocusForward() { // on the Test step, the call as it was made; an end-to-end forward (a tenth of a second) is kept until the field or the weights change
+    const L = S.fd, s = fdFocus(), r = fdOnTest() ? fdTestResult() : null; if (r) return { s, fw: r.fw };
+    if (!fdIsCnn()) return { s, fw: L.model.forward(s.H, s.dist, s.xy) };
+    const c = L.fwc; if (c && c.id === s.id && c.model === L.model && c.steps === L.model.steps) return { s, fw: c.fw };
+    const { w, h } = fdHalfSize(), fw = L.model.forward(fdHalf(s), h, w); L.fwc = { id: s.id, model: L.model, steps: L.model.steps, fw }; return { s, fw };
+  }
+  function fdShownCell(fw, k) { const L = S.fd, a = fw.outs[k].a, e = fw.evidence[k]; if (L.hoverCell != null && L.hoverCell < a.length) return L.hoverCell; let j = 0; if (fdCellMode() === 'evidence') { for (let i = 1; i < e.length; i++) if (e[i] > e[j]) j = i; } else for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; } // the hovered cell, else the one with the most attention (or evidence)
   function fdShown(fw, k) { const L = S.fd, a = fw.outs[k].a; if (L.hoverNucleus != null && L.hoverNucleus < a.length) return L.hoverNucleus; if (L.pinned != null && L.pinned < a.length) return L.pinned; let j = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[j]) j = i; return j; }
   function fdContextView(fw) { const L = S.fd; return L.ctx && fw && fw.ctxs && fw.ctxs.length ? fdAttentionView(fw) : null; }
   function fdCallText(s, o, k) { const yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS', call = o.p >= 0.5 ? 1 : 0, truth = s.y[k]; return `The ${FD.names[k]} head says <b>P(${yes}) = ${o.p.toFixed(2)}</b> → <span class="${call === truth ? 'good-text' : 'bad-text'}">${call ? yes : no} ${call === truth ? '✓' : '✗'}</span> · truth: ${truth ? yes : no}.`; }
   function fdDrawPair(ids, s, fw) { // the two viewers of one field, one per head
-    const L = S.fd, n = s.nuclei.length, view = fdContextView(fw), ok = i => (i != null && i >= 0 && i < n ? i : null), hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned);
+    const L = S.fd, n = s.nuclei.length;
+    if (fdIsCnn()) { const { w, h } = fdHalfSize(), G = L.model.grid(h, w), signed = fdCellMode() === 'evidence';
+      ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map(q => ({ x: q.x, y: q.y, a: 0, pos: s.pos[k][s.nuclei.indexOf(q)] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: true,
+        cells: fw ? { gh: G.gh, gw: G.gw, values: signed ? fw.evidence[k] : fw.outs[k].a, signed, hover: L.hoverCell } : null }));
+      return; }
+    const view = fdContextView(fw), ok = i => (i != null && i >= 0 && i < n ? i : null), hover = ok(L.hoverNucleus != null ? L.hoverNucleus : L.walkNucleus), pinned = ok(L.pinned), from = ok(L.hoverNucleus != null ? L.hoverNucleus : L.dwalk ? L.dwalk.i : L.pinned);
     ids.forEach((id, k) => Viz.drawField($(id), { px: s.px, w: L.w, h: L.h, scale: 2, tint: S.tint, nuclei: s.nuclei.map((q, i) => ({ x: q.x, y: q.y, a: fw ? fw.outs[k].a[i] : 0, pos: s.pos[k][i] })), reveal: L.reveal, membrane: s.membrane, nests: s.nests, plain: !fw,
       hover, pinned: view ? pinned : null, links: view && !L.linksAll && from != null ? { from, weights: view[from] } : null, allLinks: view && L.linksAll ? { A: view, min: L.linksMin, hover: from } : null }));
   }
@@ -2410,8 +2500,14 @@
     fdDrawPair(['fd-canvas-cis', 'fd-canvas-inv'], s, fw);
     $('fd-field-title').textContent = `Field ${s.name} · ${s.split === 'train' ? 'training' : 'test'} · ${P.name}`;
     $('fd-call-cis').innerHTML = fdCallText(s, fw.outs[0], 0); $('fd-call-inv').innerHTML = fdCallText(s, fw.outs[1], 1);
+    if (fdIsCnn()) { const G = L.model.grid(fdHalfSize().h, fdHalfSize().w), signed = fdCellMode() === 'evidence';
+      $('fd-field-note').textContent = `The grid is the encoder’s ${G.gw} × ${G.gh} cells. ${signed ? `Each cell is tinted by its evidence for the head: what it adds to the score, orange towards yes, blue towards no; the cells and the head’s bias add up to the score exactly${L.kind === 'deep' ? ', every cell weighed the same by the plain average' : ''}.` : 'Each cell is tinted by the share of the head’s attention it gets, the softmax over the cells.'} ${L.reveal ? 'Dots mark the atypical nuclei (the CIS head is judged by the cells that hold one, the invasion head by the cells holding one below the membrane); the blue line is the basement membrane and the green outlines the nests.' : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a cell for its numbers${L.selected == null && L.lastField != null ? ' · the last field trained on' : ''}.`; return; }
     $('fd-field-note').textContent = `Rings are the attention weights, thicker and stronger with the weight; the two heads read the same nuclei and weigh them differently. ${L.reveal ? `Dots mark the nuclei each head is judged against: the atypical nuclei for the CIS head, the atypical nuclei below the membrane for the invasion head; the blue line is the basement membrane and the green outlines the nests.` : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a nucleus for its two weights${L.ctx ? ' and whom it listens to' : ''}${L.selected == null && L.lastField != null ? ' · the last field trained on' : ''}.`;
     if (L.ctx) $('fd-links-note').textContent = (L.linksAll ? `Every link of the ${L.layer ? 'second' : 'first'} context layer above ${pct(L.linksMin)}: a link is wide at the end that listens. Hover a nucleus to lift its links out; click it to keep it.` : `Lines from the hovered nucleus to the nuclei it listens to in the ${L.layer ? 'second' : 'first'} context layer, thicker with the share. Click a nucleus to keep it as the one the lines follow.`) + (L.model.layers.length ? ` The learned distance cost is ${L.model.layers.map((c, l) => `${Math.log1p(Math.exp(c.beta[0])).toFixed(2)} in layer ${l + 1}`).join(', ')} per nucleus diameter: every extra diameter divides a nucleus’s weight by ${Math.exp(Math.log1p(Math.exp(L.model.layers[Math.min(L.layer, L.model.layers.length - 1)].beta[0]))).toFixed(1)}.` : '');
+  }
+  function fdCellTip(s, fw, i) { // a cell of an end-to-end model: its place, each head's share and evidence, and under Reveal what it holds
+    const L = S.fd, G = L.model.grid(fdHalfSize().h, fdHalfSize().w), r = Math.floor(i / G.gw), c = i % G.gw, cw = L.w / G.gw, ch = L.h / G.gh, t = fdCellTruth(s), share = a => (a >= 0.1 ? pct(a) : `${(a * 100).toFixed(1)}%`), head = k => `${FD.names[k]} head ${L.kind === 'shallow' ? `share ${share(fw.outs[k].a[i])} · ` : ''}evidence ${(fw.evidence[k][i] >= 0 ? '+' : '−') + Math.abs(fw.evidence[k][i]).toFixed(3)}`;
+    return `cell row ${r + 1}, column ${c + 1} · ${Math.round(c * cw)}–${Math.round((c + 1) * cw)} × ${Math.round(r * ch)}–${Math.round((r + 1) * ch)} px · ${head(0)} · ${head(1)}${L.reveal ? ` · ${t[1][i] ? 'holds an atypical nucleus below the membrane' : t[0][i] ? 'holds an atypical nucleus' : 'no atypical nucleus'}` : ''}`;
   }
   function fdNucleusTip(s, fw, i) { const L = S.fd, n = s.nuclei[i]; if (!n) return ''; const where = n.kind === 'stroma' ? 'stromal cell' : n.below ? 'below the membrane' : 'in the epithelium'; return `nucleus ${i + 1} · ${where} · CIS head ${pct(fw.outs[0].a[i])} · invasion head ${pct(fw.outs[1].a[i])}${L.reveal ? ` · ${n.kind === 'stroma' ? 'stroma' : n.atypical ? `atypical (${subtypeWord(n.subtype)})` : 'bland'}` : ''}`; }
   // the mimic table: the test fields of each pattern, how often called CIS and called invasive
@@ -2431,26 +2527,39 @@
   function fdRenderMimicCard() {
     const L = S.fd; fdRenderMimic($('fd-mimic'), L.testEval, null, fdFocus().pattern);
     const r = fdMimicRates(L.testEval);
-    $('fd-mimic-note').textContent = `Every model gets the top two rows right by cytology alone. The last three rows are the point: ${r.cisvbn[1] == null ? '' : `${pct(r.cisvbn[1])} of the CIS-into-von-Brunn-nests fields are called invasive, atypical cells below the membrane in the one arrangement that is not invasion, and ${pct(r.inv[1])} of the invasive fields are found. `}A model without positions cannot tell above from below; one without context cannot tell a round nest from an angulated one; the full model reads all three cues.`;
+    $('fd-mimic-note').textContent = `Every model gets the top two rows right by cytology alone. The last three rows are the point: ${r.cisvbn[1] == null ? '' : `${pct(r.cisvbn[1])} of the CIS-into-von-Brunn-nests fields are called invasive, atypical cells below the membrane in the one arrangement that is not invasion, and ${pct(r.inv[1])} of the invasive fields are found. `}${fdIsCnn() ? `The network reads the three cues from the pixels, if it reads them at all: nobody told it what a nucleus, a membrane or a nest is, and which rows it gets right says what it found.` : `With the fields in every orientation a position alone cannot tell above from below, so a model without context has little beyond how atypical the field is; the context layers read where the membrane runs from the nuclei around each one and whether a nest is round or angulated, and the full model reads all three cues.`}`;
   }
   function fdRenderCurves() {
     const L = S.fd, c = Viz.colors(), testCol = getComputedStyle(document.documentElement).getPropertyValue('--test-series').trim(), last = L.hist[L.hist.length - 1];
     Viz.drawCurves($('fd-loss'), { history: L.hist, key: 'loss', showTest: true, maxEpoch: L.epochs });
     Viz.drawCurves($('fd-acc'), { history: L.hist, key: 'acc', showTest: true, maxEpoch: L.epochs });
-    Viz.drawSeries($('fd-mass'), { hist: L.hist, keys: [{ key: 'mass', color: c.accent }, { key: 'testMass', color: testCol, dash: true }], maxEpoch: L.epochs, pct: true, baseline: L.share[1], baselineLabel: 'uniform' });
-    $('fd-loss-now').textContent = `${last.loss.toFixed(3)} · test ${last.testLoss.toFixed(3)}`; $('fd-acc-now').textContent = `${pct(last.acc)} · test ${pct(last.testAcc)}`; $('fd-mass-now').textContent = `${pct(last.mass)} · test ${pct(last.testMass)}`;
+    const f3 = v => (v == null ? '–' : v.toFixed(3)), pc = v => (v == null ? '–' : pct(v));
+    Viz.drawSeries($('fd-mass'), { hist: L.hist, keys: [{ key: 'mass', color: c.accent }, { key: 'testMass', color: testCol, dash: true }], maxEpoch: L.epochs, pct: true, baseline: fdIsCnn() ? fdCellShare()[1] : L.share[1], baselineLabel: 'uniform' });
+    $('fd-loss-now').textContent = `${f3(last.loss)} · test ${f3(last.testLoss)}`; $('fd-acc-now').textContent = `${pc(last.acc)} · test ${pc(last.testAcc)}`; $('fd-mass-now').textContent = `${pc(last.mass)} · test ${pc(last.testMass)}`;
+    if (fdIsCnn()) { $('fd-curves-note').textContent = `The loss is the sum of the two questions’ cross-entropies. The training curves are scored from the batches as the model trains on them, mirrored and upside down (an untrained model has none, so they start at epoch 1); the test curves peek at the held-out fields after every epoch. CIS is right on ${pc(last.testAccCis)} of the test fields; invasion is the hard one${L.kind === 'shallow' ? ', and the third chart asks where the invasion head looks: the share of its attention on the cells that hold an atypical nucleus below the membrane, against the uniform share' : ''}.`; return; }
     $('fd-curves-note').textContent = `The loss is the sum of the two questions’ cross-entropies. CIS is right on ${pct(last.testAccCis)} of the test fields (the codes alone carry cytology); invasion is the hard one. The test curves peek at the held-out fields as the model trains, which is how one sees it overfit: 400 fields are few, and the test loss turns up after some 40 epochs while the training loss keeps falling.`;
   }
   function fdRenderTrays() {
     const L = S.fd, focus = fdFocus();
     [['train', L.train, L.trainEval], ['test', L.test, L.testEval]].forEach(([split, fields, ev]) => fields.forEach((s, k) => {
-      const el = L.thumbs.get(s.id), pc = ev.outputs[0].probs[k], pi = ev.outputs[1].probs[k], callC = pc >= 0.5 ? 1 : 0, callI = pi >= 0.5 ? 1 : 0, wrong = callC !== s.y[0] || callI !== s.y[1];
-      el.className = `thumb field call-${callI}${wrong ? ' wrong' : ''}${focus === s ? ' selected' : ''}${L.lastField === s.id && split === 'train' ? ' in-batch' : ''}`;
-      el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name} · CIS ${callC ? 'yes' : 'no'} (P ${pc.toFixed(2)}) ${callC === s.y[0] ? '✓' : '✗'} · invasive ${callI ? 'yes' : 'no'} (P ${pi.toFixed(2)}) ${callI === s.y[1] ? '✓' : '✗'}`;
+      const el = L.thumbs.get(s.id), pc = ev.outputs[0].probs[k], pi = ev.outputs[1].probs[k], inBatch = split === 'train' && (L.lastBatch ? L.lastBatch.has(s.id) : L.lastField === s.id);
+      if (pc == null) { el.className = `thumb field${focus === s ? ' selected' : ''}${inBatch ? ' in-batch' : ''}`; el.title = `${s.name} · training · ${fdPattern(s).name} · not scored yet: an end-to-end model is scored on a training field when it trains on it`; return; }
+      const callC = pc >= 0.5 ? 1 : 0, callI = pi >= 0.5 ? 1 : 0, wrong = callC !== s.y[0] || callI !== s.y[1];
+      el.className = `thumb field call-${callI}${wrong ? ' wrong' : ''}${focus === s ? ' selected' : ''}${inBatch ? ' in-batch' : ''}`;
+      el.title = `${s.name} · ${split === 'train' ? 'training' : 'test'} · ${fdPattern(s).name} · CIS ${callC ? 'yes' : 'no'} (P ${pc.toFixed(2)}) ${callC === s.y[0] ? '✓' : '✗'} · invasive ${callI ? 'yes' : 'no'} (P ${pi.toFixed(2)}) ${callI === s.y[1] ? '✓' : '✗'}${fdIsCnn() && split === 'train' && L.trainScored !== 'pass' ? ' · as last trained on, mirrored or upside down' : ''}`;
     }));
   }
-  function fdRenderCards() { fdRenderUnrolled(); fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
-  function fdRenderFocus(light) { fdRenderField(); if (fdOnTest()) { if (fdTestResult()) fdRenderCards(); return; } fdRenderUnrolled(); if (light) return; fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
+  function fdRenderCards() { if (fdIsCnn()) { fdRenderConv(); if (S.fd.kind === 'shallow') fdRenderScorer(); fdRenderSummary(); return; } fdRenderUnrolled(); fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
+  function fdRenderFocus(light) { fdRenderField(); if (fdOnTest()) { if (fdTestResult()) fdRenderCards(); return; } if (fdIsCnn()) { fdRenderConv(); if (light) return; if (S.fd.kind === 'shallow') fdRenderScorer(); fdRenderSummary(); return; } fdRenderUnrolled(); if (light) return; fdRenderScorer(); fdRenderSummary(); fdRenderContext(); fdRenderDecide(); }
+  // the end-to-end models' card: the first layer's filters, the chosen head's single layer over the channels, and the shown cell's token
+  function fdRenderConv() {
+    const L = S.fd, m = L.model, { s, fw } = fdFocusForward(), k = L.head, head = m.heads[k], j = fdShownCell(fw, k), tok = fw.tokens[j], { w, h } = fdHalfSize(), G = m.grid(h, w), rf = m.receptiveField() * 2, yes = k ? 'invasive' : 'CIS';
+    Viz.drawSegFilters($('fd-conv-filters'), { W: m.enc.enc[0][0].W, cout: m.C, cin: 1, cell: 14, cols: 8 });
+    let dot = 0; for (let d = 0; d < m.C; d++) dot += head.Wo[d] * tok[d];
+    $('fd-conv-heads').innerHTML = `<div class="v"><div class="lbl">${fdHeadName(k)} head · single layer</div>${fdBars(head.Wo)}<div class="n">one weight per channel · bias ${head.bo.toFixed(2)}</div></div><div class="v"><div class="lbl">cell ${Math.floor(j / G.gw) + 1}, ${j % G.gw + 1} · its token</div>${fdBars(tok)}<div class="n">${m.C} numbers, standardised</div></div>` +
+      `<div class="txt"><div>Token · weights = <b>${dot.toFixed(2)}</b> for this cell${L.kind === 'shallow' ? `, times its share ${pct(fw.outs[k].a[j])} = <b>${fw.evidence[k][j].toFixed(3)}</b> of evidence` : `, a ${G.gw * G.gh}th of it (<b>${fw.evidence[k][j].toFixed(3)}</b>) in the plain average`}; the field’s ${G.gw * G.gh} cells and the bias add up to the ${fdHeadName(k)} score ${fw.outs[k].logit.toFixed(2)}, so P(${yes}) = <b>${fw.outs[k].p.toFixed(2)}</b>.</div><div>${L.hoverCell == null ? `The cell shown is the one with the most ${fdCellMode() === 'evidence' ? 'evidence' : 'attention'} on this field; hover a cell on the field for its own.` : 'The hovered cell.'}</div></div>`;
+    $('fd-conv-note').textContent = `Every weight of the encoder is a 3 × 3 filter slid over the whole field: eight read the pixels, then eight by eight at every further convolution, two per level and two more at the bottom, a 2 × 2 max pool between the levels. After ${m.L} level${m.L > 1 ? 's' : ''} every cell of the ${G.gw} × ${G.gh} grid is ${m.C} numbers for its ${L.w / G.gw} × ${L.h / G.gh} px of field, computed from up to ${rf} × ${rf} px around it (the receptive field, ${(rf / FD.unit).toFixed(0)} nucleus diameters). ${L.kind === 'deep' ? 'A plain average of the cells is the field’s summary, and the single layer above weighs its channels: the model cannot point at a cell, so the evidence map on the field is what each cell contributed to the mean.' : 'The attention heads sit over the cells: a scorer per head gives every cell a score, the softmax turns the scores into shares, and the weighted average of the tokens is the summary the single layer reads, as for the nuclei; the next cards take the shown cell through the scorer and the summary through the head.'}`;
+  }
   function fdRender(full) {
     const L = S.fd; if (!L.model) return;
     fdRenderStatus(); fdRenderFocus(!full && L.running);
@@ -2496,7 +2605,7 @@
   function fdTestClear() { const L = S.fd; L.trial = { next: 0, results: new Map() }; L.testSelected = null; fdRenderTest(); }
   function fdClassifyNext(quiet) {
     const L = S.fd, T = L.trial; if (!L.model || T.next >= L.test.length) return false;
-    const s = L.test[T.next++], fw = L.model.forward(s.H, s.dist, s.xy);
+    const s = L.test[T.next++], fw = fdIsCnn() ? L.model.forward(fdHalf(s), fdHalfSize().h, fdHalfSize().w) : L.model.forward(s.H, s.dist, s.xy);
     T.results.set(s.id, { p: fw.outs.map(o => o.p), call: fw.outs.map(o => (o.p >= 0.5 ? 1 : 0)), a: fw.outs.map(o => o.a), fw }); L.testSelected = s.id;
     if (!quiet) fdRenderTest();
     return true;
@@ -2530,12 +2639,12 @@
       fdRenderCards();
       $('fd-test-field-title').textContent = `Field ${s.name} · test · ${fdPattern(s).name}`;
       $('fd-test-call-cis').innerHTML = fdCallText(s, r.fw.outs[0], 0); $('fd-test-call-inv').innerHTML = fdCallText(s, r.fw.outs[1], 1);
-      $('fd-test-field-note').textContent = `${fdPattern(s).blurb} ${L.reveal ? 'The dots mark the nuclei each head is judged against; a call for the right reason lands the attention on them.' : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a nucleus for its two weights; the cards below take this call apart, as they did while training.`;
+      $('fd-test-field-note').textContent = `${fdPattern(s).blurb} ${L.reveal ? `The dots mark the ${fdIsCnn() ? 'atypical nuclei' : 'nuclei each head is judged against'}; a call for the right reason lands the ${fdIsCnn() ? 'evidence' : 'attention'} on them.` : 'Tick Reveal to see the membrane, the nests and the atypical nuclei.'} Hover a ${fdIsCnn() ? 'cell for its share and its evidence' : 'nucleus for its two weights'}; the cards below take this call apart, as they did while training.`;
     } else {
       const s0 = L.test[Math.min(T.next, L.test.length - 1)];
       fdDrawPair(['fd-test-canvas-cis', 'fd-test-canvas-inv'], s0, null);
       $('fd-test-field-title').textContent = `Field ${s0.name} · test · next up`;
-      $('fd-test-call-cis').textContent = 'Press Classify next field: the model reads every nucleus and makes both calls, and the truth is shown after.'; $('fd-test-call-inv').textContent = '';
+      $('fd-test-call-cis').textContent = `Press Classify next field: the model reads ${fdIsCnn() ? 'the pixels' : 'every nucleus'} and makes both calls, and the truth is shown after.`; $('fd-test-call-inv').textContent = '';
       $('fd-test-field-note').textContent = '';
     }
     for (const [id, el] of L.testThumbs) { const rr = T.results.get(id), f = L.byId.get(id), right = !!rr && rr.call[0] === f.y[0] && rr.call[1] === f.y[1]; el.classList.toggle('selected', id === L.testSelected); el.classList.toggle('call-0', !!rr && rr.call[1] === 0); el.classList.toggle('call-1', !!rr && rr.call[1] === 1); el.classList.toggle('wrong', !!rr && !right); el.classList.toggle('right', right); el.querySelector('.badge').textContent = right ? '✓' : '✗'; }
@@ -2577,23 +2686,30 @@
     fdRenderField(); fdRenderUnrolled();
     requestAnimationFrame(fdWalkTick);
   }
-  function fdScorerModel() { // the attention network of the chosen head for one nucleus: the hovered one, else the pinned one, else the one with the most attention
-    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], j = fdShown(fw, k), n = s.nuclei[j], tok = fw.T[j], sf = o.fws ? o.fws[j] : L.model.scorers[k].forward(tok);
+  function fdScorerModel() { // the attention network of the chosen head for one nucleus: the hovered one, else the pinned one, else the one with the most attention (one cell, for the shallow end-to-end model)
+    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k];
+    if (fdIsCnn()) { const j = fdShownCell(fw, k), tok = fw.tokens[j], sf = o.fws ? o.fws[j] : L.model.scorers[k].forward(tok), G = L.model.grid(fdHalfSize().h, fdHalfSize().w);
+      return { j, n: null, cell: `cell ${Math.floor(j / G.gw) + 1}, ${j % G.gw + 1}`, m: { net: L.model.scorers[k], mode: 'features', inputCaption: `INPUT · THIS CELL’S TOKEN · ${L.model.C} NUMBERS`, featureNames: Array.from({ length: L.model.C }, (_, i) => `channel ${i + 1}`), x: tok, fw: sf, stage: 2, hover: L.hoverScorer,
+        activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the ${G.gw * G.gh} cells\n→ ${pct(o.a[j])} of the ${fdHeadName(k)} head’s attention`, specimen: null, size: L.size, tint: S.tint } }; }
+    const j = fdShown(fw, k), n = s.nuclei[j], tok = fw.T[j], sf = o.fws ? o.fws[j] : L.model.scorers[k].forward(tok);
     return { j, n, m: { net: L.model.scorers[k], mode: 'features', inputCaption: `INPUT · THIS NUCLEUS’S TOKEN${L.ctx ? ', AFTER CONTEXT' : ''} · ${L.D} NUMBERS`, featureNames: Array.from({ length: L.D }, (_, i) => (L.pos && i >= L.codeD ? (i === L.codeD ? 'position x' : 'position y') : `code ${i + 1}`)), x: tok, fw: sf, stage: 2, hover: L.hoverScorer,
       activation: 'tanh', activationLabel: 'Tanh', positiveName: 'more attention', negativeName: 'less attention', scoreLabel: 'attention score', scoreNote: `softmax over the field\n→ ${pct(o.a[j])} of the ${fdHeadName(k)} head’s attention`, specimen: null, size: L.size, tint: S.tint } };
   }
   function fdRenderScorer() {
-    const L = S.fd, { j, n, m } = fdScorerModel(), cv = $('fd-scorer'); cv._model = m; Viz.drawNetwork(cv, m);
-    $('fd-scorer-title').textContent = `How a nucleus is scored by the ${fdHeadName(L.head)} head`;
+    const L = S.fd, { j, n, m, cell } = fdScorerModel(), cv = $('fd-scorer'); cv._model = m; Viz.drawNetwork(cv, m);
+    if (fdIsCnn()) { const { s, fw } = fdFocusForward(), t = fdCellTruth(s), G = L.model.grid(fdHalfSize().h, fdHalfSize().w);
+      $('fd-scorer-title').textContent = `How a cell is scored by the ${fdHeadName(L.head)} head`; $('fd-scorer-sub').textContent = 'the attention network of this head, the same for every cell: its token → tanh units → one score · a softmax over the cells turns the scores into weights';
+      $('fd-scorer-note').textContent = `${L.hoverCell == null ? `The cell with the most of the ${fdHeadName(L.head)} head’s ${fdCellMode() === 'evidence' ? 'evidence' : 'attention'} on this field` : `The hovered ${cell}`}${L.reveal ? ` (${t[1][j] ? 'holds an atypical nucleus below the membrane' : t[0][j] ? 'holds an atypical nucleus' : 'holds no atypical nucleus'})` : ''}. Every cell of the field goes through this same little network; the softmax then compares the ${G.gw * G.gh} scores, so a score only counts relative to the others. Nothing told the scorer what a nucleus is: its eight inputs are whatever the convolutions learned to compute from the pixels, and the field's two labels are all that ever shaped them.`; return; }
+    $('fd-scorer-title').textContent = `How a nucleus is scored by the ${fdHeadName(L.head)} head`; $('fd-scorer-sub').textContent = 'the attention network of this head, the same for every nucleus: its token → tanh units → one score · a softmax over the field turns the scores into weights';
     $('fd-scorer-note').textContent = `${L.hoverNucleus == null && L.pinned == null ? `The nucleus with the most of the ${fdHeadName(L.head)} head’s attention on this field` : `Nucleus ${j + 1} of this field${L.hoverNucleus == null ? ', pinned' : ''}`}${L.reveal ? ` (${n.kind === 'stroma' ? 'a stromal cell' : n.atypical ? 'atypical: ' + subtypeWord(n.subtype) : 'bland'}, ${n.kind === 'stroma' ? 'in the stroma' : n.below ? 'below the membrane' : 'in the epithelium'})` : ''}. Every nucleus of the field goes through this same little network; the softmax then compares the ${fdFocus().nuclei.length} scores, so a score only counts relative to the others. The CIS head’s scorer learns to fire on atypia wherever it sits; the invasion head’s on atypia below the membrane and, through the context, on atypia arranged like an invasive nest.`;
   }
   function fdRenderSummary() {
-    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], D = L.D, yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS';
-    const plain = new Float64Array(D); for (const h of fw.T) for (let d = 0; d < D; d++) plain[d] += h[d] / fw.T.length;
+    const L = S.fd, { s, fw } = fdFocusForward(), k = L.head, o = fw.outs[k], cnn = fdIsCnn(), D = cnn ? L.model.C : L.D, yes = k ? 'invasive' : 'CIS', no = k ? 'not invasive' : 'no CIS', units = cnn ? 'cells' : 'nuclei', n = fw.T.length;
+    const plain = new Float64Array(D); for (const h of fw.T) for (let d = 0; d < D; d++) plain[d] += h[d] / n;
     $('fd-summary-title').textContent = `The field’s summary for the ${fdHeadName(k)} head, and its call`;
-    $('fd-summary').innerHTML = `<div class="v"><div class="lbl">weighted average</div>${fdBars(o.z)}<div class="n">the summary</div></div><div class="v"><div class="lbl">plain average</div>${fdBars(plain)}<div class="n">for comparison</div></div>` +
-      `<div class="txt"><div>Σ weight × token over the ${s.nuclei.length} nuclei gives ${D} numbers, the field’s summary for this head; it leans towards the nuclei that weigh most, where a plain average lets the bland majority drown them.</div><div>Then a single layer on the summary: <b>P(${yes}) = ${o.p.toFixed(2)}</b>.</div></div>`;
-    const cv = $('fd-head'), m = { net: L.model.heads[k], mode: 'features', inputCaption: `INPUT · THE FIELD’S SUMMARY · ${D} NUMBERS`, featureNames: Array.from({ length: D }, (_, i) => `summary ${i + 1}`), x: o.z, fw: o.head, stage: 2, hover: L.hoverHead, activation: 'relu', activationLabel: 'ReLU', positiveName: yes, negativeName: no, specimen: null, size: L.size, tint: S.tint };
+    $('fd-summary').innerHTML = (L.kind === 'deep' ? `<div class="v"><div class="lbl">plain average</div>${fdBars(o.z)}<div class="n">the summary</div></div>` : `<div class="v"><div class="lbl">weighted average</div>${fdBars(o.z)}<div class="n">the summary</div></div><div class="v"><div class="lbl">plain average</div>${fdBars(plain)}<div class="n">for comparison</div></div>`) +
+      `<div class="txt"><div>${L.kind === 'deep' ? `The mean of the ${n} cells’ tokens gives ${D} numbers, the field’s summary for this head: every cell counts the same, so the single layer must find the invasion in an average over the whole field, which is why the encoder has to be deep enough to see a nest and the membrane from one cell.` : `Σ weight × token over the ${n} ${units} gives ${D} numbers, the field’s summary for this head; it leans towards the ${units} that weigh most, where a plain average lets the bland majority drown them.`}</div><div>Then a single layer on the summary: <b>P(${yes}) = ${o.p.toFixed(2)}</b>.</div></div>`;
+    const cv = $('fd-head'), m = { net: L.model.heads[k], mode: 'features', inputCaption: `INPUT · THE FIELD’S SUMMARY · ${D} NUMBERS`, featureNames: Array.from({ length: D }, (_, i) => (cnn ? `channel ${i + 1}` : `summary ${i + 1}`)), x: o.z, fw: o.head, stage: 2, hover: L.hoverHead, activation: 'relu', activationLabel: 'ReLU', positiveName: yes, negativeName: no, specimen: null, size: L.size, tint: S.tint };
     cv._model = m; Viz.drawNetwork(cv, m);
   }
   // the context: the chosen layer's attention as the map shows it (what the layer uses, or the match alone, or the distance alone)
@@ -2723,6 +2839,9 @@
   }
   function bindFields() {
     const L = S.fd; bindFieldCards();
+    document.querySelectorAll('#fd-kind-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.kind; if (v === L.kind) return; L.kind = v; fdSyncControls(); fdReset(v === 'nuclei' ? 'The nuclei as tokens: every nucleus its code, its position and the context as set — fresh random weights.' : v === 'deep' ? 'A convolutional network over the pixels alone, three levels and a plain average of its cells — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.' : 'A shallow convolutional network over the pixels alone, two levels, and the two attention heads over its cells — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.'); }));
+    document.querySelectorAll('#fd-cellview-seg button').forEach(b => b.addEventListener('click', () => { L.cellView = b.dataset.view; fdSyncControls(); if (L.model) fdRenderFocus(); }));
+    document.querySelectorAll('#fd-cnn-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; fdSyncControls(); if (L.model) fdRenderFocus(); }));
     document.querySelectorAll('#fd-pos-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.pos === '1'; if (v === L.pos) return; L.pos = v; fdReset(v ? 'Every nucleus now carries its position with its code — fresh random weights.' : 'The codes alone: the model no longer knows where a nucleus sits — fresh random weights.'); }));
     document.querySelectorAll('#fd-ctx-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.ctx === '1'; if (v === L.ctx) return; L.ctx = v; fdReset(v ? 'Context on: two layers of self-attention let every nucleus read the others before the heads see it — fresh random weights.' : 'Context off: every nucleus is scored on its own — fresh random weights.'); }));
     document.querySelectorAll('#fd-crop-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.crop; if (v === L.crop) return; L.crop = v; fdSyncControls(); fdReset(v === 'nucleus' ? 'Crops masked to the nucleus: the code carries cytology and nothing else — fresh random weights.' : 'Crops with their surroundings: the field around the nucleus reaches the code, and with it its location and the outline of its nest — fresh random weights.'); }));
@@ -2734,7 +2853,7 @@
     $('fd-data-prev').addEventListener('click', () => fdDataNeighbour(-1)); $('fd-data-next').addEventListener('click', () => fdDataNeighbour(1));
     $('fd-classify-next').addEventListener('click', () => fdClassifyNext()); $('fd-classify-all').addEventListener('click', fdClassifyAll); $('fd-test-clear').addEventListener('click', fdTestClear);
     $('fd-step-field').addEventListener('click', fdStepField); $('fd-step-epoch').addEventListener('click', fdStepEpoch);
-    $('fd-train').addEventListener('click', () => (L.running ? fdStop('Paused.') : fdStart()));
+    $('fd-train').addEventListener('click', () => { if (L.running) fdStop('Paused.'); else { L.stopAtEpoch = null; L.scoring = null; fdStart(); } });
     $('fd-reset').addEventListener('click', () => fdReset('Weights re-initialised from the seed.'));
     $('fd-prev').addEventListener('click', () => fdNeighbour(-1)); $('fd-next').addEventListener('click', () => fdNeighbour(1));
     document.querySelectorAll('#fd-links-seg button').forEach(b => b.addEventListener('click', () => { L.linksAll = b.dataset.links === '1'; fdSyncControls(); if (L.model) fdRenderField(); }));
@@ -2746,12 +2865,12 @@
       cv.addEventListener('mouseenter', () => fdFreeze(true));
       cv.addEventListener('mousemove', ev => {
         if (!L.model || (fdOnTest() && !fdTestResult())) return;
-        const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top);
-        if (i !== L.hoverNucleus) { L.hoverNucleus = i; fdRenderFocus(); }
-        if (i != null) { const { s, fw } = fdFocusForward(); tip.hidden = false; tip.textContent = fdNucleusTip(s, fw, i); const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
+        const r = cv.getBoundingClientRect(), cnn = fdIsCnn(), i = cnn ? Viz.hitFieldCell(cv, ev.clientX - r.left, ev.clientY - r.top) : Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top);
+        if (cnn ? i !== L.hoverCell : i !== L.hoverNucleus) { if (cnn) L.hoverCell = i; else L.hoverNucleus = i; fdRenderFocus(); }
+        if (i != null) { const { s, fw } = fdFocusForward(); tip.hidden = false; tip.textContent = cnn ? fdCellTip(s, fw, i) : fdNucleusTip(s, fw, i); const half = tip.offsetWidth / 2 + 4; tip.style.left = Math.max(half, Math.min(r.width - half, ev.clientX - r.left)) + 'px'; tip.style.top = (ev.clientY - r.top) + 'px'; }
         else tip.hidden = true;
       });
-      cv.addEventListener('mouseleave', () => { tip.hidden = true; fdFreeze(false); if (L.hoverNucleus != null) { L.hoverNucleus = null; if (L.model) fdRenderFocus(); } });
+      cv.addEventListener('mouseleave', () => { tip.hidden = true; fdFreeze(false); if (L.hoverNucleus != null || L.hoverCell != null) { L.hoverNucleus = null; L.hoverCell = null; if (L.model) fdRenderFocus(); } });
       cv.addEventListener('click', ev => { if (!L.model || !L.ctx) return; const r = cv.getBoundingClientRect(), i = Viz.hitField(cv, ev.clientX - r.left, ev.clientY - r.top); if (i == null) return; L.pinned = L.pinned === i ? null : i; fdRenderFocus(); fdNote(L.pinned == null ? 'Unpinned: the lines follow the hovered nucleus.' : `Nucleus ${i + 1} pinned: the lines follow it until you click it again.`); });
     }
     const dc = $('fd-data-canvas'), dt = $('fd-data-tip');
@@ -4101,9 +4220,37 @@
     slNote(`Loaded the trained model: ${e.trained}. Test accuracy ${pct(last.testAcc)} after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or keep training it here.`);
   }
   function fdShippedKey() { const L = S.fd; return `${L.crop}|pos${L.pos ? 1 : 0}|ctx${L.ctx ? 1 : 0}|u${L.units}|${encKeyOf()}`; }
-  function fdShipped() { const T = trained(); return T && T.fields ? T.fields[fdShippedKey()] || null : null; }
-  function syncFdLoad() { const b = $('fd-load'); if (!b) return; const e = fdShipped(); b.disabled = !e; b.title = e ? `${e.trained}: the weights that ship with the page, with the curves of that run` : 'the shipped field models cover crops masked to the nucleus, with and without positions and with and without the context layers, 4 units and the shipped encoder: set those to load one'; }
+  function fdShipped() { if (fdIsCnn()) { const C = window.FIELDS_CNN; return C && C[S.fd.kind] ? C[S.fd.kind] : null; } const T = trained(); return T && T.fields ? T.fields[fdShippedKey()] || null : null; }
+  const fdCnnTrained = e => `the ${FDK[S.fd.kind].word} model trained in Node by tools/check_fields_cnn.js, seed ${e.cfg.seed}, ${e.cfg.epochs} epochs`;
+  function syncFdLoad() { const b = $('fd-load'); if (!b) return; const e = fdShipped(); b.disabled = !e; b.title = e ? `${fdIsCnn() ? fdCnnTrained(e) : e.trained}: the weights that ship with the page, with the curves of that run` : fdIsCnn() ? 'no trained model ships for this kind' : 'the shipped field models cover crops masked to the nucleus, with and without positions and with and without the context layers, 4 units and the shipped encoder: set those to load one'; }
+  // after a load, the training fields are scored by a forward pass in the background (a dozen seconds), so that the
+  // tray shows the loaded model's calls on them; training again scores them from the batches instead
+  function fdScoreTraining() {
+    const L = S.fd, token = {}, model = L.model, E = fdNewSums(), { w, h } = fdHalfSize(); L.scoring = token; let i = 0;
+    const step = () => {
+      if (L.scoring !== token || L.model !== model || S.world !== 'fields') return;
+      const t0 = performance.now();
+      while (i < L.train.length && performance.now() - t0 < 40) { const s = L.train[i], fw = model.forward(fdHalf(s), h, w), p = fw.outs.map(o => o.p); L.cnnProbs[i] = p; E.n++; p.forEach((q, k) => { E.loss += NN.bce(q, s.y[k]); if ((q >= 0.5 ? 1 : 0) === s.y[k]) E.correct[k]++; }); i++; }
+      if (i < L.train.length) { if (!L.running) fdNote(`Loaded ${fdCnnTrained(fdShipped())}. Scoring the training fields with it: ${i} of ${L.train.length}…`); setTimeout(step, 0); return; }
+      L.scoring = null; L.epochSums = E; L.trainScored = 'pass'; fdEvaluate(); const last = L.hist[L.hist.length - 1], tr = L.trainEval.outputs; last.acc = tr[1].accuracy; last.accCis = tr[0].accuracy; L.epochSums = fdNewSums();
+      if (S.world === 'fields' && S.stage === 'train' && !L.running) { fdRender(true); fdNote(`Loaded ${fdCnnTrained(fdShipped())}. Test accuracy ${pct(last.testAcc)} for invasion and ${pct(last.testAccCis)} for CIS after ${last.epoch} epochs, the curves its own; the training fields scored ${pct(last.acc)} and ${pct(last.accCis)}. Go to 3 · Test, or keep training it here.`); }
+    };
+    setTimeout(step, 0);
+  }
+  function fdLoadCnn() {
+    const L = S.fd, e = fdShipped(); if (!e) { fdNote('No trained model ships for this kind.'); return; }
+    fdStop(); if (!L.built || L.encKey !== `${L.crop}|${codeEncoder().key}`) { fdReady().then(ok => { if (ok && S.world === 'fields') fdLoadCnn(); }); return; }
+    fdTokens(); L.seed = e.cfg.seed; L.epochs = Math.max(L.epochs, e.cfg.epochs);
+    L.model = NN.FieldNet.fromJSON(e); L.rng = NN.mulberry32(L.seed * 31 + 7); L.order = L.train.map((_, i) => i); L.cnnProbs = L.train.map(() => null); L.epochSums = fdNewSums(); L.stopAtEpoch = null; L.lastBatch = null; L.hoverCell = null; L.fwc = null; L.trainScored = 'batches';
+    L.epoch = e.cfg.epochs; L.ptr = 0; L.debt = 0; L.hist = e.hist.map(h => ({ epoch: h.epoch, loss: h.loss, testLoss: h.testLoss, acc: h.acc, testAcc: h.testAcc, accCis: h.accCis, testAccCis: h.testAccCis, mass: null, testMass: h.testMass, massCis: null, testMassCis: h.testMassCis })); L.lastField = null; L.hoverNucleus = null; L.pinned = null; L.frozen = null; L.hoverAtt = null; L.hoverDecide = null; L.hoverUnrolled = null;
+    L.trial = { next: 0, results: new Map() }; L.testSelected = null; L.modelKey = fdModelKey();
+    fdEvaluate(); fdSyncControls(); fdRenderAll();
+    const last = L.hist[L.hist.length - 1];
+    fdNote(`Loaded ${fdCnnTrained(e)}. Test accuracy ${pct(last.testAcc)} for invasion and ${pct(last.testAccCis)} for CIS after ${e.cfg.epochs} epochs, the curves its own. Scoring the training fields with it…`);
+    fdScoreTraining();
+  }
   function fdLoadShipped() {
+    if (fdIsCnn()) { fdLoadCnn(); return; }
     const L = S.fd, e = fdShipped(); if (!e) { fdNote('No trained model ships for these settings: crops masked to the nucleus, with or without positions and the context layers, 4 units, the shipped encoder.'); return; }
     fdStop(); if (!L.built || L.encKey !== `${L.crop}|${codeEncoder().key}`) { fdReady().then(ok => { if (ok && S.world === 'fields') fdLoadShipped(); }); return; }
     fdTokens(); L.seed = e.seed; L.epochs = Math.max(L.epochs, e.epochs);
