@@ -538,8 +538,7 @@ and two outputs, 405 weights, against finite differences.
 cue each one lacks: the *bag of codes* (no positions, no context: cytology only); the codes *with positions* but no
 context (cytology and location); the *context* stack without positions, where distances live inside the attention
 (cytology and arrangement); and the *full* model. Mean of three seeds on the 50 test fields (10 per pattern), small
-encoder, crops masked to the nucleus, the training fields mirrored and turned upside down at random (the last two
-rows were measured before the flip, with the lumen always up):
+encoder, crops masked to the nucleus, the training fields mirrored and turned upside down at random:
 
 | Model | Parameters | CIS right | Invasion right | Invasive fields called invasive | CIS-into-nests fields called invasive | CIS fields called invasive | Invasion head's attention on the atypical nuclei below the membrane |
 |---|---|---|---|---|---|---|---|
@@ -547,8 +546,8 @@ rows were measured before the flip, with the lumen always up):
 | With positions, no context | 120 | 100% | 79% | 33% | 40% | 0% | 24% |
 | Context, no positions | 966 | 100% | 86% | 60% | 27% | 3% | 29% |
 | **Full: positions and context** | 1,186 | 100% | 89% | 57% | 10% | 3% | 29% |
-| Full, two heads per layer | 1,876 | 100% | 91% | 77% | 17% | 3% | 78% |
-| Full, big encoder (code of 16) | 2,066 | 100% | 81% | 60% | 53% | 0% | 61% |
+| Full, two heads per layer | 1,876 | 100% | 85% | 63% | 23% | 13% | 64% |
+| Full, big encoder (code of 16) | 2,066 | 100% | 76% | 47% | 50% | 17% | 31% |
 
 No model ever calls a von Brunn nest or an inverted papilloma field invasive, and every model gets CIS right on every
 test field: cytology is read from the codes alone, as it should be. The CIS head's attention lands on the atypical
