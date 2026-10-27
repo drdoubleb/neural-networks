@@ -5,9 +5,11 @@
  * an 11 × 8 grid of cells (one per 16 px of field, about a nucleus each); every cell is a token (its channels plus its
  * position), and the fields' attention stack sits on top unchanged: two context layers with distance costs, two
  * heads (CIS, invasion). Only the field's two labels train it; no nucleus is ever segmented, no code pretrained.
- *   node tools/check_fields_cnn.js [--levels 3] [--channels 8] [--context 1] [--pos 1] [--attention 1] [--epochs 60] [--seed 1] [--lr 0.003] [--lr-att 0.02] [--batch 1] [--norm 1] [--out file.json] [--check]
+ *   node tools/check_fields_cnn.js [--levels 3] [--channels 8] [--context 1] [--pos 1] [--attention 1] [--orient 2] [--epochs 60] [--seed 1] [--lr 0.003] [--lr-att 0.02] [--batch 1] [--norm 1] [--out file.json] [--check]
  * With --attention 0 the heads take a plain average of the cells (a convolutional network with global average pooling);
  * with --pos 0 the cells carry no coordinates, so the model has no position but what the field's edge leaks.
+ * With --orient 4 the training fields are also flipped upside down half the time (their coordinates with them), so that
+ * the lumen is not always at the top and no model can read depth from the orientation, as on a real slide it could not.
  * With --norm 1 every cell's token is standardised over its channels (a layer norm without gain), as the frozen codes the
  * attention stack was built for are standardised: it keeps the tokens' scale from drifting as the encoder learns.
  */
@@ -16,7 +18,7 @@ const fs = require('fs'), path = require('path');
 const ROOT = path.join(__dirname, '..');
 const NN = require(path.join(ROOT, 'js', 'nn.js')), FL = require(path.join(ROOT, 'js', 'fields.js'));
 const arg = (k, d) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : d), num = (k, d) => +arg(k, d);
-const cfg = { channels: num('--channels', 8), context: num('--context', 1), pos: num('--pos', 1), epochs: num('--epochs', 60), seed: num('--seed', 1), lr: num('--lr', 0.003), lrAtt: num('--lr-att', 0.02), batch: num('--batch', 1), norm: num('--norm', 1), levels: num('--levels', 3), attention: num('--attention', 1), decay: 1e-4, decayAtt: 0.001, clip: 1, out: arg('--out', null), check: process.argv.includes('--check') };
+const cfg = { channels: num('--channels', 8), context: num('--context', 1), pos: num('--pos', 1), epochs: num('--epochs', 60), seed: num('--seed', 1), lr: num('--lr', 0.003), lrAtt: num('--lr-att', 0.02), batch: num('--batch', 1), norm: num('--norm', 1), levels: num('--levels', 3), attention: num('--attention', 1), orient: num('--orient', 2), decay: 1e-4, decayAtt: 0.001, clip: 1, out: arg('--out', null), check: process.argv.includes('--check') };
 const loadJs = f => { const w = {}; new Function('window', fs.readFileSync(f, 'utf8'))(w); return w; };
 const D = loadJs(path.join(ROOT, 'data', 'fields', 'fields_data.js')).LECTURE_FIELDS, W0 = D.meta.w, H0 = D.meta.h, W = W0 >> 1, H = H0 >> 1, UNIT = 16;
 const cisOf = f => (['cis', 'cisvbn', 'inv'].includes(f.pattern) ? 1 : 0), pc = v => `${Math.round(v * 100)}%`;
@@ -76,19 +78,19 @@ console.log(`fields ${train.length} training, ${test.length} test · ${W} × ${H
 const DT = cfg.channels + (cfg.pos ? 2 : 0);
 const enc = new ConvTokens({ channels: cfg.channels, levels: cfg.levels, seed: cfg.seed, norm: !!cfg.norm });
 const att = new NN.AttentionMIL({ inputSize: DT, attentionUnits: 4, attention: !!cfg.attention, outputs: 2, clip: 20, context: cfg.context ? { dk: 8, ffn: 8, heads: 1, layers: 2, distanceBias: true, excludeSelf: true, costInit: 1.5 } : null, seed: cfg.seed });
-const tokensOf = (fw, mirror) => fw.tokens.map((t, i) => { const [px, py] = G.xy[i]; return cfg.pos ? Float64Array.from([...t, mirror ? -px : px, py]) : t; });
+const tokensOf = (fw, mirror, vflip) => fw.tokens.map((t, i) => { const [px, py] = G.xy[i]; return cfg.pos ? Float64Array.from([...t, mirror ? -px : px, vflip ? -py : py]) : t; });
 const rng = NN.mulberry32(cfg.seed * 31 + 7), gauss = () => FL.gaussianFrom(rng);
 const augment = f => { // a mirror half the time, and a shift of up to 4 px sideways and 2 px up or down, the edge filled with the pale corner value
-  const mirror = rng() < 0.5, sx = Math.round(gauss() * 2), sy = Math.round(gauss() * 1), x = new Float64Array(W * H), fill = -meanInk;
-  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) { let X = xx - sx, Y = y - sy; if (mirror) X = W - 1 - X; x[y * W + xx] = X < 0 || X >= W || Y < 0 || Y >= H ? fill : f.x[Y * W + X]; }
-  return { x, mirror };
+  const mirror = rng() < 0.5, vflip = cfg.orient >= 4 && rng() < 0.5, sx = Math.round(gauss() * 2), sy = Math.round(gauss() * 1), x = new Float64Array(W * H), fill = -meanInk;
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) { let X = xx - sx, Y = y - sy; if (mirror) X = W - 1 - X; if (vflip) Y = H - 1 - Y; x[y * W + xx] = X < 0 || X >= W || Y < 0 || Y >= H ? fill : f.x[Y * W + X]; }
+  return { x, mirror, vflip };
 };
-const forward = (x, mirror) => { const fw = enc.forward(x, H, W); return { fw, H: tokensOf(fw, mirror) }; };
+const forward = (x, mirror, vflip) => { const fw = enc.forward(x, H, W); return { fw, H: tokensOf(fw, mirror, vflip) }; };
 const trainStep = fields => { // one step on a batch of fields: the attention stack averages its gradient over them, the encoder likewise
-  const runs = fields.map(f => { const a = augment(f), r = forward(a.x, a.mirror); return { fw: r.fw, slide: { H: r.H, dist: G.dist, xy: G.xy, y: f.y } }; }), collect = [], g = enc.newGradient();
+  const runs = fields.map(f => { const a = augment(f), r = forward(a.x, a.mirror, a.vflip); return { fw: r.fw, slide: { H: r.H, dist: G.dist, xy: G.xy, y: f.y } }; }), collect = [], g = enc.newGradient();
   const loss = att.trainBatch(runs.map(r => r.slide), cfg.lrAtt, cfg.decayAtt, collect);
   runs.forEach((r, i) => enc.backward(r.fw, collect[i].map(d => d.subarray(0, cfg.channels)), g)); enc.apply(g, runs.length, cfg.lr, cfg.decay, cfg.clip); return loss; };
-const evaluate = set => { const slides = set.map(f => ({ H: forward(f.x, false).H, dist: G.dist, xy: G.xy, y: f.y, pos: f.pos, pattern: f.pattern })); const ev = att.evaluate(slides); return { ev, slides }; };
+const evaluate = set => { const slides = set.map(f => ({ H: forward(f.x, false, false).H, dist: G.dist, xy: G.xy, y: f.y, pos: f.pos, pattern: f.pattern })); const ev = att.evaluate(slides); return { ev, slides }; };
 
 // ---- a finite-difference check of the gradient through the encoder on a small field
 if (cfg.check) {
@@ -102,7 +104,7 @@ if (cfg.check) {
 }
 
 // ---- training, one field per step, with the test measures after every epoch
-console.log(`encoder ${enc.parameterCount()} parameters (${cfg.channels} channels, ${cfg.levels} levels, ${GW * GH} tokens of ${DT}) · attention ${att.parameterCount ? att.parameterCount() : '?'} · context ${cfg.context ? 'on' : 'off'} · positions ${cfg.pos ? 'on' : 'off'} · pooling ${cfg.attention ? 'attention' : 'plain average'} · tokens ${cfg.norm ? 'standardised' : 'raw'} · batch ${cfg.batch} · lr ${cfg.lr} (encoder, Adam) ${cfg.lrAtt} (attention) · seed ${cfg.seed}`);
+console.log(`encoder ${enc.parameterCount()} parameters (${cfg.channels} channels, ${cfg.levels} levels, ${GW * GH} tokens of ${DT}) · attention ${att.parameterCount ? att.parameterCount() : '?'} · context ${cfg.context ? 'on' : 'off'} · positions ${cfg.pos ? 'on' : 'off'} · pooling ${cfg.attention ? 'attention' : 'plain average'} · orientations ${cfg.orient >= 4 ? 'mirror and upside down' : 'mirror'} · tokens ${cfg.norm ? 'standardised' : 'raw'} · batch ${cfg.batch} · lr ${cfg.lr} (encoder, Adam) ${cfg.lrAtt} (attention) · seed ${cfg.seed}`);
 const order = train.map((_, i) => i), hist = [];
 for (let epoch = 1; epoch <= cfg.epochs; epoch++) {
   const te = Date.now(); for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
