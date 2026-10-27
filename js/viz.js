@@ -1015,7 +1015,7 @@ window.Viz = (function () {
     const lines = [];
     P.cols.forEach((col, j) => {
       if (col.from == null) return; const from = cols[col.from], to = cols[j];
-      if (col.kind === 'conv' || col.kind === 'head') { for (let o = 0; o < col.values.length; o++) for (let c = 0; c < col.cin; c++) lines.push({ kind: 'w', col: j, c, o, v: col.contrib[o * col.cin + c], x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[o].x, y2: to.circles[o].y }); }
+      if (col.contrib && col.cin) { for (let o = 0; o < col.values.length; o++) for (let c = 0; c < col.cin; c++) lines.push({ kind: 'w', col: j, c, o, v: col.contrib[o * col.cin + c], x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[o].x, y2: to.circles[o].y }); }
       else if (col.kind === 'join') { const skip = cols[col.skipFrom], C2 = col.values.length / 2; for (let c = 0; c < C2; c++) { lines.push({ kind: 'skip', col: j, c, o: c, x1: skip.circles[c].x, y1: skip.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y }); lines.push({ kind: 'up', col: j, c, o: C2 + c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[C2 + c].x, y2: to.circles[C2 + c].y }); } }
       else for (let c = 0; c < col.values.length; c++) lines.push({ kind: col.kind, col: j, c, o: c, x1: from.circles[c].x, y1: from.circles[c].y, x2: to.circles[c].x, y2: to.circles[c].y });
     });
@@ -1058,6 +1058,105 @@ window.Viz = (function () {
       if (col.kind === 'head') col.values.forEach((v, i) => text(fmtSigned(v, 1), Lc.x + 11, Lc.circles[i].y, mono8, c.ink3, 'left', 'middle'));
     });
     text(hov && hov.text ? hov.text : 'hover a circle for its value, a line for its kernel · the pixel follows the mouse on the field; click the field to pin it', 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+  }
+  // ---- the fields end to end: every map of every layer of the encoder for one field, and the encoder unrolled at one cell
+  const FL_TILE = 88, FL_GAP = 6, FL_LABEL = 16, FL_ROWGAP = 10;
+  // opt: enc (a ConvTokens forward), C, rf (ConvTokens.receptiveFields().top), cell (an index on the top grid, or null:
+  // its footprint is boxed on every map and its window on the input), hover ({ row, map } or null), walk ({ map, frac,
+  // layer } or null: the first convolution's filter sliding over the field, its map filled in up to frac)
+  function drawFieldLayers(canvas, opt) {
+    const E = opt.enc, C = opt.C, L = E.levels.length - 1, lev0 = E.levels[0], tileW = FL_TILE, c = colors();
+    const rows = [{ label: `input · the field at half resolution · ${lev0.w} × ${lev0.h} px · the ink minus its mean (mid-grey)`, maps: [{ arr: lev0.x, off: 0 }], h: lev0.h, w: lev0.w, level: 0, kind: 'input' }];
+    E.levels.forEach((lev, l) => { const n = lev.h * lev.w;
+      rows.push({ label: `level ${l} · convolution 1 → ReLU · ${C} maps of ${lev.w} × ${lev.h}${l ? ' · after a 2 × 2 max pool' : ''}`, maps: Array.from({ length: C }, (_, m) => ({ arr: lev.c1.act, off: m * n })), h: lev.h, w: lev.w, level: l, kind: 'conv1' });
+      rows.push({ label: `level ${l} · convolution 2 → ReLU${l < L ? ' · then the 2 × 2 max pool halves it' : ''}`, maps: Array.from({ length: C }, (_, m) => ({ arr: lev.c2.act, off: m * n })), h: lev.h, w: lev.w, level: l, kind: 'conv2' }); });
+    const top = E.levels[L], nTop = top.h * top.w;
+    rows.push({ label: `the cells · ${top.w} × ${top.h} · each cell's ${C} numbers standardised over its channels (orange +, blue −)`, maps: Array.from({ length: C }, (_, m) => { const a = new Float64Array(nTop); for (let i = 0; i < nTop; i++) a[i] = E.tokens[i][m]; return { arr: a, off: 0 }; }), h: top.h, w: top.w, level: L, kind: 'token', signed: true });
+    const rowH = r => FL_LABEL + Math.round(r.h * tileW / r.w) + FL_ROWGAP, W = C * (tileW + FL_GAP) - FL_GAP, H = rows.reduce((a, r) => a + rowH(r), 0) - FL_ROWGAP, ctx = fitCanvas(canvas, W, H);
+    ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
+    const tiles = [], mono = `500 10px "IBM Plex Mono", ui-monospace, monospace`, cx = opt.cell != null ? opt.cell % top.w : null, cy = opt.cell != null ? Math.floor(opt.cell / top.w) : null; let y0 = 0, walkText = null;
+    rows.forEach((row, r) => {
+      ctx.font = mono; ctx.fillStyle = c.ink2; ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText(row.label, 0, y0 + 2);
+      const k = tileW / row.w, th = Math.round(row.h * k), y1 = y0 + FL_LABEL, n = row.h * row.w, foot = 1 << (L - row.level);
+      row.maps.forEach((mp, m) => {
+        const x0 = m * (tileW + FL_GAP); let mx = 1e-9; for (let i = 0; i < n; i++) mx = Math.max(mx, Math.abs(mp.arr[mp.off + i]));
+        segScratch.width = row.w; segScratch.height = row.h; const sctx = segScratch.getContext('2d'), im = sctx.createImageData(row.w, row.h);
+        const cut = opt.walk && row.kind === 'conv1' && row.level === 0 && m === opt.walk.map ? Math.min(n - 1, Math.floor(opt.walk.frac * n)) : -1;
+        for (let i = 0; i < n; i++) { const o = i * 4, v = mp.arr[mp.off + i] / mx; let rgb; if (cut >= 0 && i > cut) rgb = c.rgb.surface3; else if (row.signed) rgb = divergingRgb(v); else if (row.kind === 'input') { const g = Math.round(255 * (0.5 - v / 2)); rgb = [g, g, g]; } else { const g = Math.round(255 * (1 - Math.min(1, v))); rgb = [g, g, g]; } im.data[o] = rgb[0]; im.data[o + 1] = rgb[1]; im.data[o + 2] = rgb[2]; im.data[o + 3] = 255; }
+        sctx.putImageData(im, 0, 0); ctx.drawImage(segScratch, x0, y1, tileW, th);
+        const hov = opt.hover && opt.hover.row === r && opt.hover.map === m; ctx.strokeStyle = hov ? c.ink : c.line; ctx.lineWidth = hov ? 2 : 1; ctx.strokeRect(x0 + 0.5, y1 + 0.5, tileW - 1, th - 1);
+        if (cx != null) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(x0 + cx * foot * k, y1 + cy * foot * k, Math.max(2, foot * k), Math.max(2, foot * k)); // the cell's footprint
+          if (row.kind === 'input' && opt.rf) { const half = opt.rf / 2, mxp = (cx + 0.5) * foot, myp = (cy + 0.5) * foot; ctx.setLineDash([3, 3]); ctx.strokeRect(x0 + (mxp - half) * k, y1 + (myp - half) * k, opt.rf * k, opt.rf * k); ctx.setLineDash([]); } } // and, on the field, the window its token is computed from
+        if (cut >= 0) { const px = cut % row.w, py = Math.floor(cut / row.w), Wt = opt.walk.layer.W, b = opt.walk.layer.b[m]; let pre = b; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = py + dy, xx = px + dx; if (yy >= 0 && yy < lev0.h && xx >= 0 && xx < lev0.w) pre += Wt[m * 9 + (dy + 1) * 3 + dx + 1] * lev0.x[yy * lev0.w + xx]; }
+          ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x0 + px * k - 1, y1 + py * k - 1, k + 2, k + 2); const t0 = tiles.find(t => t.row === 0); if (t0) { ctx.strokeRect(t0.x + (px - 1) * t0.k, t0.y + (py - 1) * t0.k, 3 * t0.k, 3 * t0.k); } // the 3 × 3 window on the field, the pixel being written on the map
+          walkText = `filter ${m + 1} at (${px}, ${py}): Σ weight × pixel + bias ${fmtSigned(b, 2)} = ${fmtSigned(pre, 3)} → ReLU → ${Math.max(0, pre).toFixed(3)}`; }
+        tiles.push({ x: x0, y: y1, w: tileW, h: th, row: r, map: m, k, mw: row.w, mh: row.h, mx, kind: row.kind, level: row.level, arr: mp.arr, off: mp.off, label: row.label });
+      });
+      if (walkText && row.kind === 'conv1' && row.level === 0) { ctx.font = mono; ctx.fillStyle = c.ink; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(walkText, W, y0 + 2); }
+      y0 += rowH(row);
+    });
+    canvas._fieldLayers = { tiles, W, H, walkText };
+  }
+  // the map under a point (canvas-relative CSS pixels): its row and index, the pixel of the map there and its value, or null
+  function hitFieldLayers(canvas, px, py) {
+    const G = canvas._fieldLayers; if (!G) return null; const s = G.W / canvas.clientWidth, x = px * s, y = py * s;
+    for (const t of G.tiles) if (x >= t.x && x < t.x + t.w && y >= t.y && y < t.y + t.h) { const mx = Math.min(t.mw - 1, Math.floor((x - t.x) / t.k)), my = Math.min(t.mh - 1, Math.floor((y - t.y) / t.k)); return { row: t.row, map: t.map, x: mx, y: my, value: t.arr[t.off + my * t.mw + mx], max: t.mx, kind: t.kind, level: t.level, label: t.label, w: t.mw, h: t.mh }; }
+    return null;
+  }
+  // m = { path (FieldNet.cellPath), headNames, hover ({ kind: 'unit', col, i } or { kind: 'line', col, c, o } or null), pinned, nCells }
+  function drawFieldNet(canvas, m) {
+    const P = m.path, L = layoutSegNet(P), c = colors(), ctx = fitCanvas(canvas, SN_W, L.H); canvas._segNet = L;
+    const capFont = `600 11px "IBM Plex Sans", system-ui, sans-serif`, mono9 = `500 9px "IBM Plex Mono", ui-monospace, monospace`, mono8 = `500 8px "IBM Plex Mono", ui-monospace, monospace`;
+    const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
+    ctx.clearRect(0, 0, SN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, SN_W, L.H);
+    const hov = m.hover, touches = ln => !!hov && (hov.kind === 'line' ? hov.col === ln.col && hov.c === ln.c && hov.o === ln.o : (hov.col === ln.col && hov.i === ln.o) || (hov.col === P.cols[ln.col].from && hov.i === ln.c));
+    text(`THE NETWORK AT CELL ROW ${P.cy + 1}, COLUMN ${P.cx + 1}${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
+    text(`circles: the channels at the cell's place (hollow: ReLU off) · lines: each kernel's contribution there, orange +, blue − · under each column, the window it is computed from, in px of the half-resolution field`, 12, 24, mono9, c.ink3);
+    for (let l = 0; l <= P.levels; l++) { const lev = P.cols.find(col => col.level === l && col.kind === 'conv'); text(`level ${l}`, 10, L.bandY(l) - 6, mono9, c.ink2, 'left', 'middle'); text(`${lev.w} × ${lev.h}${l ? ' · pooled' : ''}`, 10, L.bandY(l) + 6, mono8, c.ink3, 'left', 'middle'); }
+    const maxOf = {}; for (const ln of L.lines) if (ln.kind === 'w') maxOf[ln.col] = Math.max(maxOf[ln.col] || 1e-9, Math.abs(ln.v));
+    const rel = ln => (ln.kind === 'w' ? Math.abs(ln.v) / maxOf[ln.col] : 0.5), dim = hov ? 0.2 : 1;
+    for (const ln of L.lines.slice().sort((a, b) => rel(a) - rel(b))) {
+      const on = touches(ln), f = on ? 1 : dim;
+      if (ln.kind === 'w') { const k = rel(ln); ctx.strokeStyle = rgbStr(ln.v < 0 ? c.rgb.regular : c.rgb.irregular, (0.08 + 0.92 * k) * f); ctx.lineWidth = (0.4 + 4 * Math.pow(k, 0.9)) * (on ? 1.5 : 1); }
+      else { ctx.strokeStyle = rgbStr(c.rgb.ink3, 0.55 * f); ctx.lineWidth = on ? 2 : 1; }
+      ctx.beginPath(); ctx.moveTo(ln.x1, ln.y1); ctx.lineTo(ln.x2, ln.y2); ctx.stroke();
+    }
+    P.cols.forEach((col, j) => {
+      const Lc = L.cols[j]; let mx = 1e-9; for (const v of col.values) mx = Math.max(mx, Math.abs(v));
+      col.values.forEach((v, i) => {
+        const q = Lc.circles[i], on = !!hov && hov.kind === 'unit' && hov.col === j && hov.i === i;
+        ctx.beginPath(); ctx.arc(q.x, q.y, q.r, 0, Math.PI * 2);
+        if (col.kind === 'share') ctx.fillStyle = rgbStr(c.rgb.accent, 0.15 + 0.85 * Math.min(1, v * (m.nCells || 1) / 4)); // a share against four times the uniform one
+        else if (col.signed) ctx.fillStyle = diverging(v / mx, 0.9);
+        else ctx.fillStyle = v > 0 ? rgbStr(c.rgb.accent, 0.12 + 0.88 * v / mx) : c.surface;
+        ctx.fill(); ctx.strokeStyle = on ? c.ink : c.lineStrong; ctx.lineWidth = on ? 2 : 1; ctx.stroke();
+      });
+      const name = col.kind === 'pool' ? 'pool' : col.kind === 'dense' ? `scorer (${m.headNames[col.head]})` : col.kind === 'score' ? 'score' : col.kind === 'share' ? 'share' : col.kind === 'head' ? 'evidence' : col.name;
+      text(name, Lc.x, Lc.top - 13, mono9, c.ink2, 'center', 'middle'); text(`${col.sees} px`, Lc.x, Lc.bottom + 11, mono8, c.ink3, 'center', 'middle');
+      if (col.kind === 'head') col.values.forEach((v, i) => text(`${m.headNames[i]} ${fmtSigned(v, 3)}`, Lc.x + 14, Lc.circles[i].y, mono9, c.ink, 'left', 'middle'));
+      if (col.kind === 'share') text(pctText(col.values[0]), Lc.x, Lc.circles[0].y - Lc.circles[0].r - 4, mono8, c.ink2, 'center', 'bottom');
+      if (col.kind === 'score') text(fmtSigned(col.values[0], 2), Lc.x, Lc.circles[0].y - Lc.circles[0].r - 4, mono8, c.ink2, 'center', 'bottom');
+    });
+    text(hov && hov.text ? hov.text : `hover a circle for its value, a line for its kernel · the cell follows the mouse on the field; click the field to pin it`, 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+  }
+  function hitFieldNet(canvas, px, py, m) {
+    const L = canvas._segNet, P = m.path; if (!L) return null; const s = SN_W / canvas.clientWidth, x = px * s, y = py * s, f3 = v => fmtSigned(v, 3), where = col => `at (${col.px}, ${col.py}) of ${col.w} × ${col.h}`;
+    for (let j = 0; j < L.cols.length; j++) for (const q of L.cols[j].circles) if (Math.hypot(x - q.x, y - q.y) <= q.r + 4) {
+      const col = P.cols[j], i = q.i, v = col.values[i]; let t;
+      if (col.kind === 'input') t = `the pixel at the centre of the cell's footprint (${col.foot} × ${col.foot} px of the half-resolution field): its ink minus the mean, ${f3(v)} · the first convolution reads it with its 8 neighbours`;
+      else if (col.kind === 'pool') t = `level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · the largest of the 2 × 2 block below it in level ${col.level - 1}'s conv 2 map · ${where(col)}`;
+      else if (col.kind === 'conv') t = `level ${col.level} · ${col.name} · channel ${i + 1}: ${fmtNum(v, 3)}${col.pre[i] <= 0 ? ` (ReLU off: ${f3(col.pre[i])} before it)` : ''} · bias ${f3(col.layer.b[i])} + ${col.cin} kernel${col.cin > 1 ? 's' : ''} of 3 × 3 · ${where(col)} · computed from ${col.sees} × ${col.sees} px`;
+      else if (col.kind === 'token') t = `the cell's token, number ${i + 1}: ${f3(v)} · the channel's value ${f3(col.raw[i])} minus the mean over the ${col.values.length} channels, over their spread ${col.sig.toFixed(3)} · what the heads read`;
+      else if (col.kind === 'dense') t = `scorer unit ${i + 1} of the ${m.headNames[col.head]} head: tanh(${f3(col.pre[i])}) = ${f3(v)} · bias ${f3(col.bias[i])} + Σ weight × token over the ${col.cin} numbers`;
+      else if (col.kind === 'score') t = `the ${m.headNames[col.head]} head's attention score for this cell: ${f3(v)} = bias ${f3(col.bias[0])} + Σ weight × unit over the ${col.cin} tanh units`;
+      else if (col.kind === 'share') t = `the ${m.headNames[col.head]} head's share of attention on this cell: ${pctText(v)} = e^score over the sum over the ${m.nCells} cells (uniform: ${pctText(1 / m.nCells)})`;
+      else if (col.kind === 'head') t = `this cell's evidence for ${m.headNames[i]}: ${f3(v)} = its share ${pctText(col.shares[i])} × Σ weight × token over the ${col.cin} numbers · the ${m.nCells} cells and the bias add up to the score ${f3(col.scores[i])}, P = ${col.probs[i].toFixed(2)}`;
+      return { kind: 'unit', col: j, i, text: t };
+    }
+    let best = null, bd = 5;
+    for (const ln of L.lines) { if (ln.kind !== 'w') continue; const d = snDist(x, y, ln); if (d < bd) { bd = d; best = ln; } }
+    if (best) { const col = P.cols[best.col], ker = col.kernel ? col.kernel(best.o, best.c) : null; return { kind: 'line', col: best.col, c: best.c, o: best.o, text: col.kind === 'conv' ? `level ${col.level} · ${col.name} · kernel from channel ${best.c + 1} to channel ${best.o + 1}: [${ker.map(v => fmtSigned(v, 2)).join(' ')}] · contributes ${f3(best.v)} here` : col.kind === 'head' ? `${m.headNames[best.o]} head · weight on token number ${best.c + 1} × the number × the share: ${f3(best.v)}` : col.kind === 'dense' ? `${m.headNames[col.head]} scorer · weight from token number ${best.c + 1} to unit ${best.o + 1}: contributes ${f3(best.v)}` : `weight from unit ${best.c + 1} to the score: contributes ${f3(best.v)}` }; }
+    return null;
   }
   function snDist(x, y, ln) { const dx = ln.x2 - ln.x1, dy = ln.y2 - ln.y1, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((x - ln.x1) * dx + (y - ln.y1) * dy) / L2)) : 0; return Math.hypot(x - ln.x1 - t * dx, y - ln.y1 - t * dy); }
   // what is under a point of the diagram (canvas-relative CSS pixels): a circle or a line, with a text for the tip and the 3 × 3 kernel of a line
@@ -2791,5 +2890,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, hitFieldCell, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, drawFieldLayers, hitFieldLayers, drawFieldNet, hitFieldNet, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, hitFieldCell, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

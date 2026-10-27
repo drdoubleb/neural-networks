@@ -746,6 +746,22 @@
         </div>
         <p class="small muted" id="fd-conv-note" style="margin-top:8px"></p>
       </div>
+      <div class="card" id="fd-layers-card" hidden>
+        <div class="card-head">
+          <h2>The network, layer by layer</h2>
+          <div class="actions-inline"><span class="small muted">every map of every layer for this field · hover a map for its numbers, a cell on the field to follow it down</span><button type="button" class="btn" id="fd-layers-walk" title="slide the first filter over the field and watch its map fill in, one pixel at a time">▶ Walk through</button></div>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-layers" width="746" height="900" aria-label="Every feature map of the convolutional encoder for this field, layer by layer"></canvas><div class="tip" id="fd-layers-tip" hidden></div></div></div>
+        <p class="small muted" id="fd-layers-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="fd-cellnet-card" hidden>
+        <div class="card-head">
+          <h2 id="fd-cellnet-title">The network at one cell</h2>
+          <span class="small muted">the channels at the cell’s place in every map, every kernel’s contribution there, its token, and what it adds to each head</span>
+        </div>
+        <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-cellnet" width="860" height="540" aria-label="The encoder unrolled at one cell: the channels at its place in every layer, the kernels’ contributions, its token and its evidence for each head"></canvas><div class="tip" id="fd-cellnet-tip" hidden></div></div></div>
+        <p class="small muted" id="fd-cellnet-note" style="margin-top:8px"></p>
+      </div>
       <div class="card" id="fd-context-card" hidden>
         <div class="card-head">
           <h2>Who looks at whom</h2>
@@ -856,8 +872,8 @@
           <span class="small muted">held-out fields go through one at a time · <kbd>N</kbd> classifies the next · the weights never change here</span>
         </div>
         <div class="fd-heads">
-          <div><h3>What the CIS head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-cis" width="352" height="256" aria-label="The field under test with the CIS head’s attention"></canvas><div class="tip" id="fd-test-tip-cis" hidden></div></div><p class="small" id="fd-test-call-cis" style="margin-top:8px"></p></div>
-          <div><h3>What the invasion head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-inv" width="352" height="256" aria-label="The field under test with the invasion head’s attention"></canvas><div class="tip" id="fd-test-tip-inv" hidden></div></div><p class="small" id="fd-test-call-inv" style="margin-top:8px"></p></div>
+          <div><h3 id="fd-test-head-cis">What the CIS head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-cis" width="352" height="256" aria-label="The field under test with the CIS head’s attention"></canvas><div class="tip" id="fd-test-tip-cis" hidden></div></div><p class="small" id="fd-test-call-cis" style="margin-top:8px"></p></div>
+          <div><h3 id="fd-test-head-inv">What the invasion head weighed</h3><div class="net-wrap"><canvas id="fd-test-canvas-inv" width="352" height="256" aria-label="The field under test with the invasion head’s attention"></canvas><div class="tip" id="fd-test-tip-inv" hidden></div></div><p class="small" id="fd-test-call-inv" style="margin-top:8px"></p></div>
         </div>
         <p class="small muted" id="fd-test-field-note" style="margin-top:8px"></p>
       </div>

@@ -1050,6 +1050,29 @@
     parameterCount() { return this.layers().reduce((a, c) => a + c.W.length + c.b.length, 0); }
     newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
     grid(h, w) { return { gh: h >> this.L, gw: w >> this.L }; }
+    // the side of the window one value is computed from, in pixels of the input, after every layer: a 3 × 3 convolution
+    // widens it by two strides, a 2 × 2 pool by one stride and doubles the stride; .top is one cell's window
+    receptiveFields() { const out = []; let rf = 1, stride = 1; for (let l = 0; l <= this.L; l++) { const lev = {}; if (l > 0) { rf += stride; stride *= 2; lev.pool = rf; } rf += 2 * stride; lev.conv1 = rf; rf += 2 * stride; lev.conv2 = rf; out.push(lev); } return { levels: out, top: rf }; }
+    // the encoder unrolled at one cell of the top grid (index i): at every level the channels at the cell's place
+    // (the pixel at the centre of the cell's footprint), with every kernel's contribution there, as SegNet.pixelPath
+    cellPath(fw, i) {
+      const C = this.C, L = this.L, gw = fw.w, cx = i % gw, cy = Math.floor(i / gw), cols = [], RF = this.receptiveFields();
+      const pos = l => { const s = L - l, n = 1 << s; return { px: (cx << s) + (n >> 1), py: (cy << s) + (n >> 1), foot: n }; };
+      const take = (arr, n, h, w, px, py) => Float64Array.from({ length: n }, (_, ch) => arr[(ch * h + py) * w + px]);
+      const contrib3 = (inp, layer, h, w, px, py) => { const { W: Wt, cin, cout } = layer, out = new Float64Array(cout * cin); for (let o = 0; o < cout; o++) for (let c = 0; c < cin; c++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const yy = py + dy; if (yy < 0 || yy >= h) continue; for (let dx = -1; dx <= 1; dx++) { const xx = px + dx; if (xx < 0 || xx >= w) continue; s += Wt[(o * cin + c) * 9 + (dy + 1) * 3 + dx + 1] * inp[(c * h + yy) * w + xx]; } } out[o * cin + c] = s; } return out; };
+      const kernelOf = layer => (o, c) => Array.from(layer.W.subarray((o * layer.cin + c) * 9, (o * layer.cin + c) * 9 + 9));
+      const lev0 = fw.levels[0], p0 = pos(0), patch = []; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = p0.py + dy, xx = p0.px + dx; patch.push(yy < 0 || yy >= lev0.h || xx < 0 || xx >= lev0.w ? 0 : lev0.x[yy * lev0.w + xx]); }
+      cols.push({ kind: 'input', level: 0, name: 'the pixel', h: lev0.h, w: lev0.w, px: p0.px, py: p0.py, foot: p0.foot, values: Float64Array.of(lev0.x[p0.py * lev0.w + p0.px]), patch, signed: true, sees: '1' });
+      for (let l = 0; l <= L; l++) {
+        const lev = fw.levels[l], { px, py, foot } = pos(l), l1 = this.enc[l][0], l2 = this.enc[l][1], rf = RF.levels[l];
+        if (l > 0) cols.push({ kind: 'pool', level: l, name: 'pool 2 × 2', h: lev.h, w: lev.w, px, py, foot, values: take(lev.x, C, lev.h, lev.w, px, py), from: cols.length - 1, sees: String(rf.pool) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 1', h: lev.h, w: lev.w, px, py, foot, values: take(lev.c1.act, C, lev.h, lev.w, px, py), pre: take(lev.c1.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.x, l1, lev.h, lev.w, px, py), cin: l1.cin, layer: l1, kernel: kernelOf(l1), sees: String(rf.conv1) });
+        cols.push({ kind: 'conv', level: l, name: 'conv 2', h: lev.h, w: lev.w, px, py, foot, values: take(lev.c2.act, C, lev.h, lev.w, px, py), pre: take(lev.c2.pre, C, lev.h, lev.w, px, py), from: cols.length - 1, contrib: contrib3(lev.c1.act, l2, lev.h, lev.w, px, py), cin: l2.cin, layer: l2, kernel: kernelOf(l2), sees: String(rf.conv2) });
+      }
+      const top = fw.levels[L];
+      cols.push({ kind: 'token', level: L, name: this.norm ? 'standardised' : 'the token', h: top.h, w: top.w, px: cx, py: cy, foot: 1, values: Float64Array.from(fw.tokens[i]), raw: Float64Array.from(fw.raw[i]), sig: fw.sig ? fw.sig[i] : 1, from: cols.length - 1, signed: true, sees: String(RF.top) });
+      return { i, cx, cy, gw, gh: fw.h, cols, C, levels: L, rf: RF.top };
+    }
     forward(x, h, w) { // x: the half-resolution ink minus its mean; the levels (for the backward) and the tokens, one per cell
       const C = this.C, levels = []; let cur = x, cin = 1;
       for (let l = 0; l <= this.L; l++) { const c1 = convOps.conv3(cur, this.enc[l][0], h, w, true), c2 = convOps.conv3(c1.act, this.enc[l][1], h, w, true), lev = { x: cur, cin, h, w, c1, c2 }; levels.push(lev); if (l < this.L) { const p = convOps.pool2(c2.act, C, h, w); lev.pool = p; cur = p.v; h = p.h; w = p.w; cin = C; } }
@@ -1089,7 +1112,27 @@
     get heads() { return this.att.heads; }
     get scorers() { return this.att.scorers; }
     grid(h, w) { return this.enc.grid(h, w); }
-    receptiveField() { let rf = 1, stride = 1; for (let l = 0; l <= this.L; l++) { rf += 4 * stride; if (l < this.L) stride *= 2; } return rf; } // the side, in pixels of the half-resolution field, of the window one cell is computed from: two 3 × 3 convolutions per level, a 2 × 2 pool between the levels
+    receptiveField() { return this.enc.receptiveFields().top; } // the side, in pixels of the half-resolution field, of the window one cell is computed from
+    // the encoder unrolled at one cell of the top grid (index i): the channels at the cell's place in every map, every
+    // kernel's contribution there, then its token and what it adds to each head's score (its evidence), with the
+    // attention head's scorer, score and share when there is one. The shape is the segmentation network's pixelPath,
+    // so the same layout draws it.
+    cellPath(fw, i, { heads = null } = {}) { // heads: which heads' scorer, score and share to unroll (every head by default)
+      const P = this.enc.cellPath(fw.enc, i), C = this.C, t = fw.tokens[i], cols = P.cols, from = cols.length - 1;
+      if (this.pooling === 'attention') {
+        const K = this.K, k0 = cols.length;
+        for (const k of heads || Array.from({ length: K }, (_, q) => q)) { const sc = this.att.scorers[k], f = fw.outs[k].fws[i], A = sc.sizes[1], hc = new Float64Array(A * C); for (let j = 0; j < A; j++) for (let c = 0; c < C; c++) hc[j * C + c] = sc.W[0][j * C + c] * t[c];
+          cols.push({ kind: 'dense', head: k, level: P.levels, name: `scorer ${k + 1}`, values: Float64Array.from(f.a[1]), pre: Float64Array.from(f.pre[0]), from, contrib: hc, cin: C, bias: Array.from(sc.b[0]), signed: true, sees: P.cols[from].sees });
+          const oc = new Float64Array(A); for (let j = 0; j < A; j++) oc[j] = sc.Wo[j] * f.a[1][j];
+          cols.push({ kind: 'score', head: k, level: P.levels, name: `score ${k + 1}`, values: Float64Array.of(f.z), from: cols.length - 1, contrib: oc, cin: A, bias: [sc.bo], signed: true, sees: P.cols[from].sees });
+          cols.push({ kind: 'share', head: k, level: P.levels, name: `share ${k + 1}`, values: Float64Array.of(fw.outs[k].a[i]), from: cols.length - 1, sees: P.cols[from].sees }); }
+        P.scorerCols = cols.slice(k0).map((col, q) => k0 + q).filter(q => cols[q].kind === 'dense');
+      }
+      const K = this.K, ev = new Float64Array(K * C), vals = new Float64Array(K);
+      for (let k = 0; k < K; k++) { const head = this.att.heads[k], a = fw.outs[k].a[i]; for (let c = 0; c < C; c++) { ev[k * C + c] = a * head.Wo[c] * t[c]; vals[k] += ev[k * C + c]; } }
+      cols.push({ kind: 'head', level: P.levels, name: 'evidence', values: vals, from, contrib: ev, cin: C, shares: Float64Array.from({ length: K }, (_, k) => fw.outs[k].a[i]), scores: Float64Array.from({ length: K }, (_, k) => fw.outs[k].logit), probs: Float64Array.from({ length: K }, (_, k) => fw.outs[k].p), signed: true, sees: P.cols[from].sees });
+      P.pooling = this.pooling; P.K = K; return P;
+    }
     parameterCount() { return this.enc.parameterCount() + this.att.parameterCount(); }
     describe(h, w) { const { gh, gw } = this.grid(h, w); return `the field at half resolution (${w} × ${h} px) → ${this.L} level${this.L > 1 ? 's' : ''} of two 3 × 3 convolutions (ReLU) and a 2 × 2 pool, two more at the bottom (${this.C} channels) → ${gw} × ${gh} cells of ${this.C} numbers → ${this.pooling === 'attention' ? `attention (${this.C} → ${this.A} tanh → score) over the cells → weighted average` : 'plain average over the cells'} → single layer, per question`; }
     centred(x) { const o = new Float64Array(x.length); for (let i = 0; i < x.length; i++) o[i] = x[i] - this.mean; return o; }
