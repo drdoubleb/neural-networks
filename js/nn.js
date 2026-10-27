@@ -672,7 +672,7 @@
     }
     // one gradient step on a batch of slides [{ H, y, dist }] (y a label, or one per output); returns their mean loss
     // before the step (summed over the outputs)
-    trainBatch(slides, lr, l2 = 0, collect = null) { // collect: an array that receives every slide's gradient at its tokens, for an encoder trained through this model
+    trainBatch(slides, lr, l2 = 0, collect = null) { // collect: an array that receives, per slide, the gradient at its tokens (dX) and the probabilities it gave (p), for an encoder trained through this model
       const gss = this.scorers.map(s => s.newGradient()), ghs = this.heads.map(h => h.newGradient()), gcs = this.layers.map(c => c.newGradient()); let loss = 0;
       for (const sl of slides) {
         const fw = this.forward(sl.H, sl.dist, sl.xy), T = fw.T, n = T.length, ys = Array.isArray(sl.y) ? sl.y : [sl.y];
@@ -687,7 +687,7 @@
             for (let i = 0; i < n; i++) { const ds = o.a[i] * (da[i] - dot); if (ds !== 0) { const dIn = this.scorers[k].backDense(o.fws[i], ds, gss[k]); if (dT) for (let d = 0; d < this.D; d++) dT[i][d] += dIn[d]; } }
           }
         });
-        if (dT) { let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, gcs[l]); if (collect) collect.push(d); } // back through the stack, and out to the caller
+        if (dT) { let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, gcs[l]); if (collect) collect.push({ dX: d, p: fw.outs.map(o => o.p) }); } // back through the stack, and out to the caller
       }
       const k = slides.length, all = ghs.concat(this.attention ? gss : [], gcs);
       this.lastGradientNorm = Math.sqrt(all.reduce((a, g) => a + gradientNorm2(g), 0)) / k; // the norm of the step's mean gradient, over every weight
@@ -1030,6 +1030,91 @@
     toJSON(meta) { const r = v => Array.from(v, q => +q.toPrecision(5)); return Object.assign({}, meta || {}, { channels: this.C, levels: this.L, classes: this.K, clip: this.clip, optimizer: this.optimizer, classWeights: this.classWeights ? Array.from(this.classWeights) : null, norm: this.norm, steps: this.steps, enc: this.enc.map(pair => pair.map(c => ({ W: r(c.W), b: r(c.b) }))), dec: this.dec.map(c => ({ W: r(c.W), b: r(c.b) })), head: { W: r(this.head.W), b: r(this.head.b) } }); }
     static fromJSON(o) { const net = new SegNet({ channels: o.channels, levels: o.levels, classes: o.classes, clip: o.clip, optimizer: o.optimizer, classWeights: o.classWeights, norm: o.norm, seed: 1 }); o.enc.forEach((pair, l) => pair.forEach((c, i) => { net.enc[l][i].W.set(c.W); net.enc[l][i].b.set(c.b); })); o.dec.forEach((c, i) => { net.dec[i].W.set(c.W); net.dec[i].b.set(c.b); }); net.head.W.set(o.head.W); net.head.b.set(o.head.b); net.steps = o.steps || 0; return net; }
   }
+  // ---- the fields end to end: a convolutional encoder over the field at half resolution whose cells become the tokens
+  // of an attention stack (ConvTokens), and the model as a whole with its two heads (FieldNet). Nothing but the pixels
+  // and the field's two labels: no nucleus found, no code pretrained, no coordinates. The experiment behind it is
+  // tools/check_fields_cnn.js; the convolution, its backward and the pool are the segmentation network's.
+  const convOps = { conv3: (...a) => SegNet.prototype.conv3.apply(null, a), conv3Back: (...a) => SegNet.prototype.conv3Back.apply(null, a), pool2: (...a) => SegNet.prototype.pool2.apply(null, a) };
+  class ConvTokens {
+    // levels of two 3 × 3 convolutions (ReLU) and a 2 × 2 max pool, then two more convolutions on the coarsest map; every
+    // cell of that map is a token of `channels` numbers, standardised over its channels (a layer norm without gain) so
+    // that the tokens' scale cannot drift as the encoder learns: the attention stack was built for standardised codes
+    constructor({ channels = 8, levels = 3, seed = 1, norm = true }) {
+      this.C = channels; this.L = levels; this.norm = !!norm; this.seed = seed;
+      const rnd = mulberry32(seed * 104729 + 11), mk = (n, fanIn) => { const s = Math.sqrt(6 / fanIn); return Float64Array.from({ length: n }, () => (rnd() * 2 - 1) * s); };
+      const conv = (cin, cout) => ({ W: mk(cout * cin * 9, cin * 9), b: new Float64Array(cout), cin, cout });
+      this.enc = []; for (let l = 0; l <= levels; l++) this.enc.push([conv(l === 0 ? 1 : channels, channels), conv(channels, channels)]);
+      this.adam = null; this.steps = 0;
+    }
+    layers() { const out = []; for (const pair of this.enc) out.push(pair[0], pair[1]); return out; }
+    parameterCount() { return this.layers().reduce((a, c) => a + c.W.length + c.b.length, 0); }
+    newGradient() { return this.layers().map(c => ({ W: new Float64Array(c.W.length), b: new Float64Array(c.b.length) })); }
+    grid(h, w) { return { gh: h >> this.L, gw: w >> this.L }; }
+    forward(x, h, w) { // x: the half-resolution ink minus its mean; the levels (for the backward) and the tokens, one per cell
+      const C = this.C, levels = []; let cur = x, cin = 1;
+      for (let l = 0; l <= this.L; l++) { const c1 = convOps.conv3(cur, this.enc[l][0], h, w, true), c2 = convOps.conv3(c1.act, this.enc[l][1], h, w, true), lev = { x: cur, cin, h, w, c1, c2 }; levels.push(lev); if (l < this.L) { const p = convOps.pool2(c2.act, C, h, w); lev.pool = p; cur = p.v; h = p.h; w = p.w; cin = C; } }
+      const top = levels[this.L], n = top.h * top.w, raw = Array.from({ length: n }, (_, i) => Float64Array.from({ length: C }, (_, c) => top.c2.act[c * n + i]));
+      if (!this.norm) return { levels, tokens: raw, raw, h: top.h, w: top.w };
+      const sig = new Float64Array(n), tokens = raw.map((a, i) => { let mu = 0; for (const v of a) mu += v; mu /= C; let va = 0; for (const v of a) va += (v - mu) * (v - mu); const s = Math.sqrt(va / C + 1e-6); sig[i] = s; return Float64Array.from(a, v => (v - mu) / s); });
+      return { levels, tokens, raw, sig, h: top.h, w: top.w };
+    }
+    backward(fw, dTokens, g) { // dTokens: the gradient at every token; accumulates the weights' gradients into g
+      const C = this.C, top = fw.levels[this.L], n = top.h * top.w; let d = new Float64Array(C * n);
+      if (this.norm) dTokens = dTokens.map((dy, i) => { const y = fw.tokens[i], s = fw.sig[i]; let mdy = 0, mdyy = 0; for (let c = 0; c < C; c++) { mdy += dy[c]; mdyy += dy[c] * y[c]; } mdy /= C; mdyy /= C; return Float64Array.from(dy, (v, c) => (v - mdy - y[c] * mdyy) / s); }); // back through the standardisation
+      for (let i = 0; i < n; i++) for (let c = 0; c < C; c++) d[c * n + i] = dTokens[i][c];
+      for (let l = this.L; l >= 0; l--) { const lev = fw.levels[l], m = lev.h * lev.w; const dAct = new Float64Array(C * m); if (l === this.L) dAct.set(d); else { const p = lev.pool; for (let j = 0; j < d.length; j++) dAct[p.arg[j]] += d[j]; }
+        const d2 = new Float64Array(C * m); for (let i = 0; i < d2.length; i++) d2[i] = lev.c2.pre[i] > 0 ? dAct[i] : 0; const d1a = convOps.conv3Back(lev.c1.act, this.enc[l][1], lev.h, lev.w, d2, g[2 * l + 1]);
+        const d1 = new Float64Array(C * m); for (let i = 0; i < d1.length; i++) d1[i] = lev.c1.pre[i] > 0 ? d1a[i] : 0; d = convOps.conv3Back(lev.x, this.enc[l][0], lev.h, lev.w, d1, g[2 * l]); }
+    }
+    apply(g, k, lr, l2, clip) { // Adam on the mean gradient of k samples, clipped to a norm when it is larger
+      let n2 = 0; for (const gl of g) { for (const v of gl.W) n2 += v * v; for (const v of gl.b) n2 += v * v; } const norm = Math.sqrt(n2) / k; this.lastGradientNorm = norm;
+      if (clip > 0 && norm > clip) { const f = clip / norm; for (const gl of g) { for (let i = 0; i < gl.W.length; i++) gl.W[i] *= f; for (let i = 0; i < gl.b.length; i++) gl.b[i] *= f; } }
+      const st = this.adam || (this.adam = { t: 0, m: this.newGradient(), v: this.newGradient() }), b1 = 0.9, b2 = 0.999; st.t++; const c1 = 1 - Math.pow(b1, st.t), c2 = 1 - Math.pow(b2, st.t);
+      const step = (p, gp, m, v, decay) => { for (let i = 0; i < p.length; i++) { const gi = gp[i] / k + (decay ? l2 * p[i] : 0); m[i] = b1 * m[i] + (1 - b1) * gi; v[i] = b2 * v[i] + (1 - b2) * gi * gi; p[i] -= lr * (m[i] / c1) / (Math.sqrt(v[i] / c2) + 1e-8); } };
+      this.layers().forEach((c, i) => { step(c.W, g[i].W, st.m[i].W, st.v[i].W, 1); step(c.b, g[i].b, st.m[i].b, st.v[i].b, 0); }); this.steps++;
+    }
+    toJSON() { const r = v => Array.from(v, q => +q.toPrecision(5)); return { channels: this.C, levels: this.L, norm: this.norm, seed: this.seed, steps: this.steps, enc: this.enc.map(pair => pair.map(c => ({ W: r(c.W), b: r(c.b), cin: c.cin, cout: c.cout }))) }; }
+    static fromJSON(o) { const e = new ConvTokens({ channels: o.channels, levels: o.levels, seed: o.seed || 1, norm: o.norm !== false }); o.enc.forEach((pair, l) => pair.forEach((c, i) => { e.enc[l][i].W.set(c.W); e.enc[l][i].b.set(c.b); })); e.steps = o.steps || 0; return e; }
+  }
+  class FieldNet {
+    // pooling 'average': a convolutional network with global average pooling and a single layer per head; 'attention':
+    // the fields' attention heads over the cells instead (a scorer per head, softmax, weighted average, single layer).
+    // The pixels come in at half resolution as ink; `mean` (the training fields' mean ink) is subtracted here, so a
+    // saved model carries it. Adam on the encoder, the stack's own step on the heads.
+    constructor({ channels = 8, levels = 3, pooling = 'average', attentionUnits = 4, outputs = 2, clip = 20, seed = 1, mean = 0, lr = 0.002, lrHead = 0.02, decay = 1e-4, decayHead = 0.001, clipEnc = 1 }) {
+      this.C = channels; this.L = levels; this.pooling = pooling; this.A = attentionUnits; this.K = outputs; this.clip = clip; this.seed = seed; this.mean = mean; this.lr = lr; this.lrHead = lrHead; this.decay = decay; this.decayHead = decayHead; this.clipEnc = clipEnc; this.steps = 0;
+      this.enc = new ConvTokens({ channels, levels, seed, norm: true });
+      this.att = new AttentionMIL({ inputSize: channels, attentionUnits, attention: pooling === 'attention', outputs, clip, context: null, seed });
+    }
+    get heads() { return this.att.heads; }
+    get scorers() { return this.att.scorers; }
+    grid(h, w) { return this.enc.grid(h, w); }
+    receptiveField() { let rf = 1, stride = 1; for (let l = 0; l <= this.L; l++) { rf += 4 * stride; if (l < this.L) stride *= 2; } return rf; } // the side, in pixels of the half-resolution field, of the window one cell is computed from: two 3 × 3 convolutions per level, a 2 × 2 pool between the levels
+    parameterCount() { return this.enc.parameterCount() + this.att.parameterCount(); }
+    describe(h, w) { const { gh, gw } = this.grid(h, w); return `the field at half resolution (${w} × ${h} px) → ${this.L} level${this.L > 1 ? 's' : ''} of two 3 × 3 convolutions (ReLU) and a 2 × 2 pool, two more at the bottom (${this.C} channels) → ${gw} × ${gh} cells of ${this.C} numbers → ${this.pooling === 'attention' ? `attention (${this.C} → ${this.A} tanh → score) over the cells → weighted average` : 'plain average over the cells'} → single layer, per question`; }
+    centred(x) { const o = new Float64Array(x.length); for (let i = 0; i < x.length; i++) o[i] = x[i] - this.mean; return o; }
+    tokensOf(x, h, w) { return this.enc.forward(this.centred(x), h, w); }
+    forward(x, h, w) {
+      const enc = this.tokensOf(x, h, w), fw = this.att.forward(enc.tokens, null, null);
+      return { enc, tokens: enc.tokens, gh: enc.h, gw: enc.w, outs: fw.outs, T: fw.T, evidence: fw.outs.map((o, k) => this.evidence(o, enc.tokens, k)) };
+    }
+    // what each cell adds to a head's score: its weight times its token's dot with the head's single layer; the cells'
+    // contributions and the head's bias add up to the score exactly, for either pooling
+    evidence(o, tokens, k) { const head = this.att.heads[k], out = new Float64Array(tokens.length); for (let i = 0; i < tokens.length; i++) { let s = 0; for (let d = 0; d < head.Wo.length; d++) s += head.Wo[d] * tokens[i][d]; out[i] = o.a[i] * s; } return out; }
+    // one step on a batch of fields (their pixels augmented already): the heads' gradient averaged over the batch and
+    // applied by the attention stack, the encoder's by Adam; returns the mean loss, every field's probabilities, and
+    // the encoder's gradient (for a check)
+    trainBatch(samples, h, w) {
+      const runs = samples.map(s => { const enc = this.tokensOf(s.x, h, w); return { enc, slide: { H: enc.tokens, dist: null, xy: null, y: s.y } }; }), collect = [], g = this.enc.newGradient();
+      const loss = this.att.trainBatch(runs.map(r => r.slide), this.lrHead, this.decayHead, collect);
+      runs.forEach((r, i) => this.enc.backward(r.enc, collect[i].dX, g)); this.enc.apply(g, runs.length, this.lr, this.decay, this.clipEnc); this.steps++;
+      return { loss, probs: collect.map(c => c.p), g };
+    }
+    // samples: [{ x, y, pos }], pos the cells each head is judged against (optional); the attention stack's measures
+    evaluate(samples, h, w) { return this.att.evaluate(samples.map(s => ({ H: this.tokensOf(s.x, h, w).tokens, y: s.y, pos: s.pos || null }))); }
+    toJSON(meta) { return Object.assign({}, meta || {}, { kind: 'fieldnet', channels: this.C, levels: this.L, pooling: this.pooling, A: this.A, K: this.K, clip: this.clip, seed: this.seed, mean: this.mean, lr: this.lr, lrHead: this.lrHead, decay: this.decay, decayHead: this.decayHead, clipEnc: this.clipEnc, steps: this.steps, enc: this.enc.toJSON(), att: this.att.toJSON() }); }
+    static fromJSON(o) { const m = new FieldNet({ channels: o.channels, levels: o.levels, pooling: o.pooling, attentionUnits: o.A, outputs: o.K, clip: o.clip, seed: o.seed, mean: o.mean, lr: o.lr, lrHead: o.lrHead, decay: o.decay, decayHead: o.decayHead, clipEnc: o.clipEnc }); m.enc = ConvTokens.fromJSON(o.enc); m.att = AttentionMIL.fromJSON(o.att); m.steps = o.steps || 0; return m; }
+  }
   function gradientCheckSeg({ levels = 1, channels = 2, classes = 3, H = 8, W = 8, weighted = false } = {}) {
     const net = new SegNet({ channels, levels, classes, seed: 5, optimizer: 'sgd', clip: 0, classWeights: weighted ? [1, 2, 0.5] : null, norm: { mean: 0.3 } }), rnd = mulberry32(99);
     const samples = [0, 1].map(() => ({ x: Float64Array.from({ length: H * W }, () => rnd()), y: Uint8Array.from({ length: H * W }, () => Math.floor(rnd() * classes)), H, W })), eps = 1e-5;
@@ -1072,5 +1157,5 @@
     for (const [key, final, field] of [['in', finalE, 'E'], ['out', finalOut, 'out']]) { const axes = pca2(final, V, D, null).axes; t[key] = { axes: axes.map(a => Array.from(a, v => +v.toFixed(5))), xy: keep.map(s => Array.from(project2(s[field], V, D, axes), v => +v.toFixed(3))) }; }
     return t;
   }
-  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, pca2, project2, wordTrails, SegNet, gradientCheckSeg, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
+  return { Net, TinyNet: Net, AutoEncoder, Contrastive, AttentionMIL, ContextLayer, LanguageModel, ACTIVATIONS, mulberry32, pca2, project2, wordTrails, SegNet, ConvTokens, FieldNet, gradientCheckSeg, fitStandardizer, standardizerFrom, bce, sigmoid, gradientCheck, gradientCheckAE, gradientCheckCL, gradientCheckMIL, gradientCheckContext, gradientCheckField, gradientCheckLM };
 });

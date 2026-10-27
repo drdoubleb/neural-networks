@@ -918,6 +918,12 @@ window.Viz = (function () {
     ctx.clearRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(fieldToCanvas(opt.px, opt.w, opt.h, opt.tint), 0, 0, W, H);
     ctx.imageSmoothingEnabled = true;
+    if (opt.cells) { // the end-to-end models: a tint per cell of the encoder's grid, the share of a head's attention (one colour, darker with the share) or the cell's evidence (towards yes in one colour, towards no in the other)
+      const { gh, gw, values, signed } = opt.cells, cw = W / gw, ch = H / gh; let mx = 1e-9; for (const v of values) mx = Math.max(mx, Math.abs(v));
+      for (let i = 0; i < gh * gw; i++) { const v = values[i] / mx, x = (i % gw) * cw, y = Math.floor(i / gw) * ch; if (signed ? Math.abs(v) < 0.02 : v < 0.02) continue; ctx.fillStyle = rgbStr(signed && v < 0 ? c.rgb.regular : c.rgb.irregular, (signed ? 0.6 : 0.7) * Math.pow(Math.abs(v), 0.7)); ctx.fillRect(x, y, cw, ch); }
+      if (opt.cells.hover != null && opt.cells.hover >= 0 && opt.cells.hover < gh * gw) { const i = opt.cells.hover; ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect((i % gw) * cw + 1, Math.floor(i / gw) * ch + 1, cw - 2, ch - 2); }
+      canvas._fieldCells = { gh, gw, W, H };
+    } else canvas._fieldCells = null;
     if (opt.reveal) { // the truth, as on the contact sheet: the membrane in blue, the nests in green, the atypical nuclei dotted
       if (opt.membrane) { ctx.strokeStyle = 'rgba(42,120,214,0.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); opt.membrane.forEach((y, i) => (i ? ctx.lineTo(i * 8 * k, y * k) : ctx.moveTo(0, y * k))); ctx.stroke(); }
       if (opt.nests) { ctx.strokeStyle = 'rgba(16,150,90,0.9)'; ctx.lineWidth = 1.5; for (const nest of opt.nests) nestOutline(ctx, nest, k); }
@@ -950,6 +956,12 @@ window.Viz = (function () {
     if (opt.pinned != null && opt.pinned >= 0 && opt.pinned < n) { const [x, y] = centre(opt.pinned); ctx.setLineDash([4, 3]); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]); }
     if (opt.hover != null && opt.hover >= 0 && opt.hover < n) { const [x, y] = centre(opt.hover); ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, R + 2, 0, 2 * Math.PI); ctx.stroke(); }
     canvas._fieldLayout = { k, W, R, xy: opt.nuclei.map((q, i) => centre(i)) };
+  }
+  // which cell of a drawn field's cell map is under a point (canvas-relative CSS pixels), or null
+  function hitFieldCell(canvas, px, py) {
+    const L = canvas._fieldLayout, G = canvas._fieldCells; if (!L || !G) return null;
+    const x = px * L.W / canvas.clientWidth, y = py * L.W / canvas.clientWidth, j = Math.floor(x / (G.W / G.gw)), i = Math.floor(y / (G.H / G.gh));
+    return i >= 0 && i < G.gh && j >= 0 && j < G.gw ? i * G.gw + j : null;
   }
   // which nucleus of a drawn field is under a point (canvas-relative CSS pixels), or null
   function hitField(canvas, px, py) {
@@ -2268,13 +2280,13 @@ window.Viz = (function () {
     // the accuracy chart, where the curves are not
     if (isAcc && opt.ceiling != null) g += `<line class="ceiling" x1="${ml}" x2="${W - mr}" y1="${sy(opt.ceiling).toFixed(1)}" y2="${sy(opt.ceiling).toFixed(1)}"/><text class="marker ceiling" x="${W - mr}" y="${(sy(opt.ceiling) + 11).toFixed(1)}" text-anchor="end">honest ceiling ${Math.round(opt.ceiling * 100)}%</text>`;
     if (opt.stopAt != null && opt.showTest) { const x = sx(opt.stopAt), left = x > ml + pw / 2; g += `<line class="stop" x1="${x.toFixed(1)}" x2="${x.toFixed(1)}" y1="${mt}" y2="${mt + ph}"/><text class="marker stop" x="${(x + (left ? -4 : 4)).toFixed(1)}" y="${isAcc ? mt + ph - 5 : mt + 10}" text-anchor="${left ? 'end' : 'start'}">lowest test loss · epoch ${opt.stopAt}</text>`; }
-    const path = key => hist.map((h, i) => `${i ? 'L' : 'M'}${sx(h.epoch).toFixed(1)} ${sy(clamp(h[key], 0, maxY)).toFixed(1)}`).join(' ');
+    const path = key => hist.filter(h => h[key] != null).map((h, i) => `${i ? 'L' : 'M'}${sx(h.epoch).toFixed(1)} ${sy(clamp(h[key], 0, maxY)).toFixed(1)}`).join(' '); // a point without a value (the training measures of a model scored from its batches, before any) is left out
     if (hist.length) {
       if (opt.showTest) g += `<path class="test" d="${path(testKey)}"/>`;
       g += `<path class="train" d="${path(trainKey)}"/>`;
       const last = hist[hist.length - 1];
-      if (opt.showTest) g += `<circle class="end test" r="3.5" cx="${sx(last.epoch).toFixed(1)}" cy="${sy(clamp(last[testKey], 0, maxY)).toFixed(1)}"/>`;
-      g += `<circle class="end" r="3.5" cx="${sx(last.epoch).toFixed(1)}" cy="${sy(clamp(last[trainKey], 0, maxY)).toFixed(1)}"/>`;
+      if (opt.showTest && last[testKey] != null) g += `<circle class="end test" r="3.5" cx="${sx(last.epoch).toFixed(1)}" cy="${sy(clamp(last[testKey], 0, maxY)).toFixed(1)}"/>`;
+      if (last[trainKey] != null) g += `<circle class="end" r="3.5" cx="${sx(last.epoch).toFixed(1)}" cy="${sy(clamp(last[trainKey], 0, maxY)).toFixed(1)}"/>`;
     }
     g += '<g class="hover"></g>';
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -2290,13 +2302,13 @@ window.Viz = (function () {
         let best = d.hist[0];
         for (const h of d.hist) if (Math.abs(h.epoch - e) < Math.abs(best.epoch - e)) best = h;
         const hx = d.sx(best.epoch);
-        const fmt = v => (d.isAcc ? Math.round(v * 100) + '%' : v.toFixed(3));
+        const fmt = v => (v == null ? '–' : d.isAcc ? Math.round(v * 100) + '%' : v.toFixed(3));
         const text = `epoch ${best.epoch} · train ${fmt(best[d.trainKey])}${d.showTest ? ` · test ${fmt(best[d.testKey])}` : ''}`;
         const tw = text.length * 6.3 + 12;
         const tx = clamp(hx - tw / 2, 2, d.W - tw - 2);
         svg.querySelector('.hover').innerHTML =
           `<line class="cross" x1="${hx.toFixed(1)}" x2="${hx.toFixed(1)}" y1="${d.mt}" y2="${d.mt + d.ph}"/>` +
-          `<circle class="end" r="3.5" cx="${hx.toFixed(1)}" cy="${d.sy(clamp(best[d.trainKey], 0, d.maxY)).toFixed(1)}"/>` +
+          (best[d.trainKey] == null ? '' : `<circle class="end" r="3.5" cx="${hx.toFixed(1)}" cy="${d.sy(clamp(best[d.trainKey], 0, d.maxY)).toFixed(1)}"/>`) +
           `<rect class="tipbox" x="${tx.toFixed(1)}" y="${d.mt - 2}" width="${tw.toFixed(1)}" height="16" rx="4"/>` +
           `<text class="tiptext" x="${(tx + tw / 2).toFixed(1)}" y="${d.mt + 9.5}" text-anchor="middle">${esc(text)}</text>`;
       });
@@ -2779,5 +2791,5 @@ window.Viz = (function () {
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
   }
 
-  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
+  return { drawEmbeddingTable, hitEmbeddingTable, drawCalibrationStrip, drawCoverageCurve, drawSegField, hitSegField, drawSegMaps, drawSegFilters, drawSegNetwork, hitSegNetwork, refreshTheme, colors, diverging, divergingRgb, sequential, unitColor, renderThumb, renderFingerprint, renderBigImage, renderEvidence, renderMeasurement, drawNetwork, hitNetwork, drawCurves, drawScatter, drawSeries, drawSimilarityMatrix, drawLineup, drawViews, drawSlide, hitSlide, drawRanked, renderSlideThumb, drawField, hitField, hitFieldCell, renderFieldThumb, drawSlideNetwork, hitSlideNetwork, drawAttentionMap, hitAttentionMap, drawDecision, hitDecision, sweepPlan, sweepState, convPlan, convAt, convAnim, CONV_STAGES, pixelRgb, fmtSigned, fmtNum, NET_W, NET_H, drawTokenNetwork, hitTokenNetwork, drawTokenAttention, hitTokenAttention, drawGroupedBars, drawWordMap, drawHeadRows, hitHeadRows, drawTokenGraph, hitTokenGraph };
 })();

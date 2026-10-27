@@ -57,11 +57,12 @@ const MODELS = {
   ctx: { name: 'context without positions (distances inside the attention)', pos: false, ctx: true },
   full: { name: 'positions and context', pos: true, ctx: true },
 };
-// a training field seen in a mirror half the time, its positions jittered by about a pixel: the same nuclei, the same
+// a training field seen in a mirror half the time and upside down half the time (a slide comes in every orientation;
+// these fields are drawn with the lumen up), its positions jittered by about a pixel: the same nuclei, the same
 // distances, another field for the position inputs (nothing changes for a model without positions)
 function augmented(sl, D, rng) {
-  const flip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = h[D - 1] + 0.015 * g(); return o; });
+  const flip = rng() < 0.5 ? -1 : 1, vflip = rng() < 0.5 ? -1 : 1, g = () => { let u = 0, v = 0; while (u === 0) u = rng(); while (v === 0) v = rng(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  const H = sl.H.map(h => { const o = Float64Array.from(h); o[D - 2] = flip * h[D - 2] + 0.015 * g(); o[D - 1] = vflip * h[D - 1] + 0.015 * g(); return o; });
   return Object.assign({}, sl, { H, xy: H.map(h => [h[D - 2], h[D - 1]]) }); // the relative offsets follow the mirrored, jittered positions
 }
 function run(P, M, seed) {
