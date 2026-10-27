@@ -644,8 +644,32 @@ with the deep encoder the attention is uniform: every cell already sees the whol
 with an average pool, the heads have nothing to choose, and the context layers add nothing. With the shallow encoder
 the invasion head becomes selective, concentrating on the nests just under the membrane of an invasive field and
 staying faint on a CIS-into-nests mimic, and the context layers spread it out again at twice the cost. Were the page to
-get this lesson, the shallow encoder without context layers is the one to build: 87 ms per field here, about a minute
-per epoch in a browser, so a shipped model with a few epochs run live.
+get this lesson, the shallow encoder without context layers or coordinates, trained in every orientation, is the one
+to build: 87 ms per field here, about a minute per epoch in a browser, so a shipped model with a few epochs run live.
+
+**The controls.** The runs above gave every cell its coordinates, which on fields that always have the lumen at the
+top is a hint no slide offers: the membrane lies 46 to 54 px down, so depth reads as *below the membrane* for free.
+Without the coordinates (`--pos 0`), with a plain average in place of the attention (`--attention 0`, a convolutional
+network with global average pooling) and with half the training fields flipped upside down (`--orient 4`), the same
+measures, one seed each:
+
+| Encoder | Pooling | Coordinates | Training orientations | Invasion right | Invasive fields called invasive | CIS-into-nests called invasive |
+|---|---|---|---|---|---|---|
+| 3 levels | attention | none | mirror | 94% | 85% | 11% |
+| 3 levels | plain average | none | mirror | 98% | 90% | 2% |
+| 3 levels | plain average | none | mirror and upside down | 96% | 89% | 10% |
+| 2 levels | attention | none | mirror | 97% | 84% | 0% |
+| 2 levels | attention | none | mirror and upside down | 95% | 82% | 6% |
+| 2 levels | plain average | none | mirror | 94% | 77% | 9% |
+| 2 levels | plain average | none | mirror and upside down | 91% | 72% | 17% |
+| 2 levels | attention | x and y | mirror and upside down | 88% | 64% | 26% |
+
+CIS stays at 99 to 100% and no CIS or von Brunn field is called invasive. The coordinates were never needed: without
+them every model is as good or better, and with the fields flipped they only get in the way (the last row). The plain
+deep convolutional network, pixels in and one label per field out, is the strongest model here and keeps its accuracy
+upside down. Attention adds nothing to the deep encoder and three to four points to the shallow one, where it also
+shows where it looked; that, not accuracy, is what an end-to-end attention lesson would teach, and either lesson
+should train with the fields in every orientation, as a slide comes.
 
 ## Reports: a small language model
 
