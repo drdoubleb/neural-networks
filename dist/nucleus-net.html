@@ -3630,11 +3630,11 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
     }
     // one gradient step on a batch of slides [{ H, y, dist }] (y a label, or one per output); returns their mean loss
     // before the step (summed over the outputs)
-    trainBatch(slides, lr, l2 = 0) {
+    trainBatch(slides, lr, l2 = 0, collect = null) { // collect: an array that receives every slide's gradient at its tokens, for an encoder trained through this model
       const gss = this.scorers.map(s => s.newGradient()), ghs = this.heads.map(h => h.newGradient()), gcs = this.layers.map(c => c.newGradient()); let loss = 0;
       for (const sl of slides) {
         const fw = this.forward(sl.H, sl.dist, sl.xy), T = fw.T, n = T.length, ys = Array.isArray(sl.y) ? sl.y : [sl.y];
-        const dT = gcs.length ? T.map(() => new Float64Array(this.D)) : null; // d loss / d instance, only needed with a context layer
+        const dT = gcs.length || collect ? T.map(() => new Float64Array(this.D)) : null; // d loss / d instance, needed with a context layer or when the caller collects it
         fw.outs.forEach((o, k) => {
           const y = ys[k], dl = o.p - y; loss += bce(o.p, y);
           const dz = this.heads[k].backDense(o.head, dl, ghs[k]); // d loss / d summary, the head's gradient collected on the way
@@ -3645,7 +3645,7 @@ window.LECTURE_FIELDS = {"meta":{"seed":20260930,"w":176,"h":128,"size":32,"grai
             for (let i = 0; i < n; i++) { const ds = o.a[i] * (da[i] - dot); if (ds !== 0) { const dIn = this.scorers[k].backDense(o.fws[i], ds, gss[k]); if (dT) for (let d = 0; d < this.D; d++) dT[i][d] += dIn[d]; } }
           }
         });
-        if (dT) { let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, gcs[l]); } // back through the stack
+        if (dT) { let d = dT; for (let l = this.layers.length - 1; l >= 0; l--) d = this.layers[l].backward(fw.ctxs[l], d, gcs[l]); if (collect) collect.push(d); } // back through the stack, and out to the caller
       }
       const k = slides.length, all = ghs.concat(this.attention ? gss : [], gcs);
       this.lastGradientNorm = Math.sqrt(all.reduce((a, g) => a + gradientNorm2(g), 0)) / k; // the norm of the step's mean gradient, over every weight

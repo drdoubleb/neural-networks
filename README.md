@@ -618,6 +618,35 @@ folder, from a mirror of the repository or the published page; decoding the 450 
 with the count shown as it goes. The single-file build inlines the fields (`tools/build_single_file.js`, or
 `--no-fields` to leave them out).
 
+**End to end, a feasibility experiment.** `tools/check_fields_cnn.js` trains the invasion question from the pixels
+alone: a convolutional encoder over the field at half resolution (levels of two 3 × 3 convolutions and a 2 × 2 pool,
+then two more convolutions at the bottom) whose cells, each with its position, are the tokens of the same attention
+stack, two context layers with distance costs and the two heads. Nothing else is given: no nucleus segmented, no code
+pretrained, only the two labels of each of the 400 training fields, with a mirror and a shift of a few pixels as
+augmentation, Adam at 0.002 on the encoder and the stack's own step at 0.02, batches of four, and every cell's token
+standardised over its channels (raw tokens and one field per step were unstable: two of three such runs collapsed to
+calling every field, or none, invasive). Sixty epochs take 35 minutes in Node (35 s each with 88 cells, 77 s with 352
+cells and the context layers). `tools/probe_fields_cnn.js` re-evaluates a saved model, with how spread each head's
+attention is (the effective number of cells, 1 / Σ a²) and the invasion head's map over the cells. On the test fields,
+10 per pattern, the mean of the last ten epochs (the final epoch in brackets):
+
+| Encoder | Context | Cells | Invasion right | Invasive fields called invasive | CIS-into-nests called invasive | Invasion head, effective cells |
+|---|---|---|---|---|---|---|
+| 3 levels, cells of 16 px that see the whole field | on, seed 1 | 88 | 97% (98%) | 89% (90%) | 5% (0%) | 88 of 88 |
+| the same | on, seed 2 | 88 | 95% (96%) | 83% (80%) | 7% (0%) | 86 of 88 |
+| the same | off | 88 | 96% (94%) | 90% (90%) | 6% (20%) | 77 of 88 |
+| 2 levels, cells of 8 px that see about 80 px | on | 352 | 94% (94%) | 83% (80%) | 9% (0%) | 310 of 352 |
+| the same | off | 352 | 94% (98%) | 72% (90%) | 1% (0%) | 212 of 352 |
+
+CIS is right on 99 to 100% of the test fields in every row, no CIS or von Brunn field is called invasive, and an
+inverted papilloma field is in 0 to 4% of the calls. The accuracy matches or beats the frozen-code model's 91%, but
+with the deep encoder the attention is uniform: every cell already sees the whole field, so the model is a convolution
+with an average pool, the heads have nothing to choose, and the context layers add nothing. With the shallow encoder
+the invasion head becomes selective, concentrating on the nests just under the membrane of an invasive field and
+staying faint on a CIS-into-nests mimic, and the context layers spread it out again at twice the cost. Were the page to
+get this lesson, the shallow encoder without context layers is the one to build: 87 ms per field here, about a minute
+per epoch in a browser, so a shipped model with a few epochs run live.
+
 ## Reports: a small language model
 
 The question in preparation, after the fields: a small language model that writes a bladder biopsy report from an
@@ -1310,5 +1339,7 @@ tools/export_models.js     train every lesson's model on the page itself (headle
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
+tools/check_fields_cnn.js  the invasion question end to end, a feasibility experiment: a convolutional encoder over the field at half resolution whose cells are the tokens of the attention stack, trained from the field labels alone, with the mimic table after every epoch and the model saved with --out
+tools/probe_fields_cnn.js  a saved end-to-end model re-evaluated: accuracy, the mimic table, how spread each head's attention is, the invasion head's map over the cells
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
