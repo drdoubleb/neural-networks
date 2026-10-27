@@ -1037,11 +1037,20 @@ of predictions).
 
 Pixels right is the easy number: the stroma and the epithelium are 81% of the field and the stroma is a plain
 texture, so even the 5 px window gets 84%, and the stroma's IoU is 94% at every depth. The intersection over union per
-class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane looks exactly like
-the nucleus above it in the epithelium, the same cells from the same generator, so the only thing that separates the
-two classes is where the pixel lies relative to the membrane, which a 5 px window cannot see: with no context three in
-four nest pixels are called epithelium and the nest IoU is 12%. One level (16 px) halves the confusion; two levels
-(36 to 40 px, enough to see the membrane from most of a nest) send 90% of the nest pixels to the nest class. The weighting
+class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane is drawn by the
+same generator as the nucleus above it in the epithelium, so a window smaller than a nucleus cannot tell them apart:
+with no context three in four nest pixels are called epithelium and the nest IoU is 12%. What separates the two
+classes within reach of a window is the packing: the urothelium is drawn as rows of nuclei 17 to 20 px apart, a nest
+as nuclei that touch. One level (16 px, a nucleus and its neighbour) halves the confusion; two levels (36 to 40 px,
+three or four nuclei with their gaps) send 90% of the nest pixels to the nest class. It is not the membrane the
+network finds. `node tools/probe_segment.js` measures that the nests are 55 × 59 px in the median, larger than the
+window, and that the membrane is within reach of 18% of nest pixels; the shipped network's nest recall is 94% on the
+pixels that can see the band, 90% at 20 to 40 px below it and 88% deeper; painting the band and the lumen over with
+the field's own stroma rows leaves the recall of the pixels that could see the band at 94%; the centre of a big nest
+pasted into the band is still called nest for 70% of its pixels (80% in place), and a patch of the band pasted into
+plain stroma is still called epithelium for 83% (98% in place). The network reads how the nuclei are packed, which
+is architecture, the pathologist's cue too. A position channel would be a shortcut here: the epithelium never reaches
+below y = 58 and 93% of nest pixels lie deeper. The weighting
 lifts the lumen, a thin strip of 5% of the pixels, from 68% to 79% and the mean to 83% without costing the rest, and
 that is the network that ships. The nest's remaining 66% is mostly a scoring artefact of the carcinoma in situ fields:
 eight of the ten have no nest at all, and a few hundred stray nest pixels on each (49 to 1,252 of 22,528) count as an
@@ -1299,6 +1308,7 @@ tools/generate_describe.js make the Describe nuclei and their descriptions (a co
 tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
 tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
+tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
