@@ -691,7 +691,7 @@
         </div>
         <p class="prose small" id="fd-blurb"></p>
         <div class="bar-row">
-          <div class="ctl"><span class="lbl">Model</span><div class="seg" id="fd-kind-seg"><button type="button" data-kind="nuclei" class="is-active" title="every nucleus a token: its code from the frozen encoder, with its position and the context layers as set here (recipe 16)">nuclei as tokens</button><button type="button" data-kind="deep" title="a convolutional network over the pixels alone, three levels deep, a plain average of its cells and a single layer per question: no nucleus found, no code, no coordinates (recipe 11)">deep convolution</button><button type="button" data-kind="shallow" title="a shallower convolutional network over the pixels alone, two levels, and the two attention heads over its cells instead of a plain average (recipe 17)">shallow convolution + attention</button></div></div>
+          <div class="ctl"><span class="lbl">Model</span><div class="seg" id="fd-kind-seg"><button type="button" data-kind="nuclei" class="is-active" title="every nucleus a token: its code from the frozen encoder, with its position and the context layers as set here (recipe 16)">nuclei as tokens</button><button type="button" data-kind="deep" title="a convolutional network over the pixels alone, three levels deep, a plain average of its patches and a single layer per question: no nucleus found, no code, no coordinates (recipe 11)">deep convolution</button><button type="button" data-kind="shallow" title="a shallower convolutional network over the pixels alone, two levels, and the two attention heads over its patches instead of a plain average (recipe 17)">shallow convolution + attention</button></div></div>
           <div class="ctl"><span class="lbl">Each nucleus</span><div class="seg" id="fd-pos-seg"><button type="button" data-pos="0" title="the code of the nucleus alone">its code</button><button type="button" data-pos="1" class="is-active" title="the code, and where the nucleus sits in the field">code + position</button></div></div>
           <div class="ctl"><span class="lbl">Context</span><div class="seg" id="fd-ctx-seg"><button type="button" data-ctx="0">none</button><button type="button" data-ctx="1" class="is-active" title="two layers of self-attention before the pooling, each with a learned distance cost">nuclei look at each other</button></div></div>
           <div class="ctl"><span class="lbl">Crop</span><div class="seg" id="fd-crop-seg"><button type="button" data-crop="nucleus" class="is-active" title="every crop masked to its nucleus by the segmentation: cytology and nothing else">masked to the nucleus</button><button type="button" data-crop="surroundings" title="the field around the nucleus stays in the crop, and leaks location and the nest’s outline into the code">with its surroundings</button></div></div>
@@ -729,7 +729,7 @@
         </div>
         <p class="small muted" id="fd-links-note" style="margin-top:6px"></p>
         <div class="bar-row" id="fd-cells-ctl" hidden style="margin-top:10px">
-          <div class="ctl"><span class="lbl">Cells tinted by</span><div class="seg small" id="fd-cellview-seg"><button type="button" data-view="attention" class="is-active" title="the share of the head’s attention on each cell: the softmax over the cells">attention</button><button type="button" data-view="evidence" title="what each cell adds to the head’s score: its share times its token’s dot with the single layer; the cells and the bias add up to the score exactly">evidence</button></div></div>
+          <div class="ctl"><span class="lbl">Patches tinted by</span><div class="seg small" id="fd-cellview-seg"><button type="button" data-view="attention" class="is-active" title="the share of the head’s attention on each cell: the softmax over the patches">attention</button><button type="button" data-view="evidence" title="what each patch adds to the head’s score: its share times its token’s dot with the single layer; the patches and the bias add up to the score exactly">evidence</button></div></div>
         </div>
       </div>
 
@@ -741,7 +741,7 @@
           <div class="actions-inline"><span class="small muted">head</span><div class="seg small" id="fd-cnn-head-seg"><button type="button" data-head="0" title="the head that answers: carcinoma in situ?">CIS</button><button type="button" data-head="1" class="is-active" title="the head that answers: invasion?">invasion</button></div></div>
         </div>
         <div class="fd-conv-grid">
-          <div><p class="small muted" style="margin:0 0 6px">The first layer’s eight 3 × 3 filters, the only weights that read the pixels (blue negative, orange positive)</p><canvas id="fd-conv-filters" width="190" height="56" aria-label="The eight 3 × 3 filters of the first convolution"></canvas></div>
+          <div><p class="small muted" style="margin:0 0 6px">The first layer’s eight 3 × 3 filters, the only weights that read the pixels (blue negative, orange positive)</p><div class="net-wrap fd-conv-filters-wrap"><canvas id="fd-conv-filters" width="406" height="56" aria-label="The eight 3 × 3 filters of the first convolution"></canvas></div></div>
           <div class="fm-selected" id="fd-conv-heads" style="margin-top:0"></div>
         </div>
         <p class="small muted" id="fd-conv-note" style="margin-top:8px"></p>
@@ -749,15 +749,15 @@
       <div class="card" id="fd-layers-card" hidden>
         <div class="card-head">
           <h2>The network, layer by layer</h2>
-          <div class="actions-inline"><span class="small muted">every map of every layer for this field · hover a map for its numbers, a cell on the field to follow it down</span><button type="button" class="btn" id="fd-layers-walk" title="slide the first filter over the field and watch its map fill in, one pixel at a time">▶ Walk through</button></div>
+          <div class="actions-inline"><span class="small muted">every map of every layer for this field · hover a map for its numbers, a patch on the field to follow it down</span><button type="button" class="btn" id="fd-layers-walk" title="slide the first filter over the field and watch its map fill in, one pixel at a time">▶ Walk through</button></div>
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-layers" width="746" height="900" aria-label="Every feature map of the convolutional encoder for this field, layer by layer"></canvas><div class="tip" id="fd-layers-tip" hidden></div></div></div>
         <p class="small muted" id="fd-layers-note" style="margin-top:8px"></p>
       </div>
       <div class="card" id="fd-cellnet-card" hidden>
         <div class="card-head">
-          <h2 id="fd-cellnet-title">The network at one cell</h2>
-          <span class="small muted">the channels at the cell’s place in every map, every kernel’s contribution there, its token, and what it adds to each head</span>
+          <h2 id="fd-cellnet-title">The network at one patch</h2>
+          <span class="small muted">the channels at the patch’s place in every map, every kernel’s contribution there, its token, and what it adds to each head</span>
         </div>
         <div class="sl-unrolled-wrap"><div class="net-wrap"><canvas id="fd-cellnet" width="860" height="540" aria-label="The encoder unrolled at one cell: the channels at its place in every layer, the kernels’ contributions, its token and its evidence for each head"></canvas><div class="tip" id="fd-cellnet-tip" hidden></div></div></div>
         <p class="small muted" id="fd-cellnet-note" style="margin-top:8px"></p>
