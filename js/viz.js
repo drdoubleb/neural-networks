@@ -919,8 +919,9 @@ window.Viz = (function () {
     ctx.drawImage(fieldToCanvas(opt.px, opt.w, opt.h, opt.tint), 0, 0, W, H);
     ctx.imageSmoothingEnabled = true;
     if (opt.cells) { // the end-to-end models: a tint per cell of the encoder's grid, the share of a head's attention (one colour, darker with the share) or the cell's evidence (towards yes in one colour, towards no in the other)
-      const { gh, gw, values, signed } = opt.cells, cw = W / gw, ch = H / gh; let mx = 1e-9; for (const v of values) mx = Math.max(mx, Math.abs(v));
-      for (let i = 0; i < gh * gw; i++) { const v = values[i] / mx, x = (i % gw) * cw, y = Math.floor(i / gw) * ch; if (signed ? Math.abs(v) < 0.02 : v < 0.02) continue; ctx.fillStyle = rgbStr(signed && v < 0 ? c.rgb.regular : c.rgb.irregular, (signed ? 0.6 : 0.7) * Math.pow(Math.abs(v), 0.7)); ctx.fillRect(x, y, cw, ch); }
+      const { gh, gw, values, signed } = opt.cells, cw = W / gw, ch = H / gh, n = gh * gw; let mx = 1e-9; for (const v of values) mx = Math.max(mx, Math.abs(v));
+      for (let i = 0; i < n; i++) { const x = (i % gw) * cw, y = Math.floor(i / gw) * ch; // the evidence against the field's largest, in two colours; a share against the uniform share 1 / n: none at uniform, full at four times it, so a head that weighs every patch alike leaves the field untinted
+        const v = signed ? values[i] / mx : Math.min(1, Math.max(0, (values[i] * n - 1) / 3)); if (signed ? Math.abs(v) < 0.02 : v <= 0) continue; ctx.fillStyle = rgbStr(signed && v < 0 ? c.rgb.regular : c.rgb.irregular, (signed ? 0.6 : 0.7) * Math.pow(Math.abs(v), 0.7)); ctx.fillRect(x, y, cw, ch); }
       if (opt.cells.hover != null && opt.cells.hover >= 0 && opt.cells.hover < gh * gw) { const i = opt.cells.hover; ctx.strokeStyle = c.ink; ctx.lineWidth = 2; ctx.strokeRect((i % gw) * cw + 1, Math.floor(i / gw) * ch + 1, cw - 2, ch - 2); }
       canvas._fieldCells = { gh, gw, W, H };
     } else canvas._fieldCells = null;

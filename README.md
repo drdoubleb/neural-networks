@@ -629,7 +629,7 @@ with the count shown as it goes. The single-file build inlines the fields (`tool
 **The three models on the page.** The Train step's first control, *Model*, chooses between the nuclei as tokens
 (recipe ⑰, the model above) and the two end-to-end networks of the next paragraphs (recipes ⑫ and ⑱). With either
 of those the nucleus controls give way; the field viewers tint the encoder's patches by the head's attention (the
-shallow model) or by each patch's evidence, what it adds to the head's score (the patches and the bias add up to the
+shallow model; against the uniform share, so a head that weighs every patch alike leaves the field untinted) or by each patch's evidence, what it adds to the head's score (the patches and the bias add up to the
 score exactly; the deep model's heads weigh every patch the same, so its evidence is all it can show); a card shows the
 first layer's eight filters, the head's single layer over the channels and the shown patch's token; the scorer and
 summary cards take a patch through the attention head where there is one; and two diagrams show the network itself, as
