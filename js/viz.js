@@ -1059,9 +1059,9 @@ window.Viz = (function () {
     });
     text(hov && hov.text ? hov.text : 'hover a circle for its value, a line for its kernel · the pixel follows the mouse on the field; click the field to pin it', 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
   }
-  // ---- the fields end to end: every map of every layer of the encoder for one field, and the encoder unrolled at one cell
+  // ---- the fields end to end: every map of every layer of the encoder for one field, and the encoder unrolled at one patch
   const FL_TILE = 88, FL_GAP = 6, FL_LABEL = 16, FL_ROWGAP = 10;
-  // opt: enc (a ConvTokens forward), C, rf (ConvTokens.receptiveFields().top), cell (an index on the top grid, or null:
+  // opt: enc (a ConvTokens forward), C, rf (ConvTokens.receptiveFields().top), patch (an index on the top grid, or null:
   // its footprint is boxed on every map and its window on the input), hover ({ row, map } or null), walk ({ map, frac,
   // layer } or null: the first convolution's filter sliding over the field, its map filled in up to frac)
   function drawFieldLayers(canvas, opt) {
@@ -1071,7 +1071,7 @@ window.Viz = (function () {
       rows.push({ label: `level ${l} · convolution 1 → ReLU · ${C} maps of ${lev.w} × ${lev.h}${l ? ' · after a 2 × 2 max pool' : ''}`, maps: Array.from({ length: C }, (_, m) => ({ arr: lev.c1.act, off: m * n })), h: lev.h, w: lev.w, level: l, kind: 'conv1' });
       rows.push({ label: `level ${l} · convolution 2 → ReLU${l < L ? ' · then the 2 × 2 max pool halves it' : ''}`, maps: Array.from({ length: C }, (_, m) => ({ arr: lev.c2.act, off: m * n })), h: lev.h, w: lev.w, level: l, kind: 'conv2' }); });
     const top = E.levels[L], nTop = top.h * top.w;
-    rows.push({ label: `the cells · ${top.w} × ${top.h} · each cell's ${C} numbers standardised over its channels (orange +, blue −)`, maps: Array.from({ length: C }, (_, m) => { const a = new Float64Array(nTop); for (let i = 0; i < nTop; i++) a[i] = E.tokens[i][m]; return { arr: a, off: 0 }; }), h: top.h, w: top.w, level: L, kind: 'token', signed: true });
+    rows.push({ label: `the patches · ${top.w} × ${top.h} · each patch's ${C} numbers standardised over its channels (orange +, blue −)`, maps: Array.from({ length: C }, (_, m) => { const a = new Float64Array(nTop); for (let i = 0; i < nTop; i++) a[i] = E.tokens[i][m]; return { arr: a, off: 0 }; }), h: top.h, w: top.w, level: L, kind: 'token', signed: true });
     const rowH = r => FL_LABEL + Math.round(r.h * tileW / r.w) + FL_ROWGAP, W = C * (tileW + FL_GAP) - FL_GAP, H = rows.reduce((a, r) => a + rowH(r), 0) - FL_ROWGAP, ctx = fitCanvas(canvas, W, H);
     ctx.clearRect(0, 0, W, H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, W, H); ctx.imageSmoothingEnabled = false;
     const tiles = [], mono = `500 10px "IBM Plex Mono", ui-monospace, monospace`, cx = opt.cell != null ? opt.cell % top.w : null, cy = opt.cell != null ? Math.floor(opt.cell / top.w) : null; let y0 = 0, walkText = null;
@@ -1085,7 +1085,7 @@ window.Viz = (function () {
         for (let i = 0; i < n; i++) { const o = i * 4, v = mp.arr[mp.off + i] / mx; let rgb; if (cut >= 0 && i > cut) rgb = c.rgb.surface3; else if (row.signed) rgb = divergingRgb(v); else if (row.kind === 'input') { const g = Math.round(255 * (0.5 - v / 2)); rgb = [g, g, g]; } else { const g = Math.round(255 * (1 - Math.min(1, v))); rgb = [g, g, g]; } im.data[o] = rgb[0]; im.data[o + 1] = rgb[1]; im.data[o + 2] = rgb[2]; im.data[o + 3] = 255; }
         sctx.putImageData(im, 0, 0); ctx.drawImage(segScratch, x0, y1, tileW, th);
         const hov = opt.hover && opt.hover.row === r && opt.hover.map === m; ctx.strokeStyle = hov ? c.ink : c.line; ctx.lineWidth = hov ? 2 : 1; ctx.strokeRect(x0 + 0.5, y1 + 0.5, tileW - 1, th - 1);
-        if (cx != null) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(x0 + cx * foot * k, y1 + cy * foot * k, Math.max(2, foot * k), Math.max(2, foot * k)); // the cell's footprint
+        if (cx != null) { ctx.strokeStyle = c.accent; ctx.lineWidth = 1.5; ctx.strokeRect(x0 + cx * foot * k, y1 + cy * foot * k, Math.max(2, foot * k), Math.max(2, foot * k)); // the patch's footprint
           if (row.kind === 'input' && opt.rf) { const half = opt.rf / 2, mxp = (cx + 0.5) * foot, myp = (cy + 0.5) * foot; ctx.setLineDash([3, 3]); ctx.strokeRect(x0 + (mxp - half) * k, y1 + (myp - half) * k, opt.rf * k, opt.rf * k); ctx.setLineDash([]); } } // and, on the field, the window its token is computed from
         if (cut >= 0) { const px = cut % row.w, py = Math.floor(cut / row.w), Wt = opt.walk.layer.W, b = opt.walk.layer.b[m]; let pre = b; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const yy = py + dy, xx = px + dx; if (yy >= 0 && yy < lev0.h && xx >= 0 && xx < lev0.w) pre += Wt[m * 9 + (dy + 1) * 3 + dx + 1] * lev0.x[yy * lev0.w + xx]; }
           ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(x0 + px * k - 1, y1 + py * k - 1, k + 2, k + 2); const t0 = tiles.find(t => t.row === 0); if (t0) { ctx.strokeRect(t0.x + (px - 1) * t0.k, t0.y + (py - 1) * t0.k, 3 * t0.k, 3 * t0.k); } // the 3 × 3 window on the field, the pixel being written on the map
@@ -1110,8 +1110,8 @@ window.Viz = (function () {
     const text = (t, x, y, font, color, align, base) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align || 'left'; ctx.textBaseline = base || 'top'; ctx.fillText(t, x, y); };
     ctx.clearRect(0, 0, SN_W, L.H); ctx.fillStyle = c.surface; ctx.fillRect(0, 0, SN_W, L.H);
     const hov = m.hover, touches = ln => !!hov && (hov.kind === 'line' ? hov.col === ln.col && hov.c === ln.c && hov.o === ln.o : (hov.col === ln.col && hov.i === ln.o) || (hov.col === P.cols[ln.col].from && hov.i === ln.c));
-    text(`THE NETWORK AT CELL ROW ${P.cy + 1}, COLUMN ${P.cx + 1}${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
-    text(`circles: the channels at the cell's place (hollow: ReLU off) · lines: each kernel's contribution there, orange +, blue − · under each column, the window it is computed from, in px of the half-resolution field`, 12, 24, mono9, c.ink3);
+    text(`THE NETWORK AT PATCH ROW ${P.cy + 1}, COLUMN ${P.cx + 1}${m.pinned ? ' · PINNED' : ''}`, 12, 8, capFont, c.ink);
+    text(`circles: the channels at the patch's place (hollow: ReLU off) · lines: each kernel's contribution there, orange +, blue − · under each column, the window it is computed from, in px of the half-resolution field`, 12, 24, mono9, c.ink3);
     for (let l = 0; l <= P.levels; l++) { const lev = P.cols.find(col => col.level === l && col.kind === 'conv'); text(`level ${l}`, 10, L.bandY(l) - 6, mono9, c.ink2, 'left', 'middle'); text(`${lev.w} × ${lev.h}${l ? ' · pooled' : ''}`, 10, L.bandY(l) + 6, mono8, c.ink3, 'left', 'middle'); }
     const maxOf = {}; for (const ln of L.lines) if (ln.kind === 'w') maxOf[ln.col] = Math.max(maxOf[ln.col] || 1e-9, Math.abs(ln.v));
     const rel = ln => (ln.kind === 'w' ? Math.abs(ln.v) / maxOf[ln.col] : 0.5), dim = hov ? 0.2 : 1;
@@ -1137,20 +1137,20 @@ window.Viz = (function () {
       if (col.kind === 'share') text(pctText(col.values[0]), Lc.x, Lc.circles[0].y - Lc.circles[0].r - 4, mono8, c.ink2, 'center', 'bottom');
       if (col.kind === 'score') text(fmtSigned(col.values[0], 2), Lc.x, Lc.circles[0].y - Lc.circles[0].r - 4, mono8, c.ink2, 'center', 'bottom');
     });
-    text(hov && hov.text ? hov.text : `hover a circle for its value, a line for its kernel · the cell follows the mouse on the field; click the field to pin it`, 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
+    text(hov && hov.text ? hov.text : `hover a circle for its value, a line for its kernel · the patch follows the mouse on the field; click the field to pin it`, 12, L.H - 14, mono9, c.ink3, 'left', 'middle');
   }
   function hitFieldNet(canvas, px, py, m) {
     const L = canvas._segNet, P = m.path; if (!L) return null; const s = SN_W / canvas.clientWidth, x = px * s, y = py * s, f3 = v => fmtSigned(v, 3), where = col => `at (${col.px}, ${col.py}) of ${col.w} × ${col.h}`;
     for (let j = 0; j < L.cols.length; j++) for (const q of L.cols[j].circles) if (Math.hypot(x - q.x, y - q.y) <= q.r + 4) {
       const col = P.cols[j], i = q.i, v = col.values[i]; let t;
-      if (col.kind === 'input') t = `the pixel at the centre of the cell's footprint (${col.foot} × ${col.foot} px of the half-resolution field): its ink minus the mean, ${f3(v)} · the first convolution reads it with its 8 neighbours`;
+      if (col.kind === 'input') t = `the pixel at the centre of the patch's footprint (${col.foot} × ${col.foot} px of the half-resolution field): its ink minus the mean, ${f3(v)} · the first convolution reads it with its 8 neighbours`;
       else if (col.kind === 'pool') t = `level ${col.level} · channel ${i + 1}: ${fmtNum(v, 3)} · the largest of the 2 × 2 block below it in level ${col.level - 1}'s conv 2 map · ${where(col)}`;
       else if (col.kind === 'conv') t = `level ${col.level} · ${col.name} · channel ${i + 1}: ${fmtNum(v, 3)}${col.pre[i] <= 0 ? ` (ReLU off: ${f3(col.pre[i])} before it)` : ''} · bias ${f3(col.layer.b[i])} + ${col.cin} kernel${col.cin > 1 ? 's' : ''} of 3 × 3 · ${where(col)} · computed from ${col.sees} × ${col.sees} px`;
-      else if (col.kind === 'token') t = `the cell's token, number ${i + 1}: ${f3(v)} · the channel's value ${f3(col.raw[i])} minus the mean over the ${col.values.length} channels, over their spread ${col.sig.toFixed(3)} · what the heads read`;
+      else if (col.kind === 'token') t = `the patch's token, number ${i + 1}: ${f3(v)} · the channel's value ${f3(col.raw[i])} minus the mean over the ${col.values.length} channels, over their spread ${col.sig.toFixed(3)} · what the heads read`;
       else if (col.kind === 'dense') t = `scorer unit ${i + 1} of the ${m.headNames[col.head]} head: tanh(${f3(col.pre[i])}) = ${f3(v)} · bias ${f3(col.bias[i])} + Σ weight × token over the ${col.cin} numbers`;
       else if (col.kind === 'score') t = `the ${m.headNames[col.head]} head's attention score for this cell: ${f3(v)} = bias ${f3(col.bias[0])} + Σ weight × unit over the ${col.cin} tanh units`;
-      else if (col.kind === 'share') t = `the ${m.headNames[col.head]} head's share of attention on this cell: ${pctText(v)} = e^score over the sum over the ${m.nCells} cells (uniform: ${pctText(1 / m.nCells)})`;
-      else if (col.kind === 'head') t = `this cell's evidence for ${m.headNames[i]}: ${f3(v)} = its share ${pctText(col.shares[i])} × Σ weight × token over the ${col.cin} numbers · the ${m.nCells} cells and the bias add up to the score ${f3(col.scores[i])}, P = ${col.probs[i].toFixed(2)}`;
+      else if (col.kind === 'share') t = `the ${m.headNames[col.head]} head's share of attention on this cell: ${pctText(v)} = e^score over the sum over the ${m.nCells} patches (uniform: ${pctText(1 / m.nCells)})`;
+      else if (col.kind === 'head') t = `this patch's evidence for ${m.headNames[i]}: ${f3(v)} = its share ${pctText(col.shares[i])} × Σ weight × token over the ${col.cin} numbers · the ${m.nCells} patches and the bias add up to the score ${f3(col.scores[i])}, P = ${col.probs[i].toFixed(2)}`;
       return { kind: 'unit', col: j, i, text: t };
     }
     let best = null, bd = 5;

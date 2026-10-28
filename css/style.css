@@ -474,7 +474,8 @@ details.fold > ul { margin-top: 8px; }
 @media (min-width: 960px) { .fd-two { grid-template-columns: 528px minmax(0, 1fr); align-items: start; } }
 .fd-conv-grid { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 .fd-conv-grid > div { min-width: 0; }
-@media (min-width: 900px) { .fd-conv-grid { grid-template-columns: auto minmax(0, 1fr); } }
+.fd-conv-filters-wrap { max-width: 406px; }
+@media (min-width: 900px) { .fd-conv-grid { grid-template-columns: minmax(0, 440px) minmax(0, 1fr); } }
 .fd-heads { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); }
 .fd-heads > div { min-width: 0; }
 .fd-heads h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; }

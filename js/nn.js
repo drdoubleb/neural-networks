@@ -1134,7 +1134,7 @@
       P.pooling = this.pooling; P.K = K; return P;
     }
     parameterCount() { return this.enc.parameterCount() + this.att.parameterCount(); }
-    describe(h, w) { const { gh, gw } = this.grid(h, w); return `the field at half resolution (${w} × ${h} px) → ${this.L} level${this.L > 1 ? 's' : ''} of two 3 × 3 convolutions (ReLU) and a 2 × 2 pool, two more at the bottom (${this.C} channels) → ${gw} × ${gh} cells of ${this.C} numbers → ${this.pooling === 'attention' ? `attention (${this.C} → ${this.A} tanh → score) over the cells → weighted average` : 'plain average over the cells'} → single layer, per question`; }
+    describe(h, w) { const { gh, gw } = this.grid(h, w); return `the field at half resolution (${w} × ${h} px) → ${this.L} level${this.L > 1 ? 's' : ''} of two 3 × 3 convolutions (ReLU) and a 2 × 2 pool, two more at the bottom (${this.C} channels) → ${gw} × ${gh} patches of ${this.C} numbers → ${this.pooling === 'attention' ? `attention (${this.C} → ${this.A} tanh → score) over the patches → weighted average` : 'plain average over the patches'} → single layer, per question`; }
     centred(x) { const o = new Float64Array(x.length); for (let i = 0; i < x.length; i++) o[i] = x[i] - this.mean; return o; }
     tokensOf(x, h, w) { return this.enc.forward(this.centred(x), h, w); }
     forward(x, h, w) {
