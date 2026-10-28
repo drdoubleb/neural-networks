@@ -658,3 +658,20 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 /* the 3 × 3 kernel of a hovered line of the segmentation network, in the tip */
 .kgrid { display: inline-grid; grid-template-columns: repeat(3, 8px); gap: 1px; vertical-align: middle; margin-left: 6px; }
 .kgrid i { display: block; width: 8px; height: 8px; border-radius: 1px; }
+
+/* ---------- your text: the text box, the documents, the prompt, the samples after every epoch ---------- */
+.rp-text .tok.sec-text { color: var(--ink); }
+.thumb.report.tx-doc, .legend .swatch.ring.tx-doc { border-color: #4a3aa7; }
+.tray.reports.wide { grid-template-columns: repeat(auto-fill, 104px); }
+.tray.reports.wide .thumb.report { width: 104px; padding: 0 4px; box-sizing: border-box; }
+.thumb.report .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.legend .line.dashed { border-top-style: dashed; }
+.tx-input { display: block; width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; min-height: 200px; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); margin-top: 10px; }
+.tx-prompt { display: block; width: 100%; box-sizing: border-box; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6; min-height: 64px; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--ink); }
+.tx-input:focus, .tx-prompt:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tx-samples { display: grid; gap: 10px; max-height: 380px; overflow: auto; padding: 2px; }
+.tx-sample { display: grid; grid-template-columns: 64px repeat(var(--tx-cols, 1), minmax(0, 1fr)); gap: 10px 14px; align-items: start; }
+.tx-sample .ep { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); padding-top: 3px; }
+.tx-sample .txt { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--ink-2); }
+.tx-sample.head .txt { font-family: var(--font-body); font-size: 12px; color: var(--ink-3); }
+.tx-sample.head + .tx-sample .txt { color: var(--ink); }

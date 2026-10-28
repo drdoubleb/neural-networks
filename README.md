@@ -49,10 +49,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists twelve questions: a blood count, three nucleus questions, the foundation model, two questions
+The masthead lists thirteen questions: a blood count, three nucleus questions, the foundation model, two questions
 asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
-chat the same model holds about a case, the description it writes of a nucleus from its image, and the same fields
-of bladder painted a class per pixel. Whatever the question, the nav has the same three steps, and a lecture recipe
+chat the same model holds about a case, the description it writes of a nucleus from its image, the same fields of
+bladder painted a class per pixel, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
@@ -184,7 +184,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the twenty-one recipe buttons
+## The lecture arc: the twenty-two recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑮:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑯: `node tools/check_slides.js --question focus --context none,distX
@@ -213,6 +213,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑲ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑳ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ㉑ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
+| ㉒ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30 | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
 
 The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
@@ -1112,6 +1113,74 @@ lab's scan of the same nucleus, for the scan flipped and turned, or for no image
 tally of its own, so that the stain-dependent word, the encoder's invariance and the base rates can each be shown in
 a minute. Recipe ㉑ sets it up.
 
+## Your text: the same model on any text
+
+The last recipe hands the language model over. Paste any text on the Specimens step and the page trains the
+next-word model on it; then type a title line, a first line or a few words on the Test step and read what it writes.
+The default text is Robert Frost's *Mountain Interval* (1916), the book of "The Road Not Taken", "Birches", "Out,
+Out—" and "The Oven Bird", and his five books of 1913 to 1928 together (*A Boy's Will*, *North of Boston*, *Mountain
+Interval*, *New Hampshire*, *West-Running Brook*) are a click away, fetched on demand. Both come from the Project
+Gutenberg eBook of the 1930 *Collected Poems* (#78327), a text in the public domain in the United States; in
+countries that count seventy years from the author's death (1963) it stays in copyright until 2034, which the page
+says, and nothing else of his ships with it.
+
+`js/text.js` cuts a text into documents the way the other language-model questions come with theirs. When the text
+marks its titles as Project Gutenberg does, `_Title_` on a line of its own, every poem is a document, the title line
+its first line; otherwise every paragraph is one. Anything longer than 200 tokens (the start and end tokens counted)
+is cut into windows at line ends, the first window carrying the title; an all-capitals line without a title (a
+book's heading) is dropped. The tenth of every ten documents is held out, and the vocabulary is the whole text's,
+held-out documents included, so that a held-out poem can be given to the model by its title line: a word that
+appears only in held-out documents keeps the random row it started with, since no training document ever moves it.
+The tokenizer is the reports' (words, numbers, punctuation and the line break). *Mountain Interval* comes to 93
+documents (33 poems, the long ones in windows), 84 for training and 9 held out, 15,135 tokens and a vocabulary of
+2,541; the five books to 470 documents, 423 and 47, 75,413 tokens and 7,623 words. The model is the report model's
+recipe unchanged (48 numbers per token, 200 learned positions, two context layers of two heads, Adam at 0.005,
+batches of four), 274,945 parameters on the default text, most of them the two tables of 2,541 rows.
+
+The Train step is the shared language-model lab with the measures a text without a hidden rule allows. The loss
+chart carries the held-out loss and, dashed, the training loss; the third chart the next word right on the first
+twenty training documents (dashed) against the held-out ones; there is no fourth chart, since nothing in a poem is
+the findings block. A box below the curves shows two titles continued after every epoch, the most probable word each
+time: "A Patch of Old Snow", a held-out poem the model never sees, and "The Road Not Taken", a training poem. Early
+on both are the commonest words in the commonest order; then phrases from the poems appear; then the training title
+turns into its own first lines, lifted from the training documents, while the held-out one gets a continuation
+stitched from what the model memorised, since nothing it learned of that poem can be there. The words' map keeps to
+the two directions (t-SNE on 2,500 words would hold the page for seconds at every epoch), coloured by whether a word
+stands in the training documents at all, with the sixty commonest words labelled.
+
+The shipped model (seed 1, 30 epochs, about 12 minutes in Node and 35 s an epoch in the browser) is the lesson in
+numbers:
+
+| Epoch | Training loss | Held-out loss | Next word right, held out | Next word right, training |
+|---|---|---|---|---|
+| 1 | 6.70 | 6.07 | 12% | 12% |
+| 4 | 4.76 | 5.68 (the lowest) | 13% | 18% |
+| 10 | 2.76 | 6.84 | 12% | 41% |
+| 20 | 1.10 | 9.08 | 12% | 73% |
+| 30 | 0.51 | 10.35 | 10% | 89% |
+
+Fourteen thousand tokens cannot teach a model of this size the language; they can be memorised, and from the fifth
+epoch on that is all that happens: the training loss falls to half a nat while the held-out loss climbs past where
+it started. The held-out words are right one time in ten throughout, mostly line breaks and *the*. Given a training
+poem's title line, the trained model reproduces 9% of the poem's words in an unbroken run on average over twelve
+poems, the first two lines of "The Road Not Taken" among them, before a wrong word sends it elsewhere; given a
+held-out title, nothing of the poem (0%), as it must be. The loaded model says where its held-out loss was lowest, and
+a lecturer who wants the best writer rather than the best memoriser sets the epochs to four and trains: early
+stopping, with the curve that justifies it on screen. Any large model has the same two curves; the gap opens after a
+trillion words instead of fourteen thousand.
+
+*Test* is the prompt box: the model continues from the end of what you typed (end with a line break to start the
+next line, or type nothing and it writes from the start token, the same poem every time at temperature 0), with the
+temperature, a word limit and the pace as sliders, and three buttons that put in a held-out title, the next training
+title or nothing. When the prompt is a poem's title line the poem itself is shown beside it, and the note after
+writing counts how many tokens came back word for word before the model left the text. Every word written has its
+bars and its lines over the text, and the network, heads and attention cards follow the word hovered, as on the
+other language-model questions. Words the vocabulary lacks go in as the unknown token, and the note names them.
+Recipe ㉒ sets the default up; a text of one's own is pasted on the Specimens step (an epoch takes about 35 s per
+14,000 tokens here, so a long text makes a slow lesson, and the five books about seven minutes). Reproduce the shipped
+model with `node tools/check_text.js --epochs 30 --curve --save data/text/text_weights.js`; `--text FILE --global NAME`
+trains on another text written the way `tools/generate_text.js` writes them.
+
 ## Segment: a class for every pixel
 
 The Segment question asks the fields of bladder, the ones the invasion lessons classify as a whole, a different
@@ -1196,7 +1265,8 @@ set two levels and train again, or load the trained network, for the comparison.
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
 training: the model that the recipe trains, with the curves of its training, comes back in an instant and the Test
 step works from it. The language models, the segmentation network and the two end-to-end field models ship from their Node trainers
-(above). The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
+(above); the text model's file (3.3 MB, most of it two tables of 2,541 rows) is not loaded with the page but fetched
+when its button is pressed, and only the default text has one. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
 recipe (1 to 10 and 14), the 4 · Foundation stage, both slide questions with and without the context layer and with
 attention pooling or a plain average, and the field model with and without positions and the context layers, presses
 Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
@@ -1379,6 +1449,14 @@ their traits in `data/describe/sample_descriptions.md`. `js/describe.js` also re
 the four traits (true, false, or unsaid when a trait is not named or named both ways) and the impression, for the
 measures and the page's ticks.
 
+`tools/generate_text.js` writes the texts of the Your-text question from the plain-text Project Gutenberg eBook of
+Frost's *Collected Poems* (1930, #78327), which is not in the repository: it strips the Gutenberg header and licence,
+takes the lines between two headings (`--from "MOUNTAIN INTERVAL" --to "NEW HAMPSHIRE"` for the default text, `--all`
+for the five books from *A Boy's Will* on; a heading's last occurrence, since the first is the contents list) and
+writes the text with its source line and counts to `data/text/mountain_interval.js` (`window.LECTURE_TEXT`, 70 KB) and
+`data/text/frost_collected.js` (`window.LECTURE_TEXT_ALL`, 345 KB, fetched by the page on demand). The cutting into
+documents happens on the page, in `js/text.js`, so that a pasted text is treated exactly like the default.
+
 ## Code map
 
 ```
@@ -1389,6 +1467,7 @@ js/nn.js                   the network: optional convolution, 0–2 dense layers
 js/reports.js              the reports as tokens: the word-level tokenizer, the vocabulary, encoding and decoding, the text back from tokens, the section and block line of every token, and a byte-pair tokenizer learned on the corpus for the page's sub-word demonstration (browser + Node)
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
+js/text.js                 the Your-text question: a text normalised and cut into documents (a poem per marked title or a paragraph each, windows of 200 tokens at line ends), the tenth of every ten held out, the whole text's vocabulary, the title line as the prefix the model continues (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network, and the network unrolled at one pixel (circles for the channels, lines for the kernels' contributions)
@@ -1403,6 +1482,9 @@ data/chat/chat_data.js     the transcripts of the chat question: 2,400 training,
 data/chat/chat_weights.js  the trained chat model with its vocabulary, the curves of its training and the words' paths, written by tools/check_chat.js --save
 data/describe/describe_data.js  the nuclei of the Describe question: 400 from the atypia generator with the four traits chosen independently, each with its description; the test nuclei as scanned at both labs; written by tools/generate_describe.js (with a contact sheet and a sample sheet beside it)
 data/describe/describe_weights.js  the trained describe model with its vocabulary, the curves of its training, its measures and the words' paths, written by tools/check_describe.js --save
+data/text/mountain_interval.js  the default text of the Your-text question: Frost's Mountain Interval (1916) from the Project Gutenberg Collected Poems, with its source line, written by tools/generate_text.js
+data/text/frost_collected.js  Frost's five books of 1913 to 1928 from the same eBook, fetched by the page on demand, written by tools/generate_text.js --all
+data/text/text_weights.js  the trained text model (30 epochs on Mountain Interval) with its vocabulary, the curves of its training, the two titles continued after every epoch and the words' paths, written by tools/check_text.js --save; fetched by the page on demand
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑫ and ⑱) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
@@ -1420,6 +1502,8 @@ tools/generate_chat.js     make the transcripts: three styles, three phrasings o
 tools/check_chat.js        train the chat model and take its measures: loss by role, the answers written from the transcript up to the last ASSISTANT: by style on the trained and the held-out phrasings and by question, the agent loop, the probes
 tools/generate_describe.js make the Describe nuclei and their descriptions (a contact sheet and a sample sheet for vetting)
 tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
+tools/generate_text.js     write a text of the Your-text question from a Project Gutenberg plain text: the header and licence stripped, the lines between two headings taken
+tools/check_text.js        train the next-word model on a text as the page does and take its measures: loss and next word right on the held-out and the training documents per epoch, two titles continued after every epoch, recall of the training and held-out poems from their title lines, poems from titles of one's own at a temperature
 tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
