@@ -2769,7 +2769,7 @@ window.Viz = (function () {
   // position vector and their sum, and the rows nearest to it by cosine; one colour scale for the whole table
   const ET_W = 800;
   function layoutEmbTable(m) {
-    const V = m.V, D = m.D, thumbRow = V > 220 ? 1 : V > 110 ? 2 : 3, thumb = { x: 12, y: 40, w: 96, h: V * thumbRow, cw: 96 / D, row: thumbRow };
+    const V = m.V, D = m.D, thumbRow = V > 320 ? 320 / V : V > 220 ? 1 : V > 110 ? 2 : 3, thumb = { x: 12, y: 40, w: 96, h: V * thumbRow, cw: 96 / D, row: thumbRow }; // a vocabulary of thousands (the text question) shares the pixels: the whole table stays 320 px tall
     const rows = { labelX: 270, xs: 280, y: 44, h: 15, cw: 10, w: D * 10, pitch: 22 }, nRows = (m.pos ? 3 : 1) + (m.img ? 1 : 0), nbY = rows.y + nRows * rows.pitch + 32, nbH = 18;
     const pin = m.img ? { x: thumb.x, y: thumb.y + thumb.h + 44, cw: thumb.w / m.img.C, rh: 4, C: m.img.C } : null;
     return { thumb, rows, nbY, nbH, pin, H: Math.max(thumb.y + thumb.h + 24, nbY + m.neighbours.length * nbH + 22, pin ? pin.y + D * pin.rh + 16 : 0) };

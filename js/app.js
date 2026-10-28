@@ -22,6 +22,8 @@
     rp: { world: 'reports', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     ch: { world: 'chat', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     dsq: { world: 'describe', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, probe: 'own', encoder: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
+    tx: { world: 'text', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
+      text: null, source: 'default', D: null, prompt: null, maxWords: 80, loading: null, loadingW: null, inputFor: null, trainTitleAt: 0, labelled: null, labelledFor: null }, // the Your-text question: the text pasted (null: the default), where it came from, its documents, and the Test step's prompt
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, testHoverNet: null },
     fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, pinnedCell: null, hoverLayers: null, hoverCellNet: null, lwalk: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
@@ -38,7 +40,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Atypia · measurements · single layer','4 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','5 · Enlargement · pixels · single layer','6 · Irregularity · pixels · single layer','7 · Irregularity · pixels · 4 ReLU + augmentation','8 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','9 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','10 · Irregularity · pixels · convolution + 4 ReLU + augmentation','11 · Segment · a class for every pixel · the window it is decided from','12 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches','13 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','14 · Irregularity · the foundation code · single layer · 10 labelled cases','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Reports · a small language model writes the report from the findings · fluency first, grounding last','20 · Chat · the next-word model on transcripts · ask it about a case','21 · Describe · from pixels to words · the image as the first token']; // the number first, in plain digits, so that it reads in the dropdown
+  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Atypia · measurements · single layer','4 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','5 · Enlargement · pixels · single layer','6 · Irregularity · pixels · single layer','7 · Irregularity · pixels · 4 ReLU + augmentation','8 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','9 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','10 · Irregularity · pixels · convolution + 4 ReLU + augmentation','11 · Segment · a class for every pixel · the window it is decided from','12 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches','13 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','14 · Irregularity · the foundation code · single layer · 10 labelled cases','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Reports · a small language model writes the report from the findings · fluency first, grounding last','20 · Chat · the next-word model on transcripts · ask it about a case','21 · Describe · from pixels to words · the image as the first token','22 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default']; // the number first, in plain digits, so that it reads in the dropdown
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -85,6 +87,7 @@
     { id: 'reports', title: 'Reports: write the report from the findings?', world: 'reports' },
     { id: 'chat', title: 'Chat: ask the model about a case?', world: 'chat' },
     { id: 'describe', title: 'Describe: from pixels to words?', world: 'describe' },
+    { id: 'text', title: 'Your text: train it on any text?', world: 'text' },
   ];
   const onClassic = step => S.world === 'classic' && S.stage === step;
   function selectQuestion(id) {
@@ -1191,6 +1194,12 @@
         go();
         return;
       }
+      if (k === '22') { // the Your-text question: the same model on a text of one's own, Frost's Mountain Interval by default
+        S.tx.dim = 48; S.tx.layers = 2; S.tx.positions = true; S.tx.epochs = 10; S.tx.lr = 0.005; S.tx.seed = 1;
+        const go = () => { selectQuestion('text'); showStage('train'); const L = S.tx; rpReset(`Recipe ${RECIPE_LABELS[22]}: ${L.train.length} training documents, ${L.meta.poems} poems of Frost cut into windows of 200 tokens with one document in ten held out, and the next word alone. Press Train (an epoch is ${txEpochEstimate()} here) and watch the two accuracy lines part: the training line climbs on while the held-out one stalls, memorisation outrunning what it learns of the language, and the box below the curves shows two titles continued after every epoch, a training poem’s and a held-out one’s. Load the trained model, then go to 3 · Test and start it off with a title of your own; or paste a text of your own on 1 · Specimens.`); };
+        if (S.tx.source !== 'default') txLoadPreset('default').then(g => { txApplyText(g.text, 'default'); go(); }).catch(() => go()); else go();
+        return;
+      }
       if (k === '21') { // the describe question: from pixels to words
         S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
         selectQuestion('describe'); showStage('train');
@@ -1305,7 +1314,7 @@
       if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
       if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else if (S.world === 'reports' || S.world === 'chat' || S.world === 'describe') { const Lx = LM(); if (Lx.running && Lx.stopAt == null) rpStop('Paused.'); else rpStart(); } else if (S.world === 'segment') { if (S.sg.running) sgStop('Paused.'); else sgStart(); } else S.sl.running ? slStop('Paused.') : slStart(); }
-      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); else if (S.world === 'reports') rpWriteNext(); else if (S.world === 'chat') chAskNext(); else if (S.world === 'describe') dsDescribeNext(); else if (S.world === 'segment') sgSegmentNext(false); }
+      else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); else if (S.world === 'reports') rpWriteNext(); else if (S.world === 'chat') chAskNext(); else if (S.world === 'describe') dsDescribeNext(); else if (S.world === 'text') txWrite(); else if (S.world === 'segment') sgSegmentNext(false); }
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && onClassic('train')) teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
     });
@@ -1335,7 +1344,7 @@
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
     applyVisibility();
   }
-  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test' };
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test', 'text:data': 'panel-tx-data', 'text:train': 'panel-reports', 'text:test': 'panel-tx-test' };
   function showStage(name) {
     if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
@@ -1348,10 +1357,11 @@
     if (!(w === 'slides' && name === 'train')) slStop();
     if (!(w === 'fields' && name === 'train')) fdStop();
     if (!(w === 'segment' && name === 'train')) sgStop();
-    if (!((w === 'reports' || w === 'chat' || w === 'describe') && name === 'train')) lmStopAll();
+    if (!(LM_WORLDS[w] && name === 'train')) lmStopAll();
     if (!(w === 'reports' && name === 'test')) { rpWriteStop(); S.rp.batchWriting = false; }
     if (!(w === 'chat' && name === 'test')) { chWriteStop(); S.ch.batchWriting = false; }
     if (!(w === 'describe' && name === 'test')) { dsWriteStop(); S.dsq.batchWriting = false; }
+    if (!(w === 'text' && name === 'test')) txWriteStop();
     if (w !== 'classic' || name === 'test') stopTraining();
     if (w === 'classic') {
       if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); }
@@ -1371,6 +1381,7 @@
     else if (w === 'reports') { if (name === 'data') rpEnterData(); else if (name === 'train') rpEnter(); else rpEnterTest(); }
     else if (w === 'chat') { if (name === 'data') chEnterData(); else if (name === 'train') rpEnter(); else chEnterTest(); }
     else if (w === 'describe') { if (name === 'data') dsEnterData(); else if (name === 'train') rpEnter(); else dsEnterTest(); }
+    else if (w === 'text') { if (name === 'data') txEnterData(); else if (name === 'train') rpEnter(); else txEnterTest(); }
     else if (w === 'segment') { if (name === 'data') sgEnterData(); else if (name === 'train') sgEnter(); else sgEnterTest(); }
     else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
     try { history.replaceState(null, '', '#' + (w === 'classic' ? name : `${S.questionId}/${name}`)); } catch (e) { /* ignore */ }
@@ -3288,6 +3299,15 @@
     $('ds-temp').addEventListener('input', ev => { L.temperature = +ev.target.value / 100; dsSyncControls(); });
     $('ds-pace').addEventListener('input', ev => { L.pace = +ev.target.value; dsSyncControls(); });
   }
+  // the Your-text question: the same model on a text of one's own (js/text.js cuts it into documents); the default
+  // text ships with the page, the five books and the trained model come on demand
+  const NTX = window.NucleusText;
+  const TX = { groundN: 20, sampleMax: 60, colors: { text: '#4a3aa7' }, trainColor: '#d97706',
+    presets: { default: { global: 'LECTURE_TEXT', label: 'Mountain Interval', size: '70 kB', sources: ['data/text/mountain_interval.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/mountain_interval.js', 'https://drdoubleb.github.io/neural-networks/data/text/mountain_interval.js'] },
+      all: { global: 'LECTURE_TEXT_ALL', label: 'the five books', size: '340 kB', sources: ['data/text/frost_collected.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/frost_collected.js', 'https://drdoubleb.github.io/neural-networks/data/text/frost_collected.js'] } },
+    weights: { size: '3 MB', sources: ['data/text/text_weights.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/text_weights.js', 'https://drdoubleb.github.io/neural-networks/data/text/text_weights.js'] } }; // the page's own folder, then a mirror of the repository, then the published page
+  const TX_SHIPPED = { size: TX.weights.size, load: () => S.tx.loadingW || (S.tx.loadingW = txLoadScript(TX.weights.sources, () => window.TEXT_LM).finally(() => { S.tx.loadingW = null; })) }; // stands for the trained model until its file is loaded
+  const txVocabFrom = words => ({ words, index: new Map(words.map((w, i) => [w, i])), start: 0, end: 1, unk: 2, size: words.length });
   const LM_WORLDS = {
     reports: {
       key: 'reports', title: 'Reports: a small language model', subtitle: 'every word predicted from the words before it · the only teacher is the next word', testNote: 'rp-test-note',
@@ -3353,12 +3373,38 @@
       testView: L => (L.written && !L.writing && L.written.view ? L.written.view : null),
       renderData: () => dsRenderData(), renderTest: () => dsRenderTest(),
     },
+    text: {
+      key: 'text', title: 'Your text: the same model on any text', subtitle: 'the next-word model trained on the text you paste · Frost’s Mountain Interval by default · it memorises before it generalises', testNote: 'tx-test-note',
+      state: () => S.tx, data: () => txData(), shipped: () => (S.tx.source === 'default' ? window.TEXT_LM || TX_SHIPPED : null),
+      sections: NTX ? NTX.SECTIONS : ['text'], colors: TX.colors, headers: {}, sectionsOf: words => NTX.sectionsOf(words),
+      vocabOf: (W, D) => (W && W.words ? txVocabFrom(W.words) : NTX.vocabOf(D.docs)), splits: D => NTX.splits(D.docs),
+      groundN: TX.groundN, groundDocs: L => L.train.slice(0, TX.groundN), measureChunk: (L, M, deadline) => txMeasureChunk(L, M, deadline), measureNote: L => `Measuring the next word on ${Math.min(TX.groundN, L.train.length)} training documents and writing the sample…`, finishNote: (L, last) => txFinishNote(L, last),
+      unit: 'documents', doc: 'text', wideThumbs: true, heldLabel: 'never trained on', groundLabel: 'next word right, training', groundSub: 'training documents; the gap to the test figure is memorisation', groundChart: 'Next word right: training documents (dashed) against held-out ones', groundVerb: 'Measuring the next word on the training documents', groundColor: TX.trainColor,
+      groundKeys: () => [{ key: 'acc', color: Viz.colors().accent }, { key: 'ground', color: TX.trainColor, dash: true }],
+      curveKeys: () => [{ key: 'text', color: TX.colors.text }, { key: 'loss', color: TX.trainColor, dash: true }], lossChart: 'Loss per epoch: held-out documents, and the training batches (dashed)',
+      curveLegend: () => `<span><span class="line" style="border-top-color:${TX.colors.text}"></span>held-out documents</span><span><span class="line dashed" style="border-top-color:${TX.trainColor}"></span>training</span>`,
+      noEvidence: true, samples: L => txRenderSamples(L), mapModes: ['pca'], epochTime: () => txEpochEstimate(),
+      prep: (L, r, split) => { const tokens = NTX.encode(L.vocab, r.text), words = NTX.decode(L.vocab, tokens); return { id: r.id, name: r.name, title: r.title, part: r.part, split, text: r.text, tokens, words, sections: NTX.sectionsOf(words), cls: split }; },
+      groundPrefix: d => NTX.prefixOf(d), groundStop: () => false, groundRight: () => false,
+      evidenceSpan: () => null, evidenceChart: '', evidenceNow: '', evidenceColor: TX.trainColor,
+      defaultWord: words => { const k = words.indexOf('\n'); return k > 0 && k + 1 < words.length - 1 ? k + 1 : Math.min(1, words.length - 1); }, defaultWordName: 'the first word after the title line',
+      docTitle: r => `“${r.name}” · ${r.split === 'train' ? 'training' : 'held out, never trained on'} · ${r.tokens.length - 2} tokens`,
+      thumbClass: () => 'tx-doc', thumbTitle: r => `${r.name} · ${r.split === 'train' ? 'training' : 'held out'} · ${r.tokens.length - 2} tokens`, thumbLabel: r => (r.part > 1 ? `window ${r.part}` : `${r.tokens.length - 2} tokens`), traysTitle: 'The documents',
+      traysLegend: '<span><span class="swatch ring tx-doc"></span>a poem, or a window of a long one</span><span><span class="swatch batch"></span>the last batch trained on</span>',
+      labelled: () => txLabelled(), mapExample: 'the little words together, the nouns of the woods and the weather, the words that end a line before the rhyme', mapColour: 'whether it stands in the training documents at all: the grey words appear only in held-out documents, and their vectors never move', mapLegend: () => `<span><span class="swatch" style="background:${TX.colors.text}"></span>in the training documents</span><span><span class="swatch" style="background:${Viz.colors().ink3}"></span>only in held-out documents</span>`, wordNote: (L, v) => `${L.wordCount[v]} time${L.wordCount[v] === 1 ? '' : 's'} in the training documents`,
+      get untrainedNote() { return `Untrained: every next word is a guess over the whole vocabulary, so the text on screen is red all over. Step a batch to watch one gradient step, press Train (an epoch is ${txEpochEstimate()} here) and watch the two accuracy lines part${S.tx.source === 'default' ? ', or load the trained model' : ''}.`; },
+      get loadedNote() { const W = window.TEXT_LM, h = W && Array.isArray(W.hist) ? W.hist : null; if (!h || !h.length) return 'It writes Frost; go to 3 · Test to start it off, or keep training it here.'; let best = h[0]; for (const r of h) if (r.testLoss < best.testLoss) best = r; const last = h[h.length - 1]; return `Its held-out loss was lowest after epoch ${best.epoch} (${best.testLoss.toFixed(2)}) and has climbed since, to ${last.testLoss.toFixed(2)}: it has memorised the book, as the curves show, and gets ${pct(last.ground)} of the training words against ${pct(last.acc)} of the held-out ones. Go to 3 · Test and start it off with a training title, a held-out one and words of your own.`; },
+      curvesNote: 'The loss is the surprise per word, in nats: solid on the held-out documents the model never trains on, dashed on the training batches. With a text this small the two part within a few epochs: the training loss keeps falling while the held-out loss levels off and turns back up, and the third chart shows the same as accuracy. The model is memorising the poems it saw and learning less and less about the ones it did not; a large model trained on a trillion words has the same two curves, only the gap opens far later. The box below shows what it writes after every epoch for the same held-out title line.',
+      attentionNote: n => `Rows ask, columns answer: every row is one word's shares over the words before it, scaled to its largest share. The near head hugs the diagonal, reading the words just before; the far head reaches back along the poem, to the line ends and the words before them. The bars give each head's attention by distance back, averaged over the ${n} words. Hover a cell for its pair of words; the outlined row is the word the diagram follows.`,
+      testView: L => (L.written && !L.writing && L.written.view ? L.written.view : null),
+      renderData: () => txRenderData(), renderTest: () => txRenderTest(),
+    },
   };
-  const LMW = () => LM_WORLDS[S.world === 'chat' ? 'chat' : S.world === 'describe' ? 'describe' : 'reports']; // the language-model world on screen
+  const LMW = () => LM_WORLDS[LM_WORLDS[S.world] ? S.world : 'reports']; // the language-model world on screen (the reports' when none is)
   const LM = () => LMW().state();                                          // its state
   const WDof = L => LM_WORLDS[L.world];                                    // the descriptor of a state, for work that runs on while another world is on screen
   function lmStopAll() { for (const k of Object.keys(LM_WORLDS)) { const Lx = LM_WORLDS[k].state(); Lx.running = false; Lx.stopAt = null; } rpNetWalkStop(); }
-  const rpOnTest = () => (S.world === 'reports' || S.world === 'chat' || S.world === 'describe') && S.stage === 'test';
+  const rpOnTest = () => !!LM_WORLDS[S.world] && S.stage === 'test';
   function rpNote(msg) { $(rpOnTest() ? LMW().testNote : 'rp-note').textContent = msg || ''; } // the note of the step on screen
   function rpData() { const D = window.LECTURE_REPORTS; return D && D.meta ? D : null; }
   const rpClassGroup = cls => (cls === 'invasive' || cls === 'invasive-mp' ? 'rp-inv' : cls === 'cis' || cls === 'suspicious' ? 'rp-cis' : 'rp-benign');
@@ -3414,7 +3460,10 @@
   }
   // the model trained for 30 epochs in Node, the weights that ship with the page
   function rpLoadShipped() {
-    const L = LM(), WD = LMW(), W = WD.shipped(); if (!W) { rpNote('The trained model did not load with the page.'); return; } rpStop(); if (!rpBuild()) return;
+    const L = LM(), WD = LMW(), W = WD.shipped(); if (!W) { rpNote('The trained model did not load with the page.'); return; }
+    if (W.load) { rpNote(`Loading the trained model (${W.size})…`); W.load().then(() => { if (LMW() === WD && !WD.shipped().load && !L.shipped) rpLoadShipped(); }).catch(e => rpNote(`The trained model did not load: ${e.message}`)); return; } // a model that comes on demand: fetched first, then loaded
+    rpStop(); if (!rpBuild()) return;
+    if (W.words && (W.words.length !== L.vocab.size || W.words.some((w, i) => w !== L.vocab.words[i]))) { L.built = false; L.trayFor = {}; if (!rpBuild()) return; } // the model's own vocabulary, so that its weights fit the tokens
     L.model = NN.LanguageModel.fromJSON(W); L.shipped = true; L.dim = W.dim; L.layers = W.layers; L.positions = W.positions > 0;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
     const hist = Array.isArray(W.hist) && W.hist.length ? W.hist.map(h => Object.assign({}, h)) : null; // the history of its training in Node, epoch by epoch, when the file carries it
@@ -3433,25 +3482,30 @@
     for (const s of WDof(L).sections) rec[s] = n[s] ? sum[s] / n[s] : null;
     rec.evidence = rpEvidenceShare(L); // where the diagnosis (the answer) looks: the share of its attention on the findings, on a few test documents
     L.hist.push(rec); rpTrailPush(L); // the tables now: one step of every word's path on the map
-    if (withGround) { const docsG = L.test.slice(0, WDof(L).groundN || RP.groundN); rec.groundN = docsG.length; L.measuring = { docs: docsG, i: 0, st: null, ok: 0, rec }; if (!L.running) requestAnimationFrame(now => rpTick(now, L)); }
+    if (withGround) { const WDg = WDof(L), docsG = WDg.groundDocs ? WDg.groundDocs(L) : L.test.slice(0, WDg.groundN || RP.groundN); rec.groundN = docsG.length; L.measuring = { docs: docsG, i: 0, st: null, ok: 0, n: 0, rec }; if (!L.running) requestAnimationFrame(now => rpTick(now, L)); }
   }
   function rpEvidenceShare(L) { // the share of the diagnosis' (the answer's) attention, in the last layer with the heads averaged, that lands on the findings block, averaged over the first test documents
     const WD = WDof(L); let s = 0, n = 0;
     for (const d of L.test.slice(0, RP.evidenceN)) { const span = WD.evidenceSpan(d); if (!span) continue; const target = WD.evidenceSection || 'findings', v = RPR.attentionShare(L.model.forward(d.tokens, d.code || null), span[0], span[1], j => d.sections[j] === target); if (v != null) { s += v; n++; } }
     return n ? s / n : null;
   }
-  function rpMeasureChunk(deadline, L) { // a few words of the grounding measure per frame: the model writes the description and the diagnosis of a test report from its findings and its requisition, with its cache of the words so far
+  function rpMeasureChunk(deadline, L) { // a few words of the grounding measure per frame: the model writes the description and the diagnosis of a test report from its findings and its requisition, with its cache of the words so far (a world with a measure of its own, the text's, takes the frame itself)
     const WD = WDof(L), M = L.measuring; if (!M) return;
-    while (performance.now() < deadline) {
-      const d = M.docs[M.i]; if (!d) break;
-      if (!M.st) M.st = L.model.genState(WD.groundPrefix(d), WD.groundCode ? WD.groundCode(d) : null); // the reports: the findings, the specimen, the history and the gross given; the chat: the transcript up to the assistant's last turn
-      const { token } = L.model.genNext(M.st, { temperature: 0 });
-      if (token === L.vocab.end || WD.groundStop(token, L) || M.st.tokens.length >= RP.maxWrite) {
-        if (WD.groundRight(d, RPR.decode(L.vocab, M.st.tokens))) M.ok++;
-        M.i++; M.st = null;
+    if (WD.measureChunk) { if (!WD.measureChunk(L, M, deadline)) return; }
+    else {
+      while (performance.now() < deadline) {
+        const d = M.docs[M.i]; if (!d) break;
+        if (!M.st) M.st = L.model.genState(WD.groundPrefix(d), WD.groundCode ? WD.groundCode(d) : null); // the reports: the findings, the specimen, the history and the gross given; the chat: the transcript up to the assistant's last turn
+        const { token } = L.model.genNext(M.st, { temperature: 0 });
+        if (token === L.vocab.end || WD.groundStop(token, L) || M.st.tokens.length >= RP.maxWrite) {
+          if (WD.groundRight(d, RPR.decode(L.vocab, M.st.tokens))) M.ok++;
+          M.i++; M.st = null;
+        }
       }
+      if (M.i < M.docs.length) return;
+      M.rec.ground = M.ok / M.docs.length;
     }
-    if (M.i >= M.docs.length) { M.rec.ground = M.ok / M.docs.length; L.measuring = null; if (L === LM()) { rpRenderCurves(); rpRenderStatus(); if (!L.running && L.finishedAt === M.rec.epoch) rpFinishNote(); } }
+    L.measuring = null; if (L === LM()) { rpRenderCurves(); rpRenderStatus(); if (!L.running && L.finishedAt === M.rec.epoch) rpFinishNote(); }
   }
   function rpStep(Lx) { // one gradient step on the next batch of the epoch's order; true when the epoch ended
     const L = Lx || LM(), n = L.train.length;
@@ -3482,10 +3536,11 @@
     } catch (e) { console.error(e); L.running = false; if (L === LM()) rpSyncButtons(); }
     if (L.running || L.measuring) requestAnimationFrame(now2 => rpTick(now2, L));
   }
-  function rpFinish(Lx) { const L = Lx || LM(), WD = WDof(L); L.finishedAt = L.epoch; rpStop(`Finished ${rpEpochs(L.epochs)} on the next word alone. ${WD.groundVerb} on ${WD.groundN || RP.groundN} test ${WD.unit}…`, L); if (!L.measuring && L === LM()) rpFinishNote(); }
+  function rpFinish(Lx) { const L = Lx || LM(), WD = WDof(L); L.finishedAt = L.epoch; rpStop(`Finished ${rpEpochs(L.epochs)} on the next word alone. ${WD.measureNote ? WD.measureNote(L) : `${WD.groundVerb} on ${WD.groundN || RP.groundN} test ${WD.unit}…`}`, L); if (!L.measuring && L === LM()) rpFinishNote(); }
   const rpEpochs = n => `${n} epoch${n === 1 ? '' : 's'}`;
   function rpFinishNote() { // the run's last word, with the shipped model for comparison
     const L = LM(), WD = LMW(), last = L.hist[L.hist.length - 1], W = WD.shipped(), shipped = W && Array.isArray(W.hist) && W.hist.length ? W.hist[W.hist.length - 1] : null, same = W && L.dim === W.dim && L.positions === (W.positions > 0) && L.layers === W.layers;
+    if (WD.finishNote) { rpNote(WD.finishNote(L, last)); return; } // a world with a measure of its own words its own ending
     const cmp = shipped && shipped.ground != null ? (L.shipped ? ` The trained model that ships with the page, which you continued, had ${pct(shipped.ground)} after its ${W.hist.length} epochs.` : ` The trained model that ships with the page, ${same ? 'the same recipe' : `${W.layers} context layer${W.layers === 1 ? '' : 's'} and ${W.dim} numbers per token`} after ${W.hist.length} epochs, gets ${pct(shipped.ground)}${last.ground != null && last.ground < shipped.ground ? ': fluent first, grounded later. Load it to compare, or raise the epochs and keep training' : ''}.`) : '';
     rpNote(`Finished ${rpEpochs(L.epochs)} on the next word alone. Test loss ${last.testLoss.toFixed(3)}, ${pct(last.acc)} of next words right, and ${WD.groundLabel} for ${last.ground == null ? '–' : pct(last.ground)} of ${WD.groundN || RP.groundN} test ${WD.unit}.${cmp} Go to 3 · Test to ${WD.key === 'chat' ? 'ask it' : 'make it write'}.`);
   }
@@ -3583,14 +3638,16 @@
     $('rp-next-note').textContent = `The eight most probable next words after “${r.words.slice(Math.max(1, i - 4), i).map(w => (w === '\n' ? '↵' : w)).join(' ')}”, and the actual one (✓). The lit words on the left, with the lines to them, are the ones the model read, standing at “${rpWordLabel(r.words[i - 1])}”, to expect this word, in layer ${L.layer + 1}${L.head < 0 ? ', both heads' : L.head ? ', the far head' : ', the near head'}; the deeper the underline and the thicker the line, the more it listened.`;
   }
   function rpRenderCurves() {
-    const L = LM(), WD = LMW(), keys = (WD.curveSections || WD.sections).map(s => ({ key: s, color: WD.colors[s] })), last = L.hist[L.hist.length - 1];
-    Viz.drawSeries($('rp-loss'), { hist: L.hist, keys, maxEpoch: L.epochs });
+    const L = LM(), WD = LMW(), keys = WD.curveKeys ? WD.curveKeys() : (WD.curveSections || WD.sections).map(s => ({ key: s, color: WD.colors[s] })), last = L.hist[L.hist.length - 1];
+    Viz.drawSeries($('rp-loss'), { hist: L.hist, keys, maxEpoch: L.epochs }); { const t = $('rp-loss-title'); if (t) t.textContent = WD.lossChart || 'Loss per epoch by section, test reports'; }
     Viz.drawSeries($('rp-acc'), { hist: L.hist, keys: [{ key: 'acc', color: Viz.colors().accent }], maxEpoch: L.epochs, pct: true, baseline: null });
-    Viz.drawSeries($('rp-ground'), { hist: L.hist, keys: [{ key: 'ground', color: WD.groundColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-ground-title').textContent = WD.groundChart;
-    Viz.drawSeries($('rp-evidence'), { hist: L.hist, keys: [{ key: 'evidence', color: WD.evidenceColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-evidence-title').textContent = WD.evidenceChart; $('rp-evidence-now').textContent = last && last.evidence != null ? `${pct(last.evidence)} ${WD.evidenceNow}` : '';
-    $('rp-legend').innerHTML = WD.sections.map(s => `<span><span class="line" style="border-top-color:${WD.colors[s]}"></span>${s}</span>`).join('');
+    Viz.drawSeries($('rp-ground'), { hist: L.hist, keys: WD.groundKeys ? WD.groundKeys() : [{ key: 'ground', color: WD.groundColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-ground-title').textContent = WD.groundChart;
+    { const ch = $('rp-evidence').closest('.chart'); if (ch) ch.hidden = !!WD.noEvidence; } // a world without a block to look at (the text) has no fourth chart
+    if (!WD.noEvidence) { Viz.drawSeries($('rp-evidence'), { hist: L.hist, keys: [{ key: 'evidence', color: WD.evidenceColor }], maxEpoch: L.epochs, pct: true, baseline: null }); $('rp-evidence-title').textContent = WD.evidenceChart; $('rp-evidence-now').textContent = last && last.evidence != null ? `${pct(last.evidence)} ${WD.evidenceNow}` : ''; }
+    $('rp-legend').innerHTML = WD.curveLegend ? WD.curveLegend() : WD.sections.map(s => `<span><span class="line" style="border-top-color:${WD.colors[s]}"></span>${s}</span>`).join('');
     $('rp-loss-now').textContent = last ? `test ${last.testLoss.toFixed(3)}` : ''; $('rp-acc-now').textContent = last ? pct(last.acc) : ''; $('rp-ground-now').textContent = last && last.ground != null ? pct(last.ground) : L.measuring ? 'measuring…' : '';
-    $('rp-curves-note').textContent = WD.curvesNote + (L.model && !L.model.layers.length ? ' With no context layer the fourth chart stays empty: nothing reads the block, and the model can only write the most probable continuation of each word.' : '');
+    $('rp-curves-note').textContent = WD.curvesNote + (!WD.noEvidence && L.model && !L.model.layers.length ? ' With no context layer the fourth chart stays empty: nothing reads the block, and the model can only write the most probable continuation of each word.' : '');
+    { const card = $('rp-samples-card'); if (card) { card.hidden = !WD.samples; if (WD.samples) WD.samples(L); } } // what the model writes after every epoch, the text world's box
   }
   function rpThumb(r, onClick) {
     const WD = LMW(); if (WD.thumb) return WD.thumb(r, onClick); const b = document.createElement('button'); b.type = 'button'; b.className = `thumb report ${WD.thumbClass(r)}`; b.dataset.id = r.id; b.title = WD.thumbTitle(r);
@@ -3602,14 +3659,14 @@
   function rpTrays(kind, onClick) { // a panel's trays, built once
     const L = LM(); if (L.trayFor[kind]) return; L.trayFor[kind] = true;
     const map = new Map(), fill = (id, tray) => { const el = $(id); el.innerHTML = ''; for (const r of tray) { const b = rpThumb(r, onClick); el.appendChild(b); map.set(r.id, b); } };
-    if (kind === 'train') { const WD = LMW(); fill('rp-train-tray', L.train); fill('rp-test-tray', L.test); for (const id of ['rp-train-tray', 'rp-test-tray']) $(id).classList.toggle('scroll', !!WD.trayScroll); L.thumbs = map; $('rp-train-label').textContent = `Training ${WD.unit} (${L.train.length})`; $('rp-test-label').textContent = `Test ${WD.unit} (${L.test.length}) · never trained on`; $('rp-trays-title').textContent = WD.traysTitle; $('rp-trays-legend').innerHTML = WD.traysLegend; }
+    if (kind === 'train') { const WD = LMW(); fill('rp-train-tray', L.train); fill('rp-test-tray', L.test); for (const id of ['rp-train-tray', 'rp-test-tray']) { $(id).classList.toggle('scroll', !!WD.trayScroll); $(id).classList.toggle('wide', !!WD.wideThumbs); } L.thumbs = map; $('rp-train-label').textContent = `Training ${WD.unit} (${L.train.length})`; $('rp-test-label').textContent = `Test ${WD.unit} (${L.test.length}) · never trained on`; $('rp-trays-title').textContent = WD.traysTitle; $('rp-trays-legend').innerHTML = WD.traysLegend; }
     else if (kind === 'data') { fill('rp-data-train-tray', L.train); fill('rp-data-test-tray', L.test); fill('rp-data-held-tray', L.held); L.dataThumbs = map; $('rp-data-train-label').textContent = `Training reports (${L.train.length})`; $('rp-data-test-label').textContent = `Test reports (${L.test.length}) · held out`; }
     else { fill('rp-test-results', L.cases === 'held' ? L.held : L.test); L.testThumbs = map; $('rp-test-count').textContent = `${(L.cases === 'held' ? L.held : L.test).length} cases`; }
   }
   function rpRenderTrays() { const L = LM(), focus = rpFocus(), batch = new Set(L.lastBatch); rpTrays('train'); for (const [id, el] of L.thumbs) { el.classList.toggle('selected', focus.id === id); el.classList.toggle('in-batch', batch.has(id)); } }
   function rpRenderFocus() { rpRenderText(); }
   function rpRender(full) { const L = LM(); if (!L.model) return; rpRenderStatus(); rpRenderFocus(); if (full) { rpRenderCurves(); rpRenderTrays(); rpRenderWordMap(); } rpSyncButtons(); }
-  function rpRenderAll() { const L = LM(); if (!(S.world === 'reports' || S.world === 'chat' || S.world === 'describe') || !L.built) return; if (S.stage === 'data') LMW().renderData(); else if (S.stage === 'test') LMW().renderTest(); else if (L.model) rpRender(true); }
+  function rpRenderAll() { const L = LM(); if (!LM_WORLDS[S.world] || !L.built) return; if (S.stage === 'data') LMW().renderData(); else if (S.stage === 'test') LMW().renderTest(); else if (L.model) rpRender(true); }
   function rpNoContextRecipe() { // the former recipe: the reports question without attention, from the link on its Train step
     S.rp.dim = 48; S.rp.layers = 0; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
     selectQuestion('reports'); showStage('train');
@@ -3617,9 +3674,10 @@
     $('recipe-select').value = '';
   }
   function rpEnter() {
-    const L = LM(); if (!rpData()) { rpNote('The reports did not load.'); return; }
+    const L = LM(); if (!LMW().data()) { rpNote(`The ${LMW().unit} did not load.`); return; }
     if (!rpBuild()) return;
-    const WD = LMW(); $('rp-panel-title').textContent = WD.title; $('rp-panel-sub').textContent = WD.subtitle; $('rp-blurb').innerHTML = WD.blurb || ''; $('rp-blurb').hidden = !WD.blurb; L.trayFor.train = false; // the trays are this world's
+    const WD = LMW(); $('rp-panel-title').textContent = WD.title; $('rp-panel-sub').textContent = WD.subtitle; $('rp-step-epoch').title = `one pass through the ${L.train.length} training ${WD.unit} (${WD.epochTime ? WD.epochTime() : 'about half a minute'})`; $('rp-blurb').innerHTML = WD.blurb || ''; $('rp-blurb').hidden = !WD.blurb; L.trayFor.train = false; // the trays are this world's
+    { const modes = WD.mapModes || ['pca', 'tsne']; document.querySelectorAll('#rp-map-seg button').forEach(b => { b.hidden = !modes.includes(b.dataset.map); }); if (!modes.includes(L.map.mode)) { L.map.mode = modes[0]; L.map.running = false; } } // a vocabulary of thousands has no t-SNE: the text world keeps to the two directions
     L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpSyncControls();
     if (!L.model) rpReset(WD.untrainedNote);
     else rpRender(true);
@@ -4008,14 +4066,14 @@
   }
   function rpDrawWordMap() {
     const L = LM(), WD = LMW(), m = L.model, M = L.map, tsne = M.mode === 'tsne', xs = v => (tsne ? M.Y[2 * v] : M.pcaX[v]), ys = v => (tsne ? M.Y[2 * v + 1] : M.pcaY[v]); if (!(tsne ? M.Y : M.pcaX)) return;
-    const pts = L.vocab.words.map((w, v) => ({ id: v, word: rpWordLabel(w), note: L.wordSec[v] ? `mostly in the ${L.wordSec[v]}` : 'never in the training reports', x: xs(v), y: ys(v), color: L.wordSec[v] ? WD.colors[L.wordSec[v]] : Viz.colors().ink3, label: WD.labelled().has(w) }));
+    const pts = L.vocab.words.map((w, v) => ({ id: v, word: rpWordLabel(w), note: L.wordSec[v] ? (WD.wordNote ? WD.wordNote(L, v) : `mostly in the ${L.wordSec[v]}`) : `never in the training ${WD.unit}`, x: xs(v), y: ys(v), color: L.wordSec[v] ? WD.colors[L.wordSec[v]] : Viz.colors().ink3, label: WD.labelled().has(w) }));
     const trails = tsne ? null : rpTrails(L, pts);
     Viz.drawWordMap($('rp-map'), tsne ? { points: pts, W: 640, H: 400, axes: false, xLabel: `t-SNE${M.todo > 0 ? ` · settling, ${M.todo} steps to go` : ''}` } : { points: pts, W: 640, H: 400, trails });
-    $('rp-map-legend').innerHTML = WD.sections.map(s => `<span><span class="swatch" style="background:${WD.colors[s]}"></span>mostly in the ${s}</span>`).join('');
+    $('rp-map-legend').innerHTML = WD.mapLegend ? WD.mapLegend() : WD.sections.map(s => `<span><span class="swatch" style="background:${WD.colors[s]}"></span>mostly in the ${s}</span>`).join('');
     const what = M.source === 'out' ? `its row of the output layer, the ${m.D} numbers the model scores it with as the next word` : `its vector at the input, ${m.D} learned numbers`;
     $('rp-map-note').textContent = tsne
-      ? `Every word is ${what}; t-SNE lays the ${m.V} words out so that each keeps its neighbours from the ${m.D}-dimensional space (cosine distances, perplexity ${RP_MAP_PERPLEXITY}), starting from the two-direction map; clusters are real neighbourhoods, the distances between clusters mean little, and the layout carries on from where it was after each training step. Each word is coloured by the section it mostly appears in on the training reports. Hover a dot for its word.`
-      : `Every word is ${what}; the map is the two directions that spread the ${m.V} vectors most (${pct(M.pcaShare || 0)} of their spread), each word coloured by the section it mostly appears in on the training reports. Untrained, the vectors are random and the map a cloud; as the model trains, words used alike move together: ${WD.mapExample}. Hover a dot for its word.${M.trail ? (trails ? ` The paths are the labelled words' way from their random start (epoch 0, the hollow ring) to where they stand now, one dot per epoch recorded (epochs ${rpRuns(L.trail.steps.map(s => s.epoch))}), on the two directions of the table as it is now; hover any word for its own path.` : (L.trail && L.trail.steps.length === 1 && L.trail.steps[0].epoch > 0 ? ' This model came without its path; from here on, every epoch trained adds a step.' : ' The paths need training: so far there is only the random start.')) : ''}`;
+      ? `Every word is ${what}; t-SNE lays the ${m.V} words out so that each keeps its neighbours from the ${m.D}-dimensional space (cosine distances, perplexity ${RP_MAP_PERPLEXITY}), starting from the two-direction map; clusters are real neighbourhoods, the distances between clusters mean little, and the layout carries on from where it was after each training step. Each word is coloured by ${WD.mapColour || 'the section it mostly appears in on the training reports'}. Hover a dot for its word.`
+      : `Every word is ${what}; the map is the two directions that spread the ${m.V} vectors most (${pct(M.pcaShare || 0)} of their spread), each word coloured by ${WD.mapColour || 'the section it mostly appears in on the training reports'}. Untrained, the vectors are random and the map a cloud; as the model trains, words used alike move together: ${WD.mapExample}. Hover a dot for its word.${M.trail ? (trails ? ` The paths are the labelled words' way from their random start (epoch 0, the hollow ring) to where they stand now, one dot per epoch recorded (epochs ${rpRuns(L.trail.steps.map(s => s.epoch))}), on the two directions of the table as it is now; hover any word for its own path.` : (L.trail && L.trail.steps.length === 1 && L.trail.steps[0].epoch > 0 ? ' This model came without its path; from here on, every epoch trained adds a step.' : ' The paths need training: so far there is only the random start.')) : ''}`;
   }
   // ------------------------------------------------------------------ the chat question: Specimens and Test (the Train step is the shared language-model lab)
   const CH_LABELLED = new Set(['SYSTEM', 'USER', 'ASSISTANT', 'TOOL', 'FINDINGS', 'Yes', 'No', 'Suspicious', 'findings', '(', ')', 'briefly', 'brief', 'full', 'sentence', 'reason', 'diagnosis', 'invasion', 'situ', 'carcinoma', 'present', 'absent', 'involved', 'rounded', 'irregular', 'normal', 'reactive', 'atypia', 'denuded', 'mild', 'marked', 'none', 'Benign', 'Denuded', 'Urothelial', 'muscularis', 'propria', 'inflammation', 'contours', 'surface', 'nests', 'question', 'Here', 'Is', 'What', '?', '.', ':', '\n', RPR.END, RPR.START]);
@@ -4321,19 +4379,19 @@
     document.querySelectorAll('.rp-layer-seg button').forEach(b => b.addEventListener('click', () => { L.layer = +b.dataset.layer; rpSyncControls(); if (L.model) { if (rpOnTest()) LMW().renderTest(); else rpRenderFocus(); } }));
     document.querySelectorAll('.rp-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; rpSyncControls(); if (L.model) { if (rpOnTest()) LMW().renderTest(); else rpRenderFocus(); } }));
     // hovering a word on either report follows it: what the model expected there, and whom it read
-    for (const [id, onTest] of [['rp-text', false], ['rp-test-text', true], ['ch-test-text', true], ['ds-test-text', true]]) {
+    for (const [id, onTest] of [['rp-text', false], ['rp-test-text', true], ['ch-test-text', true], ['ds-test-text', true], ['tx-test-text', true]]) {
       const el = $(id), tokAt = ev => { const t = ev.target.closest('.tok'); return t && el.contains(t) ? +t.dataset.i : null; };
       el.addEventListener('mousemove', ev => { const i = tokAt(ev); if (i === L.hover) return; L.hover = i; if (L.model) rpFollowWord(onTest); });
       el.addEventListener('mouseleave', () => { if (L.hover == null) return; L.hover = null; if (L.model) rpFollowWord(onTest); });
       el.addEventListener('click', ev => { const i = tokAt(ev); if (i == null || !L.model) return; L.pinned = L.pinned === i ? null : i; rpFollowWord(onTest); });
     }
     // the diagrams: a tooltip on every canvas; a read word hovered on the diagram is marked on the report
-    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-']) { const cv = $(`${pre}net`); if (!cv) continue; rpBindTip(cv, $(`${pre}net-tip`), (c, x, y) => (c._model ? (L.netView === 'graph' ? Viz.hitTokenGraph : Viz.hitTokenNetwork)(c, x, y, c._model) : null), h => { L.hoverNet = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderNet(view); rpMarkPair(view.textEl, null, h && h.kind === 'read' ? h.j : null); }); }
+    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-', 'tx-test-']) { const cv = $(`${pre}net`); if (!cv) continue; rpBindTip(cv, $(`${pre}net-tip`), (c, x, y) => (c._model ? (L.netView === 'graph' ? Viz.hitTokenGraph : Viz.hitTokenNetwork)(c, x, y, c._model) : null), h => { L.hoverNet = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderNet(view); rpMarkPair(view.textEl, null, h && h.kind === 'read' ? h.j : null); }); }
     document.querySelectorAll('.rp-arcs-check').forEach(cb => cb.addEventListener('change', () => { L.arcs = cb.checked; rpSyncControls(); if (L.model) rpFollowWord(rpOnTest()); }));
     document.querySelectorAll('.rp-hops-check').forEach(cb => cb.addEventListener('change', () => { L.hops = cb.checked; rpSyncControls(); if (L.model) rpFollowWord(rpOnTest()); }));
     document.querySelectorAll('.rp-netview-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.view; if (v === L.netView) return; rpNetWalkStop(); L.netView = v; L.hoverNet = null; rpSyncControls(); const view = rpView(rpOnTest()); if (view) rpRenderNet(view); }));
-    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-']) { const b = $(`${pre}net-walk`); if (b) b.addEventListener('click', () => rpNetWalkStart(pre)); }
-    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-']) { const ch = $(`${pre}heads`); if (!ch) continue; rpBindTip(ch, $(`${pre}heads-tip`), (c, x, y) => (c._model ? Viz.hitHeadRows(c, x, y, c._model) : null), h => { L.hoverHeads = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderHeads(view); rpMarkPair(view.textEl, null, h ? h.j : null); }); }
+    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-', 'tx-test-']) { const b = $(`${pre}net-walk`); if (b) b.addEventListener('click', () => rpNetWalkStart(pre)); }
+    for (const pre of ['rp-', 'rp-test-', 'ch-test-', 'ds-test-', 'tx-test-']) { const ch = $(`${pre}heads`); if (!ch) continue; rpBindTip(ch, $(`${pre}heads-tip`), (c, x, y) => (c._model ? Viz.hitHeadRows(c, x, y, c._model) : null), h => { L.hoverHeads = h ? Object.assign({ pre }, h) : null; const view = rpView(pre !== 'rp-'); if (!view) return; rpRenderHeads(view); rpMarkPair(view.textEl, null, h ? h.j : null); }); }
     document.querySelectorAll('#rp-map-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.map; if (v === L.map.mode) return; L.map.mode = v; if (v === 'tsne') L.map.trail = false; rpSyncControls(); if (!L.model) return; if (v === 'tsne') rpMapRestart(true); else { L.map.running = false; rpRenderWordMap(); } }));
     const trailBox = $('rp-map-trail'); if (trailBox) trailBox.addEventListener('change', () => { L.map.trail = trailBox.checked; if (L.map.trail && L.map.mode === 'tsne') { L.map.mode = 'pca'; L.map.running = false; } rpSyncControls(); if (L.model) rpRenderWordMap(); }); // the paths are drawn on the two directions: asking for them leaves the neighbourhoods
     const mapSvg = $('rp-map'); if (mapSvg) { mapSvg.addEventListener('mouseover', ev => { const c = ev.target.closest('circle[data-id]'); if (!c) return; const v = +c.dataset.id; if (L.map.hoverWord === v) return; L.map.hoverWord = v; if (L.map.trail && L.map.mode !== 'tsne' && L.model) rpDrawWordMap(); }); mapSvg.addEventListener('mouseleave', () => { if (L.map.hoverWord == null) return; L.map.hoverWord = null; if (L.map.trail && L.map.mode !== 'tsne' && L.model) rpDrawWordMap(); }); }
@@ -4357,6 +4415,190 @@
     $('rp-noblock').addEventListener('change', ev => { L.noblock = ev.target.checked; if (L.writing) rpWriteStop(); L.written = null; L.truthShown = false; rpSyncForm(); rpRenderTest(); });
   }
 
+  // ------------------------------------------------------------------ the Your-text question: the same model on a text of one's own
+  // The Train step and the model's diagrams are the shared language-model lab (LM_WORLDS above). Specimens is the text
+  // box: the default text, the five books on demand, or anything pasted, cut into documents by js/text.js; Test is a
+  // prompt of one's own that the model continues. The measure after every epoch is the next word on a few training
+  // documents against the same measure on the held-out ones (the gap is memorisation), and the model continues the same
+  // held-out title line after every epoch, so that the writing can be watched sharpening.
+  function txLoadScript(sources, ready) { // a script of the page's data loaded on demand: the page's folder, then a mirror of the repository, then the published page
+    if (ready()) return Promise.resolve(ready());
+    return new Promise((resolve, reject) => { const tryUrl = k => { if (k >= sources.length) { reject(new Error('no source answered')); return; } const el = document.createElement('script'); el.src = sources[k]; el.onload = () => (ready() ? resolve(ready()) : tryUrl(k + 1)); el.onerror = () => tryUrl(k + 1); document.head.appendChild(el); }; tryUrl(0); });
+  }
+  function txPresetText(key) { const p = TX.presets[key], g = p && window[p.global]; return g && g.text ? g : null; }
+  function txLoadPreset(key) { const L = S.tx, have = txPresetText(key); if (have) return Promise.resolve(have); if (L.loading) return L.loading; L.loading = txLoadScript(TX.presets[key].sources, () => txPresetText(key)).finally(() => { L.loading = null; }); return L.loading; }
+  function txData() { // the text as the language-model lab wants it: a meta line and the documents
+    const L = S.tx; if (L.D) return L.D;
+    const preset = L.text == null ? txPresetText('default') : null, text = L.text != null ? L.text : preset ? preset.text : null; if (text == null) return null;
+    const docs = NTX.documentsOf(text); if (!docs.length) return null;
+    const src = L.source === 'own' ? null : txPresetText(L.source);
+    L.D = { meta: { title: src ? src.meta.title : 'your text', author: src ? src.meta.author : null, year: src ? src.meta.year : null, source: src ? src.meta.source : null, poems: docs.filter(d => d.title && d.part === 1).length, titled: docs.some(d => d.title) }, docs, text };
+    return L.D;
+  }
+  const txTokens = L => L.all.reduce((s, d) => s + d.tokens.length - 2, 0), txTrainTokens = L => L.train.reduce((s, d) => s + d.tokens.length - 2, 0);
+  function txEpochEstimate() { const L = S.tx, toks = L.built ? txTrainTokens(L) : 13600, V = L.built ? L.vocab.size : 2541, secs = toks / 13600 * 35 * (0.25 + 0.75 * V / 2541); return secs < 90 ? `about ${Math.max(5, Math.round(secs / 5) * 5)} s` : `about ${Math.round(secs / 60)} minutes`; } // about 35 s for the default text here; the output layer, most of the work, grows with the vocabulary
+  const txSampleDocs = L => { const t = d => d.title && d.part === 1; return [...new Set([L.test.find(t) || L.test[0], L.train.find(t) || L.train[0]].filter(Boolean))]; }; // the documents continued after every epoch, by their title lines: the first whole poem of the held-out set, and the first of the training set
+  const txSampleDoc = L => txSampleDocs(L)[0] || null; // the held-out one: the Test step's first prompt
+  const txDetok = (L, tokens) => NTX.detokenize(NTX.decode(L.vocab, tokens).filter(w => w !== NTX.START && w !== NTX.END));
+  const txGiven = (L, d) => txDetok(L, NTX.prefixOf(d)); // its title line, or its first words
+  function txApplyText(text, source) { // a new text: its documents, its vocabulary and a fresh model follow (the caller builds and renders); false when there is nothing to train on
+    const L = S.tx, docs = NTX.documentsOf(text); if (!docs.length) return false;
+    rpStop(null, L); if (L.writing) txWriteStop();
+    L.text = text; L.source = source; L.D = null; L.built = false; L.model = null; L.shipped = false; L.hist = []; L.epoch = 0; L.ptr = 0; L.trayFor = {}; L.thumbs = null; L.dataThumbs = null; L.dataSelected = null; L.testSelected = null; L.selected = null; L.lastBatch = []; L.written = null; L.writing = null; L.prompt = null; L.trainTitleAt = 0; L.labelled = null; L.labelledFor = null; L.hover = null; L.pinned = null; L.trial = { next: 0, results: new Map() }; L.fw = null; L.fwFor = null; L.trail = null; L.pcaAxes = null; L.measuring = null; L.finishedAt = null; L.map.Y = null; L.map.forModel = null; L.map.running = false;
+    return true;
+  }
+  function txDataNote(msg) { $('tx-data-note').textContent = msg || ''; }
+  function txUseInput() { // the text in the box becomes the corpus: new documents, a new vocabulary, a fresh model
+    const L = S.tx, text = $('tx-input').value, d = txPresetText('default'), a = txPresetText('all'), source = d && text === d.text ? 'default' : a && text === a.text ? 'all' : 'own';
+    if (!txApplyText(text, source)) { txDataNote('Nothing to train on: paste some text first.'); return; }
+    if (!rpBuild()) return; L.inputFor = L.D; rpReset();
+    const toks = txTokens(L);
+    txDataNote(`${source === 'own' ? 'Your text' : L.meta.title}: ${L.all.length} documents, ${L.train.length} training and ${L.test.length} held out, ${toks.toLocaleString()} tokens, a vocabulary of ${L.vocab.size}. A fresh model stands on it${LMW().shipped() ? ', and the trained model is there to load' : ''}; go to 2 · Train (an epoch is ${txEpochEstimate()} here${toks > 40000 ? ': a long text makes a slow lesson' : ''}).`);
+  }
+  function txChoosePreset(key) {
+    const L = S.tx, p = TX.presets[key]; if (L.loading) return;
+    if (!txPresetText(key)) txDataNote(`Loading ${p.label} (${p.size})…`);
+    txLoadPreset(key).then(g => { if (S.world !== 'text') return; $('tx-input').value = g.text; txUseInput(); }).catch(e => txDataNote(`${p.label} did not load: ${e.message}`));
+  }
+  // ---- Specimens: the text box and the documents
+  function txEnterData() { const L = S.tx; if (!LMW().data() || !rpBuild()) return; txTrays('data'); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id; txRenderData(); }
+  function txTrays(kind) { // the Specimens trays, built once per text
+    const L = S.tx, key = `tx${kind}`; if (L.trayFor[key]) return; L.trayFor[key] = true;
+    const map = new Map(), fill = (id, tray, onClick) => { const el = $(id); el.innerHTML = ''; for (const r of tray) { const b = rpThumb(r, onClick); el.appendChild(b); map.set(r.id, b); } };
+    fill('tx-data-train-tray', L.train, id => txDataSelect(id)); fill('tx-data-test-tray', L.test, id => txDataSelect(id)); L.dataThumbs = map;
+    $('tx-data-train-label').textContent = `Training documents (${L.train.length})`; $('tx-data-test-label').textContent = `Held-out documents (${L.test.length}) · never trained on: the tenth of every ten`;
+  }
+  function txDataSelect(id) { S.tx.dataSelected = id; txRenderData(); }
+  function txDataNeighbour(step) { const L = S.tx, i = L.all.findIndex(r => r.id === L.dataSelected); txDataSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function txRenderData() {
+    const L = S.tx; if (!L.built) return; txTrays('data'); if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id;
+    const r = L.byId.get(L.dataSelected) || L.train[0], M = L.meta, own = L.source === 'own', ta = $('tx-input'), toks = txTokens(L);
+    if (L.inputFor !== L.D) { ta.value = L.D.text; L.inputFor = L.D; }
+    document.querySelectorAll('#tx-source-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.source === L.source));
+    $('tx-data-sub').textContent = `${own ? 'a text of your own' : `${M.title} · ${M.author}, ${M.year}`} · ${L.all.length} documents, ${L.train.length} training and ${L.test.length} held out · ${toks.toLocaleString()} tokens · a vocabulary of ${L.vocab.size}`;
+    $('tx-data-stats').textContent = `Cut into ${L.all.length} documents: ${M.titled ? `${M.poems} poem${M.poems === 1 ? '' : 's'} by their marked titles, the long ones into windows` : 'the paragraphs, since no title is marked, the long ones cut'} of at most 200 tokens at line ends; ${L.test.length} held out, the tenth of every ten. ${toks.toLocaleString()} tokens, ${L.vocab.size} different.${M.source ? ` ${M.source}.` : ''}`;
+    $('tx-data-doc-title').textContent = `“${r.name}” · ${r.split === 'train' ? 'training' : 'held out, never trained on'}${r.part > 1 ? ` · window ${r.part} of the poem` : ''}`;
+    $('tx-data-text').innerHTML = rpTextHtml(r.words, null, null);
+    const lines = r.words.filter(w => w === '\n').length + 1, fresh = r.split === 'test' ? r.tokens.filter(t => t > 2 && L.wordCount[t] === 0).length : 0;
+    $('tx-data-case').innerHTML = `<div class="row"><span class="k">document</span><span class="v">${esc(r.id)} · ${r.title ? (r.part > 1 ? `window ${r.part} of “${esc(r.title)}”` : 'a whole poem') : 'a paragraph'}</span></div><div class="row"><span class="k">split</span><span class="v">${r.split === 'train' ? 'training' : 'held out'}</span></div><div class="row"><span class="k">tokens</span><span class="v">${r.tokens.length - 2} words, numbers, marks and line breaks (${lines} line${lines === 1 ? '' : 's'}), the start and end tokens around them</span></div>${r.split === 'test' ? `<div class="row"><span class="k">new words</span><span class="v">${fresh} token${fresh === 1 ? '' : 's'} of it never appear in a training document${fresh ? ': the model cannot learn them' : ''}</span></div>` : ''}`;
+    $('tx-data-doc-note').textContent = 'Every word, number, punctuation mark and line break is a token, the reports’ tokenizer unchanged; the title line is part of the poem. The model trains on the training documents, the next word alone, and is measured on the held-out ones, which it never sees. Click a document below, or step through them.';
+    for (const [id, el] of L.dataThumbs) el.classList.toggle('selected', id === L.dataSelected);
+  }
+  // ---- the measure after every epoch, and the sample
+  function txMeasureChunk(L, M, deadline) { // the frame's share of the measure after an epoch: the next word on the first training documents, then the samples; true when done
+    const sd = txSampleDocs(L);
+    while (performance.now() < deadline) {
+      if (M.i < M.docs.length) { const d = M.docs[M.i++], ev = L.model.evaluate([d]); M.ok += ev.accuracy * (d.tokens.length - 1); M.n += d.tokens.length - 1; continue; }
+      if (M.rec.ground == null && M.n) M.rec.ground = M.ok / M.n;
+      if (M.k == null) { M.k = 0; M.samples = []; }
+      if (M.k >= sd.length) { M.rec.samples = M.samples; return true; }
+      const d = sd[M.k];
+      if (!M.st) { M.prefix = NTX.prefixOf(d); M.st = L.model.genState(M.prefix); }
+      const { token } = L.model.genNext(M.st, { temperature: 0 });
+      if (token === L.vocab.end || M.st.tokens.length - M.prefix.length >= TX.sampleMax) { M.samples.push({ id: d.id, name: d.name, split: d.split, given: txGiven(L, d), written: txDetok(L, M.st.tokens.slice(M.prefix.length)) }); M.k++; M.st = null; }
+    }
+    return false;
+  }
+  const txSamplesOf = h => h.samples || (h.sample ? [h.sample] : null); // an epoch's samples (one, in an older file)
+  function txRenderSamples(L) { // two columns: a held-out title continued, a training title continued, epoch by epoch, the newest first
+    const sd = txSampleDocs(L), recs = L.hist.filter(h => txSamplesOf(h)), el = $('rp-samples');
+    $('rp-samples-sub').textContent = sd.length ? `after every epoch the model continues ${sd.map(d => `“${txGiven(L, d).trim().replace(/\n/g, ' / ')}”`).join(' and ')}, the most probable word each time` : '';
+    el.style.setProperty('--tx-cols', sd.length || 1);
+    const head = sd.length ? `<div class="tx-sample head"><span class="ep"></span>${sd.map(d => `<div class="txt"><b>${esc(d.name)}</b> · ${d.split === 'test' ? 'held out: the model never sees this poem, so nothing of it can come back' : 'a training poem: what comes back word for word is memory'}</div>`).join('')}</div>` : '';
+    el.innerHTML = head + (recs.length ? recs.slice().reverse().map(h => { const ss = txSamplesOf(h); return `<div class="tx-sample"><span class="ep">epoch ${h.epoch}</span>${sd.map((d, k) => { const smp = ss.find(x => x.id === d.id) || (sd.length === 1 ? ss[k] : null); return `<div class="txt">${smp ? (smp.written.trim() ? esc(smp.written).replace(/\n/g, '<br>') : `<i>(${smp.written.length ? 'line breaks only' : 'nothing: the end token at once'})</i>`) : ''}</div>`; }).join('')}</div>`; }).join('') : '<p class="small muted" style="margin:0">Nothing written yet: the first samples come with the first epoch.</p>');
+  }
+  function txFinishNote(L, last) {
+    const gap = last.ground != null ? last.ground - last.acc : null, ss = txSamplesOf(last) || [], s = ss.find(x => x.split === 'test') || ss[0], first = s ? s.written.split('\n').map(l => l.trim()).filter(Boolean)[0] : null;
+    return `Finished ${rpEpochs(L.epochs)} on the next word alone. Test loss ${last.testLoss.toFixed(3)}; the next word right for ${pct(last.acc)} of the held-out words and ${last.ground == null ? '–' : pct(last.ground)} of the training ones${gap != null && gap > 0.15 ? ': it knows the poems it trained on far better than it knows the language, which is memorisation' : gap != null && gap > 0.05 ? ': the gap between the two is memorisation, and it widens with every epoch' : ''}.${first ? ` Given “${s.given.trim()}”, it now writes “${first}…”.` : ''} Go to 3 · Test to start it off yourself.`;
+  }
+  function txLabelled() { // the words the map labels: the sixty most frequent of the training documents, and the end token
+    const L = S.tx; if (L.labelledFor === L.vocab && L.labelled) return L.labelled;
+    const idx = []; for (let v = 3; v < L.vocab.size; v++) if (L.wordCount[v] > 0) idx.push(v); idx.sort((a, b) => L.wordCount[b] - L.wordCount[a]);
+    L.labelled = new Set(idx.slice(0, 60).map(v => L.vocab.words[v]).concat([NTX.END])); L.labelledFor = L.vocab; return L.labelled;
+  }
+  // ---- Test: a prompt of one's own, and what the model makes of it
+  function txEnterTest() { const L = S.tx; if (!LMW().data() || !rpBuild()) return; if (!L.model) rpReset(); if (L.prompt == null) { const d = txSampleDoc(L); L.prompt = d ? txGiven(L, d) : ''; } L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; txRenderTest(); }
+  const txPromptText = () => (S.tx.prompt || '').replace(/\r\n?/g, '\n').replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+  function txPrefix() { return NTX.encode(S.tx.vocab, txPromptText()).slice(0, -1); } // the start token and the prompt, without the end token
+  function txUnknown() { const L = S.tx; return NTX.tokenize(txPromptText()).filter(w => w !== '\n' && !L.vocab.index.has(w)); } // the words of the prompt the model has no token for
+  function txMatchDoc() { // the poem whose title line the prompt is, if any
+    const L = S.tx, toks = NTX.tokenize(txPromptText()).filter(w => w !== '\n'); if (!toks.length) return null; const key = toks.join(' ').toLowerCase();
+    return L.all.find(d => d.title && d.part === 1 && NTX.tokenize(d.title).join(' ').toLowerCase() === key) || null;
+  }
+  function txSetPrompt(text) { const L = S.tx; if (L.writing) txWriteStop(); L.prompt = text; L.written = null; L.hover = null; L.pinned = null; if (L.model) txRenderTest(); }
+  function txTrainTitle() { const L = S.tx, titled = L.train.filter(d => d.title && d.part === 1); if (!titled.length) { txSetPrompt(txGiven(L, L.train[0])); return; } const d = titled[L.trainTitleAt % titled.length]; L.trainTitleAt++; txSetPrompt(txGiven(L, d)); }
+  function txSyncControls() { const L = S.tx, ta = $('tx-prompt'); if (ta.value !== L.prompt) ta.value = L.prompt; $('tx-temp').value = Math.round(L.temperature * 100); $('tx-temp-val').textContent = L.temperature.toFixed(2); $('tx-pace').value = L.pace; $('tx-pace-val').textContent = `${L.pace} words/s`; $('tx-len').value = L.maxWords; $('tx-len-val').textContent = L.maxWords; }
+  function txWrite() { // the model continues the prompt, a few words per frame at the chosen pace
+    const L = S.tx; if (!L.model) return; if (L.writing) { txWriteStop(); return; }
+    const prefix = txPrefix(), st = L.model.genState(prefix);
+    L.writing = { prefix, st, tokens: st.tokens, steps: [], t0: performance.now(), count: 0, prompt: L.prompt, unknown: txUnknown(), match: txMatchDoc(), temperature: L.temperature };
+    L.written = null; L.hover = null; L.pinned = null;
+    $('tx-write').textContent = '■ Stop'; txRenderTest(); requestAnimationFrame(txWriteTick);
+  }
+  function txWriteStop() { const L = S.tx; if (!L.writing) return; L.writing = null; $('tx-write').textContent = 'Write'; }
+  function txWriteTick(now) {
+    const L = S.tx, W = L.writing; if (!W) return;
+    try {
+      const due = Math.min(6, Math.floor((now - W.t0) / 1000 * L.pace) - W.count); let done = false;
+      for (let k = 0; k < due && !done; k++) { const at = W.st.tokens.length, { token, probs } = L.model.genNext(W.st, { temperature: L.temperature }); W.steps.push({ at, token, probs }); W.count++; if (token === L.vocab.end || W.steps.length >= L.maxWords) done = true; }
+      if (due > 0 || done) txRenderWriting();
+      if (done) { txWriteFinish(); return; }
+    } catch (e) { console.error(e); txWriteStop(); return; }
+    requestAnimationFrame(txWriteTick);
+  }
+  function txRecall(W) { // how far the model reproduced the matched poem word for word from the end of the prompt
+    const d = W.match; if (!d) return null; const truth = d.tokens.slice(W.prefix.length), out = W.tokens.slice(W.prefix.length); let run = 0; while (run < truth.length && run < out.length && out[run] === truth[run]) run++; return { run, of: truth.length };
+  }
+  function txWriteFinish() {
+    const L = S.tx, W = L.writing; if (!W) return;
+    const words = NTX.decode(L.vocab, W.tokens), fw = L.model.forward(W.tokens);
+    const res = { tokens: W.tokens, words, steps: W.steps, fw, prompt: W.prompt, promptLen: W.prefix.length, unknown: W.unknown, match: W.match, recall: txRecall(W), temperature: W.temperature, text: txDetok(L, W.tokens.slice(W.prefix.length)), ended: W.tokens[W.tokens.length - 1] === L.vocab.end };
+    res.view = { words: res.words, tokens: res.tokens, fw: res.fw, textEl: $('tx-test-text'), pre: 'tx-test-', chosen: true, steps: res.steps, nextEl: 'tx-test-nextword' };
+    L.writing = null; $('tx-write').textContent = 'Write'; L.written = res;
+    txRenderTest();
+  }
+  function txRenderWriting() { // the text as it grows, and the bars for the word being chosen
+    const L = S.tx, W = L.writing, words = NTX.decode(L.vocab, W.tokens), stepAt = new Map(W.steps.map(s => [s.at, s])), probsOf = i => { const s = stepAt.get(i); return s ? s.probs[s.token] : null; };
+    $('tx-test-text').innerHTML = rpTextHtml(words, probsOf, null) + '<span class="cursor"></span>';
+    const last = W.steps[W.steps.length - 1]; if (last) $('tx-test-nextword').innerHTML = rpNextWordHtml(last.probs, null, last.token, `word ${W.steps.length}: what the model chose from`);
+    $('tx-test-call').textContent = `Writing… ${W.steps.length} words so far${L.temperature > 0 ? `, drawn at temperature ${L.temperature.toFixed(2)}` : ', the most probable word each time'}.`;
+  }
+  function txRenderTest() {
+    const L = S.tx; if (!L.built || !L.model) return; txSyncControls();
+    $('tx-test-warning').hidden = !(L.model.steps === 0 && !L.shipped);
+    const showCards = !!L.written && !L.writing;
+    $('tx-test-net-card').hidden = !showCards; $('tx-test-heads-card').hidden = !showCards; $('tx-test-att-card').hidden = !showCards;
+    const unk = txUnknown(), match = L.written ? L.written.match : txMatchDoc(), empty = !NTX.tokenize(txPromptText()).length, endsLine = /\n\s*$/.test(txPromptText());
+    $('tx-prompt-note').textContent = (empty ? 'Nothing typed: the model writes from the start token alone, as if opening a new poem; at temperature 0 that is the same poem every time.' : `The model continues from the end of what you typed${endsLine ? ', on a new line' : ' in the same line (end with a line break to start the next line)'}, ${L.maxWords} words at most or until it writes the end token.`) + (unk.length ? ` ${unk.length} word${unk.length === 1 ? '' : 's'} of the prompt the model has no token for (${unk.map(w => `“${w}”`).join(', ')}) go${unk.length === 1 ? 'es' : ''} in as ⟨?⟩.` : '') + (match ? ` “${match.name}” is ${match.split === 'train' ? 'a poem it trained on: what comes back word for word is memory, not invention' : 'a held-out poem it never saw: whatever follows the title is its own'}; the original is below.` : '');
+    $('tx-truth').hidden = !match;
+    if (match) $('tx-truth').innerHTML = `<div class="small muted" style="margin-bottom:6px">The poem itself${match.split === 'train' ? ', a training document' : ', held out of training'}:</div><div class="rp-text">${esc(txDetok(L, match.tokens)).replace(/\n/g, '<br>')}</div>`;
+    if (L.writing) txRenderWriting();
+    else if (L.written) {
+      const res = L.written, stepAt = new Map(res.steps.map(s => [s.at, s])), probsOf = i => { const s = stepAt.get(i); return s ? s.probs[s.token] : null; };
+      $('tx-test-text').innerHTML = rpTextHtml(res.words, probsOf, null);
+      const rc = res.recall, recall = rc ? (rc.run >= rc.of ? ` The whole poem came back word for word, ${rc.of} tokens of it: memorised.` : rc.run >= 8 ? ` The first ${rc.run} tokens are the poem’s own, ${pct(rc.run / rc.of)} of it; then it leaves the text.` : rc.run > 0 ? ` The first ${rc.run} token${rc.run === 1 ? '' : 's'} match the poem; then it goes its own way.` : res.match.split === 'train' ? ' Not a word of the poem itself came back.' : ' Nothing of the poem itself: it never saw it.') : '';
+      $('tx-test-call').innerHTML = `${res.steps.length} words${res.ended ? ', to the end token' : `, the limit of ${L.maxWords}`}${res.temperature > 0 ? `, drawn at temperature ${res.temperature.toFixed(2)}` : ', the most probable word each time'}.${recall} Hover a word for what the model chose from and the words it read; on the prompt’s own words the bars show what it expected there.`;
+      rpFollowWord(true); rpRenderAttention(rpView(true), false);
+    } else {
+      $('tx-test-text').innerHTML = rpTextHtml(NTX.decode(L.vocab, txPrefix()), null, null) + '<span class="muted"> … press Write.</span>';
+      $('tx-test-nextword').innerHTML = ''; $('tx-test-call').textContent = 'The prompt goes in as tokens after the start token; the model writes the next word, then the next, each drawn from its bars, until the end token or the word limit. The weights never change here.';
+    }
+  }
+  function bindText() {
+    const L = S.tx;
+    document.querySelectorAll('#tx-source-seg button').forEach(b => b.addEventListener('click', () => txChoosePreset(b.dataset.source)));
+    $('tx-use').addEventListener('click', txUseInput);
+    $('tx-data-prev').addEventListener('click', () => txDataNeighbour(-1)); $('tx-data-next').addEventListener('click', () => txDataNeighbour(1));
+    $('tx-write').addEventListener('click', txWrite); $('tx-test-clear').addEventListener('click', () => txSetPrompt(''));
+    $('tx-prompt').addEventListener('input', () => { if (L.writing) txWriteStop(); L.prompt = $('tx-prompt').value; L.written = null; if (L.model) txRenderTest(); });
+    $('tx-prompt').addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); txWrite(); } });
+    $('tx-prompt-held').addEventListener('click', () => { const d = txSampleDoc(L); txSetPrompt(d ? txGiven(L, d) : ''); });
+    $('tx-prompt-train').addEventListener('click', txTrainTitle); $('tx-prompt-none').addEventListener('click', () => txSetPrompt(''));
+    $('tx-temp').addEventListener('input', () => { L.temperature = +$('tx-temp').value / 100; $('tx-temp-val').textContent = L.temperature.toFixed(2); });
+    $('tx-pace').addEventListener('input', () => { L.pace = +$('tx-pace').value; $('tx-pace-val').textContent = `${L.pace} words/s`; if (L.writing) { L.writing.t0 = performance.now(); L.writing.count = 0; } });
+    $('tx-len').addEventListener('input', () => { L.maxWords = +$('tx-len').value; $('tx-len-val').textContent = L.maxWords; if (L.model && !L.writing) txRenderTest(); });
+  }
+
   // ------------------------------------------------------------------ boot
   function init() {
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
@@ -4366,7 +4608,7 @@
     const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
     $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
     $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindSegment(); bindTrainedModels();
+    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindText(); bindSegment(); bindTrainedModels();
     renderBackboneOptions();
     window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js
     loadTask(S.taskId);
