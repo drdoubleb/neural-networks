@@ -3,7 +3,7 @@
  * check_fields_cnn.js — the invasion question end to end: a convolutional encoder over the field at half resolution
  * (levels of two 3 × 3 convolutions with 2 × 2 pooling, two more convolutions at the bottom), so that the field
  * becomes a grid of cells, each a token of a few numbers; then either a plain average of the cells (a convolutional
- * network with global average pooling, lesson 11) or the fields' attention heads over them (lesson 17). Nothing but
+ * network with global average pooling, lesson 11) or the fields' attention heads over them (lesson 18). Nothing but
  * the pixels and the field's two labels train it: no nucleus is segmented, no code pretrained, no coordinate fed, and
  * the training fields are mirrored and turned upside down at random, so that no model can read depth from the lumen
  * being at the top (on a real slide it would not be). The model itself is NN.FieldNet (js/nn.js), the one the page
@@ -70,6 +70,6 @@ const saved = model.toJSON({ cfg, hist, trainedAt: new Date().toISOString() });
 if (cfg.out) fs.writeFileSync(cfg.out, JSON.stringify(saved), 'utf8');
 if (cfg.ship) { // merge into the page's shipped file: window.FIELDS_CNN = { deep, shallow }
   const file = path.join(ROOT, 'data', 'fields', 'fields_cnn_weights.js'), cur = fs.existsSync(file) ? loadJs(file).FIELDS_CNN || {} : {}; cur[cfg.ship] = saved;
-  fs.writeFileSync(file, `// The fields end to end, trained in Node by tools/check_fields_cnn.js: 'deep' is the convolutional network with global average pooling (lesson 11), 'shallow' the shallow encoder under attention (lesson 17). Each carries its history and its mimic table.\nwindow.FIELDS_CNN = ${JSON.stringify(cur)};\n`, 'utf8');
+  fs.writeFileSync(file, `// The fields end to end, trained in Node by tools/check_fields_cnn.js: 'deep' is the convolutional network with global average pooling (lesson 12), 'shallow' the shallow encoder under attention (lesson 18). Each carries its history and its mimic table.\nwindow.FIELDS_CNN = ${JSON.stringify(cur)};\n`, 'utf8');
   console.log(`shipped as ${cfg.ship} in ${path.relative(ROOT, file)} (${(fs.statSync(file).size / 1024).toFixed(0)} kB)`);
 }
