@@ -213,7 +213,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑲ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑳ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ㉑ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
-| ㉒ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30 | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
+| ㉒ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30; the five books' own model, stopped at epoch 3 of 7: held-out loss 5.18, 19% of the next words | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
 
 The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
@@ -1119,7 +1119,7 @@ The last recipe hands the language model over. Paste any text on the Specimens s
 next-word model on it; then type a title line, a first line or a few words on the Test step and read what it writes.
 The default text is Robert Frost's *Mountain Interval* (1916), the book of "The Road Not Taken", "Birches", "Out,
 Out—" and "The Oven Bird", and his five books of 1913 to 1928 together (*A Boy's Will*, *North of Boston*, *Mountain
-Interval*, *New Hampshire*, *West-Running Brook*) are a click away, fetched on demand. Both come from the Project
+Interval*, *New Hampshire*, *West-Running Brook*) are a click away, fetched on demand, with a trained model of their own. Both come from the Project
 Gutenberg eBook of the 1930 *Collected Poems* (#78327), a text in the public domain in the United States; in
 countries that count seventy years from the author's death (1963) it stays in copyright until 2034, which the page
 says, and nothing else of his ships with it.
@@ -1169,6 +1169,28 @@ a lecturer who wants the best writer rather than the best memoriser sets the epo
 stopping, with the curve that justifies it on screen. Any large model has the same two curves; the gap opens after a
 trillion words instead of fourteen thousand.
 
+The five books have a trained model of their own, the same recipe on five times the text (423 training documents,
+68,425 tokens, a vocabulary of 7,626, 768,190 parameters, about 4.7 minutes an epoch in Node), trained with early
+stopping: the run is stopped once four epochs have passed without a lower held-out loss, and the model of the best
+epoch is the one kept, its history cut there.
+
+| Epoch | Training loss | Held-out loss | Next word right, held out | Next word right, training |
+|---|---|---|---|---|
+| 1 | 6.12 | 5.47 | 15% | 18% |
+| 2 | 5.25 | 5.29 | 17% | 20% |
+| 3 | 4.92 | 5.18 (the lowest, kept) | 19% | 24% |
+| 4 | 4.68 | 5.21 | 18% | 27% |
+| 7 | 4.11 | 5.45 (stopped) | 18% | 30% |
+
+Five times the text buys a held-out loss of 5.18 against 5.68, two words in ten right instead of one, and three
+epochs of learning before the memorising starts; it also means the kept model has memorised nothing (from a title
+line it reproduces no run of any poem, training or held out) and writes, at temperature 0, the loops a small model
+falls into when it takes the most probable word every time (*And the wind, and, and, and*), and at 0.8 varied lines
+that scan and seldom parse (*And struck the world was a bird / One of his town I was the upper track*). The one-book
+model after 30 epochs writes memorised fragments stitched together; the five-book model after 3 writes the language's
+statistics and nothing it has seen: between them is the whole trade. Its file is 7.6 MB, fetched when its text is
+chosen and the button pressed.
+
 *Test* is the prompt box: the model continues from the end of what you typed (end with a line break to start the
 next line, or type nothing and it writes from the start token, the same poem every time at temperature 0), with the
 temperature, a word limit and the pace as sliders, and three buttons that put in a held-out title, the next training
@@ -1179,7 +1201,9 @@ other language-model questions. Words the vocabulary lacks go in as the unknown 
 Recipe ㉒ sets the default up; a text of one's own is pasted on the Specimens step (an epoch takes about 35 s per
 14,000 tokens here, so a long text makes a slow lesson, and the five books about seven minutes). Reproduce the shipped
 model with `node tools/check_text.js --epochs 30 --curve --save data/text/text_weights.js`; `--text FILE --global NAME`
-trains on another text written the way `tools/generate_text.js` writes them.
+trains on another text written the way `tools/generate_text.js` writes them; the five-book model is
+`node tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --epochs 24 --curve --keep-best
+--patience 4 --save data/text/text_weights_all.js --global-out TEXT_LM_ALL`.
 
 ## Segment: a class for every pixel
 
@@ -1265,8 +1289,9 @@ set two levels and train again, or load the trained network, for the comparison.
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
 training: the model that the recipe trains, with the curves of its training, comes back in an instant and the Test
 step works from it. The language models, the segmentation network and the two end-to-end field models ship from their Node trainers
-(above); the text model's file (3.3 MB, most of it two tables of 2,541 rows) is not loaded with the page but fetched
-when its button is pressed, and only the default text has one. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
+(above); the two text models' files (3.1 MB for *Mountain Interval*, most of it two tables of 2,541 rows, and about
+8 MB for the five books) are not loaded with the page but fetched when the button is pressed, each for its own text;
+a pasted text has none. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
 recipe (1 to 10 and 14), the 4 · Foundation stage, both slide questions with and without the context layer and with
 attention pooling or a plain average, and the field model with and without positions and the context layers, presses
 Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
@@ -1485,6 +1510,7 @@ data/describe/describe_weights.js  the trained describe model with its vocabular
 data/text/mountain_interval.js  the default text of the Your-text question: Frost's Mountain Interval (1916) from the Project Gutenberg Collected Poems, with its source line, written by tools/generate_text.js
 data/text/frost_collected.js  Frost's five books of 1913 to 1928 from the same eBook, fetched by the page on demand, written by tools/generate_text.js --all
 data/text/text_weights.js  the trained text model (30 epochs on Mountain Interval) with its vocabulary, the curves of its training, the two titles continued after every epoch and the words' paths, written by tools/check_text.js --save; fetched by the page on demand
+data/text/text_weights_all.js  the trained text model of the five books, stopped where its held-out loss was lowest, with its vocabulary, curves, samples and word paths, written by tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --keep-best --save; fetched on demand
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑫ and ⑱) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction

@@ -3,7 +3,7 @@
  * build_single_file.js — inlines the stylesheet, scripts and dataset into one portable HTML file.
  *   node tools/build_single_file.js            -> dist/nucleus-net.html  (open anywhere, no server needed)
  *   node tools/build_single_file.js --fragment -> prints the same page without the <html>/<head>/<body> wrapper
- *   --no-fields                                 -> without the fields of the invasion question, the five books of Frost and the trained text model inlined (loaded on demand instead)
+ *   --no-fields                                 -> without the fields of the invasion question, the five books of Frost and the two trained text models inlined (loaded on demand instead)
  */
 'use strict';
 const fs = require('fs');
@@ -14,7 +14,7 @@ html = html.replace(/<link rel="stylesheet" href="css\/style.css">/, () => `<sty
 // the fields of the invasion question are loaded on demand by the page (5.7 MB); a single file has no folder to load
 // them from, so they go in unless --no-fields (the artifact leaves them out and fetches them from the published page)
 if (!process.argv.includes('--no-fields')) html = html.replace(/<script src="js\/features.js"><\/script>/, m => `<script src="data/fields/fields_data.js"></script>\n${m}`);
-if (!process.argv.includes('--no-fields')) html = html.replace(/<script src="js\/features.js"><\/script>/, m => `<script src="data/text/frost_collected.js"></script>\n<script src="data/text/text_weights.js"></script>\n${m}`); // the Your-text question's five books and trained model, which the page fetches on demand
+if (!process.argv.includes('--no-fields')) html = html.replace(/<script src="js\/features.js"><\/script>/, m => `<script src="data/text/frost_collected.js"></script>\n<script src="data/text/text_weights.js"></script>\n<script src="data/text/text_weights_all.js"></script>\n${m}`); // the Your-text question's five books and the two trained models, which the page fetches on demand
 html = html.replace(/<script src="([^"]+)"><\/script>/g, (_, src) => `<script>\n${fs.readFileSync(path.join(root, src), 'utf8').replace(/<\/script/gi, '<\\/script')}\n</script>`);
 if (process.argv.includes('--fragment')) {
   let frag = html.replace(/^[\s\S]*?<head>/, '').replace(/<\/head>\s*<body>/, '').replace(/<\/body>\s*<\/html>\s*$/, '');
