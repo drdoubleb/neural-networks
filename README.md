@@ -640,7 +640,7 @@ with the shown patch's footprint boxed in every map and the window its token is 
 weight × pixel at the filter's place. *The network at one patch* unrolls the encoder at that patch on the segmentation
 diagram's layout: the channels at the patch's place after every convolution and pool as circles, every kernel's
 contribution there as a line, the token, the chosen head's scorer, score and share when there is one, and the patch's
-evidence for each head. Hover a patch on the field and both follow it; click it to pin it. The two "heads" of the deep
+evidence for each head. Hover a patch on the field and both follow it; click it, or click any map of the gallery, to pin it. The two "heads" of the deep
 model are its two single layers on the same average, one per question, not attention heads, and the page says so.
 An epoch is 100 batches of four fields, one per frame, about twenty seconds in a browser; the training curves are
 scored from the batches as the model trains on them, mirrored or upside down (a forward pass over the 400 training
