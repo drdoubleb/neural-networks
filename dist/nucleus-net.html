@@ -2151,7 +2151,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
             <div class="rp-truth" id="tx-truth" hidden></div>
           </div>
           <div>
-            <h3>What it writes</h3>
+            <h3>What it writes · coloured by its confidence in each word it chose</h3>
             <div class="rp-text" id="tx-test-text"></div>
             <p class="small" id="tx-test-call" style="margin-top:8px"></p>
             <div class="rp-next" id="tx-test-nextword"></div>
@@ -12193,6 +12193,12 @@ window.Glossary = (function () {
     const L = S.tx, toks = NTX.tokenize(txPromptText()).filter(w => w !== '\n'); if (!toks.length) return null; const key = toks.join(' ').toLowerCase();
     return L.all.find(d => d.title && d.part === 1 && NTX.tokenize(d.title).join(' ').toLowerCase() === key) || null;
   }
+  function txTruthForward(L, d) { // how well the model predicts the poem shown beside the prompt: its probability for every word of it, with the poem's own words before it (the Train step's measure), cached per model and poem
+    const c = L.truthFw; if (c && c.id === d.id && c.model === L.model && c.steps === L.model.steps) return c;
+    const fw = L.model.forward(d.tokens), V = L.vocab.size; let loss = 0, n = 0, right = 0, worse = 0;
+    for (let i = 1; i < d.tokens.length; i++) { const p = fw.probs[i - 1][d.tokens[i]]; loss += -Math.log(p + 1e-7); n++; if (p * V < 1) worse++; const pr = fw.probs[i - 1]; let best = 0; for (let v = 1; v < pr.length; v++) if (pr[v] > pr[best]) best = v; if (best === d.tokens[i]) right++; }
+    L.truthFw = { id: d.id, model: L.model, steps: L.model.steps, fw, loss: loss / n, n, right: right / n, worse }; return L.truthFw;
+  }
   function txSetPrompt(text) { const L = S.tx; if (L.writing) txWriteStop(); L.prompt = text; L.written = null; L.hover = null; L.pinned = null; if (L.model) txRenderTest(); }
   function txTrainTitle() { const L = S.tx, titled = L.train.filter(d => d.title && d.part === 1); if (!titled.length) { txSetPrompt(txGiven(L, L.train[0])); return; } const d = titled[L.trainTitleAt % titled.length]; L.trainTitleAt++; txSetPrompt(txGiven(L, d)); }
   function txSyncControls() { const L = S.tx, ta = $('tx-prompt'); if (ta.value !== L.prompt) ta.value = L.prompt; $('tx-temp').value = Math.round(L.temperature * 100); $('tx-temp-val').textContent = L.temperature.toFixed(2); $('tx-pace').value = L.pace; $('tx-pace-val').textContent = `${L.pace} words/s`; $('tx-len').value = L.maxWords; $('tx-len-val').textContent = L.maxWords; }
@@ -12239,17 +12245,17 @@ window.Glossary = (function () {
     const unk = txUnknown(), match = L.written ? L.written.match : txMatchDoc(), empty = !NTX.tokenize(txPromptText()).length, endsLine = /\n\s*$/.test(txPromptText());
     $('tx-prompt-note').textContent = (empty ? 'Nothing typed: the model writes from the start token alone, as if opening a new poem; at temperature 0 that is the same poem every time.' : `The model continues from the end of what you typed${endsLine ? ', on a new line' : ' in the same line (end with a line break to start the next line)'}, ${L.maxWords} words at most or until it writes the end token.`) + (unk.length ? ` ${unk.length} word${unk.length === 1 ? '' : 's'} of the prompt the model has no token for (${unk.map(w => `“${w}”`).join(', ')}) go${unk.length === 1 ? 'es' : ''} in as ⟨?⟩.` : '') + (match ? ` “${match.name}” is ${match.split === 'train' ? 'a poem it trained on: what comes back word for word is memory, not invention' : 'a held-out poem it never saw: whatever follows the title is its own'}; the original is below.` : '');
     $('tx-truth').hidden = !match;
-    if (match) $('tx-truth').innerHTML = `<div class="small muted" style="margin-bottom:6px">The poem itself${match.split === 'train' ? ', a training document' : ', held out of training'}:</div><div class="rp-text">${esc(txDetok(L, match.tokens)).replace(/\n/g, '<br>')}</div>`;
+    if (match) { const tf = txTruthForward(L, match), probsOf = i => (i > 0 ? tf.fw.probs[i - 1][match.tokens[i]] : null); $('tx-truth').innerHTML = `<div class="small muted" style="margin-bottom:6px">The poem itself${match.split === 'train' ? ', a training document' : ', held out of training'} · coloured by how well the model predicts it, each word with the poem’s own words before it: loss ${tf.loss.toFixed(2)} per word, ${pct(tf.right)} of its words the most probable, ${tf.worse} of ${tf.n} below chance${match.split === 'train' && tf.right > 0.6 ? ' (memorised)' : match.split === 'test' && tf.worse > tf.n / 2 ? ' (confidently wrong: it never saw this poem)' : ''}</div><div class="rp-text">${rpTextHtml(match.words, probsOf, null)}</div>`; }
     if (L.writing) txRenderWriting();
     else if (L.written) {
       const res = L.written, stepAt = new Map(res.steps.map(s => [s.at, s])), probsOf = i => { const s = stepAt.get(i); return s ? s.probs[s.token] : null; };
       $('tx-test-text').innerHTML = rpTextHtml(res.words, probsOf, null);
       const rc = res.recall, recall = rc ? (rc.run >= rc.of ? ` The whole poem came back word for word, ${rc.of} tokens of it: memorised.` : rc.run >= 8 ? ` The first ${rc.run} tokens are the poem’s own, ${pct(rc.run / rc.of)} of it; then it leaves the text.` : rc.run > 0 ? ` The first ${rc.run} token${rc.run === 1 ? '' : 's'} match the poem; then it goes its own way.` : res.match.split === 'train' ? ' Not a word of the poem itself came back.' : ' Nothing of the poem itself: it never saw it.') : '';
-      $('tx-test-call').innerHTML = `${res.steps.length} words${res.ended ? ', to the end token' : `, the limit of ${L.maxWords}`}${res.temperature > 0 ? `, drawn at temperature ${res.temperature.toFixed(2)}` : ', the most probable word each time'}.${recall} Hover a word for what the model chose from and the words it read; on the prompt’s own words the bars show what it expected there.`;
+      $('tx-test-call').innerHTML = `${res.steps.length} words${res.ended ? ', to the end token' : `, the limit of ${L.maxWords}`}${res.temperature > 0 ? `, drawn at temperature ${res.temperature.toFixed(2)}` : ', the most probable word each time'}.${recall} The colours here are the model’s confidence in each word it chose, not a score against any poem${match ? ': the poem on the left carries that score' : ''}. Hover a word for what the model chose from and the words it read; on the prompt’s own words the bars show what it expected there.`;
       rpFollowWord(true); rpRenderAttention(rpView(true), false);
     } else {
       $('tx-test-text').innerHTML = rpTextHtml(NTX.decode(L.vocab, txPrefix()), null, null) + '<span class="muted"> … press Write.</span>';
-      $('tx-test-nextword').innerHTML = ''; $('tx-test-call').textContent = 'The prompt goes in as tokens after the start token; the model writes the next word, then the next, each drawn from its bars, until the end token or the word limit. The weights never change here. At temperature 0 it takes the most probable word every time, which brings a memorised poem back word for word but soon falls into a loop on anything else (and, and, and); at 0.5 to 0.8 it draws from the bars instead, and the lines come out different every time.';
+      $('tx-test-nextword').innerHTML = ''; $('tx-test-call').textContent = 'The prompt goes in as tokens after the start token; the model writes the next word, then the next, each drawn from its bars, until the end token or the word limit. The weights never change here. The words it writes are coloured by its confidence in each choice, not by any comparison with a poem; a poem shown on the left is coloured by how well the model predicts it. At temperature 0 it takes the most probable word every time, which brings a memorised poem back word for word but soon falls into a loop on anything else (and, and, and); at 0.5 to 0.8 it draws from the bars instead, and the lines come out different every time.';
     }
   }
   function bindText() {
