@@ -1210,8 +1210,13 @@ language-model Train step and on the Your-text Test step; the other questions ke
 *Test* is the prompt box: the model continues from the end of what you typed (end with a line break to start the
 next line, or type nothing and it writes from the start token, the same poem every time at temperature 0), with the
 temperature, a word limit and the pace as sliders, and three buttons that put in a held-out title, the next training
-title or nothing. When the prompt is a poem's title line the poem itself is shown beside it, and the note after
-writing counts how many tokens came back word for word before the model left the text. Every word written has its
+title or nothing. When the prompt is a poem's title line the poem itself is shown beside it, coloured as the Train
+step colours text, by how well the model predicts each word with the poem's own words before it (a training poem of
+the one-book model is green, memorised; a held-out one is red below chance), and the note after writing counts how
+many tokens came back word for word before the model left the text. The writing on the right is coloured by the
+model's confidence in each word it chose, which is a different thing (at temperature 0 every choice is the most
+probable word, so a path that has nothing to do with the poem is green all the same), and the headings and the note
+say so. Every word written has its
 bars and its lines over the text, and the network, heads and attention cards follow the word hovered, as on the
 other language-model questions. Words the vocabulary lacks go in as the unknown token, and the note names them.
 Recipe ㉒ sets the default up; a text of one's own is pasted on the Specimens step (an epoch takes about 35 s per
