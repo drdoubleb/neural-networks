@@ -107,7 +107,7 @@
       if (wq.world === 'slides') S.sl.question = wq.q;
       revealFoundation(); // both use the foundation encoder's code
     }
-    $('question-select').value = id;
+    syncRecipeMenu();
     showStage(S.stage);
   }
   function loadTask(id) {
@@ -126,7 +126,6 @@
     $('task-title').textContent = S.task.title;
     $('task-blurb').textContent = S.task.blurb;
     $('meta-line').textContent = `${S.ds.specimens.length} synthetic ${noun(2)} · ${S.ds.train.length} training / ${S.ds.test.length} test${S.size ? ` · ${S.size} × ${S.size} px` : ''} · seed ${raw.meta.seed}`;
-    $('question-select').value = id;
     document.querySelectorAll('[data-cls="0"]').forEach(el => { el.textContent = negName(); });
     document.querySelectorAll('[data-cls="1"]').forEach(el => { el.textContent = posName(); });
     document.querySelectorAll('[data-cls-called="0"]').forEach(el => { el.textContent = `called ${negName()}`; });
@@ -244,7 +243,7 @@
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
     S.epoch = 0; S.ptr = 0; S.debt = 0; S.history = []; S.lastBatch = new Set(); S.prevW = null;
     S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
-    if (!S.applyingRecipe) $('recipe-select').value = matchingRecipe() || ''; // the masthead shows the recipe these settings are, if they are one
+    if (!S.applyingRecipe && S.world === 'classic') syncRecipeMenu(); // the masthead names the recipe these settings are, or the question once they are none
     syncClassicLoad();
     S.rng = NN.mulberry32(S.seed * 31 + 7);
     S.order = S.inputs.trainX.map((_, i) => i);
@@ -1146,7 +1145,6 @@
     renderInputPicker();
   }
   function bindControls() {
-    $('question-select').addEventListener('change', () => selectQuestion($('question-select').value));
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode || b.disabled) return;
       S.mode = b.dataset.mode;
@@ -1213,7 +1211,7 @@
         return;
       }
       if (k === '19') { // the reports question: the small language model
-        S.rp.dim = 48; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
+        S.rp.dim = 48; S.rp.layers = 2; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false; // the two context layers back, after the no-context link
         selectQuestion('reports'); showStage('train');
         rpReset(`Recipe ${RECIPE_LABELS[19]}: 800 reports, no rule ever given, only the next word. Press Train and watch the loss by section: the gross falls first, the microscopic description next, and the diagnosis reads as certain from the fifth epoch while the third chart, the diagnosis written from the findings alone, is still climbing. Load the trained model when you have seen enough, then go to 3 · Test and flip a finding.`); return;
       }
@@ -1252,7 +1250,7 @@
       const { task: taskId, ...settings } = RECIPES[k];
       const switchTask = taskId !== S.taskId;
       if (switchTask) loadTask(taskId);
-      S.world = 'classic'; S.questionId = taskId; $('question-select').value = taskId;
+      S.world = 'classic'; S.questionId = taskId;
       if (settings.mode === 'code') { revealFoundation(); S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); } // the encoder you pretrained, if you did; else the shipped copy of it
       Object.assign(S, LAB_SETTINGS, settings);
       applySources();
@@ -1261,7 +1259,7 @@
       syncControls();
       resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
       S.applyingRecipe = false;
-      $('recipe-select').value = k; syncClassicLoad();
+      showRecipe(k); syncClassicLoad();
       renderDataTrays(); renderScatter(); renderInspector();
       showStage('train');
       if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
@@ -2877,7 +2875,7 @@
   }
   function bindFields() {
     const L = S.fd; bindFieldCards();
-    document.querySelectorAll('#fd-kind-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.kind; if (v === L.kind) return; L.kind = v; fdSyncControls(); fdReset(v === 'nuclei' ? 'The nuclei as tokens: every nucleus its code, its position and the context as set — fresh random weights.' : v === 'deep' ? 'A convolutional network over the pixels alone, three levels and a plain average of its patches — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.' : 'A shallow convolutional network over the pixels alone, two levels, and the two attention heads over its patches — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.'); }));
+    document.querySelectorAll('#fd-kind-seg button').forEach(b => b.addEventListener('click', () => { const v = b.dataset.kind; if (v === L.kind) return; L.kind = v; showRecipe(fdRecipe()); fdSyncControls(); fdReset(v === 'nuclei' ? 'The nuclei as tokens: every nucleus its code, its position and the context as set — fresh random weights.' : v === 'deep' ? 'A convolutional network over the pixels alone, three levels and a plain average of its patches — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.' : 'A shallow convolutional network over the pixels alone, two levels, and the two attention heads over its patches — fresh random weights. An epoch is 100 batches of four fields, a batch per frame.'); }));
     document.querySelectorAll('#fd-cellview-seg button').forEach(b => b.addEventListener('click', () => { L.cellView = b.dataset.view; fdSyncControls(); if (L.model) fdRenderFocus(); }));
     document.querySelectorAll('#fd-cnn-head-seg button').forEach(b => b.addEventListener('click', () => { L.head = +b.dataset.head; fdSyncControls(); if (L.model) fdRenderFocus(); }));
     $('fd-layers-walk').addEventListener('click', () => (L.lwalk ? fdLayersWalkStop() : fdLayersWalkStart()));
@@ -3718,7 +3716,7 @@
     S.rp.dim = 48; S.rp.layers = 0; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false;
     selectQuestion('reports'); showStage('train');
     rpReset(`No context layer: the lookup table and the output table with no attention between them, so every next word is predicted from the current word and its position and nothing else. Press Train: the loss falls to the floor such a model allows, the reports read as locally fluent nonsense, and the diagnosis is never right from the findings, since nothing in the model can read them; the fourth chart stays empty. Then set the context layers back to 2 and watch what attention buys.`);
-    $('recipe-select').value = '';
+    showRecipeOff('Reports · no context layer');
   }
   function rpEnter() {
     const L = LM(); if (!LMW().data()) { rpNote(`The ${LMW().unit} did not load.`); return; }
@@ -4328,6 +4326,20 @@
     if (S.world !== 'classic' || (S.excluded && S.excluded.size)) return null;
     return Object.keys(RECIPES).find(k => { const { task, ...settings } = RECIPES[k], want = Object.assign({}, LAB_SETTINGS, settings); delete want.speed; delete want.peek; return task === S.taskId && Object.keys(want).every(key => S[key] === want[key]) && (S.mode !== 'code' || S.backbone !== 'page'); }) || null;
   }
+  // the masthead's one menu, the lecture recipe, names where the page is: on the classic questions the recipe whose
+  // settings are on screen, or the question and "your own settings" once a setting has moved off it; on the other
+  // questions the recipe last chosen, the fields by their kind (recipes 12, 17 and 18 are the three kinds)
+  const RECIPE_QUESTION = { 11: 'segment', 12: 'fields', 13: 'foundation', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'reports', 20: 'chat', 21: 'describe', 22: 'text' };
+  const recipeQuestion = k => (RECIPES[k] ? RECIPES[k].task : RECIPE_QUESTION[k]);
+  const fdRecipe = () => ({ deep: '12', shallow: '18' }[S.fd.kind] || '17');
+  function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); }
+  function showRecipeOff(desc) { const sel = $('recipe-select'); $('recipe-none').textContent = desc; sel.value = ''; sel.classList.add('is-off'); }
+  function syncRecipeMenu() {
+    if (S.world === 'classic') { const k = matchingRecipe(); if (k) showRecipe(k); else showRecipeOff(`${S.task.title} · your own settings`); return; }
+    const cur = $('recipe-select').value, want = S.world === 'fields' ? fdRecipe() : Object.keys(RECIPE_QUESTION).find(k => RECIPE_QUESTION[k] === S.questionId);
+    if (cur && recipeQuestion(cur) === S.questionId && (S.world !== 'fields' || cur === want)) showRecipe(cur); // the recipe chosen, its styling back after a side path
+    else if (want) showRecipe(want);
+  }
   function classicShipped() { const T = trained(); if (!T || !T.classic) return null; const k = $('recipe-select').value || matchingRecipe(); return k && T.classic[k] ? { k, entry: T.classic[k] } : null; }
   function syncClassicLoad() { const b = $('btn-load'); if (!b) return; const sh = classicShipped(); b.disabled = !sh; b.title = sh ? `${sh.entry.trained}: the weights that ship with the page, with the curves of that run` : 'pick a recipe from the masthead: the trained models ship one per recipe, for the recipe\'s own settings'; }
   function loadTrainedClassic() {
@@ -4336,7 +4348,7 @@
     if (net.D !== S.inputs.inputSize) { note('The settings on screen no longer match the recipe; pick it again from the masthead, then load.'); return; }
     S.net = net; S.epoch = e.epochs; S.epochs = Math.max(S.epochs, e.epochs); S.ptr = 0; S.debt = 0; S.history = e.hist.map(h => Object.assign({}, h)); S.lastBatch = new Set(); S.prevW = null;
     S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
-    clearTestResults(false); evaluateAll(); renderTraining(true); $('recipe-select').value = sh.k; syncClassicLoad();
+    clearTestResults(false); evaluateAll(); renderTraining(true); showRecipe(sh.k); syncClassicLoad();
     const last = S.history[S.history.length - 1];
     note(`Loaded the trained model: ${e.trained}. Train accuracy ${pct(last.acc)}, test accuracy ${pct(last.testAcc)} after ${e.epochs} epochs, the curves its own. Go to 3 · Test, or reset to train it yourself.`);
   }
@@ -4659,12 +4671,10 @@
     try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
     S.tasks = window.LECTURE_TASKS;
-    const questions = [...Object.values(S.tasks).sort((a, b) => a.meta.task.order - b.meta.task.order).map(t => ({ id: t.meta.task.id, title: t.meta.task.title })), ...WORLD_QUESTIONS];
-    $('question-select').innerHTML = questions.map((q, i) => `<option value="${q.id}">${i + 1} · ${esc(q.title)}</option>`).join('');
-    $('recipe-select').innerHTML = '<option value="">choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
+    $('recipe-select').innerHTML = '<option value="" id="recipe-none" hidden>choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindText(); bindSegment(); bindTrainedModels();
     renderBackboneOptions();
-    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey } }; // the page's state, for the console and for tools/export_models.js
+    window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey }, question: selectQuestion }; // the page's state, for the console and for tools/export_models.js, which opens a question by its id
     loadTask(S.taskId);
     if (S.foundationShown) revealFoundation();
     syncControls();

@@ -52,7 +52,7 @@ const existing = () => { if (!fs.existsSync(FILE)) return null; const w = {}; ne
   }
 
   if (want('foundation')) {
-    await page.selectOption('#question-select', 'foundation'); await page.click('.stage[data-stage="train"]');
+    await run(id => window.NUCLEUS_NET.question(id), 'foundation'); await page.click('.stage[data-stage="train"]');
     await until(() => { const F = window.NUCLEUS_NET.state.fm; return F.cl && F.set && !F.running; });
     await page.click('#fm-reset'); await page.waitForTimeout(300);
     await run(() => { const F = window.NUCLEUS_NET.state.fm; F.speed = 1e6; });
@@ -67,7 +67,7 @@ const existing = () => { if (!fs.existsSync(FILE)) return null; const w = {}; ne
   }
 
   if (want('slides')) for (const qid of ['slides-atypia', 'slides-focus']) for (const att of [1, 0]) for (const ctx of [0, 1]) {
-    await page.selectOption('#question-select', qid); await page.click('.stage[data-stage="train"]');
+    await run(id => window.NUCLEUS_NET.question(id), qid); await page.click('.stage[data-stage="train"]');
     await until(() => { const L = window.NUCLEUS_NET.state.sl; return L.built && L.model && !L.running; });
     await page.click(`#sl-pool-seg button[data-att="${att}"]`); await page.click(`#sl-context-seg button[data-ctx="${ctx}"]`); await page.waitForTimeout(300);
     await run(() => { window.NUCLEUS_NET.state.sl.speed = 1e6; });
@@ -83,7 +83,7 @@ const existing = () => { if (!fs.existsSync(FILE)) return null; const w = {}; ne
   }
 
   if (want('fields')) {
-    await page.selectOption('#question-select', 'fields'); await page.click('.stage[data-stage="train"]');
+    await run(id => window.NUCLEUS_NET.question(id), 'fields'); await page.click('.stage[data-stage="train"]');
     await until(() => { const L = window.NUCLEUS_NET.state.fd; return L.built && L.model && !L.running; }, 900000);
     for (const pos of [1, 0]) for (const ctx of [1, 0]) {
       await page.click(`#fd-pos-seg button[data-pos="${pos}"]`); await page.click(`#fd-ctx-seg button[data-ctx="${ctx}"]`); await page.waitForTimeout(500);

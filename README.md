@@ -23,8 +23,9 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
 Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
 
-The masthead has two dropdowns: the **question** (which dataset) and the **lecture recipe** (a one-click preset for
-each step of the arc, which also switches the question if needed). The Train stage shows only the essential controls
+The masthead has one dropdown, the **lecture recipe**: a one-click preset for each step of the arc, which selects the
+question (the dataset) and its settings. The menu names the recipe on screen; on the classic questions, once a setting
+has moved off the recipe, it names the question instead and says *your own settings*. The Train stage shows only the essential controls
 (input, convolution, hidden units, and the training buttons in the order a resident should try them: Teach next case,
 Step batch, Step epoch, Complete training, Reset); everything else lives under *Advanced settings*. Controls that
 do not apply to the current question are hidden. The masthead's **Glossary** button opens one definition per
@@ -35,7 +36,7 @@ during training. They can be switched off from the glossary, and the choice is k
 
 ## Four questions, one page
 
-The **question** dropdown switches between four datasets, each with its own synthetic cases (80/20 split):
+The classic recipes (1 to 10 and 14) work on four datasets, each with its own synthetic cases (80/20 split):
 
 | Question | Cases | Positive class | What separates the classes | Decoys |
 |---|---|---|---|---|
@@ -49,11 +50,11 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The masthead lists thirteen questions: a blood count, three nucleus questions, the foundation model, two questions
+The recipes ask thirteen questions: a blood count, three nucleus questions, the foundation model, two questions
 asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
 chat the same model holds about a case, the description it writes of a nucleus from its image, the same fields of
 bladder painted a class per pixel, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
-simply selects a question and its settings.
+simply selects a question and its settings (a link such as `#reports/train` opens a question directly, at its default settings).
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
