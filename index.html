@@ -1572,6 +1572,11 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
         </div>
       </div>
       <div class="card">
+        <div class="card-head"><h2>The network, live, over the whole field</h2><span class="small muted">the field through every layer, left to right · dark where a map fires · the four classes in their colours at the end · hover any map or filter</span></div>
+        <div class="net-wrap"><canvas id="sg-live" width="860" height="540" aria-label="The segmentation network over the whole field: the field, the first layer's filters and their maps, every level's maps on the way down and up again, the four class probability maps in the class colours, and the painted output"></canvas><div class="tip" id="sg-live-tip" hidden></div></div>
+        <p class="small muted" id="sg-live-note" style="margin-top:6px"></p>
+      </div>
+      <div class="card">
         <div class="card-head"><h2>The network, for one pixel</h2><span class="small muted">every map at the pixel's place: the channels as circles, the kernels' contributions as lines · the pixel follows the mouse on the field, click to pin it</span></div>
         <div class="net-wrap"><canvas id="sg-net" width="860" height="460" aria-label="The segmentation network unrolled at one pixel: circles for the channels of every map at that pixel, lines for the kernels' contributions"></canvas><div class="tip" id="sg-net-tip" hidden></div></div>
         <p class="small muted" id="sg-net-note" style="margin-top:6px"></p>
