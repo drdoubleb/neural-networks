@@ -1144,6 +1144,90 @@
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.color === S.trayColor));
     renderInputPicker();
   }
+  // a recipe, from the menu or from the address (#12/train): the question, its settings, the Train step and a note on what to watch
+  function applyRecipe(k) {
+    if (k === '11') { // the segment question: a class for every pixel, and the window it is decided from
+      S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
+      selectQuestion('segment'); showStage('train');
+      const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[11]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest is drawn like a nucleus in the epithelium, and a 5-px window, smaller than one nucleus, cannot see how the nuclei are packed (rows 17 to 20 px apart in the urothelium, touching in a nest). Then set the context to 2 levels, a window of 36 to 40 px that takes in three or four nuclei with their gaps, and train again, or load the trained network, which paints the nests.`); };
+      go();
+      return;
+    }
+    if (k === '22') { // the Your-text question: the same model on a text of one's own, Frost's Mountain Interval by default
+      S.tx.dim = 48; S.tx.layers = 2; S.tx.positions = true; S.tx.epochs = 10; S.tx.lr = 0.005; S.tx.seed = 1;
+      const go = () => { selectQuestion('text'); showStage('train'); const L = S.tx; rpReset(`Recipe ${RECIPE_LABELS[22]}: ${L.train.length} training documents, ${L.meta.poems} poems of Frost cut into windows of 200 tokens with one document in ten held out, and the next word alone. Press Train (an epoch is ${txEpochEstimate()} here) and watch the two accuracy lines part: the training line climbs on while the held-out one stalls, memorisation outrunning what it learns of the language, and the box below the curves shows two titles continued after every epoch, a training poem’s and a held-out one’s. Load the trained model, then go to 3 · Test and start it off with a title of your own; or paste a text of your own on 1 · Specimens.`); };
+      if (S.tx.source !== 'default') txLoadPreset('default').then(g => { txApplyText(g.text, 'default'); go(); }).catch(() => go()); else go();
+      return;
+    }
+    if (k === '21') { // the describe question: from pixels to words
+      S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
+      selectQuestion('describe'); showStage('train');
+      rpReset(`Recipe ${RECIPE_LABELS[21]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
+      return;
+    }
+    if (k === '20') { // the chat question: the same model on transcripts
+      S.ch.dim = 48; S.ch.positions = true; S.ch.epochs = 10; S.ch.lr = 0.005; S.ch.seed = 1; S.ch.reveal = false;
+      selectQuestion('chat'); showStage('train');
+      rpReset(`Recipe ${RECIPE_LABELS[20]}: 2,400 transcripts, the next word alone. Press Train and watch the loss by role: the system line and the findings cost almost nothing within an epoch or two, the question stays high since nothing predicts which one comes, and the assistant line, the only one that matters, falls last; the third chart asks the model for the answer of 8 test transcripts after every epoch. Or load the trained model and go to 3 · Test to ask it yourself, in the trained phrasings and in your own.`);
+      return;
+    }
+    if (k === '19') { // the reports question: the small language model
+      S.rp.dim = 48; S.rp.layers = 2; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false; // the two context layers back, after the no-context link
+      selectQuestion('reports'); showStage('train');
+      rpReset(`Recipe ${RECIPE_LABELS[19]}: 800 reports, no rule ever given, only the next word. Press Train and watch the loss by section: the gross falls first, the microscopic description next, and the diagnosis reads as certain from the fifth epoch while the third chart, the diagnosis written from the findings alone, is still climbing. Load the trained model when you have seen enough, then go to 3 · Test and flip a finding.`); return;
+    }
+    if (k === '18') { // the fields question end to end: the shallow convolutional network under the attention heads
+      S.fd.kind = 'shallow'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.cellView = 'attention'; S.fd.head = 1;
+      selectQuestion('fields'); showStage('train'); fdSyncControls();
+      fdReset(`Recipe ${RECIPE_LABELS[18]}: the same fields and labels, the pixels alone, and an encoder too shallow to see the membrane from a nest: every patch sees 64 px around it. The two attention heads over its ${(S.fd.w ? (S.fd.w >> 3) * (S.fd.h >> 3) : 352)} patches have to find the few that matter. Load the trained model (an epoch is a minute here) and watch the invasion head’s attention land on the patches below the membrane; then compare the mimic table with recipe 12, where a plain average had to do.`); return;
+    }
+    if (k === '17') { // the fields question: the full model, the nuclei as tokens
+      S.fd.kind = 'nuclei'; S.fd.pos = true; S.fd.ctx = true; S.fd.crop = 'nucleus'; S.fd.epochs = 60; S.fd.speed = 8; S.fd.seed = 1; S.fd.reveal = false;
+      selectQuestion('fields'); showStage('train'); fdSyncControls();
+      fdReset(`Recipe ${RECIPE_LABELS[17]}: 400 fields of bladder, five patterns, two labels each and no nucleus ever labelled. Press Train and watch the mimic table: cytology alone gets the first three rows; the training fields are mirrored and turned upside down at random, as a slide comes, so a position alone cannot say below the membrane, and it is the context, every nucleus reading its neighbours, that finds the membrane and tells a round nest from an angulated one. Then switch a cue off and train again.`); return;
+    }
+    if (k === '16') { // the focus question, with the context layer
+      S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+      selectQuestion('slides-focus'); showStage('train');
+      slReset(`Recipe ${RECIPE_LABELS[16]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe 15 stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
+    }
+    if (k === '15') { // the slides question, without context
+      S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
+      selectQuestion('slides-atypia'); showStage('train');
+      slReset(`Recipe ${RECIPE_LABELS[15]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
+      return;
+    }
+    if (k === '12') { // the fields question end to end: a deep convolutional network on the pixels alone, no attention
+      S.fd.kind = 'deep'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.head = 1;
+      selectQuestion('fields'); showStage('train'); fdSyncControls();
+      fdReset(`Recipe ${RECIPE_LABELS[12]}: 400 fields of bladder, five patterns, two labels each, and nothing but the pixels: no nucleus found, no code, no coordinates. Three levels of 3 × 3 filters, a plain average of the patches, a single layer per question. Press Train (an epoch is a minute here) or load the trained model, and watch the mimic table and the evidence map: the network finds the invasion without being told what a nucleus is, from 400 fields, as long as it is deep enough to see a nest and the membrane from one patch.`); return;
+    }
+    if (k === '13') { // the foundation question
+      S.fm.labs = true; S.fm.epochs = 100; S.fm.speed = 4;
+      selectQuestion('foundation'); showStage('train');
+      fmReset(`Recipe ${RECIPE_LABELS[13]}: 100 nuclei from all three questions, no labels. Press Pretrain and watch the right-hand curve: a single layer on the code gets better at every question, though the code was never told what any of them asks.`);
+      return;
+    }
+    const { task: taskId, ...settings } = RECIPES[k];
+    const switchTask = taskId !== S.taskId;
+    if (switchTask) loadTask(taskId);
+    S.world = 'classic'; S.questionId = taskId;
+    if (settings.mode === 'code') { revealFoundation(); S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); } // the encoder you pretrained, if you did; else the shipped copy of it
+    Object.assign(S, LAB_SETTINGS, settings);
+    applySources();
+    S.excluded = new Set();
+    S.applyingRecipe = true;
+    syncControls();
+    resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
+    S.applyingRecipe = false;
+    showRecipe(k); syncClassicLoad();
+    renderDataTrays(); renderScatter(); renderInspector();
+    showStage('train');
+    if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
+    if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
+    if (k === '14') note(`Recipe ${RECIPE_LABELS[14]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 6 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
+    if (k === '4') note(`Recipe ${RECIPE_LABELS[4]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
+  }
   function bindControls() {
     document.querySelectorAll('#mode-seg button').forEach(b => b.addEventListener('click', () => {
       if (S.mode === b.dataset.mode || b.disabled) return;
@@ -1183,90 +1267,7 @@
     $('btn-step-epoch').addEventListener('click', stepEpoch);
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
     $('btn-teach').addEventListener('click', teachNext);
-    $('recipe-select').addEventListener('change', () => {
-      const k = $('recipe-select').value; if (!k) return;
-      if (k === '11') { // the segment question: a class for every pixel, and the window it is decided from
-        S.sg.levels = 0; S.sg.channels = 8; S.sg.crops = 100; S.sg.epochs = 10; S.sg.seed = 1; S.sg.view = 'pred';
-        selectQuestion('segment'); showStage('train');
-        const go = () => { if (!S.sg.built) { setTimeout(go, 200); return; } sgReset(`Recipe ${RECIPE_LABELS[11]}: no context, a window of 5 px around every pixel. Press Train and watch the nest line of the IoU chart stay low: a nucleus in a nest is drawn like a nucleus in the epithelium, and a 5-px window, smaller than one nucleus, cannot see how the nuclei are packed (rows 17 to 20 px apart in the urothelium, touching in a nest). Then set the context to 2 levels, a window of 36 to 40 px that takes in three or four nuclei with their gaps, and train again, or load the trained network, which paints the nests.`); };
-        go();
-        return;
-      }
-      if (k === '22') { // the Your-text question: the same model on a text of one's own, Frost's Mountain Interval by default
-        S.tx.dim = 48; S.tx.layers = 2; S.tx.positions = true; S.tx.epochs = 10; S.tx.lr = 0.005; S.tx.seed = 1;
-        const go = () => { selectQuestion('text'); showStage('train'); const L = S.tx; rpReset(`Recipe ${RECIPE_LABELS[22]}: ${L.train.length} training documents, ${L.meta.poems} poems of Frost cut into windows of 200 tokens with one document in ten held out, and the next word alone. Press Train (an epoch is ${txEpochEstimate()} here) and watch the two accuracy lines part: the training line climbs on while the held-out one stalls, memorisation outrunning what it learns of the language, and the box below the curves shows two titles continued after every epoch, a training poem’s and a held-out one’s. Load the trained model, then go to 3 · Test and start it off with a title of your own; or paste a text of your own on 1 · Specimens.`); };
-        if (S.tx.source !== 'default') txLoadPreset('default').then(g => { txApplyText(g.text, 'default'); go(); }).catch(() => go()); else go();
-        return;
-      }
-      if (k === '21') { // the describe question: from pixels to words
-        S.dsq.dim = 48; S.dsq.layers = 2; S.dsq.positions = true; S.dsq.epochs = 20; S.dsq.lr = 0.005; S.dsq.seed = 1;
-        selectQuestion('describe'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[21]}: 320 nuclei, each with its description, the next word alone. The frozen encoder of the Foundation question makes the code, one learned matrix projects it, and the model writes from it. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last; or load the trained model and go to 3 · Test to describe a nucleus, then try the other lab’s scan and no image at all.`);
-        return;
-      }
-      if (k === '20') { // the chat question: the same model on transcripts
-        S.ch.dim = 48; S.ch.positions = true; S.ch.epochs = 10; S.ch.lr = 0.005; S.ch.seed = 1; S.ch.reveal = false;
-        selectQuestion('chat'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[20]}: 2,400 transcripts, the next word alone. Press Train and watch the loss by role: the system line and the findings cost almost nothing within an epoch or two, the question stays high since nothing predicts which one comes, and the assistant line, the only one that matters, falls last; the third chart asks the model for the answer of 8 test transcripts after every epoch. Or load the trained model and go to 3 · Test to ask it yourself, in the trained phrasings and in your own.`);
-        return;
-      }
-      if (k === '19') { // the reports question: the small language model
-        S.rp.dim = 48; S.rp.layers = 2; S.rp.positions = true; S.rp.epochs = 10; S.rp.lr = 0.005; S.rp.seed = 1; S.rp.reveal = false; // the two context layers back, after the no-context link
-        selectQuestion('reports'); showStage('train');
-        rpReset(`Recipe ${RECIPE_LABELS[19]}: 800 reports, no rule ever given, only the next word. Press Train and watch the loss by section: the gross falls first, the microscopic description next, and the diagnosis reads as certain from the fifth epoch while the third chart, the diagnosis written from the findings alone, is still climbing. Load the trained model when you have seen enough, then go to 3 · Test and flip a finding.`); return;
-      }
-      if (k === '18') { // the fields question end to end: the shallow convolutional network under the attention heads
-        S.fd.kind = 'shallow'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.cellView = 'attention'; S.fd.head = 1;
-        selectQuestion('fields'); showStage('train'); fdSyncControls();
-        fdReset(`Recipe ${RECIPE_LABELS[18]}: the same fields and labels, the pixels alone, and an encoder too shallow to see the membrane from a nest: every patch sees 64 px around it. The two attention heads over its ${(S.fd.w ? (S.fd.w >> 3) * (S.fd.h >> 3) : 352)} patches have to find the few that matter. Load the trained model (an epoch is a minute here) and watch the invasion head’s attention land on the patches below the membrane; then compare the mimic table with recipe 12, where a plain average had to do.`); return;
-      }
-      if (k === '17') { // the fields question: the full model, the nuclei as tokens
-        S.fd.kind = 'nuclei'; S.fd.pos = true; S.fd.ctx = true; S.fd.crop = 'nucleus'; S.fd.epochs = 60; S.fd.speed = 8; S.fd.seed = 1; S.fd.reveal = false;
-        selectQuestion('fields'); showStage('train'); fdSyncControls();
-        fdReset(`Recipe ${RECIPE_LABELS[17]}: 400 fields of bladder, five patterns, two labels each and no nucleus ever labelled. Press Train and watch the mimic table: cytology alone gets the first three rows; the training fields are mirrored and turned upside down at random, as a slide comes, so a position alone cannot say below the membrane, and it is the context, every nucleus reading its neighbours, that finds the membrane and tells a round nest from an angulated one. Then switch a cue off and train again.`); return;
-      }
-      if (k === '16') { // the focus question, with the context layer
-        S.sl.context = true; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 150; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
-        selectQuestion('slides-focus'); showStage('train');
-        slReset(`Recipe ${RECIPE_LABELS[16]}: every slide holds four atypical nuclei, a 2 × 2 block or scattered, so the bag of nuclei is the same in both classes and the model of recipe 15 stays at chance. Context is on: one layer of self-attention lets each nucleus read its neighbours before the scorer sees it. Press Train, then hover a nucleus to see whom it listens to; switch context off and train again to compare.`); return;
-      }
-      if (k === '15') { // the slides question, without context
-        S.sl.context = false; S.sl.attention = true; S.sl.units = 4; S.sl.epochs = 60; S.sl.speed = 2; S.sl.seed = 1; S.sl.reveal = false;
-        selectQuestion('slides-atypia'); showStage('train');
-        slReset(`Recipe ${RECIPE_LABELS[15]}: 60 slides of 20 nuclei, one label each, no nucleus ever labelled. Press Train and watch the right-hand curve: the share of attention landing on the atypical nuclei climbs from the uniform ${pct(S.sl.share)} towards 90%. Then tick “Reveal” on any slide, and try the plain average for comparison.`);
-        return;
-      }
-      if (k === '12') { // the fields question end to end: a deep convolutional network on the pixels alone, no attention
-        S.fd.kind = 'deep'; S.fd.epochs = 60; S.fd.seed = 1; S.fd.reveal = false; S.fd.head = 1;
-        selectQuestion('fields'); showStage('train'); fdSyncControls();
-        fdReset(`Recipe ${RECIPE_LABELS[12]}: 400 fields of bladder, five patterns, two labels each, and nothing but the pixels: no nucleus found, no code, no coordinates. Three levels of 3 × 3 filters, a plain average of the patches, a single layer per question. Press Train (an epoch is a minute here) or load the trained model, and watch the mimic table and the evidence map: the network finds the invasion without being told what a nucleus is, from 400 fields, as long as it is deep enough to see a nest and the membrane from one patch.`); return;
-      }
-      if (k === '13') { // the foundation question
-        S.fm.labs = true; S.fm.epochs = 100; S.fm.speed = 4;
-        selectQuestion('foundation'); showStage('train');
-        fmReset(`Recipe ${RECIPE_LABELS[13]}: 100 nuclei from all three questions, no labels. Press Pretrain and watch the right-hand curve: a single layer on the code gets better at every question, though the code was never told what any of them asks.`);
-        return;
-      }
-      const { task: taskId, ...settings } = RECIPES[k];
-      const switchTask = taskId !== S.taskId;
-      if (switchTask) loadTask(taskId);
-      S.world = 'classic'; S.questionId = taskId;
-      if (settings.mode === 'code') { revealFoundation(); S.backbone = S.fm.cl && S.fm.epoch > 0 ? 'page' : defaultBackbone(); } // the encoder you pretrained, if you did; else the shipped copy of it
-      Object.assign(S, LAB_SETTINGS, settings);
-      applySources();
-      S.excluded = new Set();
-      S.applyingRecipe = true;
-      syncControls();
-      resetModel(`Recipe ${RECIPE_LABELS[k]}${switchTask ? ` — question switched to “${S.task.title}”` : ''}. Press Train.`);
-      S.applyingRecipe = false;
-      showRecipe(k); syncClassicLoad();
-      renderDataTrays(); renderScatter(); renderInspector();
-      showStage('train');
-      if (k === '8') note(`Recipe ${RECIPE_LABELS[8]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
-      if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
-      if (k === '14') note(`Recipe ${RECIPE_LABELS[14]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 6 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
-      if (k === '4') note(`Recipe ${RECIPE_LABELS[4]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
-    });
+    $('recipe-select').addEventListener('change', () => { const k = $('recipe-select').value; if (k) applyRecipe(k); });
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
@@ -1382,8 +1383,11 @@
     else if (w === 'text') { if (name === 'data') txEnterData(); else if (name === 'train') rpEnter(); else txEnterTest(); }
     else if (w === 'segment') { if (name === 'data') sgEnterData(); else if (name === 'train') sgEnter(); else sgEnterTest(); }
     else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
-    try { history.replaceState(null, '', '#' + (w === 'classic' ? name : `${S.questionId}/${name}`)); } catch (e) { /* ignore */ }
+    writeHash();
   }
+  // the address names the recipe on screen and the step (#12/train), or the question when the settings are no recipe's
+  // (#irregularity/train), so that a refresh or a copied link comes back to the same place; init reads it
+  function writeHash() { try { history.replaceState(null, '', `#${$('recipe-select').value || S.questionId}/${S.stage}`); } catch (e) { /* ignore */ } }
 
   // ------------------------------------------------------------------ the Foundation question: a miniature foundation model, pretrained live
   // 100 nuclei from the three image questions' training sets (34 / 33 / 33) and no labels. The encoder (4 filters 5×5,
@@ -2997,7 +3001,7 @@
     L.epoch = hist.length; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist; L.trainLoss = hist.length ? hist[hist.length - 1].loss : null; L.lastField = null; L.fw = null; L.fwFor = null; L.trial = { next: 0, results: new Map() }; L.testSelected = null; for (const s of L.all) { s.sgPred = null; }
     if (!hist.length) sgRecordEpoch();
     sgSyncControls(); sgRenderAll();
-    sgNote(`Loaded the trained network: ${W.trained}, mean IoU ${pct(W.meanIoU)} on the 50 test fields (${sgClasses().map((c, k) => `${c} ${pct(W.iou[k])}`).join(', ')}). It paints a field; go to 3 · Test, or keep training it here.`);
+    sgNote(`Loaded the trained network: ${W.trained}, mean IoU ${pct(W.meanIoU)} on the 50 test fields (${sgClasses().map((c, k) => `${c} ${pct(W.iou[k])}`).join(', ')}). Context is now ${W.levels} level${W.levels === 1 ? '' : 's'} and ${W.channels} channels, the trained network’s own, so Reset gives a fresh network of that size; set Context back to none for the small one of the recipe. It paints a field; go to 3 · Test, or keep training it here.`);
   }
   // the measures on a few test fields: loss, pixels right, IoU per class and its mean; each field keeps its prediction
   function sgPredict(s) { const L = S.sg; if (s.sgPred && s.sgPredSteps === L.model.steps && s.sgPredModel === L.model) return s.sgPred; const p = L.model.predict(s.ink, L.h, L.w), io = NFL.iou(p.labels, s.mask, 4), l = L.model.loss(p.fw, s.mask); s.sgPred = { labels: p.labels, probs: p.probs, fw: p.fw, iou: io, loss: l.loss, acc: l.accuracy }; s.sgPredSteps = L.model.steps; s.sgPredModel = L.model; return s.sgPred; }
@@ -4332,8 +4336,8 @@
   const RECIPE_QUESTION = { 11: 'segment', 12: 'fields', 13: 'foundation', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'reports', 20: 'chat', 21: 'describe', 22: 'text' };
   const recipeQuestion = k => (RECIPES[k] ? RECIPES[k].task : RECIPE_QUESTION[k]);
   const fdRecipe = () => ({ deep: '12', shallow: '18' }[S.fd.kind] || '17');
-  function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); }
-  function showRecipeOff(desc) { const sel = $('recipe-select'); $('recipe-none').textContent = desc; sel.value = ''; sel.classList.add('is-off'); }
+  function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); writeHash(); }
+  function showRecipeOff(desc) { const sel = $('recipe-select'); $('recipe-none').textContent = desc; sel.value = ''; sel.classList.add('is-off'); writeHash(); }
   function syncRecipeMenu() {
     if (S.world === 'classic') { const k = matchingRecipe(); if (k) showRecipe(k); else showRecipeOff(`${S.task.title} · your own settings`); return; }
     const cur = $('recipe-select').value, want = S.world === 'fields' ? fdRecipe() : Object.keys(RECIPE_QUESTION).find(k => RECIPE_QUESTION[k] === S.questionId);
@@ -4670,6 +4674,7 @@
     try { const t = localStorage.getItem('nucleus-net-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
     try { if (sessionStorage.getItem('nucleus-net-foundation')) S.foundationShown = true; } catch (e) { /* ignore */ }
     Viz.refreshTheme();
+    const hash = (location.hash || '').replace('#', ''), steps = ['data', 'train', 'test']; // read before the page writes its own
     S.tasks = window.LECTURE_TASKS;
     $('recipe-select').innerHTML = '<option value="" id="recipe-none" hidden>choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
     bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindText(); bindSegment(); bindTrainedModels();
@@ -4681,11 +4686,11 @@
     resetModel();
     renderDataTrays(); renderScatter(); renderInspector();
     onThemeChange();
-    const hash = (location.hash || '').replace('#', ''), steps = ['data', 'train', 'test'];
     let qid = null, step = 'data';
     if (hash.includes('/')) [qid, step] = hash.split('/'); else if (steps.includes(hash)) step = hash; else if (hash) { qid = hash; step = 'train'; }
     if (qid === 'slides') qid = 'slides-atypia';
-    if (qid && (WORLD_QUESTIONS.some(q => q.id === qid) || S.tasks[qid])) selectQuestion(qid);
+    if (qid && /^\d+$/.test(qid) && RECIPE_LABELS[+qid]) { showRecipe(+qid); applyRecipe(String(+qid)); } // #12/train: the recipe, as from the menu
+    else if (qid && (WORLD_QUESTIONS.some(q => q.id === qid) || S.tasks[qid])) selectQuestion(qid);
     showStage(steps.includes(step) ? step : 'data');
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (onClassic('train')) renderTrainGraph(); if (onClassic('test')) renderTestGraph(); });
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', onThemeChange);

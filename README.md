@@ -54,7 +54,8 @@ The recipes ask thirteen questions: a blood count, three nucleus questions, the 
 asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
 chat the same model holds about a case, the description it writes of a nucleus from its image, the same fields of
 bladder painted a class per pixel, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
-simply selects a question and its settings (a link such as `#reports/train` opens a question directly, at its default settings).
+simply selects a question and its settings. The address follows: `#12/train` is recipe 12 on its Train step, `#reports/train` a
+question at its default settings, so a refresh or a copied link comes back to the same recipe and step.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
    Blood counts appear as fingerprint cards (one bar per parameter, up = above the reference range); nuclei as images.
