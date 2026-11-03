@@ -634,7 +634,12 @@ shallow model; against the uniform share, so a head that weighs every patch alik
 score exactly; the deep model's heads weigh every patch the same, so its evidence is all it can show); a card shows the
 first layer's eight filters, the head's single layer over the channels and the shown patch's token; the scorer and
 summary cards take a patch through the attention head where there is one; and two diagrams show the network itself, as
-recipe ⑩ and the segmentation lesson do. *The network, layer by layer* draws every map of every convolution for the
+recipe ⑩ and the segmentation lesson do. *The network, live, over the whole field* runs the field through the network left to
+right, as the classic recipe's live diagram and the segmentation lesson's do: the field, the first layer's filters
+beside the maps they make, every level's maps on the way down, each half the size of the one above, the patches'
+tokens, their pooling (the plain mean, or each head's attention shares and weighted mean), each head's evidence per
+patch, orange toward the finding and blue against, and the two answers with the truth; the followed patch's footprint
+is drawn on every map, a hover gives any map's numbers and a click on a map pins the patch under it. *The network, layer by layer* draws every map of every convolution for the
 field on screen, each on its own scale, the resolution halved by the pools, down to the patches' standardised numbers,
 with the shown patch's footprint boxed in every map and the window its token is computed from dashed on the field; its
 *Walk through* slides the first filter over the field one pixel at a time and fills its map in, with the sum of
