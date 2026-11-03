@@ -1295,7 +1295,11 @@ on two crops, an epoch of 100, 200 or 400 crops scores five test fields and fill
 and on the test fields, pixels right, the IoU per class), the focus field is painted after every epoch as the
 prediction, the truth or the errors in red, and hovering a pixel gives its truth, the network's class, the four
 probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
-on the field are on the cards below, with the network itself unrolled at one pixel: every map's channels at the
+on the field are on the cards below, with the network live over the whole field (the field, the first layer's
+filters beside the maps they make, every level's maps on the way down, each half the size of the one above, and up
+again through the upsampling and the skips, then the four class probabilities drawn in the class colours, bright
+where the network is sure, and the painting of the most probable class; hover a map for its numbers or a filter for
+its weights, and the pixel followed on the field is marked on every map) and unrolled at one pixel: every map's channels at the
 pixel's place as circles (hollow where the ReLU is off, at the pooled coordinates on the deeper levels), every
 kernel's contribution there as a line (orange positive, blue negative, the lines of a column adding up with the bias
 to its circles), the levels as bands going down and up again, the skip and the upsampling into each join, the head's
