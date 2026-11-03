@@ -51,10 +51,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 ## Three steps for every question
 
 The recipes ask thirteen questions: a blood count, three nucleus questions, the foundation model, two questions
-asked of slides, the fields of bladder, the reports a small language model writes from an analyser's findings, the
-chat the same model holds about a case, the description it writes of a nucleus from its image, the same fields of
-bladder painted a class per pixel, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
-simply selects a question and its settings. The address follows: `#12/train` is recipe 12 on its Train step, `#reports/train` a
+asked of slides, the fields of bladder, the same fields painted a class per pixel, the reports a small language model
+writes from an analyser's findings, the chat the same model holds about a case, the description it writes of a nucleus
+from its image, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
+simply selects a question and its settings. The address follows: `#17/train` is recipe 17 on its Train step, `#reports/train` a
 question at its default settings, so a refresh or a copied link comes back to the same recipe and step.
 
 1. **Specimens.** All cases with their ground truth (test labels hidden until a lecturer's checkbox reveals them).
@@ -163,7 +163,7 @@ and the contrastive loss runs per epoch on the batches and on 60 held-out nuclei
 after every epoch a single layer is trained on the frozen code with 20 labelled cases per question and scored on 40
 nuclei it never saw, as a curve per question and a table before and after pretraining. See *A foundation model, in
 miniature*. The encoder then serves as the *code* input of the nucleus questions (see *The code as an input*); that
-input and the *Labelled cases* control stay hidden until the foundation question, a slides question or recipe ⑬ or ⑭
+input and the *Labelled cases* control stay hidden until the foundation question, a slides question or recipe ⑪ or ⑫
 has been visited, so the earlier steps are uncluttered until then.
 
 For the **slides questions** *Specimens* is the training and test slides with their labels: click a slide to see its
@@ -188,8 +188,8 @@ call for each scan.
 
 ## The lecture arc: the twenty-two recipe buttons
 
-Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑮:
-`node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑯: `node tools/check_slides.js --question focus --context none,distX
+Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑬:
+`node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑭: `node tools/check_slides.js --question focus --context none,distX
 --decay 0.001 --nopos --epochs 150 --lr 0.02`).
 
 | Recipe | Parameters | Test accuracy | What it shows |
@@ -204,14 +204,14 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑧ Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab | 4,125 | ~82% | A second layer is "deep learning" but buys only a few points here: depth is not the missing ingredient. The recipe to show the other lab on: switch the test cases to the other lab and it falls to chance, and stain normalisation repairs it (see *Another lab, and the shortcut*). |
 | ⑨ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑧ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
 | ⑩ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
-| ⑪ Segment · a class for every pixel · the window it is decided from | 700 (no context) | mean IoU 59% with no context (nest 12%), 71% with one level (nest 32%), 83% with two (nest 66%); pixels right 84%, 90% and 95% | A fully convolutional network: every weight is a 3 × 3 filter slid over the field, so the same few thousand weights paint any field. With no context a pixel's class is decided from the 5 px window around it, which cannot tell a nucleus in the epithelium from the same nucleus in a nest below the membrane: three in four nest pixels are called epithelium and the nest line of the IoU chart stays on the floor. Each level of pooling widens the window (15 px, then 35 px) until it sees the membrane. Set two levels or load the trained network, paint the held-out fields on the Test step, and hover a pixel for its probabilities and the window it was decided from. |
-| ⑫ Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches | 4,186 | 96% invasion right and 100% CIS right on the test fields (seed 1, 60 epochs; 98% at its best epoch); 9 invasive fields in 10 found, 1 CIS-into-nests field in 10 called invasive | What a pathology image network usually is: pixels in, a label out. Three levels of 3 × 3 filters turn the field into 88 patches of 8 numbers, a plain average of the patches and a single layer per question make the two calls; no nucleus is found, no code pretrained, no coordinate fed, and the training fields are mirrored and turned upside down at random. It matches the nuclei model of ⑰ without any of its scaffolding, from 400 fields, and cannot say where it looked: the evidence map on the field is what each patch added to the mean. |
-| ⑬ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
-| ⑭ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑫ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
-| ⑮ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
-| ⑯ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑭ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
-| ⑰ Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~89% invasion right on the test fields (mean of three seeds; the page's seed 1 after 60 epochs: 86%); six invasive fields in ten found, one CIS-into-nests field in ten called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns; with the training fields turned upside down at random, as a slide comes, a position alone cannot say below the membrane, and the context, every nucleus reading its neighbours, is what finds the membrane and tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
-| ⑱ Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches | 3,100 | 96% invasion right and 100% CIS right on the test fields (seed 1, 60 epochs); 8 invasive fields in 10 found, no CIS-into-nests field called invasive | The attention lesson end to end. Two levels of filters give 352 patches of 8 × 8 px that see at most 64 px around them, four nuclei, too little to see the membrane from a nest; the two attention heads over the patches have to find the few that matter. The invasion head's attention gathers on a few dozen patches of an invasive field and stays faint on a mimic: what attention buys here is not accuracy, which the plain average of ⑫ already has, but a map of where the call came from. Pixels alone, mirrored and upside down, no nucleus found, no code, no coordinates. |
+| ⑪ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
+| ⑫ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑰ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑥ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
+| ⑬ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
+| ⑭ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑫ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
+| ⑮ Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question | 1,186 | ~100% CIS right and ~89% invasion right on the test fields (mean of three seeds; the page's seed 1 after 60 epochs: 86%); six invasive fields in ten found, one CIS-into-nests field in ten called invasive | The transformer at work on a diagnosis with three cues. A strip of bladder holds thirty to fifty nuclei, one of five patterns, and two labels: carcinoma in situ, invasion. Every nucleus is its code (masked to the nucleus, so the code is cytology and nothing else) plus its position; two layers of self-attention let the nuclei read each other with a learned distance cost; two attention heads over the same nuclei answer the two questions. Watch the mimic table: cytology alone gets the bland patterns; with the training fields turned upside down at random, as a slide comes, a position alone cannot say below the membrane, and the context, every nucleus reading its neighbours, is what finds the membrane and tells a round von Brunn nest with CIS in it from an angulated invasive nest. Switch a cue off (*its code* alone, context *none*) and train again to see which mimic fools the model. See *Invasion: the field model*. |
+| ⑯ Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches | 3,100 | 96% invasion right and 100% CIS right on the test fields (seed 1, 60 epochs); 8 invasive fields in 10 found, no CIS-into-nests field called invasive | The attention lesson end to end. Two levels of filters give 352 patches of 8 × 8 px that see at most 64 px around them, four nuclei, too little to see the membrane from a nest; the two attention heads over the patches have to find the few that matter. The invasion head's attention gathers on a few dozen patches of an invasive field and stays faint on a mimic: what attention buys here is not accuracy, which the plain average of ⑰ already has, but a map of where the call came from. Pixels alone, mirrored and upside down, no nucleus found, no code, no coordinates. |
+| ⑰ Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional | 4,186 | 96% invasion right and 100% CIS right on the test fields (seed 1, 60 epochs; 98% at its best epoch); 9 invasive fields in 10 found, 1 CIS-into-nests field in 10 called invasive | What a pathology image network usually is: pixels in, a label out. Three levels of 3 × 3 filters turn the field into 88 patches of 8 numbers, a plain average of the patches and a single layer per question make the two calls; no nucleus is found, no code pretrained, no coordinate fed, and the training fields are mirrored and turned upside down at random. It matches the nuclei model of ⑮ without any of its scaffolding, from 400 fields, and cannot say where it looked: the evidence map on the field is what each patch added to the mean. |
+| ⑱ Segment · a class for every pixel · the window it is decided from | 700 (no context) | mean IoU 59% with no context (nest 12%), 71% with one level (nest 32%), 83% with two (nest 66%); pixels right 84%, 90% and 95% | A fully convolutional network: every weight is a 3 × 3 filter slid over the field, so the same few thousand weights paint any field. With no context a pixel's class is decided from the 5 px window around it, which cannot tell a nucleus in the epithelium from the same nucleus in a nest below the membrane: three in four nest pixels are called epithelium and the nest line of the IoU chart stays on the floor. Each level of pooling widens the window (15 px, then 35 px) until it sees the membrane. Set two levels or load the trained network, paint the held-out fields on the Test step, and hover a pixel for its probabilities and the window it was decided from. |
 | ⑲ Reports · a small language model writes the report from the findings | 55,725 | the right diagnosis for 97% of the test reports from the findings and the requisition, the description written by itself | The next word is the only teacher. The loss by section falls in the order of the sign-out and is flat long before the model is grounded: fluent reports at epoch 5 with half the diagnoses right, 97% only at epoch 30. Where the diagnosis looked, and what the model does with a combination it never saw. |
 | ⑳ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ㉑ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
@@ -303,7 +303,7 @@ above the 75% ceiling.
 
 ## A foundation model, in miniature
 
-Recipe ⑬ and the foundation question. The idea of a foundation model is that the expensive part, learning what images are
+Recipe ⑪ and the foundation question. The idea of a foundation model is that the expensive part, learning what images are
 made of, is done once, on many unlabelled images, and every later question is a small model on top of the resulting
 **code**. The miniature keeps every part visible: 100 nuclei from the three image questions' training sets (34 / 33 /
 33, our lab's scans, never a label), an encoder of 1,680 weights (4 filters of 5 × 5, pool 4 × 4, a linear layer to a
@@ -344,11 +344,11 @@ per epoch for both in Node); at the default speed of 4 epochs per second the 100
 
 ## The code as an input, and how many labelled cases it needs
 
-Recipe ⑭ and the *Labelled cases* control close the loop on why anyone pretrains. In the Train step of a nucleus question the third input, **the
+Recipe ⑫ and the *Labelled cases* control close the loop on why anyone pretrains. In the Train step of a nucleus question the third input, **the
 code**, feeds the network the encoder's 8 (or 16) numbers for each nucleus instead of its pixels or measurements; the
 *Code from* control picks the encoder: the one pretrained in the foundation question, or one of two shipped with the page
 (`data/foundation/backbones.js`, written by `tools/pretrain_backbone.js`): a saved copy of exactly what the foundation question
-makes with seed 1 (100 nuclei, 4 filters, a code of 8, 100 epochs), so the recipe works before anyone has run ⑬, and a
+makes with seed 1 (100 nuclei, 4 filters, a code of 8, 100 epochs), so the recipe works before anyone has run ⑪, and a
 bigger encoder (the page's 240 training nuclei, 8 filters, a code of 16, 200 epochs). Everything else works as for the
 measurements: the diagram shows the code numbers as inputs, the checklist lists their weights, the inspector adds a
 card with each number's value and push, and its *Evidence* view carries the push back through the frozen encoder to
@@ -382,9 +382,9 @@ carries information on its own (their correlations with the irregularity label r
 weighting of them is already a classifier, pointing the right way or the wrong way by the luck of the seed. Before a
 single step of training, seed 1 scores 80% on the 10 labelled cases and 70% on the test set, seed 9 scores 20% and
 25%, seed 11 70% and 90%; over many seeds it averages 50%, but no one seed sits there. A random weighting of 1,024
-pixels averages out to about 50% every time. Recipe ⑭ therefore starts from seed 8, whose untrained network sits near
+pixels averages out to about 50% every time. Recipe ⑫ therefore starts from seed 8, whose untrained network sits near
 chance (50% train, 45% test) so that the curve visibly climbs, and every other recipe starts from seed 1; roll the
-dice on ⑭ and watch where it starts.
+dice on ⑫ and watch where it starts.
 
 **Does a bigger encoder help?** `node tools/pretrain_backbone.js --measure` pretrains five encoders and probes each
 one the same way (a single layer on the frozen code, n labelled cases per question as random draws, scored on the 20
@@ -408,7 +408,7 @@ foundation models does not reproduce, and the page says so rather than pretendin
 
 ## Slides: one label for twenty nuclei
 
-Recipe ⑮ and the slides questions. Everything before it labels the nucleus. A pathologist's label is a diagnosis for the
+Recipe ⑬ and the slides questions. Everything before it labels the nucleus. A pathologist's label is a diagnosis for the
 slide, and a slide holds thousands of cells of which the decisive ones may be a handful; nobody outlines them. That is
 the setting of *multiple-instance learning*: a bag of instances, one label for the bag, and the instances that earned
 the label unknown. The miniature keeps the word *slide*: 60 training slides and 20 test slides of 20 nuclei each, drawn
@@ -468,7 +468,7 @@ under a real slide-level model is far larger and often trained on the slides the
 The second slide question is the warm-up for a transformer. Every slide holds exactly four atypical nuclei among sixteen
 bland ones, from the same pool: on a positive slide the four sit together as a 2 × 2 block on the 5 × 4 grid, a focus;
 on a negative slide they are scattered, no two adjacent, not even diagonally. The nuclei are the same in both classes,
-so the bag of codes is identical by construction, and the model of recipe ⑮, which scores every nucleus on its own,
+so the bag of codes is identical by construction, and the model of recipe ⑬, which scores every nucleus on its own,
 cannot tell the classes apart however long it trains. 200 training slides and 40 test slides, drawn by
 `tools/generate_slides.js` next to the first question's.
 
@@ -603,7 +603,7 @@ climbs from 0.21 to 0.48, at a learning rate of 0.02; at 0.01 over 200 epochs it
 there while the test loss climbs from 0.26 to 0.8. The model overfits 400 fields either way, so the page
 shows the test curves and stops at 60 epochs by default.
 
-**On the page.** The question *Fields: is it invasive?* (recipe ⑰, `#fields/train`) has the same three steps as the
+**On the page.** The question *Fields: is it invasive?* (recipe ⑮, `#fields/train`) has the same three steps as the
 others. *Specimens* shows a field at 3× with its pattern, its two labels and the table of the five patterns, and with
 *Reveal* the basement membrane, the nests' outlines and a dot on every atypical nucleus, none of which the model ever
 sees. *Train* trains the field model live: the two attention heads' weights are drawn as rings on the same field side
@@ -630,7 +630,7 @@ with the count shown as it goes. The single-file build inlines the fields (`tool
 `--no-fields` to leave them out).
 
 **The three models on the page.** The Train step's first control, *Model*, chooses between the nuclei as tokens
-(recipe ⑰, the model above) and the two end-to-end networks of the next paragraphs (recipes ⑫ and ⑱). With either
+(recipe ⑮, the model above) and the two end-to-end networks of the next paragraphs (recipes ⑯ and ⑰). With either
 of those the nucleus controls give way; the field viewers tint the encoder's patches by the head's attention (the
 shallow model; against the uniform share, so a head that weighs every patch alike leaves the field untinted) or by each patch's evidence, what it adds to the head's score (the patches and the bias add up to the
 score exactly; the deep model's heads weigh every patch the same, so its evidence is all it can show); a card shows the
@@ -664,7 +664,7 @@ channels, under the fields' `AttentionMIL` with no context layer, or with a plai
 Nothing but the pixels and the field's two labels: the field goes in at half resolution, 88 × 64 px, mirrored half the
 time and upside down half the time with a shift of a pixel or two, in batches of four, Adam at 0.002 on the encoder
 and the heads' own step at 0.02, no nucleus segmented, no code pretrained, no coordinate fed. `--levels 3 --pooling
-average --ship deep` writes recipe ⑫, `--levels 2 --pooling attention --ship shallow` recipe ⑱, both seed 1 and
+average --ship deep` writes recipe ⑰, `--levels 2 --pooling attention --ship shallow` recipe ⑯, both seed 1 and
 60 epochs (20 s each in Node), into `data/fields/fields_cnn_weights.js`; `--check` is the gradient check through the
 whole model (worst relative error 2 × 10⁻⁶) and the proof that the patches' evidence adds up to the score;
 `node tools/probe_fields_cnn.js data/fields/fields_cnn_weights.js:deep` re-evaluates a shipped model, with the
@@ -673,8 +673,8 @@ fields, after 60 epochs:
 
 | Recipe | Parameters | Patches | Each sees | CIS right | Invasion right | Invasive fields called invasive | CIS-into-nests called invasive | Invasion head's attention on the patches holding atypical nuclei below the membrane | Effective patches |
 |---|---|---|---|---|---|---|---|---|---|
-| ⑫ deep, plain average | 4,186 | 11 × 8 of 16 px | 136 px | 100% | 96% (98% at epoch 32) | 90% | 10% | uniform (9%) | 88 of 88 |
-| ⑱ shallow, attention | 3,100 | 22 × 16 of 8 px | 64 px | 100% | 96% (96% at epoch 47) | 80% | 0% | 4% (uniform 1%) | 248 of 352 |
+| ⑰ deep, plain average | 4,186 | 11 × 8 of 16 px | 136 px | 100% | 96% (98% at epoch 32) | 90% | 10% | uniform (9%) | 88 of 88 |
+| ⑯ shallow, attention | 3,100 | 22 × 16 of 8 px | 64 px | 100% | 96% (96% at epoch 47) | 80% | 0% | 4% (uniform 1%) | 248 of 352 |
 
 Both match the nuclei model without any of its scaffolding. The deep network is the stronger finder and the shallow
 one the cleaner on the mimic, one seed each, which is within the noise of 50 test fields; the difference that is not
@@ -712,8 +712,8 @@ with the deep encoder the attention is uniform: every patch already sees the who
 with an average pool, the heads have nothing to choose, and the context layers add nothing. With the shallow encoder
 the invasion head becomes selective, concentrating on the nests just under the membrane of an invasive field and
 staying faint on a CIS-into-nests mimic, and the context layers spread it out again at twice the cost. That is the
-lesson the page got: recipe ⑱ is the shallow encoder without context layers or coordinates, trained in every
-orientation, and recipe ⑫ the deep encoder with the plain average.
+lesson the page got: recipe ⑯ is the shallow encoder without context layers or coordinates, trained in every
+orientation, and recipe ⑰ the deep encoder with the plain average.
 
 **The controls.** The runs above gave every patch its coordinates, which on fields that always have the lumen at the
 top is a hint no slide offers: the membrane lies 46 to 54 px down, so depth reads as *below the membrane* for free.
@@ -738,6 +738,89 @@ deep convolutional network, pixels in and one label per field out, is the strong
 upside down. Attention adds nothing to the deep encoder and three to four points to the shallow one, where it also
 shows where it looked; that, not accuracy, is what the end-to-end attention lesson teaches, and both lessons train
 with the fields in every orientation, as a slide comes.
+
+## Segment: a class for every pixel
+
+The Segment question asks the fields of bladder, the ones the invasion lessons classify as a whole, a different
+question: not whether the field is invasive, but what every pixel is. Four classes: the lumen above the surface, the epithelium, the stroma, and the
+cells below the membrane (a von Brunn nest, a cord of an inverted papilloma, an invasive nest or a shed single cell).
+It is semantic segmentation in miniature, the task behind the nucleus and gland segmentation networks of computational
+pathology, with a network small enough that every filter and every map fits on the screen. The masks are described
+under *The data*: nobody painted them; `js/fields.js` reads them off the geometry each field carries, the membrane's
+height and every nest's outline, and they come out as 5%, 34%, 47% and 14% of the pixels.
+
+**The model.** `SegNet` in `js/nn.js` is a fully convolutional network: every weight belongs to a 3 × 3 filter slid
+over the whole field with 'same' padding and followed by a ReLU, so the same few thousand weights paint a field of any
+size, a 64 × 64 crop in training and the whole 176 × 128 field at test. Two convolutions of 8 channels at the pixels'
+own scale decide each pixel's class from the 5 × 5 window around it; each **level of context** below them pools the
+maps 2 × 2 (the maximum), convolves twice at the coarser scale, upsamples the result (nearest neighbour) and joins it
+to the finer map before two more convolutions, a U-Net in miniature, so that the window a pixel is decided from widens
+to 16 px with one level and 36 to 40 px with two (the exact span depends on where the pixel falls on the pooling grid,
+since the nearest-neighbour upsampling reads the coarser entry the pixel falls in) while the join keeps the fine edges. A 1 × 1 convolution gives four scores
+per pixel and a softmax the probabilities; the loss is the cross-entropy per pixel, optionally weighted by 1/√(class
+share) so that the rare lumen and nests count; Adam at 0.003 on batches of 4 random crops of 64 × 64 from the
+training fields, 400 crops per epoch, weight decay 0.0001, gradients clipped at 1, the ink centred on its mean
+(0.289). The gradient is checked numerically against the loss (worst relative error 3 × 10⁻⁵ over 354 gradients at
+two levels). Parameters: 700 with no context, 3,028 with one level, 5,356 with two. Reproduce with
+`node tools/check_segment.js --levels 2 --epochs 20 --crops 400 --weighted --curve` (about 34 s per epoch in Node;
+`--save data/fields/seg_weights.js` writes the shipped network, `--load` takes the measures on it, `--sheet` a sheet
+of predictions).
+
+**What the window buys.** After 20 epochs, on the 50 held-out fields, the same recipe at each depth (seed 1):
+
+| Context | Window | Parameters | Pixels right | Mean IoU | Lumen | Epithelium | Stroma | Nest | Of the nest pixels, called epithelium |
+|---|---|---|---|---|---|---|---|---|---|
+| none | 5 px | 700 | 84% | 59% | 62% | 69% | 94% | 12% | 75% |
+| 1 level | 16 px | 3,028 | 90% | 71% | 76% | 79% | 98% | 32% | 56% |
+| 2 levels | 36–40 px | 5,356 | 95% | 81% | 68% | 88% | 98% | 66% | 4% |
+| 2 levels, pixels weighted by 1/√share (the shipped network) | 36–40 px | 5,356 | 95% | 83% | 79% | 89% | 97% | 66% | 5% |
+
+Pixels right is the easy number: the stroma and the epithelium are 81% of the field and the stroma is a plain
+texture, so even the 5 px window gets 84%, and the stroma's IoU is 94% at every depth. The intersection over union per
+class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane is drawn by the
+same generator as the nucleus above it in the epithelium, so a window smaller than a nucleus cannot tell them apart:
+with no context three in four nest pixels are called epithelium and the nest IoU is 12%. What separates the two
+classes within reach of a window is the packing: the urothelium is drawn as rows of nuclei 17 to 20 px apart, a nest
+as nuclei that touch. One level (16 px, a nucleus and its neighbour) halves the confusion; two levels (36 to 40 px,
+three or four nuclei with their gaps) send 90% of the nest pixels to the nest class. It is not the membrane the
+network finds. `node tools/probe_segment.js` measures that the nests are 55 × 59 px in the median, larger than the
+window, and that the membrane is within reach of 18% of nest pixels; the shipped network's nest recall is 94% on the
+pixels that can see the band, 90% at 20 to 40 px below it and 88% deeper; painting the band and the lumen over with
+the field's own stroma rows leaves the recall of the pixels that could see the band at 94%; the centre of a big nest
+pasted into the band is still called nest for 70% of its pixels (80% in place), and a patch of the band pasted into
+plain stroma is still called epithelium for 83% (98% in place). The network reads how the nuclei are packed, which
+is architecture, the pathologist's cue too. A position channel would be a shortcut here: the epithelium never reaches
+below y = 58 and 93% of nest pixels lie deeper. The weighting
+lifts the lumen, a thin strip of 5% of the pixels, from 68% to 79% and the mean to 83% without costing the rest, and
+that is the network that ships. The nest's remaining 66% is mostly a scoring artefact of the carcinoma in situ fields:
+eight of the ten have no nest at all, and a few hundred stray nest pixels on each (49 to 1,252 of 22,528) count as an
+IoU of zero for the whole field; over the 42 test fields that have a nest the nest IoU averages 79% (von Brunn nests
+79%, CIS in von Brunn nests 73%, inverted papilloma 83%, invasive 78%). What it gets wrong is on the sheet
+`data/fields/contact_sheet_segmentation.png` (ten test fields: the image, the truth, the prediction with the wrong
+pixels darkened): the darkest nuclei inside a nest, called epithelium or stroma from their texture, the rim of a nest,
+and the surface line where the lumen begins, the boundaries, as ever in segmentation.
+
+**The page.** *Specimens* shows the fields of the invasion question again with their masks painted over them (image
+or mask), each field's class shares, and two explainers: where the mask comes from, and what the network has to do
+(22,528 labelled pixels per field, which are anything but independent). *Train* is a live training loop on crops: the
+context control (none, one level, two levels) rebuilds the network and its window, Step batch takes one gradient step
+on two crops, an epoch of 100, 200 or 400 crops scores five test fields and fills the curves (the loss on the crops
+and on the test fields, pixels right, the IoU per class), the focus field is painted after every epoch as the
+prediction, the truth or the errors in red, and hovering a pixel gives its truth, the network's class, the four
+probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
+on the field are on the cards below, with the network live over the whole field (the field, the first layer's
+filters beside the maps they make, every level's maps on the way down, each half the size of the one above, and up
+again through the upsampling and the skips, then the four class probabilities drawn in the class colours, bright
+where the network is sure, and the painting of the most probable class; hover a map for its numbers or a filter for
+its weights, and the pixel followed on the field is marked on every map) and unrolled at one pixel: every map's channels at the
+pixel's place as circles (hollow where the ReLU is off, at the pooled coordinates on the deeper levels), every
+kernel's contribution there as a line (orange positive, blue negative, the lines of a column adding up with the bias
+to its circles), the levels as bands going down and up again, the skip and the upsampling into each join, the head's
+score per class and the softmax, with the window each column sees; the pixel follows the mouse on the field and a
+click pins it, and hovering a circle or a line gives its value, or the kernel's nine weights. *Load the trained model* brings the shipped network with its twenty epochs
+of curves. *Test* paints the held-out fields one at a time (N for the next) with the IoU per class of each and a
+tally over the fifty. Recipe ⑱ sets it up with no context, so that the nest line's failure is the first thing seen;
+set two levels and train again, or load the trained network, for the comparison.
 
 ## Reports: a small language model
 
@@ -1233,89 +1316,6 @@ trains on another text written the way `tools/generate_text.js` writes them; the
 `node tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --epochs 7 --curve --save
 data/text/text_weights_all.js --global-out TEXT_LM_ALL` (add `--keep-best --patience 4` for the early-stopped model).
 
-## Segment: a class for every pixel
-
-The Segment question asks the fields of bladder, the ones the invasion lessons classify as a whole, a different
-question: not whether the field is invasive, but what every pixel is. Four classes: the lumen above the surface, the epithelium, the stroma, and the
-cells below the membrane (a von Brunn nest, a cord of an inverted papilloma, an invasive nest or a shed single cell).
-It is semantic segmentation in miniature, the task behind the nucleus and gland segmentation networks of computational
-pathology, with a network small enough that every filter and every map fits on the screen. The masks are described
-under *The data*: nobody painted them; `js/fields.js` reads them off the geometry each field carries, the membrane's
-height and every nest's outline, and they come out as 5%, 34%, 47% and 14% of the pixels.
-
-**The model.** `SegNet` in `js/nn.js` is a fully convolutional network: every weight belongs to a 3 × 3 filter slid
-over the whole field with 'same' padding and followed by a ReLU, so the same few thousand weights paint a field of any
-size, a 64 × 64 crop in training and the whole 176 × 128 field at test. Two convolutions of 8 channels at the pixels'
-own scale decide each pixel's class from the 5 × 5 window around it; each **level of context** below them pools the
-maps 2 × 2 (the maximum), convolves twice at the coarser scale, upsamples the result (nearest neighbour) and joins it
-to the finer map before two more convolutions, a U-Net in miniature, so that the window a pixel is decided from widens
-to 16 px with one level and 36 to 40 px with two (the exact span depends on where the pixel falls on the pooling grid,
-since the nearest-neighbour upsampling reads the coarser entry the pixel falls in) while the join keeps the fine edges. A 1 × 1 convolution gives four scores
-per pixel and a softmax the probabilities; the loss is the cross-entropy per pixel, optionally weighted by 1/√(class
-share) so that the rare lumen and nests count; Adam at 0.003 on batches of 4 random crops of 64 × 64 from the
-training fields, 400 crops per epoch, weight decay 0.0001, gradients clipped at 1, the ink centred on its mean
-(0.289). The gradient is checked numerically against the loss (worst relative error 3 × 10⁻⁵ over 354 gradients at
-two levels). Parameters: 700 with no context, 3,028 with one level, 5,356 with two. Reproduce with
-`node tools/check_segment.js --levels 2 --epochs 20 --crops 400 --weighted --curve` (about 34 s per epoch in Node;
-`--save data/fields/seg_weights.js` writes the shipped network, `--load` takes the measures on it, `--sheet` a sheet
-of predictions).
-
-**What the window buys.** After 20 epochs, on the 50 held-out fields, the same recipe at each depth (seed 1):
-
-| Context | Window | Parameters | Pixels right | Mean IoU | Lumen | Epithelium | Stroma | Nest | Of the nest pixels, called epithelium |
-|---|---|---|---|---|---|---|---|---|---|
-| none | 5 px | 700 | 84% | 59% | 62% | 69% | 94% | 12% | 75% |
-| 1 level | 16 px | 3,028 | 90% | 71% | 76% | 79% | 98% | 32% | 56% |
-| 2 levels | 36–40 px | 5,356 | 95% | 81% | 68% | 88% | 98% | 66% | 4% |
-| 2 levels, pixels weighted by 1/√share (the shipped network) | 36–40 px | 5,356 | 95% | 83% | 79% | 89% | 97% | 66% | 5% |
-
-Pixels right is the easy number: the stroma and the epithelium are 81% of the field and the stroma is a plain
-texture, so even the 5 px window gets 84%, and the stroma's IoU is 94% at every depth. The intersection over union per
-class is the honest one, and the nest line tells the lesson. A nucleus in a nest below the membrane is drawn by the
-same generator as the nucleus above it in the epithelium, so a window smaller than a nucleus cannot tell them apart:
-with no context three in four nest pixels are called epithelium and the nest IoU is 12%. What separates the two
-classes within reach of a window is the packing: the urothelium is drawn as rows of nuclei 17 to 20 px apart, a nest
-as nuclei that touch. One level (16 px, a nucleus and its neighbour) halves the confusion; two levels (36 to 40 px,
-three or four nuclei with their gaps) send 90% of the nest pixels to the nest class. It is not the membrane the
-network finds. `node tools/probe_segment.js` measures that the nests are 55 × 59 px in the median, larger than the
-window, and that the membrane is within reach of 18% of nest pixels; the shipped network's nest recall is 94% on the
-pixels that can see the band, 90% at 20 to 40 px below it and 88% deeper; painting the band and the lumen over with
-the field's own stroma rows leaves the recall of the pixels that could see the band at 94%; the centre of a big nest
-pasted into the band is still called nest for 70% of its pixels (80% in place), and a patch of the band pasted into
-plain stroma is still called epithelium for 83% (98% in place). The network reads how the nuclei are packed, which
-is architecture, the pathologist's cue too. A position channel would be a shortcut here: the epithelium never reaches
-below y = 58 and 93% of nest pixels lie deeper. The weighting
-lifts the lumen, a thin strip of 5% of the pixels, from 68% to 79% and the mean to 83% without costing the rest, and
-that is the network that ships. The nest's remaining 66% is mostly a scoring artefact of the carcinoma in situ fields:
-eight of the ten have no nest at all, and a few hundred stray nest pixels on each (49 to 1,252 of 22,528) count as an
-IoU of zero for the whole field; over the 42 test fields that have a nest the nest IoU averages 79% (von Brunn nests
-79%, CIS in von Brunn nests 73%, inverted papilloma 83%, invasive 78%). What it gets wrong is on the sheet
-`data/fields/contact_sheet_segmentation.png` (ten test fields: the image, the truth, the prediction with the wrong
-pixels darkened): the darkest nuclei inside a nest, called epithelium or stroma from their texture, the rim of a nest,
-and the surface line where the lumen begins, the boundaries, as ever in segmentation.
-
-**The page.** *Specimens* shows the fields of the invasion question again with their masks painted over them (image
-or mask), each field's class shares, and two explainers: where the mask comes from, and what the network has to do
-(22,528 labelled pixels per field, which are anything but independent). *Train* is a live training loop on crops: the
-context control (none, one level, two levels) rebuilds the network and its window, Step batch takes one gradient step
-on two crops, an epoch of 100, 200 or 400 crops scores five test fields and fills the curves (the loss on the crops
-and on the test fields, pixels right, the IoU per class), the focus field is painted after every epoch as the
-prediction, the truth or the errors in red, and hovering a pixel gives its truth, the network's class, the four
-probabilities and the window it was decided from, drawn on the field; the first layer's eight filters and their maps
-on the field are on the cards below, with the network live over the whole field (the field, the first layer's
-filters beside the maps they make, every level's maps on the way down, each half the size of the one above, and up
-again through the upsampling and the skips, then the four class probabilities drawn in the class colours, bright
-where the network is sure, and the painting of the most probable class; hover a map for its numbers or a filter for
-its weights, and the pixel followed on the field is marked on every map) and unrolled at one pixel: every map's channels at the
-pixel's place as circles (hollow where the ReLU is off, at the pooled coordinates on the deeper levels), every
-kernel's contribution there as a line (orange positive, blue negative, the lines of a column adding up with the bias
-to its circles), the levels as bands going down and up again, the skip and the upsampling into each join, the head's
-score per class and the softmax, with the window each column sees; the pixel follows the mouse on the field and a
-click pins it, and hovering a circle or a line gives its value, or the kernel's nine weights. *Load the trained model* brings the shipped network with its twenty epochs
-of curves. *Test* paints the held-out fields one at a time (N for the next) with the IoU per class of each and a
-tally over the fifty. Recipe ⑪ sets it up with no context, so that the nest line's failure is the first thing seen;
-set two levels and train again, or load the trained network, for the comparison.
-
 ## The trained models that ship
 
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
@@ -1544,7 +1544,7 @@ data/text/frost_collected.js  Frost's five books of 1913 to 1928 from the same e
 data/text/text_weights.js  the trained text model (30 epochs on Mountain Interval) with its vocabulary, the curves of its training, the two titles continued after every epoch and the words' paths, written by tools/check_text.js --save; fetched by the page on demand
 data/text/text_weights_all.js  the trained text model of the five books (7 epochs) with its vocabulary, curves, samples and word paths, written by tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --save; fetched on demand
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
-data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑫ and ⑱) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
+data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑯ and ⑰) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
 tools/generate_cbc.js      make the blood-count dataset
 tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at both labs (also a module for the pretraining script)
@@ -1566,7 +1566,7 @@ tools/export_models.js     train every lesson's model on the page itself (headle
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
 tools/check_fields.js      what the frozen encoders make of the fields' crops: atypia and location probes on the code, before any model
-tools/check_fields_cnn.js  the invasion question end to end (recipes ⑫ and ⑱): the convolutional encoder over the field at half resolution with a plain average or the attention heads over its cells, trained in Node from the field labels alone, mirrored and upside down; --ship writes the page's models, --check the gradient check; the mimic table after every epoch and the model saved with --out
+tools/check_fields_cnn.js  the invasion question end to end (recipes ⑯ and ⑰): the convolutional encoder over the field at half resolution with a plain average or the attention heads over its cells, trained in Node from the field labels alone, mirrored and upside down; --ship writes the page's models, --check the gradient check; the mimic table after every epoch and the model saved with --out
 tools/probe_fields_cnn.js  a saved end-to-end model re-evaluated: accuracy, the mimic table, how spread each head's attention is, the invasion head's map over the cells
 tools/build_single_file.js bundle everything into dist/nucleus-net.html
 ```
