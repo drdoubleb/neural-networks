@@ -24,7 +24,8 @@ Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `
 (Train) and `N` classifies the next test case (Test).
 
 The masthead has one dropdown, the **lecture recipe**: a one-click preset for each step of the arc, which selects the
-question (the dataset) and its settings. The menu names the recipe on screen; on the classic questions, once a setting
+question (the dataset) and its settings. The ‹ and › buttons beside it step to the previous or next recipe (from the
+last recipe shown, once a setting has moved off it), and name their target on hover. The menu names the recipe on screen; on the classic questions, once a setting
 has moved off the recipe, it names the question instead and says *your own settings*. The Train stage shows only the essential controls
 (input, convolution, hidden units, and the training buttons in the order a resident should try them: Teach next case,
 Step batch, Step epoch, Complete training, Reset); everything else lives under *Advanced settings*. Controls that

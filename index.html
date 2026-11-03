@@ -18,7 +18,7 @@
     <p class="tagline">Watch a tiny neural network learn to read a blood count, then a nucleus.</p>
   </div>
   <div class="mh-selects">
-    <label class="mh-select"><span>Lecture recipe</span><select id="recipe-select" title="the lecture in twenty-two steps: each one picks a question and its settings. On the classic questions, once a setting has moved off the recipe, the menu names the question and says so"></select></label>
+    <div class="mh-select"><span id="recipe-label">Lecture recipe</span><div class="mh-recipe"><button type="button" class="mh-step" id="recipe-prev" aria-label="previous recipe">‹</button><select id="recipe-select" aria-labelledby="recipe-label" title="the lecture in twenty-two steps: each one picks a question and its settings. On the classic questions, once a setting has moved off the recipe, the menu names the question and says so"></select><button type="button" class="mh-step" id="recipe-next" aria-label="next recipe">›</button></div></div>
   </div>
   <nav class="stages" aria-label="Stages">
     <button type="button" class="stage is-active" data-stage="data">1 · Specimens</button>

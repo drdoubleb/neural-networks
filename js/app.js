@@ -1268,6 +1268,7 @@
     $('btn-reset').addEventListener('click', () => resetModel('Weights re-initialised from the seed.'));
     $('btn-teach').addEventListener('click', teachNext);
     $('recipe-select').addEventListener('change', () => { const k = $('recipe-select').value; if (k) applyRecipe(k); });
+    $('recipe-prev').addEventListener('click', () => stepRecipe(-1)); $('recipe-next').addEventListener('click', () => stepRecipe(1));
     document.querySelectorAll('#tray-color-seg button').forEach(b => b.addEventListener('click', () => { S.trayColor = b.dataset.color; syncControls(); renderTrainTray(); }));
     document.querySelectorAll('.views button').forEach(b => b.addEventListener('click', () => { S.view = b.dataset.view; renderInspector(); }));
     $('reveal-test').addEventListener('change', () => { S.revealTest = $('reveal-test').checked; renderDataTrays(); renderScatter(); renderInspector(); });
@@ -4336,8 +4337,18 @@
   const RECIPE_QUESTION = { 11: 'foundation', 13: 'slides-atypia', 14: 'slides-focus', 15: 'fields', 16: 'fields', 17: 'fields', 18: 'segment', 19: 'reports', 20: 'chat', 21: 'describe', 22: 'text' };
   const recipeQuestion = k => (RECIPES[k] ? RECIPES[k].task : RECIPE_QUESTION[k]);
   const fdRecipe = () => ({ deep: '17', shallow: '16' }[S.fd.kind] || '15');
-  function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); writeHash(); }
-  function showRecipeOff(desc) { const sel = $('recipe-select'); $('recipe-none').textContent = desc; sel.value = ''; sel.classList.add('is-off'); writeHash(); }
+  function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); recipeAnchor = +k; syncRecipeNav(); writeHash(); }
+  function showRecipeOff(desc) { const sel = $('recipe-select'); $('recipe-none').textContent = desc; sel.value = ''; sel.classList.add('is-off'); syncRecipeNav(); writeHash(); }
+  // the previous and next buttons beside the menu walk the lecture in order, from the recipe shown or, once the settings
+  // have moved off it, from the last one shown; each names its target on hover
+  let recipeAnchor = 1;
+  const recipeShown = () => +($('recipe-select').value || recipeAnchor), lastRecipe = RECIPE_LABELS.length - 1;
+  function syncRecipeNav() {
+    const k = recipeShown(), prev = $('recipe-prev'), next = $('recipe-next');
+    prev.disabled = k <= 1; next.disabled = k >= lastRecipe;
+    prev.title = k > 1 ? `previous: ${RECIPE_LABELS[k - 1]}` : 'the first recipe'; next.title = k < lastRecipe ? `next: ${RECIPE_LABELS[k + 1]}` : 'the last recipe';
+  }
+  function stepRecipe(d) { const k = recipeShown() + d; if (k < 1 || k > lastRecipe) return; showRecipe(k); applyRecipe(String(k)); }
   function syncRecipeMenu() {
     if (S.world === 'classic') { const k = matchingRecipe(); if (k) showRecipe(k); else showRecipeOff(`${S.task.title} · your own settings`); return; }
     const cur = $('recipe-select').value, want = S.world === 'fields' ? fdRecipe() : Object.keys(RECIPE_QUESTION).find(k => RECIPE_QUESTION[k] === S.questionId);
