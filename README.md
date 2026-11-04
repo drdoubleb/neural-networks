@@ -23,7 +23,7 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
 Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
 
-The masthead has one dropdown, the **lecture recipe**: a one-click preset for each step of the arc, which selects the
+The masthead carries a small link back to [drdoubleb.com](https://drdoubleb.com) above the title. It has one dropdown, the **lecture recipe**: a one-click preset for each step of the arc, which selects the
 question (the dataset) and its settings. The ‹ and › buttons beside it step to the previous or next recipe (from the
 last recipe shown, once a setting has moved off it), and name their target on hover. The menu names the recipe on screen; on the classic questions, once a setting
 has moved off the recipe, it names the question instead and says *your own settings*. The Train stage shows only the essential controls
