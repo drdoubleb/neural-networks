@@ -108,6 +108,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, .thumb:focus-vi
   padding-block: 18px 14px; border-bottom: 1px solid var(--line); margin-bottom: 18px;
 }
 .brand { flex: 1 1 320px; min-width: 0; }
+.home-link { display: inline-block; font-size: 12px; font-weight: 500; color: var(--ink-3); text-decoration: none; margin-bottom: 1px; } /* the way back to the author's site, above the title */
+.home-link:hover { color: var(--accent); text-decoration: underline; }
 .tagline { color: var(--ink-2); max-width: 62ch; margin-top: 2px; }
 .stages { display: flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 999px; }
 .stage {
