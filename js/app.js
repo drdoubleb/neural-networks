@@ -72,7 +72,7 @@
   const className = label => S.task.classes[label].name;
   const posName = () => S.task.classes[1].name, negName = () => S.task.classes[0].name;
   const noun = (n) => { const w = S.task.specimenNoun || 'specimen'; return n === 1 ? w : (w === 'nucleus' ? 'nuclei' : w + 's'); };
-  function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id); }
+  function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id) || (S.world === 'cluster' && S.stage === 'test'); } // the clusters' Test step scores the naming against the truth, so it shows it
   function isClassified(s) { return s.split === 'train' || S.test.results.has(s.id); }
   function subtypeName(key) { const st = (S.task.subtypes || []).find(t => t.key === key); return st ? st.name : key; }
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -997,9 +997,11 @@
     $('spec-caption').textContent = caption;
     renderLabCard(s, fw);
 
-    // verdict
+    // verdict: on the Cluster question the case's cluster, there being no network; else the network's call
     const v = $('verdict');
-    if (!fw) {
+    v.classList.toggle('km', S.world === 'cluster');
+    if (S.world === 'cluster' && S.km.built && S.km.st) kmInspectorVerdict(s, v);
+    else if (!fw) {
       v.querySelector('.p').innerHTML = untrainedHere ? '<small class="lbl">network call</small><b class="soft">not trained yet</b><small>see stage 2</small>' : (s.split === 'test' ? '<small class="lbl">network call</small><b class="soft">pending</b><small>press Classify next</small>' : '<small class="lbl">network call</small><b class="soft">–</b>');
       $('verdict-call').innerHTML = '';
       $('pbar-marker').style.left = '50%';
@@ -4774,7 +4776,7 @@
     for (const [id, ax] of [['km-x', 'x'], ['km-y', 'y']]) { const sel = $(id), cur = L.axes[ax]; sel.innerHTML = opts.map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join(''); sel.value = opts.some(o => o.v === cur) ? cur : (ax === 'x' ? 'pc1' : 'pc2'); L.axes[ax] = sel.value; }
     kmSyncButtons();
   }
-  function kmRenderAll() { kmRenderStatus(); kmRenderMaps(); kmRenderCurves(); kmRenderTable($('km-table'), S.ds.train, S.km.st.A, $('km-table-note'), 'training'); kmRenderProfiles(); kmRenderSweep(); if (S.world === 'cluster' && S.stage === 'test') kmEnterTest(); }
+  function kmRenderAll() { kmRenderStatus(); kmRenderMaps(); kmRenderCurves(); kmRenderTable($('km-table'), S.ds.train, S.km.st.A, $('km-table-note'), 'training'); kmRenderProfiles(); kmRenderSweep(); if (S.world === 'cluster' && S.stage === 'test') kmEnterTest(); else if (S.world === 'cluster') renderInspector(); }
   function kmRenderStatus() {
     const L = S.km, st = L.st;
     const startText = L.start === 'random' ? `${L.k} random ${noun(2)} as the first centres (seed ${L.seed})` : `the tightest of ${st.starts} k-means++ starts from seed ${L.seed}, replayed`;
@@ -4820,7 +4822,8 @@
   function kmRenderMaps() {
     const L = S.km; kmRenderMap($('km-map'), 'train'); kmRenderLegend();
     const pcs = L.axes.x.startsWith('pc') || L.axes.y.startsWith('pc');
-    $('km-map-note').textContent = pcs ? `The components are the two directions of greatest spread of ${kmInputName()}, the space where k-means measures its distances; the rings are the centres, each at the mean of its cases. Pick two ${S.kind === 'tabular' ? 'parameters' : 'measurements'} instead to see the clusters in units you know.` : `Two of the ${S.kind === 'tabular' ? 'parameters' : 'measurements'} as axes; the clusters were found in ${kmInputName()} at once, so two can overlap here and still be apart.`;
+    const D = L.inp.inputSize, share = L.pca.explained[0] + L.pca.explained[1], all = L.mode === 'features' ? kmInputName().replace(/^the \d+ /, `all ${D} `) : `all ${D} numbers of ${kmInputName()}`;
+    $('km-map-note').textContent = pcs ? `k-means measured its distances in ${all}; the map shows the two directions of greatest spread of those ${D}, which carry ${pct(share)} of it, so two clusters can overlap here and still be apart. The rings are the centres, each at the mean of its cases. Pick two ${S.kind === 'tabular' ? 'parameters' : 'measurements'} instead to see the clusters in units you know.` : `Two of the ${S.kind === 'tabular' ? 'parameters' : 'measurements'} as axes; the clusters were found in ${all} at once, so two can overlap here and still be apart.`;
     if (S.world === 'cluster' && S.stage === 'test' && L.At) kmRenderMap($('km-test-map'), 'test');
   }
   function kmRenderLegend() {
@@ -4869,7 +4872,20 @@
     $('km-names').innerHTML = Array.from({ length: L.k }, (_, j) => `<label><span class="km-swatch" style="background:${kmRgb(j)}"></span>cluster ${j + 1} is <select data-j="${j}"><option value="0"${L.names[j] === 0 ? ' selected' : ''}>${esc(negName())}</option><option value="1"${L.names[j] === 1 ? ' selected' : ''}>${esc(posName())}</option></select></label>`).join('');
     const right = kmNamedRight(S.ds.test, L.At, L.names), sup = kmSupervised();
     $('km-test-status').innerHTML = `Named this way, <b>${right} of ${S.ds.test.length}</b> held-out ${noun(2)} are called right (${pct(right / S.ds.test.length)}).${sup ? ` The supervised recipes on the same held-out ${noun(2)}: ${sup}.` : ''}`;
-    kmRenderMap($('km-test-map'), 'test'); kmRenderTable($('km-test-table'), S.ds.test, L.At, $('km-test-note'), 'held-out');
+    kmRenderMap($('km-test-map'), 'test'); kmRenderTable($('km-test-table'), S.ds.test, L.At, $('km-test-note'), 'held-out'); renderInspector();
+  }
+  // the inspector's verdict on the Cluster question: which cluster the case is in, by its nearest centre, and what that
+  // cluster mostly holds; on the Test step the name the cluster was given, and whether it agrees with the truth
+  function kmInspectorVerdict(s, v) {
+    const L = S.km, ti = S.ds.train.indexOf(s), held = ti < 0;
+    const j = !held ? L.st.A[ti] : (L.At && S.ds.test.indexOf(s) >= 0 ? L.At[S.ds.test.indexOf(s)] : NucleusCluster.nearest(Array.from(L.inp.xOf(s)), L.st.C));
+    const members = S.ds.train.filter((t, i) => L.st.A[i] === j), ct = NucleusCluster.contingency(members.map(() => 0), members.map(t => t.subtype), 1).rows[0];
+    v.querySelector('.p').innerHTML = `<small class="lbl">cluster</small><b style="color:${kmRgb(j)}">cluster ${j + 1}</b><small>${held ? 'held out: joined its nearest centre' : 'by its nearest centre'}${L.st.converged ? '' : ' · rounds still running'}</small>`;
+    let chips = `<span class="chip" style="background:${kmRgb(j, 0.18)}">cluster ${j + 1} · ${members.length} ${noun(2)}</span>`;
+    if (held && L.names && S.world === 'cluster' && S.stage === 'test') { const named = L.names[j]; chips += `<span class="chip ${classOf(named)}">named: ${esc(className(named))}</span>`; if (truthKnown(s)) chips += named === s.label ? '<span class="chip good">✓ agrees with truth</span>' : `<span class="chip bad">✗ truth is ${esc(className(s.label))}</span>`; }
+    else if (!held) chips += `<span class="chip">mostly ${esc(kmSub(ct.majority))}, ${pct(ct.purity)}</span>`;
+    $('verdict-call').innerHTML = chips;
+    $('evidence-sum').textContent = `No network here: a case belongs to whichever of the ${L.k} centres is nearest in ${kmInputName()}, with no radius and no probability; this cluster's ${members.length} training ${noun(2)} are mostly ${kmSub(ct.majority)} (${ct.counts.get(ct.majority) || 0} of ${members.length}).`;
   }
   function kmSupervised() { const T = trained(); if (!T || !T.classic) return ''; return Object.entries(T.classic).filter(([, e]) => e.settings && e.settings.task && e.settings.task.id === S.taskId).map(([k, e]) => `recipe ${k} ${pct(e.testAcc)}`).join(', '); }
   function bindCluster() {
