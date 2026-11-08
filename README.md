@@ -198,7 +198,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 |---|---|---|---|
 | ① Leukemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and hemoglobin, positive on basophils, immature granulocytes, WBC and blasts. |
 | ② Leukemia · blood count · 3 ReLU units | 37 | ~95% | Hidden units organise themselves: one becomes an acute-leukemia detector, one a CML detector, one a "looks healthy" detector with a negative weight; CLL is folded into a neighbour. Nobody told the network these types exist. |
-| ③ Leukemia · cluster the blood counts · no labels | k centres | subtype purity 60% at k = 4 and 89% at k = 7 on the training counts; named by each cluster’s majority class, 93% of the held-out counts at k = 4 | Unsupervised learning, before the next labelled recipe: k-means is told only how many groups to find. With four, the counts fall into CML (basophils and immature granulocytes far from everything), the blast-rich acute leukemias, a neutrophil-high group of normal counts, infections and iron deficiency, and a lymphocytosis group of CLL, viral lymphocytosis and the acute leukemias presenting with a low count: the label cuts across the clusters. With seven, every kind of count comes out on its own except CLL and viral lymphocytosis, which the counts cannot part. The Test step names the clusters by hand and scores the naming on the held-out counts. |
+| ③ Leukemia · cluster the blood counts · no labels | k centres | subtype purity 60% at k = 4 and 89% at k = 7 on the training counts; named by each cluster’s majority class, 93% of the held-out counts at k = 4 | Unsupervised learning, before the next labelled recipe: k-means is told only how many groups to find, and its rounds are watched like a training run, the centres gliding and the cases changing sides until none does. With four, the counts fall into CML (basophils and immature granulocytes far from everything), the blast-rich acute leukemias, a neutrophil-high group of normal counts, infections and iron deficiency, and a lymphocytosis group of CLL, viral lymphocytosis and the acute leukemias presenting with a low count: the label cuts across the clusters. With seven, every kind of count comes out on its own except CLL and viral lymphocytosis, which the counts cannot part. The Test step names the clusters by hand and scores the naming on the held-out counts. |
 | ④ Atypia · measurements · single layer | 7 | ~95% | One approach to images: measure what a pathologist would name (area, darkness, chromatin texture, solidity, contour roughness) and let a single layer weigh the numbers. The checklist reads like a grading scheme: every trait measurement earns a weight, because each trait appears on its own in some nuclei, and elongation, the decoy, stays near zero. |
 | ⑤ Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong | 137 | ~97% early, ~83% after 300 epochs | Overfitting in its textbook shape. With 20 of the 80 training labels flipped, the network first learns the rule (the test curve peaks early), then memorises the mislabelled cases: training accuracy climbs past the honest ceiling of 75% while the test curve falls. See *Label noise and overfitting*. |
 | ⑥ Enlargement · pixels · single layer | 1,025 | 100% | The other approach: raw pixels. A basic network works on pixels when the answer is a whole-image template: the weight map becomes a nucleus-shaped stencil. |
@@ -233,11 +233,26 @@ Recipe ③ and the Cluster question. Everything else on the page learns from lab
 groups to find, *k*, and uses no label at all. It drops k centres among the cases (by k-means++: the first a random
 case, each next one a case drawn with probability proportional to its squared distance from the centres so far),
 every case joins its nearest centre, every centre moves to the mean of its cases, and the two steps repeat until no
-case changes group. As the usual implementations do, the page runs ten such starts from the seed and keeps the
-tightest, then replays the winning start step by step so that the lecture watches the run that ends best. The
-distances are measured in the same standardised numbers the networks are given (the measurements or the ten
-parameters of the blood count, the pixels, or the eight numbers of the foundation code), which is the one choice
-that decides what the clusters mean: they are groups of whatever varies most in the input.
+case changes group. The page shows the rounds the way it shows a network training: every round the rings glide to
+their cases' means and the cases then join their nearest centre, the ones that change sides flashing; the trails
+keep where every centre has been, and two curves follow the within-cluster distance, which falls like a loss and
+never rises, and the number of cases changing group, which reaches zero at convergence. Two starts: *random cases*,
+k random cases as the first centres and one run, so that the rounds are there to watch and another seed ends
+elsewhere, which is the local-search lesson; and *k-means++ · best of ten*, what the usual implementations do, ten
+seedings from the seed, the tightest kept and its start replayed. The distances are measured in the same
+standardised numbers the networks are given (the measurements or the ten parameters of the blood count, the pixels,
+or the eight numbers of the foundation code), which is the one choice that decides what the clusters mean: they are
+groups of whatever varies most in the input.
+
+**How many groups?** k-means cannot choose k, and the page says so with the two usual aids, each k from 2 to 8 run
+from the tightest of ten starts: the within-cluster distance, which always falls as k grows and is read for an
+elbow, and the silhouette, how much nearer each case is to its own cluster than to the next (1 tight and apart, 0
+on the border). On the blood counts the silhouette is 0.43 at k = 2 (CML against everything) and 0.43 again at k =
+6 and 7, with nothing in it that says seven; on the irregularity nuclei it is 0.30 on the measurements, 0.25 on the
+code and 0.15 on pixels at k = 2, the pixels having no structure worth the name. Both aids suggest; neither knows the
+kinds. Methods that do not take k take something else instead: a distance at which to cut a hierarchical tree, a
+density scale for DBSCAN and HDBSCAN, a resolution for the Leiden and Louvain clusterings of single-cell and spatial
+work, so the knob moves rather than disappears, and the number of groups stays a decision.
 
 **On the page.** The question (recipe ③, `#3/train`, and recipe ⑭, `#14/train`) keeps the classic Specimens step
 and the inspector, since its cases are the classic questions' own; the *Cases* control walks the four datasets and
@@ -249,8 +264,10 @@ image questions. The Test step assigns the held-out cases to their nearest centr
 cluster, scoring the naming on the held-out cases beside the supervised recipes' test accuracy on the same cases.
 
 **The blood counts.** Ten parameters, 160 training counts, seven hidden kinds (33 normal, 17 bacterial infections,
-18 viral lymphocytoses, 20 iron-deficiency anemias, 29 acute leukemias, 17 CML, 26 CLL). What k-means finds, as k
-grows:
+18 viral lymphocytoses, 20 iron-deficiency anemias, 29 acute leukemias, 17 CML, 26 CLL). Recipe ③ starts from four
+random counts with seed 1, which takes seven rounds to the optimum (17 counts change sides in the first round, none
+in the seventh, the within-cluster distance falling from about 1,000 to 607); seeds 2 to 6 end at 613, 807, 607, 830
+and 613, three of them worse local optima, which is what the other start is for. What k-means finds, as k grows:
 
 | k | the clusters |
 |---|---|

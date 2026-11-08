@@ -2551,7 +2551,7 @@ window.Viz = (function () {
     g += '</g>';
     g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     g += `<text class="axlabel" transform="translate(11 ${mt + ph / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel)}</text>`;
-    if (opt.segments) for (const s of opt.segments) g += `<line class="seg" x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
+    if (opt.segments) for (const s of opt.segments) g += `<line class="seg"${s.color ? ` style="stroke:${s.color};stroke-opacity:${s.opacity != null ? s.opacity : 0.6};stroke-width:${s.width || 2}"` : ''} x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
       const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}${p.small ? ' small' : ''}`;
