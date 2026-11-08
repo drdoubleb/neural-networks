@@ -682,3 +682,31 @@ table.rp-sec th .n { font-weight: 400; text-transform: none; letter-spacing: 0; 
 .tx-sample .txt { font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--ink-2); }
 .tx-sample.head .txt { font-family: var(--font-body); font-size: 12px; color: var(--ink-3); }
 .tx-sample.head + .tx-sample .txt { color: var(--ink); }
+
+/* ---------- the cluster question: the table of clusters against the subtypes, the profiles, the naming ---------- */
+.km-table-wrap { overflow-x: auto; }
+table.km-table { border-collapse: collapse; font-size: 13px; }
+table.km-table th, table.km-table td { padding: 4px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.km-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); font-weight: 600; white-space: normal; max-width: 96px; line-height: 1.15; vertical-align: bottom; }
+table.km-table th.name, table.km-table td.name { text-align: left; }
+table.km-table th.sep, table.km-table td.sep { border-left: 1px solid var(--line-strong); }
+table.km-table td.cell { font-family: var(--font-mono); }
+table.km-table td.cell.z { color: var(--ink-3); }
+table.km-table td.cell.top { font-weight: 600; }
+table.km-table tr.total td { border-top: 1px solid var(--line-strong); border-bottom: 0; color: var(--ink-2); }
+.km-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; }
+.km-leg { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); margin-right: 10px; }
+.km-leg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+.km-profiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.km-profile { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; align-content: start; }
+.km-profile .head { display: flex; align-items: center; gap: 2px; font-weight: 600; font-size: 13px; }
+.km-profile .head .n { color: var(--ink-3); font-weight: 500; margin-left: auto; font-family: var(--font-mono); font-size: 12px; }
+.km-profile .row { display: flex; gap: 10px; align-items: flex-start; }
+.km-profile canvas { image-rendering: pixelated; border-radius: 6px; border: 1px solid var(--line); flex: 0 0 auto; }
+.km-profile svg { width: 100%; height: auto; display: block; }
+.km-profile .words { font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+.km-names { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 10px; }
+.km-names label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.km-names select { font: inherit; font-size: 13px; padding: 3px 24px 3px 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+.scatter-controls .ctl .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; margin-right: 6px; }
+.scatter .pt.ring { cursor: default; }
