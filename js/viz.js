@@ -2551,6 +2551,15 @@ window.Viz = (function () {
     g += '</g>';
     g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     g += `<text class="axlabel" transform="translate(11 ${mt + ph / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel)}</text>`;
+    if (opt.territories) { // each centre's territory: the part of the plot nearer to it than to any other centre, on these two axes, each axis divided by its scale
+      const T = opt.territories, kx = 1 / ((T.scale && T.scale[0]) || 1), ky = 1 / ((T.scale && T.scale[1]) || 1), rect = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+      const clip = (poly, a, b) => { // keep the half-plane nearer to a than to b (Sutherland–Hodgman on the linear function |p−a|² − |p−b|²)
+        const f = p => ((p[0] - a.x) ** 2 - (p[0] - b.x) ** 2) * kx * kx + ((p[1] - a.y) ** 2 - (p[1] - b.y) ** 2) * ky * ky, out = [];
+        for (let i = 0; i < poly.length; i++) { const p = poly[i], q = poly[(i + 1) % poly.length], fp = f(p), fq = f(q); if (fp <= 0) out.push(p); if ((fp <= 0) !== (fq <= 0)) { const t = fp / (fp - fq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); } }
+        return out;
+      };
+      T.centres.forEach((a, j) => { if (!a) return; let poly = rect; T.centres.forEach((b, i) => { if (i !== j && b && poly.length) poly = clip(poly, a, b); }); if (poly.length > 2) g += `<polygon class="terr" points="${poly.map(p => `${sx(p[0]).toFixed(1)},${sy(p[1]).toFixed(1)}`).join(' ')}" style="fill:${a.color};stroke:${a.color}"/>`; });
+    }
     if (opt.segments) for (const s of opt.segments) g += `<line class="seg"${s.color ? ` style="stroke:${s.color};stroke-opacity:${s.opacity != null ? s.opacity : 0.6};stroke-width:${s.width || 2}"` : ''} x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
