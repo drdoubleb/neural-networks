@@ -715,3 +715,4 @@ table.km-sweep td.bar i { display: inline-block; height: 10px; border-radius: 3p
 table.km-sweep td.bar i.sil { background: var(--irregular); }
 table.km-sweep tr.now td { background: var(--surface-2); font-weight: 600; }
 .verdict.km .pbar, .verdict.km .pbar-labels { display: none; } /* the Cluster question: no probability to mark */
+.chart.scatter svg polygon.terr { fill-opacity: 0.09; stroke-opacity: 0.4; stroke-width: 1; pointer-events: none; } /* a cluster's territory on the map */

@@ -25,7 +25,7 @@
     tx: { world: 'text', colour: 'chance', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
       text: null, source: 'default', D: null, prompt: null, maxWords: 80, loading: null, loadingW: null, inputFor: null, trainTitleAt: 0, labelled: null, labelledFor: null }, // the Your-text question: the text pasted (null: the default), where it came from, its documents, and the Test step's prompt
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, hoverLive: null, testHoverNet: null },
-    km: { built: false, mode: 'features', k: 4, seed: 1, start: 'pp', colour: 'cluster', axes: { x: 'pc1', y: 'pc2' }, st: null, hist: [], inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, running: false, anim: null, sweep: null, sweepKey: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
+    km: { built: false, mode: 'features', k: 4, seed: 1, start: 'pp', colour: 'cluster', show: { spokes: false, territories: false }, axes: { x: 'pc1', y: 'pc2' }, st: null, hist: [], inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, running: false, anim: null, sweep: null, sweepKey: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
     fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, pinnedCell: null, hoverLayers: null, hoverCellNet: null, hoverLive: null, lwalk: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -4771,6 +4771,7 @@
     document.querySelectorAll('#km-mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === L.mode));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.colour === L.colour));
     document.querySelectorAll('#km-start-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.start === L.start));
+    document.querySelectorAll('#km-show-seg button').forEach(b => b.classList.toggle('is-active', !!L.show[b.dataset.show]));
     $('km-k').value = L.k; $('km-k-val').textContent = L.k; $('km-seed').value = L.seed;
     const opts = [{ v: 'pc1', t: 'component 1 of the input' }, { v: 'pc2', t: 'component 2 of the input' }, ...S.featureDefs.map((f, i) => ({ v: String(i), t: f.name }))];
     for (const [id, ax] of [['km-x', 'x'], ['km-y', 'y']]) { const sel = $(id), cur = L.axes[ax]; sel.innerHTML = opts.map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join(''); sel.value = opts.some(o => o.v === cur) ? cur : (ax === 'x' ? 'pc1' : 'pc2'); L.axes[ax] = sel.value; }
@@ -4802,8 +4803,14 @@
     if (which === 'train') { // the trails: where every centre has been, round by round
       for (let j = 0; j < L.k; j++) { let prev = kmCentrePosAt(j, 0); for (let r = 1; r <= upTo; r++) { const p = kmCentrePosAt(j, r); if (prev && p) segments.push({ x1: prev[0], y1: prev[1], x2: p[0], y2: p[1], color: kmRgb(j), opacity: 0.45, width: 2 }); prev = p; } if (o.gliding && prev && centres[j]) segments.push({ x1: prev[0], y1: prev[1], x2: centres[j][0], y2: centres[j][1], color: kmRgb(j), opacity: 0.45, width: 2 }); }
     }
+    if (L.show.spokes) cases.forEach((s, i) => { const p = centres[A[i]], q = pts[i]; if (p) segments.push({ x1: q.x, y1: q.y, x2: p[0], y2: p[1], color: kmRgb(A[i]), opacity: 0.22, width: 1 }); }); // every case to its centre
+    let territories = null;
+    if (L.show.territories) { // on the components the metric is the input's own; on two measurements each axis counts by its spread
+      const pc = xa.startsWith('pc') && ya.startsWith('pc'), sd = v => { const m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / v.length) || 1; };
+      territories = { centres: centres.map((p, j) => (p ? { x: p[0], y: p[1], color: kmRgb(j) } : null)), scale: pc ? [1, 1] : [sd(pts.map(q => q.x)), sd(pts.map(q => q.y))] };
+    }
     for (let j = 0; j < L.k; j++) { const p = centres[j]; if (!p) continue; const n = A.filter(a => a === j).length; pts.push({ id: -1 - j, name: `centre of cluster ${j + 1} · ${n} ${noun(2)}`, x: p[0], y: p[1], ring: true, color: kmRgb(j), cls: 'km' }); }
-    Viz.drawScatter(svg, { points: pts, segments, xLabel: kmAxisLabel(xa), yLabel: kmAxisLabel(ya), onSelect: id => { if (id >= 0) { selectSpecimen(S.ds.specimens[id]); kmRenderMaps(); } } });
+    Viz.drawScatter(svg, { points: pts, segments, territories, xLabel: kmAxisLabel(xa), yLabel: kmAxisLabel(ya), onSelect: id => { if (id >= 0) { selectSpecimen(S.ds.specimens[id]); kmRenderMaps(); } } });
   }
   function kmRenderCurves() {
     const L = S.km, rounds = L.hist.length - 1, hist = L.hist.map((h, r) => ({ epoch: r, dist: h.inertia, moved: h.moved }));
@@ -4823,7 +4830,8 @@
     const L = S.km; kmRenderMap($('km-map'), 'train'); kmRenderLegend();
     const pcs = L.axes.x.startsWith('pc') || L.axes.y.startsWith('pc');
     const D = L.inp.inputSize, share = L.pca.explained[0] + L.pca.explained[1], all = L.mode === 'features' ? kmInputName().replace(/^the \d+ /, `all ${D} `) : `all ${D} numbers of ${kmInputName()}`;
-    $('km-map-note').textContent = pcs ? `k-means measured its distances in ${all}; the map shows the two directions of greatest spread of those ${D}, which carry ${pct(share)} of it, so two clusters can overlap here and still be apart. The rings are the centres, each at the mean of its cases. Pick two ${S.kind === 'tabular' ? 'parameters' : 'measurements'} instead to see the clusters in units you know.` : `Two of the ${S.kind === 'tabular' ? 'parameters' : 'measurements'} as axes; the clusters were found in ${all} at once, so two can overlap here and still be apart.`;
+    const shown = `${L.show.spokes ? ' The spokes join every case to its centre: membership is by nearest centre and nothing else, so there is no radius and no case left out.' : ''}${L.show.territories ? ` The territories are the parts of the map nearer to each centre than to any other, on these two axes, with straight boundaries halfway between neighbouring centres; a case coloured unlike its territory is nearer another centre in the ${D - 2} dimensions the map does not show.` : ''}`;
+    $('km-map-note').textContent = (pcs ? `k-means measured its distances in ${all}; the map shows the two directions of greatest spread of those ${D}, which carry ${pct(share)} of it, so two clusters can overlap here and still be apart. The rings are the centres, each at the mean of its cases. Pick two ${S.kind === 'tabular' ? 'parameters' : 'measurements'} instead to see the clusters in units you know.` : `Two of the ${S.kind === 'tabular' ? 'parameters' : 'measurements'} as axes; the clusters were found in ${all} at once, so two can overlap here and still be apart.`) + shown;
     if (S.world === 'cluster' && S.stage === 'test' && L.At) kmRenderMap($('km-test-map'), 'test');
   }
   function kmRenderLegend() {
@@ -4900,6 +4908,7 @@
     $('km-run').addEventListener('click', kmRun);
     $('km-reset').addEventListener('click', () => kmReset('New starting centres from the seed, the tightest of ten random starts.'));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.addEventListener('click', () => { L.colour = b.dataset.colour; kmSyncControls(); kmRenderMaps(); }));
+    document.querySelectorAll('#km-show-seg button').forEach(b => b.addEventListener('click', () => { L.show[b.dataset.show] = !L.show[b.dataset.show]; kmSyncControls(); kmRenderMaps(); }));
     $('km-x').addEventListener('change', () => { L.axes.x = $('km-x').value; kmRenderMaps(); });
     $('km-y').addEventListener('change', () => { L.axes.y = $('km-y').value; kmRenderMaps(); });
     $('km-names').addEventListener('change', ev => { const sel = ev.target.closest('select[data-j]'); if (!sel) return; L.names[+sel.dataset.j] = +sel.value; kmRenderTest(); });

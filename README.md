@@ -236,7 +236,14 @@ every case joins its nearest centre, every centre moves to the mean of its cases
 case changes group. The page shows the rounds the way it shows a network training: every round the rings glide to
 their cases' means and the cases then join their nearest centre, the ones that change sides flashing; the trails
 keep where every centre has been, and two curves follow the within-cluster distance, which falls like a loss and
-never rises, and the number of cases changing group, which reaches zero at convergence. Two starts: *random cases*,
+never rises, and the number of cases changing group, which reaches zero at convergence. Two overlays, each with its
+own toggle: *spokes*, a line from every case to its centre, since membership is by nearest centre and nothing else,
+with no radius and no case left out; and *territories*, each centre's region of the map, the part nearer to it than
+to any other centre on the two plotted axes, with straight boundaries halfway between neighbouring centres (exact on
+the two components, where the input's own metric holds; on two measurements each axis counts by its spread). A case
+coloured unlike its territory is nearer another centre in the dimensions the map does not show, which is the point:
+the map is two directions of a space with ten, six, eight or a thousand. Both overlays move with the rings during a
+round. Two starts: *random cases*,
 k random cases as the first centres and one run, so that the rounds are there to watch and another seed ends
 elsewhere, which is the local-search lesson; and *k-means++ · best of ten*, what the usual implementations do, ten
 seedings from the seed, the tightest kept and its start replayed. The distances are measured in the same
