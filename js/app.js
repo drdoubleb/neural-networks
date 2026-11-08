@@ -4771,7 +4771,7 @@
     document.querySelectorAll('#km-mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === L.mode));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.colour === L.colour));
     document.querySelectorAll('#km-start-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.start === L.start));
-    document.querySelectorAll('#km-show-seg button').forEach(b => b.classList.toggle('is-active', !!L.show[b.dataset.show]));
+    document.querySelectorAll('#km-show-seg button, #km-test-show-seg button').forEach(b => b.classList.toggle('is-active', !!L.show[b.dataset.show]));
     $('km-k').value = L.k; $('km-k-val').textContent = L.k; $('km-seed').value = L.seed;
     const opts = [{ v: 'pc1', t: 'component 1 of the input' }, { v: 'pc2', t: 'component 2 of the input' }, ...S.featureDefs.map((f, i) => ({ v: String(i), t: f.name }))];
     for (const [id, ax] of [['km-x', 'x'], ['km-y', 'y']]) { const sel = $(id), cur = L.axes[ax]; sel.innerHTML = opts.map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join(''); sel.value = opts.some(o => o.v === cur) ? cur : (ax === 'x' ? 'pc1' : 'pc2'); L.axes[ax] = sel.value; }
@@ -4908,7 +4908,7 @@
     $('km-run').addEventListener('click', kmRun);
     $('km-reset').addEventListener('click', () => kmReset('New starting centres from the seed, the tightest of ten random starts.'));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.addEventListener('click', () => { L.colour = b.dataset.colour; kmSyncControls(); kmRenderMaps(); }));
-    document.querySelectorAll('#km-show-seg button').forEach(b => b.addEventListener('click', () => { L.show[b.dataset.show] = !L.show[b.dataset.show]; kmSyncControls(); kmRenderMaps(); }));
+    document.querySelectorAll('#km-show-seg button, #km-test-show-seg button').forEach(b => b.addEventListener('click', () => { L.show[b.dataset.show] = !L.show[b.dataset.show]; kmSyncControls(); kmRenderMaps(); })); // the Train and Test steps share the overlays
     $('km-x').addEventListener('change', () => { L.axes.x = $('km-x').value; kmRenderMaps(); });
     $('km-y').addEventListener('change', () => { L.axes.y = $('km-y').value; kmRenderMaps(); });
     $('km-names').addEventListener('change', ev => { const sel = ev.target.closest('select[data-j]'); if (!sel) return; L.names[+sel.dataset.j] = +sel.value; kmRenderTest(); });
