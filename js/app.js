@@ -72,7 +72,7 @@
   const className = label => S.task.classes[label].name;
   const posName = () => S.task.classes[1].name, negName = () => S.task.classes[0].name;
   const noun = (n) => { const w = S.task.specimenNoun || 'specimen'; return n === 1 ? w : (w === 'nucleus' ? 'nuclei' : w + 's'); };
-  function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id); }
+  function truthKnown(s) { return s.split === 'train' || S.revealTest || S.test.revealed.has(s.id) || (S.world === 'cluster' && S.stage === 'test'); } // the clusters' Test step scores the naming against the truth, so it shows it
   function isClassified(s) { return s.split === 'train' || S.test.results.has(s.id); }
   function subtypeName(key) { const st = (S.task.subtypes || []).find(t => t.key === key); return st ? st.name : key; }
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
