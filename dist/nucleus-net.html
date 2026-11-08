@@ -721,6 +721,10 @@ table.km-table tr.total td { border-top: 1px solid var(--line-strong); border-bo
 .km-names select { font: inherit; font-size: 13px; padding: 3px 24px 3px 8px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
 .scatter-controls .ctl .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; margin-right: 6px; }
 .scatter .pt.ring { cursor: default; }
+table.km-sweep td.bar { min-width: 140px; }
+table.km-sweep td.bar i { display: inline-block; height: 10px; border-radius: 3px; vertical-align: -1px; background: var(--accent); opacity: 0.55; }
+table.km-sweep td.bar i.sil { background: var(--irregular); }
+table.km-sweep tr.now td { background: var(--surface-2); font-weight: 600; }
 
 </style>
 </head>
@@ -1039,6 +1043,7 @@ table.km-table tr.total td { border-top: 1px solid var(--line-strong); border-bo
         <div class="bar-row">
           <div class="ctl"><span class="lbl">Cases</span><div class="seg" id="km-task-seg"><button type="button" data-task="leukemia" title="the 200 blood counts of the leukemia question">blood counts</button><button type="button" data-task="atypia" title="the 100 nuclei of the atypia question">atypia</button><button type="button" data-task="enlargement" title="the 100 nuclei of the enlargement question">enlargement</button><button type="button" data-task="irregularity" title="the 100 nuclei of the irregularity question">irregularity</button></div></div>
           <div class="ctl"><span class="lbl">Input</span><div class="seg" id="km-mode-seg"><button type="button" data-mode="features" title="the six measurements a pathologist would name">measurements</button><button type="button" data-mode="pixels" title="the raw pixels, 1,024 numbers">pixels</button><button type="button" data-mode="code" title="the 8 numbers of the foundation code">the code</button></div></div>
+          <div class="ctl"><span class="lbl">Start</span><div class="seg" id="km-start-seg"><button type="button" data-start="random" title="k random cases as the first centres, one run: the rounds are there to watch, and another seed can end elsewhere">random cases</button><button type="button" data-start="pp" title="k-means++ seeding from ten random starts, the tightest result kept and its start replayed: what the usual implementations do">k-means++ · best of ten</button></div></div>
           <div class="ctl slim"><label for="km-k">Groups, k <span class="val" id="km-k-val">4</span></label><input type="range" id="km-k" min="2" max="8" step="1" value="4"></div>
           <div class="ctl slim"><label for="km-seed">Random seed</label><div style="display:flex;gap:6px"><input type="number" id="km-seed" min="1" max="9999" value="1"><button type="button" class="btn" id="km-seed-random" title="new random seed">🎲</button></div></div>
           <div class="actions-inline">
@@ -1064,6 +1069,27 @@ table.km-table tr.total td { border-top: 1px solid var(--line-strong); border-bo
         </div>
         <div class="chart scatter"><svg id="km-map" role="img" aria-label="The training cases on two axes, coloured by cluster, with the centres as rings"></svg></div>
         <p class="small muted" id="km-map-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The training curves</h2>
+          <span class="small muted">a round is the centres moving to their cases’ means, then every case joining its nearest centre · it ends when no case moves</span>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>Within-cluster distance per round</span><span class="now" id="km-curve-dist-now"></span></div><svg id="km-curve-dist" role="img" aria-label="Within-cluster distance per round"></svg></div>
+          <div class="chart"><div class="title"><span>Cases changing group per round</span><span class="now" id="km-curve-moved-now"></span></div><svg id="km-curve-moved" role="img" aria-label="Cases changing group per round"></svg></div>
+        </div>
+        <p class="small muted" id="km-curves-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>How many groups?</h2>
+          <span class="small muted">k-means cannot choose k · two aids, each k run from the tightest of ten starts</span>
+        </div>
+        <div class="km-table-wrap"><table class="km-table km-sweep" id="km-sweep"></table></div>
+        <p class="small muted" id="km-sweep-note" style="margin-top:8px"></p>
       </div>
 
       <div class="card">
@@ -3341,6 +3367,7 @@ window.TEXT_LM_ALL = {"name":"the text model","trained":"7 epochs on 423 documen
  * drawn with probability proportional to its squared distance from the centres so far), and since a single start
  * can settle in a poor local optimum, `start` tries several seedings and keeps the tightest result, as the usual
  * implementations do; the stepping then replays the winning start so that the lecture watches the run that ends best.
+ * `startRandom` is the plain start, k random cases, for watching the rounds and the local optima they end in.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -3350,14 +3377,14 @@ window.TEXT_LM_ALL = {"name":"the text model","trained":"7 epochs on 423 documen
   function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
   function dist2(a, b) { let d = 0; for (let i = 0; i < a.length; i++) { const t = a[i] - b[i]; d += t * t; } return d; }
   function nearest(x, C) { let b = 0, bd = Infinity; for (let j = 0; j < C.length; j++) { const d = dist2(x, C[j]); if (d < bd) { bd = d; b = j; } } return b; }
-  function seedCentres(X, k, rng) { // k-means++
-    const n = X.length, C = [Array.from(X[Math.floor(rng() * n)])];
+  function seedCentres(X, k, rng) { // k-means++; returns the centres and which cases they are
+    const n = X.length, idx = [Math.floor(rng() * n)], C = [Array.from(X[idx[0]])];
     while (C.length < k) {
       const d = X.map(x => dist2(x, C[nearest(x, C)])), tot = d.reduce((a, b) => a + b, 0);
       let r = rng() * tot, i = 0; while (i < n - 1 && (r -= d[i]) > 0) i++;
-      C.push(Array.from(X[i]));
+      idx.push(i); C.push(Array.from(X[i]));
     }
-    return C;
+    return { C, idx };
   }
   function assign(X, C) { return X.map(x => nearest(x, C)); }
   function means(X, A, k, C) { // a centre with no case keeps its place
@@ -3380,14 +3407,38 @@ window.TEXT_LM_ALL = {"name":"the text model","trained":"7 epochs on 423 documen
   function start(X, k, seed, starts = 10) {
     let best = null;
     for (let s = 0; s < starts; s++) {
-      const C0 = seedCentres(X, k, mulberry32((seed * 1000003 + s * 7919 + k) | 0)), C = C0.map(c => Array.from(c));
+      const seeded = seedCentres(X, k, mulberry32((seed * 1000003 + s * 7919 + k) | 0)), C = seeded.C.map(c => Array.from(c));
       const st = run({ X, k, C, A: assign(X, C), it: 0, moved: 0, converged: false, inertia: 0 });
-      if (!best || st.inertia < best.inertia - 1e-9) best = { inertia: st.inertia, C0, it: st.it };
+      if (!best || st.inertia < best.inertia - 1e-9) best = { inertia: st.inertia, C0: seeded.C, idx: seeded.idx, it: st.it };
     }
-    const st = { X, k, C: best.C0.map(c => Array.from(c)), A: assign(X, best.C0), it: 0, moved: 0, converged: false, inertia: 0, starts, final: best.inertia, finalIt: best.it };
+    const st = { X, k, C: best.C0.map(c => Array.from(c)), A: assign(X, best.C0), it: 0, moved: 0, converged: false, inertia: 0, starts, seeds: best.idx, final: best.inertia, finalIt: best.it };
     st.inertia = inertia(X, st.C, st.A);
     return st;
   }
+  // the plain start: k distinct random cases as the first centres, one run, so that the rounds are there to watch and
+  // another seed ends elsewhere (the salt makes seed 1 a long run to the optimum on the page's blood counts)
+  function startRandom(X, k, seed) {
+    const rng = mulberry32((seed * 1000003 + k * 7919 + 44) | 0), idx = [];
+    while (idx.length < k) { const i = Math.floor(rng() * X.length); if (!idx.includes(i)) idx.push(i); }
+    const C = idx.map(i => Array.from(X[i])), st = { X, k, C, A: assign(X, C), it: 0, moved: 0, converged: false, inertia: 0, starts: 1, seeds: idx };
+    st.inertia = inertia(X, C, st.A);
+    return st;
+  }
+  // the silhouette: for every case, how much nearer its own cluster is than the nearest other, (b − a) / max(a, b),
+  // averaged; 1 is tight and apart, 0 is on the border, negative is in the wrong cluster
+  function silhouette(X, A, k) {
+    const n = X.length, members = Array.from({ length: k }, () => []); A.forEach((j, i) => members[j].push(i));
+    let tot = 0, cnt = 0;
+    for (let i = 0; i < n; i++) {
+      const own = members[A[i]]; if (own.length <= 1) continue;
+      let a = 0; for (const o of own) if (o !== i) a += Math.sqrt(dist2(X[i], X[o])); a /= own.length - 1;
+      let b = Infinity; for (let j = 0; j < k; j++) { if (j === A[i] || !members[j].length) continue; let s = 0; for (const o of members[j]) s += Math.sqrt(dist2(X[i], X[o])); s /= members[j].length; if (s < b) b = s; }
+      if (b === Infinity) continue; tot += (b - a) / Math.max(a, b); cnt++;
+    }
+    return cnt ? tot / cnt : 0;
+  }
+  // what each k gives, each from the tightest of ten k-means++ starts: the within-cluster distance and the silhouette
+  function sweep(X, ks, seed = 1) { return ks.map(k => { const st = run(start(X, k, seed)); return { k, inertia: st.inertia, silhouette: silhouette(X, st.A, k) }; }); }
   // the clusters against a labelling (the hidden subtypes, or the class): counts, each cluster's majority, the purity
   function contingency(A, labels, k) {
     const rows = []; let agree = 0;
@@ -3421,7 +3472,7 @@ window.TEXT_LM_ALL = {"name":"the text model","trained":"7 epochs on 423 documen
     const project = x => dirs.map(u => { let s = 0; for (let d = 0; d < D; d++) s += (x[d] - mean[d]) * u[d]; return s; });
     return { mean, dirs, explained: values.map(l => (trace ? l / trace : 0)), project };
   }
-  return { dist2, nearest, assign, means, inertia, step, run, start, contingency, pca2 };
+  return { dist2, nearest, assign, means, inertia, step, run, start, startRandom, silhouette, sweep, contingency, pca2 };
 });
 
 </script>
@@ -7360,7 +7411,7 @@ window.Viz = (function () {
     g += '</g>';
     g += `<text class="axlabel" x="${ml + pw / 2}" y="${H - 4}" text-anchor="middle">${esc(opt.xLabel)}</text>`;
     g += `<text class="axlabel" transform="translate(11 ${mt + ph / 2}) rotate(-90)" text-anchor="middle">${esc(opt.yLabel)}</text>`;
-    if (opt.segments) for (const s of opt.segments) g += `<line class="seg" x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
+    if (opt.segments) for (const s of opt.segments) g += `<line class="seg"${s.color ? ` style="stroke:${s.color};stroke-opacity:${s.opacity != null ? s.opacity : 0.6};stroke-width:${s.width || 2}"` : ''} x1="${sx(s.x1).toFixed(1)}" y1="${sy(s.y1).toFixed(1)}" x2="${sx(s.x2).toFixed(1)}" y2="${sy(s.y2).toFixed(1)}"/>`;
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
       const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}${p.small ? ' small' : ''}`;
@@ -8000,7 +8051,7 @@ window.Glossary = (function () {
     tx: { world: 'text', colour: 'chance', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
       text: null, source: 'default', D: null, prompt: null, maxWords: 80, loading: null, loadingW: null, inputFor: null, trainTitleAt: 0, labelled: null, labelledFor: null }, // the Your-text question: the text pasted (null: the default), where it came from, its documents, and the Test step's prompt
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, hoverLive: null, testHoverNet: null },
-    km: { built: false, mode: 'features', k: 4, seed: 1, colour: 'cluster', axes: { x: 'pc1', y: 'pc2' }, st: null, inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, timer: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
+    km: { built: false, mode: 'features', k: 4, seed: 1, start: 'pp', colour: 'cluster', axes: { x: 'pc1', y: 'pc2' }, st: null, hist: [], inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, running: false, anim: null, sweep: null, sweepKey: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
     fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, pinnedCell: null, hoverLayers: null, hoverCellNet: null, hoverLive: null, lwalk: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
     animSpeed: 1, // playback speed of the walk-throughs (the lesson and Classify next): 1 = the normal pace
     excluded: new Set(),
@@ -9125,14 +9176,14 @@ window.Glossary = (function () {
   function applyRecipe(k) {
     if (k === '3') { // the cluster question on the blood counts: k-means, no label anywhere
       if (S.taskId !== 'leukemia') kmSwitchTask('leukemia', true);
-      Object.assign(S.km, { mode: 'features', k: 4, seed: 1, colour: 'cluster', axes: { x: 'pc1', y: 'pc2' } });
+      Object.assign(S.km, { mode: 'features', k: 4, seed: 1, start: 'random', colour: 'cluster', axes: { x: 'pc1', y: 'pc2' } });
       selectQuestion('cluster'); showStage('train');
-      kmReset(`Recipe ${RECIPE_LABELS[3]}: the 160 training blood counts and no label. Four centres dropped among them by k-means++; press Step and watch every centre move to the mean of its counts while the counts change sides, or Run. At k = 4 the counts fall into CML on its own (its basophils and immature granulocytes stand far from everything), the blast-rich acute leukemias, a neutrophil-high group of normal counts, infections and iron deficiency, and a lymphocytosis group of CLL, viral lymphocytosis and the acute leukemias that present with a low count: the label “leukemia” cuts across the clusters. Raise k to 7, one per kind of count, and every kind comes out on its own except CLL and viral lymphocytosis, which the counts cannot part. Then go to 3 · Test and name the clusters.`);
+      kmReset(`Recipe ${RECIPE_LABELS[3]}: the 160 training blood counts and no label. Four centres dropped on four random counts; press Step and watch a round: every centre glides to the mean of its counts, then every count joins its nearest centre, the ones that change sides flashing, and the trails keep where each centre has been. Run and it takes seven rounds here, 17 counts changing sides in the first and none in the seventh, while the within-cluster distance falls like a loss. Roll the dice and the dance ends elsewhere: k-means is a local search, so in practice it is run from many starts and the tightest kept, the other Start. At k = 4 the counts fall into CML on its own (its basophils and immature granulocytes stand far from everything), the blast-rich acute leukemias, a neutrophil-high group of normal counts, infections and iron deficiency, and a lymphocytosis group of CLL, viral lymphocytosis and the acute leukemias that present with a low count: the label “leukemia” cuts across the clusters. Raise k to 7, one per kind of count, and every kind comes out on its own except CLL and viral lymphocytosis, which the counts cannot part. Then go to 3 · Test and name the clusters.`);
       return;
     }
     if (k === '14') { // the clusters revisited on the nuclei: pixels, the measurements or the foundation code
       if (S.taskId !== 'irregularity') kmSwitchTask('irregularity', true);
-      Object.assign(S.km, { mode: 'pixels', k: 2, seed: 1, colour: 'cluster', axes: { x: 'pc1', y: 'pc2' } });
+      Object.assign(S.km, { mode: 'pixels', k: 2, seed: 1, start: 'pp', colour: 'cluster', axes: { x: 'pc1', y: 'pc2' } });
       selectQuestion('cluster'); showStage('train');
       kmReset(`Recipe ${RECIPE_LABELS[14]}: the 80 training nuclei of the irregularity question, two centres, and the pixels alone. The clusters follow size and orientation, and against the contour they sit near chance, as the single layer on pixels did in recipe 7. Switch the input to the code: with no label anywhere, the two clusters line up with irregular against regular about four times in five, close to what the hand-made measurements give, because the pretraining kept the contour. Raise k to 4 to watch the lobulated and the jagged nuclei gather, and try the enlargement nuclei, where the pixels alone cluster perfectly, since size and darkness are what pixels vary most by.`);
       return;
@@ -12695,14 +12746,42 @@ window.Glossary = (function () {
     const inp = inputsFor(L.mode, false, new Set()); L.inp = inp; L.for = kmKey();
     L.X = S.ds.train.map(s => Array.from(inp.xOf(s))); L.Xt = S.ds.test.map(s => Array.from(inp.xOf(s)));
     if (L.pcaKey !== L.for) { L.pca = NucleusCluster.pca2(L.X); L.pcaKey = L.for; }
-    L.st = NucleusCluster.start(L.X, L.k, L.seed); L.At = null; L.names = null; L.built = true;
+    L.st = L.start === 'random' ? NucleusCluster.startRandom(L.X, L.k, L.seed) : NucleusCluster.start(L.X, L.k, L.seed); L.At = null; L.names = null; L.built = true;
+    L.hist = [{ A: L.st.A.slice(), C: L.st.C.map(c => c.slice()), inertia: L.st.inertia, moved: null }]; L.anim = null; L.running = false;
     kmSyncControls(); kmRenderAll(); if (reason) kmNote(reason);
   }
-  function kmEnter() { const L = S.km; if (!L.built || L.for !== kmKey()) kmReset(`${L.k} centres dropped among the ${S.ds.train.length} training ${noun(2)} by k-means++, no label in sight. Press Step to watch every centre move to the mean of its ${noun(2)} while the ${noun(2)} change sides, or Run.`); else { kmSyncControls(); kmRenderAll(); } }
-  function kmStep() { const L = S.km; if (!L.st || L.st.converged) return; NucleusCluster.step(L.st); L.At = null; kmRenderAll(); if (L.st.converged) kmStop(); }
-  function kmRun() { const L = S.km; if (L.timer) { kmStop(); return; } if (!L.st || L.st.converged) return; L.timer = setInterval(kmStep, 450); kmSyncButtons(); }
-  function kmStop() { const L = S.km; if (L.timer) { clearInterval(L.timer); L.timer = null; } kmSyncButtons(); }
-  function kmSyncButtons() { const L = S.km, run = $('km-run'); if (!run) return; const done = !!(L.st && L.st.converged); run.textContent = L.timer ? '⏸ Pause' : '▶ Run'; run.disabled = done; $('km-step').disabled = done; }
+  function kmEnter() { const L = S.km; if (!L.built || L.for !== kmKey()) kmReset(`${L.k} centres dropped among the ${S.ds.train.length} training ${noun(2)}, no label in sight. Press Step to watch a round, every centre gliding to the mean of its ${noun(2)} and every ${noun(1)} joining its nearest centre, or Run.`); else { kmSyncControls(); kmRenderAll(); } }
+  // a round, kept in the history for the trails and the curves
+  function kmRound() { const L = S.km, st = L.st; if (!st || st.converged) return false; NucleusCluster.step(st); L.hist.push({ A: st.A.slice(), C: st.C.map(c => c.slice()), inertia: st.inertia, moved: st.moved }); L.At = null; return true; }
+  // the round as the lecture watches it: the rings glide to their cases' means, then the cases join their nearest
+  // centre, the ones that change sides flashing; resolves true when the round was shown to its end
+  function kmAnimateRound() {
+    const L = S.km; if (!L.st || L.st.converged) return Promise.resolve(false);
+    const r0 = L.hist.length - 1, from = kmCentrePositions(r0), oldA = L.hist[r0].A;
+    kmRound();
+    const r1 = L.hist.length - 1, to = kmCentrePositions(r1), changed = new Set(); L.hist[r1].A.forEach((a, i) => { if (a !== oldA[i]) changed.add(S.ds.train[i].id); });
+    const token = {}; L.anim = token;
+    L.animPromise = new Promise(resolve => {
+      const t0 = performance.now(), dur = 700;
+      const frame = now => {
+        if (L.anim !== token) { resolve(false); return; }
+        const t = Math.min(1, (now - t0) / dur), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        if (t < 1) { kmRenderMap($('km-map'), 'train', { A: oldA, centres: from.map((p, j) => (p && to[j] ? [p[0] + (to[j][0] - p[0]) * e, p[1] + (to[j][1] - p[1]) * e] : to[j])), trailUpTo: r0, gliding: true }); requestAnimationFrame(frame); return; }
+        kmRenderMap($('km-map'), 'train', { flash: changed }); kmRenderStatus(); kmRenderCurves(); kmRenderTable($('km-table'), S.ds.train, L.st.A, $('km-table-note'), 'training'); kmRenderProfiles(); kmSyncButtons();
+        setTimeout(() => { if (L.anim === token) { L.anim = null; kmRenderMaps(); } resolve(L.anim == null); }, 450);
+      };
+      requestAnimationFrame(frame);
+    });
+    return L.animPromise;
+  }
+  function kmStep() { const L = S.km; if (L.running || L.anim || !L.st || L.st.converged) return; kmAnimateRound(); }
+  function kmRun() { // round after round, each shown to its end; pressed during a round, it waits for that round
+    const L = S.km; if (L.running) { L.running = false; kmSyncButtons(); return; } if (!L.st || L.st.converged) return;
+    L.running = true; kmSyncButtons();
+    (async () => { if (L.anim && L.animPromise) await L.animPromise; while (L.running && L.st && !L.st.converged) { const shown = await kmAnimateRound(); if (!shown) break; } L.running = false; kmSyncButtons(); })();
+  }
+  function kmStop() { const L = S.km; L.running = false; kmSyncButtons(); }
+  function kmSyncButtons() { const L = S.km, run = $('km-run'); if (!run) return; const done = !!(L.st && L.st.converged); run.textContent = L.running ? '⏸ Pause' : '▶ Run'; run.disabled = done; $('km-step').disabled = done || L.running; }
   function kmSwitchTask(id, quiet) { // another question's cases: the dataset, the classic model behind it and the inspector follow
     loadTask(id); if (S.kind === 'image' && S.mode === 'features' && S.lr < 0.05) S.lr = 0.1;
     syncControls(); resetModel(); renderDataTrays(); renderScatter(); renderInspector();
@@ -12715,24 +12794,54 @@ window.Glossary = (function () {
     $('km-mode-seg').closest('.ctl').hidden = S.kind === 'tabular';
     document.querySelectorAll('#km-mode-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.mode === L.mode));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.colour === L.colour));
+    document.querySelectorAll('#km-start-seg button').forEach(b => b.classList.toggle('is-active', b.dataset.start === L.start));
     $('km-k').value = L.k; $('km-k-val').textContent = L.k; $('km-seed').value = L.seed;
     const opts = [{ v: 'pc1', t: 'component 1 of the input' }, { v: 'pc2', t: 'component 2 of the input' }, ...S.featureDefs.map((f, i) => ({ v: String(i), t: f.name }))];
     for (const [id, ax] of [['km-x', 'x'], ['km-y', 'y']]) { const sel = $(id), cur = L.axes[ax]; sel.innerHTML = opts.map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join(''); sel.value = opts.some(o => o.v === cur) ? cur : (ax === 'x' ? 'pc1' : 'pc2'); L.axes[ax] = sel.value; }
     kmSyncButtons();
   }
-  function kmRenderAll() { kmRenderStatus(); kmRenderMaps(); kmRenderTable($('km-table'), S.ds.train, S.km.st.A, $('km-table-note'), 'training'); kmRenderProfiles(); if (S.world === 'cluster' && S.stage === 'test') kmEnterTest(); }
+  function kmRenderAll() { kmRenderStatus(); kmRenderMaps(); kmRenderCurves(); kmRenderTable($('km-table'), S.ds.train, S.km.st.A, $('km-table-note'), 'training'); kmRenderProfiles(); kmRenderSweep(); if (S.world === 'cluster' && S.stage === 'test') kmEnterTest(); }
   function kmRenderStatus() {
     const L = S.km, st = L.st;
-    $('km-status').innerHTML = `<b>k = ${L.k}</b> · each ${noun(1)} is ${L.inp.inputSize} numbers (${esc(kmInputName())}) · ${st.it ? `round ${st.it}: ${st.moved ? `${st.moved} ${st.moved === 1 ? noun(1) : noun(2)} changed group` : `no ${noun(1)} changed group`}` : `the starting centres, the tightest of ${st.starts} random starts from seed ${L.seed}`} · within-cluster distance ${st.inertia.toFixed(0)}${st.converged ? ' · <b>converged</b>: nobody changes group, so no centre moves' : ''}`;
+    const startText = L.start === 'random' ? `${L.k} random ${noun(2)} as the first centres (seed ${L.seed})` : `the tightest of ${st.starts} k-means++ starts from seed ${L.seed}, replayed`;
+    $('km-status').innerHTML = `<b>k = ${L.k}</b> · each ${noun(1)} is ${L.inp.inputSize} numbers (${esc(kmInputName())}) · ${st.it ? `round ${st.it}: ${st.moved ? `${st.moved} ${st.moved === 1 ? noun(1) : noun(2)} changed group` : `no ${noun(1)} changed group`}` : startText} · within-cluster distance ${st.inertia.toFixed(0)}${st.converged ? ` · <b>converged</b> after ${st.it} round${st.it === 1 ? '' : 's'}: nobody changes group, so no centre moves` : ''}`;
   }
   function kmCoord(s, axis) { const L = S.km; if (axis === 'pc1' || axis === 'pc2') return L.pca.project(Array.from(L.inp.xOf(s)))[axis === 'pc1' ? 0 : 1]; const i = +axis, f = S.featureDefs[i], v = s.features[i]; return f.log ? Math.log10(Math.max(v, 1e-3)) : v; }
   function kmAxisLabel(axis) { if (axis === 'pc1' || axis === 'pc2') { const i = axis === 'pc1' ? 0 : 1; return `component ${i + 1} of the input (${pct(S.km.pca.explained[i])} of the spread)`; } const f = S.featureDefs[+axis]; return (f.log ? 'log₁₀ ' : '') + f.name; }
   function kmColourOf(s, j) { const L = S.km; if (L.colour === 'cluster') return { color: kmRgb(j), cls: 'km' }; if (L.colour === 'subtype') { const i = kmSubtypes().findIndex(t => t.key === s.subtype); return { color: kmRgb(i < 0 ? 7 : i), cls: 'km' }; } return { cls: classOf(s.label) }; }
-  function kmRenderMap(svg, which) {
-    const L = S.km, st = L.st, xa = L.axes.x, ya = L.axes.y, cases = which === 'test' ? S.ds.test : S.ds.train, A = which === 'test' ? L.At : st.A;
-    const pts = cases.map((s, i) => { const c = kmColourOf(s, A[i]); return Object.assign({ id: s.id, name: `${s.name} · cluster ${A[i] + 1}${s.subtype ? ' · ' + kmSub(s.subtype) : ''} · ${className(s.label)}`, x: kmCoord(s, xa), y: kmCoord(s, ya), split: which === 'test' && !c.color ? 'test' : 'train', hollow: which === 'test' && !!c.color, selected: !!(S.selected && S.selected.id === s.id) }, c); });
-    for (let j = 0; j < L.k; j++) { const m = S.ds.train.filter((s, i) => st.A[i] === j); if (!m.length) continue; pts.push({ id: -1 - j, name: `centre of cluster ${j + 1} · ${m.length} ${noun(2)}`, x: m.reduce((a, s) => a + kmCoord(s, xa), 0) / m.length, y: m.reduce((a, s) => a + kmCoord(s, ya), 0) / m.length, ring: true, color: kmRgb(j), cls: 'km' }); }
-    Viz.drawScatter(svg, { points: pts, xLabel: kmAxisLabel(xa), yLabel: kmAxisLabel(ya), onSelect: id => { if (id >= 0) { selectSpecimen(S.ds.specimens[id]); kmRenderMaps(); } } });
+  // where centre j stood after round r, on the current axes: on the components, its projection; on two measurements,
+  // the mean of the cases it had just been moved to (round 0: the case it was dropped on); an empty cluster stays put
+  function kmCentrePosAt(j, r) {
+    const L = S.km, xa = L.axes.x, ya = L.axes.y, h = L.hist[r];
+    if (xa.startsWith('pc') && ya.startsWith('pc')) { const p = L.pca.project(h.C[j]); return [p[xa === 'pc1' ? 0 : 1], p[ya === 'pc1' ? 0 : 1]]; }
+    if (r === 0) { const s = S.ds.train[L.st.seeds[j]]; return s ? [kmCoord(s, xa), kmCoord(s, ya)] : null; }
+    const m = S.ds.train.filter((s, i) => L.hist[r - 1].A[i] === j); if (!m.length) return kmCentrePosAt(j, r - 1);
+    return [m.reduce((a, s) => a + kmCoord(s, xa), 0) / m.length, m.reduce((a, s) => a + kmCoord(s, ya), 0) / m.length];
+  }
+  function kmCentrePositions(r) { const L = S.km; return Array.from({ length: L.k }, (_, j) => kmCentrePosAt(j, r)); }
+  function kmRenderMap(svg, which, o = {}) {
+    const L = S.km, st = L.st, xa = L.axes.x, ya = L.axes.y, cases = which === 'test' ? S.ds.test : S.ds.train, A = o.A || (which === 'test' ? L.At : st.A);
+    const pts = cases.map((s, i) => { const c = kmColourOf(s, A[i]); return Object.assign({ id: s.id, name: `${s.name} · cluster ${A[i] + 1}${s.subtype ? ' · ' + kmSub(s.subtype) : ''} · ${className(s.label)}`, x: kmCoord(s, xa), y: kmCoord(s, ya), split: which === 'test' && !c.color ? 'test' : 'train', hollow: which === 'test' && !!c.color, selected: !!(S.selected && S.selected.id === s.id) || !!(o.flash && o.flash.has(s.id)) }, c); });
+    const last = L.hist.length - 1, upTo = o.trailUpTo != null ? o.trailUpTo : last, centres = o.centres || kmCentrePositions(last), segments = [];
+    if (which === 'train') { // the trails: where every centre has been, round by round
+      for (let j = 0; j < L.k; j++) { let prev = kmCentrePosAt(j, 0); for (let r = 1; r <= upTo; r++) { const p = kmCentrePosAt(j, r); if (prev && p) segments.push({ x1: prev[0], y1: prev[1], x2: p[0], y2: p[1], color: kmRgb(j), opacity: 0.45, width: 2 }); prev = p; } if (o.gliding && prev && centres[j]) segments.push({ x1: prev[0], y1: prev[1], x2: centres[j][0], y2: centres[j][1], color: kmRgb(j), opacity: 0.45, width: 2 }); }
+    }
+    for (let j = 0; j < L.k; j++) { const p = centres[j]; if (!p) continue; const n = A.filter(a => a === j).length; pts.push({ id: -1 - j, name: `centre of cluster ${j + 1} · ${n} ${noun(2)}`, x: p[0], y: p[1], ring: true, color: kmRgb(j), cls: 'km' }); }
+    Viz.drawScatter(svg, { points: pts, segments, xLabel: kmAxisLabel(xa), yLabel: kmAxisLabel(ya), onSelect: id => { if (id >= 0) { selectSpecimen(S.ds.specimens[id]); kmRenderMaps(); } } });
+  }
+  function kmRenderCurves() {
+    const L = S.km, rounds = L.hist.length - 1, hist = L.hist.map((h, r) => ({ epoch: r, dist: h.inertia, moved: h.moved }));
+    Viz.drawSeries($('km-curve-dist'), { hist, keys: [{ key: 'dist', color: 'var(--accent)' }], maxEpoch: Math.max(8, rounds) });
+    Viz.drawSeries($('km-curve-moved'), { hist: hist.slice(1), keys: [{ key: 'moved', color: 'var(--irregular)' }], maxEpoch: Math.max(8, rounds) });
+    $('km-curve-dist-now').textContent = L.st.inertia.toFixed(0); $('km-curve-moved-now').textContent = rounds ? String(L.st.moved) : '';
+    $('km-curves-note').textContent = rounds ? `${rounds} round${rounds === 1 ? '' : 's'} so far: the within-cluster distance fell from ${L.hist[0].inertia.toFixed(0)} to ${L.st.inertia.toFixed(0)}${L.st.converged ? ', and the last round moved nobody: converged. It never rises, since each step can only tighten the clusters, which is also why it can stop in a local optimum; Reset with another seed or the other Start to compare where it ends.' : '.'}` : 'No round yet. Every round can only lower the within-cluster distance, so the curve falls and settles; where it settles depends on the start.';
+  }
+  function kmRenderSweep() {
+    const L = S.km, key = L.for;
+    if (L.sweepKey !== key) { L.sweep = NucleusCluster.sweep(L.X, [2, 3, 4, 5, 6, 7, 8], 1); L.sweepKey = key; }
+    const sw = L.sweep, maxD = sw[0].inertia, best = sw.reduce((a, r) => (r.silhouette > a.silhouette ? r : a), sw[0]), now = sw.find(r => r.k === L.k);
+    $('km-sweep').innerHTML = `<tr><th>k</th><th class="name">within-cluster distance</th><th class="name">silhouette</th></tr>` + sw.map(r => `<tr class="${r.k === L.k ? 'now' : ''}"><td class="cell">${r.k}</td><td class="bar"><i style="width:${Math.round(120 * r.inertia / maxD)}px"></i> <span class="cell">${r.inertia.toFixed(0)}</span></td><td class="bar"><i class="sil" style="width:${Math.max(1, Math.round(240 * Math.max(0, r.silhouette)))}px"></i> <span class="cell">${r.silhouette.toFixed(2)}</span></td></tr>`).join('');
+    $('km-sweep-note').textContent = `The within-cluster distance always falls as k grows, so people look for an elbow where it stops falling fast; the silhouette, how much nearer each ${noun(1)} is to its own cluster than to the next (1 tight and apart, 0 on the border), peaks where the clusters are best separated. Here the silhouette peaks at k = ${best.k} (${best.silhouette.toFixed(2)})${now && now.k !== best.k ? `, and k = ${L.k} scores ${now.silhouette.toFixed(2)}` : ''}${S.taskId === 'leukemia' && L.mode === 'features' ? '; the seven kinds of count are nowhere in these numbers' : ''}. Both aids suggest, neither knows the kinds: in practice the number of groups is a decision, and clusters are named by someone who looks at them.`;
   }
   function kmRenderMaps() {
     const L = S.km; kmRenderMap($('km-map'), 'train'); kmRenderLegend();
@@ -12777,7 +12886,7 @@ window.Glossary = (function () {
   // 3 · Test: the held-out cases join their nearest centre, and the lecturer names the clusters
   function kmEnterTest() {
     const L = S.km; if (!L.built || L.for !== kmKey()) kmReset();
-    if (!L.st.converged) { NucleusCluster.run(L.st); kmRenderStatus(); kmSyncButtons(); }
+    if (!L.st.converged) { L.running = false; L.anim = null; while (kmRound()) { /* the remaining rounds, unwatched */ } kmRenderStatus(); kmRenderCurves(); kmSyncButtons(); }
     L.At = L.Xt.map(x => NucleusCluster.nearest(x, L.st.C)); if (!L.names || L.names.length !== L.k) L.names = kmMajorityNames(L.st.A);
     kmRenderTest();
   }
@@ -12796,7 +12905,8 @@ window.Glossary = (function () {
     $('km-k').addEventListener('input', () => { L.k = +$('km-k').value; $('km-k-val').textContent = L.k; kmReset(`${L.k} groups — new starting centres.`); });
     $('km-seed').addEventListener('change', () => { L.seed = Math.max(1, Math.floor(+$('km-seed').value || 1)); kmReset(`Seed ${L.seed} — new starting centres.`); });
     $('km-seed-random').addEventListener('click', () => { L.seed = 1 + Math.floor(Math.random() * 9999); kmReset(`Seed ${L.seed} — new starting centres.`); });
-    $('km-step').addEventListener('click', () => { kmStop(); kmStep(); });
+    document.querySelectorAll('#km-start-seg button').forEach(b => b.addEventListener('click', () => { if (b.dataset.start === L.start) return; L.start = b.dataset.start; kmReset(L.start === 'random' ? `${L.k} random ${noun(2)} as the first centres: one run from seed ${L.seed}, with its rounds to watch.` : `k-means++ from ten starts, the tightest kept and its start replayed: what the usual implementations do.`); }));
+    $('km-step').addEventListener('click', kmStep);
     $('km-run').addEventListener('click', kmRun);
     $('km-reset').addEventListener('click', () => kmReset('New starting centres from the seed, the tightest of ten random starts.'));
     document.querySelectorAll('#km-colour-seg button').forEach(b => b.addEventListener('click', () => { L.colour = b.dataset.colour; kmSyncControls(); kmRenderMaps(); }));
