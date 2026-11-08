@@ -2555,7 +2555,8 @@ window.Viz = (function () {
     const ordered = pts.slice().sort((a, b) => (a.selected ? 1 : 0) - (b.selected ? 1 : 0));
     for (const p of ordered) {
       const cls = `pt ${p.cls}${p.split === 'test' ? ' test' : ''}${p.selected ? ' selected' : ''}${p.small ? ' small' : ''}`;
-      g += `<circle class="${cls}"${p.color ? ` style="fill:${p.color}"` : ''} data-id="${p.id}" r="${p.selected ? 6 : p.small ? 3 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.clsName ? ' · ' + p.clsName : ''}</title></circle>`;
+      const style = p.ring ? `stroke:${p.color};fill:none;stroke-width:3` : p.hollow ? `stroke:${p.color};fill:var(--surface);stroke-width:2.5` : p.color ? `fill:${p.color}` : ''; // a ring marks a cluster centre, a hollow point a held-out case
+      g += `<circle class="${cls}${p.ring ? ' ring' : ''}"${style ? ` style="${style}"` : ''} data-id="${p.id}" r="${p.ring ? 9 : p.selected ? 6 : p.small ? 3 : 4.5}" cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}"><title>${esc(p.name)} · ${esc(opt.xLabel)} ${p.x.toFixed(3)} · ${esc(opt.yLabel)} ${p.y.toFixed(3)}${p.clsName ? ' · ' + p.clsName : ''}</title></circle>`;
     }
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     svg.innerHTML = g;

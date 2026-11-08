@@ -314,6 +314,77 @@
       </div>
     </section>
 
+    <!-- ============================ THE CLUSTER QUESTION · 2 · CLUSTER AND 3 · NAME ============================ -->
+    <section class="stage-panel" id="panel-cluster" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Clusters: the groups the cases fall into, with no label anywhere</h2>
+          <span class="small muted">k-means on the training cases · the labels and the hidden subtypes only score the result</span>
+        </div>
+        <p class="prose small">Every recipe so far learnt from labels. k-means uses none: it is told only how many groups to find, <em>k</em>. It drops k centres among the cases; every case joins its nearest centre, every centre moves to the mean of its cases, and the two steps repeat until no case changes group. The groups it finds are groups of <strong>whatever varies most in the input</strong>, which may or may not be the groups a pathologist means. Distances are measured in the same standardised numbers the networks are given.</p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">Cases</span><div class="seg" id="km-task-seg"><button type="button" data-task="leukemia" title="the 200 blood counts of the leukemia question">blood counts</button><button type="button" data-task="atypia" title="the 100 nuclei of the atypia question">atypia</button><button type="button" data-task="enlargement" title="the 100 nuclei of the enlargement question">enlargement</button><button type="button" data-task="irregularity" title="the 100 nuclei of the irregularity question">irregularity</button></div></div>
+          <div class="ctl"><span class="lbl">Input</span><div class="seg" id="km-mode-seg"><button type="button" data-mode="features" title="the six measurements a pathologist would name">measurements</button><button type="button" data-mode="pixels" title="the raw pixels, 1,024 numbers">pixels</button><button type="button" data-mode="code" title="the 8 numbers of the foundation code">the code</button></div></div>
+          <div class="ctl slim"><label for="km-k">Groups, k <span class="val" id="km-k-val">4</span></label><input type="range" id="km-k" min="2" max="8" step="1" value="4"></div>
+          <div class="ctl slim"><label for="km-seed">Random seed</label><div style="display:flex;gap:6px"><input type="number" id="km-seed" min="1" max="9999" value="1"><button type="button" class="btn" id="km-seed-random" title="new random seed">🎲</button></div></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="km-step" title="one round: every centre moves to the mean of its cases, then every case joins its nearest centre">Step</button>
+            <button type="button" class="btn primary big" id="km-run" title="round after round until no case changes group">▶ Run</button>
+            <button type="button" class="btn" id="km-reset" title="new starting centres from the seed">↺ Reset</button>
+          </div>
+        </div>
+        <div class="status" id="km-status"></div>
+        <div class="note" id="km-note"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The map</h2>
+          <span class="small muted">the rings are the centres · click a case to put it under the inspector</span>
+        </div>
+        <div class="scatter-controls">
+          <span class="ctl"><span class="lbl">colour</span><span class="seg" id="km-colour-seg"><button type="button" data-colour="cluster">by cluster</button><button type="button" data-colour="subtype">by hidden subtype</button><button type="button" data-colour="class">by class</button></span></span>
+          <label>x axis <select id="km-x"></select></label>
+          <label>y axis <select id="km-y"></select></label>
+          <span class="legend" id="km-legend"></span>
+        </div>
+        <div class="chart scatter"><svg id="km-map" role="img" aria-label="The training cases on two axes, coloured by cluster, with the centres as rings"></svg></div>
+        <p class="small muted" id="km-map-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>The clusters against the hidden subtypes</h2>
+          <span class="small muted">what each cluster holds, counted with the subtypes the page keeps and no model ever sees</span>
+        </div>
+        <div class="km-table-wrap"><table class="km-table" id="km-table"></table></div>
+        <p class="small muted" id="km-table-note" style="margin-top:8px"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>What each cluster is</h2>
+          <span class="small muted" id="km-profiles-sub">each cluster's mean, parameter by parameter, in standard deviations from the training mean · red above, blue below</span>
+        </div>
+        <div class="km-profiles" id="km-profiles"></div>
+      </div>
+    </section>
+
+    <section class="stage-panel" id="panel-km-test" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Name the clusters</h2>
+          <span class="small muted">a cluster becomes a diagnosis only once someone names it</span>
+        </div>
+        <p class="prose small">The held-out cases, which played no part in the clustering, each join their nearest centre. Name every cluster below, as a pathologist would after looking at a few of its cases; the page starts from the majority class of each cluster’s training cases. The naming is scored on the held-out cases, next to what the supervised recipes score on the same cases.</p>
+        <div class="km-names" id="km-names"></div>
+        <div class="status" id="km-test-status"></div>
+        <div class="chart scatter"><svg id="km-test-map" role="img" aria-label="The held-out cases on the map, hollow, with the centres"></svg></div>
+        <div class="km-table-wrap" style="margin-top:10px"><table class="km-table" id="km-test-table"></table></div>
+        <p class="small muted" id="km-test-note" style="margin-top:8px"></p>
+      </div>
+    </section>
+
     <!-- ============================ 4 · FOUNDATION ============================ -->
     <section class="stage-panel" id="panel-foundation" hidden>
       <div class="card bar">
@@ -691,7 +762,7 @@
         </div>
         <p class="prose small" id="fd-blurb"></p>
         <div class="bar-row">
-          <div class="ctl"><span class="lbl">Model</span><div class="seg" id="fd-kind-seg"><button type="button" data-kind="nuclei" class="is-active" title="every nucleus a token: its code from the frozen encoder, with its position and the context layers as set here (recipe 15)">nuclei as tokens</button><button type="button" data-kind="deep" title="a convolutional network over the pixels alone, three levels deep, a plain average of its patches and a single layer per question: no nucleus found, no code, no coordinates (recipe 17)">deep convolution</button><button type="button" data-kind="shallow" title="a shallower convolutional network over the pixels alone, two levels, and the two attention heads over its patches instead of a plain average (recipe 16)">shallow convolution + attention</button></div></div>
+          <div class="ctl"><span class="lbl">Model</span><div class="seg" id="fd-kind-seg"><button type="button" data-kind="nuclei" class="is-active" title="every nucleus a token: its code from the frozen encoder, with its position and the context layers as set here (recipe 17)">nuclei as tokens</button><button type="button" data-kind="deep" title="a convolutional network over the pixels alone, three levels deep, a plain average of its patches and a single layer per question: no nucleus found, no code, no coordinates (recipe 19)">deep convolution</button><button type="button" data-kind="shallow" title="a shallower convolutional network over the pixels alone, two levels, and the two attention heads over its patches instead of a plain average (recipe 18)">shallow convolution + attention</button></div></div>
           <div class="ctl"><span class="lbl">Each nucleus</span><div class="seg" id="fd-pos-seg"><button type="button" data-pos="0" title="the code of the nucleus alone">its code</button><button type="button" data-pos="1" class="is-active" title="the code, and where the nucleus sits in the field">code + position</button></div></div>
           <div class="ctl"><span class="lbl">Context</span><div class="seg" id="fd-ctx-seg"><button type="button" data-ctx="0">none</button><button type="button" data-ctx="1" class="is-active" title="two layers of self-attention before the pooling, each with a learned distance cost">nuclei look at each other</button></div></div>
           <div class="ctl"><span class="lbl">Crop</span><div class="seg" id="fd-crop-seg"><button type="button" data-crop="nucleus" class="is-active" title="every crop masked to its nucleus by the segmentation: cytology and nothing else">masked to the nucleus</button><button type="button" data-crop="surroundings" title="the field around the nucleus stays in the crop, and leaks location and the nest’s outline into the code">with its surroundings</button></div></div>
@@ -1729,6 +1800,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="js/chat.js"></script>
 <script src="js/describe.js"></script>
 <script src="js/text.js"></script>
+<script src="js/cluster.js"></script>
 <script src="js/nn.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>
