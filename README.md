@@ -17,6 +17,7 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
 - **GitHub Pages:** repository settings → Pages → *Deploy from a branch* → the default branch, root folder.
 - **The numbers in this file:** `node tools/check_training.js` (the recipes, the other lab, the shortcut, label noise,
   the labelled-cases table), `node tools/check_foundation.js` (the foundation model's pretraining),
+  `node tools/check_distill.js` (a teacher and a student against the game),
   `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) and `node tools/check_slides.js`
   (attention over slides) reproduce them.
 
@@ -398,6 +399,36 @@ tried first and rejected: its code captures size and darkness but leaves contour
 trains, because a smooth blob reconstructs almost as well as a lobulated one. The contrastive rule has to keep each
 nucleus recognisable across flips, rotations and stains, and the contour is part of what does that. The class is still
 in `js/nn.js` (`AutoEncoder`) for comparison.
+
+A **teacher and a student** was tried next (`node tools/check_distill.js`), because that is the rule behind the large
+pathology foundation models: self-distillation in the manner of DINO. A student encoder and a teacher that is a slow
+moving average of it (momentum 0.99); a head from the code to K prototypes, the unit code against unit prototypes as in
+DINO's weight-normed last layer (without that normalisation nothing bounds the logits of a linear code, and the loss is
+NaN within an epoch); the teacher's softmax over the prototypes for one view, centred by a running mean and sharpened
+to temperature 0.04, is the target the student's softmax (temperature 0.1) for the other view is trained to match, by
+cross-entropy, both ways round; no negatives anywhere; the gradient runs back through the head and the encoder, and the
+finite-difference check passes. The same 100 nuclei, views, seeds and probes as the game. It trains and does not
+collapse, and it learns what the autoencoder learned: size and darkness, not the contour. A second teacher–student
+rule without prototypes (BYOL: the student's code, through a small predictor, must point where the teacher's code of
+the other view points) does the same. A 5-nearest-neighbour probe on the same codes agrees (irregularity 48–60%
+against 75–78% for the game), so the contour is not in the code at all, linearly or otherwise. Means of two seeds at
+100 epochs; the 32-prototype rule a second time at 300 epochs, where its teacher has sharpened onto a third of its
+prototypes and the code arranges itself by the coarse groups they stand for:
+
+| Pretraining rule | Partner found | Atypia | Enlargement | Irregularity | Mean |
+|---|---|---|---|---|---|
+| random encoder (epoch 0 above) | 15% | 74% | 80% | 60% | 71% |
+| spot the same nucleus (the game, 100 epochs) | 82% | 83% | 97% | 84% | 88% |
+| teacher and student, 32 prototypes, 100 epochs | 51% | 83% | 100% | 66% | 83% |
+| teacher and student, 32 prototypes, 300 epochs | 61% | 79% | 98% | 53% | 76% |
+| teacher and student, predicted code (BYOL), 100 epochs | 22% | 86% | 100% | 60% | 82% |
+
+Prototype counts from 8 to 100, teacher temperatures 0.04 and 0.07, momenta 0.9 and 0.99, learning rates 0.05 and
+0.1 and a hidden layer in the head move the mean between 75% and 83% and the irregularity probe between 48% and 70%,
+never near the game's. The lesson runs the other way at scale: with millions of patches, a large network and many
+crops of every image, teaching a student to agree with its own averaged past finds the semantic groups and wins, and
+it is what the field uses; with 100 nuclei and a code of 8, only the game that must tell every nucleus from 39 others
+keeps the contour. The page keeps the game, and says so in a sentence on the Foundation panel.
 
 What the code is worth is measured on the side after every epoch and never fed back: a single layer is trained on the
 frozen code with 20 labelled training cases of a question (10 per class) and scored on 40 nuclei it never saw (the
@@ -1629,6 +1660,7 @@ tools/generate_nuclei.js   make the nucleus datasets, each nucleus scanned at bo
 tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind the choice (pretraining set × encoder size × labelled cases)
 tools/check_training.js    gradient check + the ten recipes, the other lab, the shortcut and the label-noise curve in Node
 tools/check_foundation.js  the foundation model's pretraining and what its code is worth, in Node
+tools/check_distill.js     the teacher–student rules (DINO-style prototypes, BYOL) against the contrastive game on the same nuclei, views and probes, in Node
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
 tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
 tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
