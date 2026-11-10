@@ -377,6 +377,13 @@
       cl.std = standardizerFrom(o.std.mean, o.std.scale); cl.meta = o;
       return cl;
     }
+    // an exact copy, with the same input standardiser: what fine-tuning trains, so that the pretrained encoder stays as it was
+    clone() {
+      const cl = new Contrastive({ imageSize: this.size, conv: this.enc.conv, code: this.code, tau: this.tau, seed: this.seed });
+      cl.enc.Wc.set(this.enc.Wc); cl.enc.bc.set(this.enc.bc); cl.enc.W[0].set(this.enc.W[0]); cl.enc.b[0].set(this.enc.b[0]); cl.enc.Wo.set(this.enc.Wo); cl.enc.bo = this.enc.bo;
+      cl.steps = this.steps; cl.std = this.std; cl.meta = this.meta;
+      return cl;
+    }
   }
 
   // ---------------------------------------------------------------------------- context: the nuclei look at each other

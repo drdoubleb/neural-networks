@@ -18,6 +18,7 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
 - **The numbers in this file:** `node tools/check_training.js` (the recipes, the other lab, the shortcut, label noise,
   the labelled-cases table), `node tools/check_foundation.js` (the foundation model's pretraining),
   `node tools/check_distill.js` (a teacher and a student against the game),
+  `node tools/check_finetune.js` (the code input with the encoder unfrozen),
   `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) and `node tools/check_slides.js`
   (attention over slides) reproduce them.
 
@@ -209,7 +210,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ⑩ Irregularity · pixels · 4 + 4 ReLU · the shortcut | 4,125 | 97% on a test set with the same flaw, ~55% at our lab | The network of ⑨ trained on a badly collected set: every irregular nucleus was scanned at another lab with a weaker stain. It learns the stain instead of the contour: the first-layer weight maps turn into plain interior templates, the *Evidence* view weighs the inside of the nucleus, the test set looks perfect when it is split the same way, and our lab's scans are called regular. See *Another lab, and the shortcut*. |
 | ⑪ Irregularity · pixels · convolution + 4 ReLU + augmentation | 897 | ~88% | The same 5 × 5 filter slides over the whole image, so a bend in the membrane is detected wherever it is. Fewer parameters, far better generalisation. |
 | ⑫ Foundation · pretrain a code on 100 unlabelled nuclei | 1,680 | a single layer on the code, 20 labelled cases per question: ~81% atypia, ~97% enlargement, ~83% irregularity | The foundation-model idea in miniature: pretrain once without labels, then every question is a small model on top of the code. The right-hand curve shows the code becoming worth more for every question as pretraining runs, though it was never told what any question asks. See *A foundation model, in miniature*. |
-| ⑬ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑲ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑦ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. |
+| ⑬ Irregularity · the foundation code · single layer · 10 labelled cases | 9 | ~82% with 10 labelled cases, mean of three seeds (the page's seed 8: 75%; pixels with the same 10: ~60%) | The payoff of the pretraining: the network sees 10 labelled nuclei only, each as the 8 numbers of the code from the encoder of ⑲ (or its shipped copy), and a single layer on them beats any pixel network trained on all 80. Move the *Labelled cases* control on recipe ⑦ to compare, and switch to the bigger shipped encoder at 40 cases. See *The code as an input*. Set *Encoder* to fine-tuned and the gradient runs on into the encoder: with 10 labelled cases it memorises them (training 100%, test down), with 40 or more it beats the frozen code (see *Fine-tuning*). |
 | ⑭ Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional | k centres | class purity of two clusters on the training nuclei: pixels 61% (chance is 50%), the measurements 84%, the code 81%; the enlargement nuclei on pixels alone, 100% | What the code is worth with no label at all. On pixels the clusters follow size and orientation, as the single layer on pixels did; on the code, two clusters line up with irregular against regular four times in five, close to the hand-made measurements, because the pretraining kept the contour; on the enlargement nuclei the pixels alone cluster perfectly, since size and darkness are what pixels vary most by. |
 | ⑮ Slides · one label for 20 nuclei · attention finds the atypical ones | 50 | ~98% slide accuracy on the test slides; ~85% of a positive slide's attention on its 2–4 atypical nuclei (uniform weights: 15%; a plain average: 90% and no idea where) | Weak supervision. A diagnosis is a label for the slide, yet the atypical cells are a few among many and nobody outlines them. An attention network scores every nucleus's code, a softmax over the slide turns the scores into weights, and the weighted average of the codes is classified. Only the slide's label teaches it, and the attention still learns to land on the atypical nuclei: tick *Reveal* after training and look. See *Slides: one label for twenty nuclei*. |
 | ⑯ Focus · four atypical cells together or scattered · the nuclei look at each other | 483 | ~88% on the test slides with context; ~50% without, by construction | The warm-up for a transformer. Four atypical nuclei on every slide, a 2 × 2 block or scattered, so the bag of nuclei is identical in both classes and the model of ⑬ is at chance. One layer of self-attention lets each nucleus read the others, with a learned cost per cell of distance; it learns to listen to its immediate neighbours, and the scorer can then weigh "atypical, with atypical neighbours". Hover a nucleus to see whom it listens to, and the *How a nucleus decides where to look* card for the query, the keys, the match, the distance cost, the softmax and the message. See *A focus, and the nuclei look at each other*. |
@@ -484,6 +485,31 @@ code is a general-purpose set of numbers that nobody had to design, and most que
 measurements. With 20 test nuclei and one fixed draw of labelled cases the numbers are noisy: another draw of 10
 labelled cases moves the code's score by ten points either way (over random draws it averages 73 to 75%), which is
 why the recipe keeps its draw fixed.
+
+**Fine-tuning.** The *Encoder* control beside *Code from* unfreezes the encoder: the head's gradient at its input,
+divided by the code standardiser's scale, is the loss's gradient at the code, and it runs on through the encoder's
+layer and convolution, so the encoder's 1,680 weights move with the head's, at a tenth of its learning rate or at the
+same rate. What trains is a fresh copy of the pretrained encoder (the Foundation question's own encoder and the
+shipped ones stay as they are), the code's standardiser stays as fitted on the frozen codes, the diagram, the code
+card and the *Evidence* view follow the live code, and the status line counts the encoder's weights beside the
+head's. Irregular contour, recipe ⑬'s single layer on the 100-nuclei encoder, learning rate 0.1, 60 epochs, mean of
+five seeds (`node tools/check_finetune.js`), test accuracy at our lab / at the other lab:
+
+| Labelled cases | Frozen | Fine-tuned, lr ÷ 10 | Fine-tuned, same lr |
+|---|---|---|---|
+| 4 | 78% / 75% | 74% / 77% | 67% / 69% |
+| 10 | 82% / 67% | 65% / 64% | 63% / 62% |
+| 20 | 71% / 77% | 59% / 67% | 61% / 63% |
+| 40 | 80% / 86% | 86% / 85% | 89% / 83% |
+| 80 (all) | 80% / 85% | 85% / 80% | 85% / 83% |
+
+Fine-tuned, the training accuracy reaches 100% at every count. With 20 labelled cases or fewer that is the whole
+story: the test accuracy falls by ten to twenty points, the encoder's 1,680 weights having memorised a handful of
+nuclei that the head's nine could not. With 40 or 80 it is a gain of five to nine points at our lab, the filters
+bending towards the contour the question is about, and the other lab's score moves little, so the stain invariance the
+pretraining bought survives at these rates. That is the rule in practice: freeze with few labels, fine-tune with many,
+and fine-tune the backbone slower than the head. No lessons while the encoder fine-tunes: a lesson would show the
+head's step alone.
 
 One more thing the small numbers make visible: **an untrained network on the code is not at chance.** Every code number
 carries information on its own (their correlations with the irregularity label run up to 0.71), so any random
@@ -1661,6 +1687,7 @@ tools/pretrain_backbone.js pretrain the shipped encoder, and the ablation behind
 tools/check_training.js    gradient check + the ten recipes, the other lab, the shortcut and the label-noise curve in Node
 tools/check_foundation.js  the foundation model's pretraining and what its code is worth, in Node
 tools/check_distill.js     the teacher–student rules (DINO-style prototypes, BYOL) against the contrastive game on the same nuclei, views and probes, in Node
+tools/check_finetune.js    recipe ⑬ with the encoder frozen and fine-tuned at two rates, for every labelled-cases count, at both labs, in Node
 tools/generate_slides.js   make the slides: the pool of nuclei and which nuclei each slide holds
 tools/check_slides.js      the slide models in Node: attention pooling against a plain average, and the context layer on both questions
 tools/generate_fields.js   make the tissue fields: five bladder patterns, the nuclei from the atypia generator, two contact sheets in H&E colour
