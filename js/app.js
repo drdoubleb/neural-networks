@@ -14,6 +14,7 @@
     mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60, speed: 6, seed: 1, augment: false, l2: 0, peek: false,
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
+    share: null, // the positive class's share of the training set when the lecturer changes the mix (the first positives and negatives that give it are collected, the rest left out); null = as collected
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
     ftRate: 0, ft: null, // the code input with the encoder unfrozen: its learning rate as a fraction of the head's (0 = frozen), and the copy of the encoder that trains on (see ftSetup)
     foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe 12/13 introduces them, and stay for the session
@@ -43,7 +44,7 @@
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
   const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default']; // the number first, in plain digits, so that it reads in the dropdown
-  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, ftRate: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
+  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, ftRate: 0, share: null, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -154,12 +155,12 @@
     renderSourceOptions();
     renderInputPicker();
   }
-  function inputsFor(mode, augment, excluded) {
-    const normalize = mode !== 'features' ? S.normalize : 'off', enc = mode === 'code' ? codeEncoder() : null;
-    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '') + (enc ? '|' + enc.key : '') + `|${S.ds.sources.train}/${S.ds.sources.test}|${normalize}|noise${S.labelNoise}|labelled${S.labelled}`;
+  function inputsFor(mode, augment, excluded, opts = {}) {
+    const normalize = mode !== 'features' ? S.normalize : 'off', enc = mode === 'code' ? codeEncoder() : null, share = 'share' in opts ? opts.share : S.share;
+    const key = mode + (mode === 'pixels' && augment ? '+aug' : '') + (mode === 'features' && excluded.size ? '-' + [...excluded].sort().join(',') : '') + (enc ? '|' + enc.key : '') + `|${S.ds.sources.train}/${S.ds.sources.test}|${normalize}|noise${S.labelNoise}|labelled${S.labelled}|share${share}`;
     if (!S.inputCache.has(key)) {
       if (S.inputCache.size > 40) S.inputCache.clear();
-      const inp = DS.buildInputs(S.ds, mode, { augment, exclude: excluded, normalize, labelNoise: S.labelNoise, encoder: enc, labelled: S.labelled });
+      const inp = DS.buildInputs(S.ds, mode, { augment, exclude: excluded, normalize, labelNoise: S.labelNoise, encoder: enc, labelled: S.labelled, share });
       inp.encoderKey = enc ? enc.key : null;
       S.inputCache.set(key, inp);
     }
@@ -240,6 +241,16 @@
     for (const id of ['source-test', 'source-test-2']) $(id).value = S.ds.sources.test;
     $('normalize').value = S.normalize; $('show-lab').checked = S.showLab;
     $('sources-text').textContent = sourceText();
+  }
+  // the class mix: the two sliders (Specimens, Advanced settings) and the Specimens card's text
+  function shareSlider() { const c = DS.shareCounts(S.ds, null); return S.share == null ? Math.round(c.P / (c.P + c.N) * 20) * 5 : Math.round(S.share * 100); }
+  function renderShare() {
+    const v = shareSlider(), c = DS.shareCounts(S.ds, S.share), plural = n => `${n} ${noun(n)}`, testPos = S.ds.test.filter(s => s.label).length;
+    for (const id of ['share', 'share-2']) $(id).value = v;
+    const label = S.share == null ? `${v}% · as collected` : `${v}%`; $('share-val').textContent = label; $('share-2-val').textContent = label;
+    $('share-text').textContent = S.share == null
+      ? `The training set as collected: ${plural(c.P + c.N)}, ${c.P} ${posName()} (${pct(c.P / (c.P + c.N))}) and ${c.N} ${negName()}. Slide to collect a different set: the cases that would spoil the share asked for are left out, dimmed and dotted in the tray below, and the network never sees them. The test set keeps its own mix, ${testPos} ${posName()} in ${S.ds.test.length}, throughout.`
+      : `Collected for training: ${c.p} ${posName()} and ${c.n} ${negName()}, ${pct(c.p + c.n ? c.p / (c.p + c.n) : 0)} ${posName()}; the other ${plural(c.P + c.N - c.p - c.n)} are left out, dimmed and dotted in the tray below, and the network never sees them. The test set keeps its own mix, ${testPos} ${posName()} in ${S.ds.test.length}.`;
   }
   function renderNoiseControls() {
     const on = S.labelNoise > 0;
@@ -658,8 +669,8 @@
   function repaintThumbs() {
     for (const map of Object.values(thumbs)) for (const [id, el] of map) paintThumb(el.querySelector('canvas'), S.ds.specimens[id]);
   }
-  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit, lab, flipped, unlabelled }) {
-    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '') + (lab === 'B' ? ' lab-b' : '') + (S.showLab ? ' show-lab' : '') + (flipped ? ' flipped' : '') + (S.showFlipped ? ' show-flip' : '') + (unlabelled ? ' unlabelled' : '');
+  function setThumbState(el, { call, truth, wrong, right, unknown, inBatch, selected, q, title, unit, lab, flipped, unlabelled, uncollected }) {
+    el.className = 'thumb' + (call != null ? ` call-${call}` : '') + (truth != null ? ` truth-${truth}` : '') + (wrong ? ' wrong' : '') + (right ? ' right' : '') + (unknown ? ' unknown' : '') + (inBatch ? ' in-batch' : '') + (selected ? ' selected' : '') + (lab === 'B' ? ' lab-b' : '') + (S.showLab ? ' show-lab' : '') + (flipped ? ' flipped' : '') + (S.showFlipped ? ' show-flip' : '') + (unlabelled ? ' unlabelled' : '') + (uncollected ? ' uncollected' : '');
     el.style.borderColor = unit != null ? Viz.unitColor(unit) : '';
     const badge = el.querySelector('.badge');
     badge.className = 'badge' + (q ? ' q' : '');
@@ -670,9 +681,9 @@
     for (const s of S.ds.specimens) {
       const el = thumbs.data.get(s.id); if (!el) continue;
       const known = truthKnown(s);
-      const withheld = s.split === 'train' && !S.inputs.labelled.has(s.id);
-      setThumbState(el, { truth: known ? trainLabel(s) : null, unknown: !known, selected: S.selected && S.selected.id === s.id, lab: s.lab, flipped: isFlipped(s), unlabelled: withheld,
-        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${withheld ? ' · label withheld: the network never sees this case' : ''}${known ? ` · ${labelWord(s)} ${className(trainLabel(s))}` : ''}${known && isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
+      const withheld = s.split === 'train' && !S.inputs.labelled.has(s.id), out = s.split === 'train' && !!S.inputs.collected && !S.inputs.collected.has(s.id);
+      setThumbState(el, { truth: known ? trainLabel(s) : null, unknown: !known, selected: S.selected && S.selected.id === s.id, lab: s.lab, flipped: isFlipped(s), unlabelled: withheld, uncollected: out,
+        title: `${s.name} · ${s.split === 'train' ? 'training' : 'test'} set${out ? ' · not collected: left out of the training set by the class mix' : withheld ? ' · label withheld: the network never sees this case' : ''}${known ? ` · ${labelWord(s)} ${className(trainLabel(s))}` : ''}${known && isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${known && s.subtype ? ' · ' + subtypeName(s.subtype) : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     }
   }
   function topUnit(acts) { let j = 0; for (let i = 1; i < acts.length; i++) if (acts[i] > acts[j]) j = i; return acts[j] > 0 ? j : null; }
@@ -681,11 +692,11 @@
     const byUnit = S.trayColor === 'unit' && acts;
     S.ds.train.forEach((s, k) => {
       const el = thumbs.train.get(s.id);
-      const p = probs[k], call = p >= 0.5 ? 1 : 0, unl = !S.inputs.labelled.has(s.id);
+      const p = probs[k], call = p >= 0.5 ? 1 : 0, unl = !S.inputs.labelled.has(s.id), out = !!S.inputs.collected && !S.inputs.collected.has(s.id);
       const u = byUnit && !unl ? topUnit(acts[k]) : null;
       const y = trainLabel(s);
-      setThumbState(el, { call: unl ? null : call, wrong: !unl && call !== y, unlabelled: unl, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u, lab: s.lab, flipped: !unl && isFlipped(s),
-        title: unl ? `${s.name} · no label given: the network never trains on it · it would call ${className(call)} (P ${fmtP(p)})${s.lab === 'B' ? ' · scanned at the other lab' : ''}` : `${s.name} · ${labelWord(s)} ${className(y)}${isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
+      setThumbState(el, { call: unl ? null : call, wrong: !unl && call !== y, unlabelled: unl, uncollected: out, inBatch: S.lastBatch.has(s.id), selected: S.selected && S.selected.id === s.id, unit: u, lab: s.lab, flipped: !unl && isFlipped(s),
+        title: unl ? `${s.name} · ${out ? 'not collected: left out of the training set by the class mix' : 'no label given: the network never trains on it'} · it would call ${className(call)} (P ${fmtP(p)})${s.lab === 'B' ? ' · scanned at the other lab' : ''}` : `${s.name} · ${labelWord(s)} ${className(y)}${isFlipped(s) && S.showFlipped ? ` (mislabelled: truth ${className(s.label)})` : ''}${s.subtype ? ' (' + subtypeName(s.subtype) + ')' : ''} · call ${className(call)} (P ${fmtP(p)})${byUnit ? ` · most active: ${u == null ? 'no unit' : 'unit ' + (u + 1)}` : ''}${s.lab === 'B' ? ' · scanned at the other lab' : ''}` });
     });
     $('tray-legend-call').hidden = !!byUnit;
     $('tray-legend-unit').hidden = !byUnit;
@@ -717,7 +728,7 @@
     $('status').innerHTML =
       `<span>architecture <b>${inputDesc} → ${S.net.describe()} → output</b></span>` +
       `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b>${S.ft ? ` + <b>${S.ft.cl.parameterCount().toLocaleString()}</b> in the encoder, fine-tuning at ${S.ftRate === 1 ? 'the same' : `${S.ftRate} × the`} learning rate` : ''}</span>` +
-      `<span>training cases <b>${nTrain}</b>${sub ? ` labelled of ${S.ds.train.length}` : ''}${S.augment && S.mode === 'pixels' ? ` (× 8 orientations = ${S.inputs.trainX.length})` : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode !== 'features' ? ' · stain normalised' : ''}${S.labelNoise > 0 ? ` · <b>${flippedSeen}</b> mislabelled` : ''}</span>` +
+      `<span>training cases <b>${nTrain}</b>${S.inputs.share != null ? ` (${pct(S.inputs.shareActual)} ${esc(posName())}; ${S.ds.train.length - S.inputs.collected.size} left out)` : sub ? ` labelled of ${S.ds.train.length}` : ''}${S.augment && S.mode === 'pixels' ? ` (× 8 orientations = ${S.inputs.trainX.length})` : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode !== 'features' ? ' · stain normalised' : ''}${S.labelNoise > 0 ? ` · <b>${flippedSeen}</b> mislabelled` : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
       `<span>loss <b>${S.trainEval.loss.toFixed(3)}</b></span>` +
@@ -984,7 +995,7 @@
     $('spec-name').textContent = `${tabular ? 'Patient' : 'Specimen'} ${s.name}`;
     const known = truthKnown(s);
     $('spec-chips').innerHTML =
-      `<span class="chip plain">${s.split === 'train' ? (S.inputs.labelled.has(s.id) ? 'Training set' : 'Training set · label withheld') : 'Test set · held out'}</span>` +
+      `<span class="chip plain">${s.split === 'train' ? (S.inputs.labelled.has(s.id) ? 'Training set' : S.inputs.collected && !S.inputs.collected.has(s.id) ? 'Training set · not collected (class mix)' : 'Training set · label withheld') : 'Test set · held out'}</span>` +
       (known ? `<span class="chip ${classOf(trainLabel(s))}">${labelWord(s)}: ${esc(className(trainLabel(s)))}</span>` : `<span class="chip plain">truth hidden</span>`) +
       (known && isFlipped(s) && S.showFlipped ? `<span class="chip bad">mislabelled · truth: ${esc(className(s.label))}</span>` : '') +
       (known && s.subtype && tabular ? `<span class="chip plain">${esc(subtypeName(s.subtype))}</span>` : '') +
@@ -1114,7 +1125,8 @@
     const xi = +$('scatter-x').value, yi = +$('scatter-y').value;
     const fx = S.featureDefs[xi], fy = S.featureDefs[yi];
     const tx = v => (fx.log ? Math.log10(Math.max(v, 1e-3)) : v), ty = v => (fy.log ? Math.log10(Math.max(v, 1e-3)) : v);
-    const pts = S.ds.specimens.filter(s => s.split === 'train' || S.revealTest).map(s => ({
+    const out = s => s.split === 'train' && !!(S.inputs && S.inputs.collected) && !S.inputs.collected.has(s.id); // left out by the class mix: not in the picture either
+    const pts = S.ds.specimens.filter(s => (s.split === 'train' && !out(s)) || (s.split === 'test' && S.revealTest)).map(s => ({
       id: s.id, name: s.name, x: tx(s.features[xi]), y: ty(s.features[yi]), split: s.split,
       cls: truthKnown(s) ? classOf(trainLabel(s)) : 'unknown', clsName: truthKnown(s) ? className(trainLabel(s)) + (isFlipped(s) && S.showFlipped ? ' · mislabelled' : '') + (s.subtype ? ' · ' + subtypeName(s.subtype) : '') : '', selected: S.selected && S.selected.id === s.id,
     }));
@@ -1165,6 +1177,7 @@
     $('labelled').value = String(S.labelled); $('labelled').querySelector('option[value="0"]').textContent = `all ${S.ds.train.length}`;
     if (S.backbone !== 'page' && !backbones().some(b => b.id === S.backbone)) S.backbone = defaultBackbone();
     $('backbone').value = S.backbone; $('finetune').value = String(S.ftRate);
+    renderShare();
     renderNoiseControls();
     $('threshold').value = S.test.threshold;
     $('prev').value = sliderFromPrev(S.test.prevalence);
@@ -1264,6 +1277,7 @@
     showRecipe(k); syncClassicLoad();
     renderDataTrays(); renderScatter(); renderInspector();
     showStage('train');
+    if (k === '1') note(`Recipe ${RECIPE_LABELS[1]}: a single layer on the ten parameters of the blood count, a weighted checklist. Train, test, then go to 1 · Specimens and slide the share of leukemia in the training set to 100%: trained on leukemias alone, the network calls every patient leukemia (test specificity 0%); at 10% it learns to say no and misses a third of them. A network learns the mix it was shown; the test set keeps its own.`);
     if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
     if (k === '10') note(`Recipe ${RECIPE_LABELS[10]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
     if (k === '13') note(`Recipe ${RECIPE_LABELS[13]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 7 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Then set “Encoder” to fine-tuned: the gradient runs on into the encoder, which memorises 10 labelled cases (training 100%, test down) and only pays with 40 or more. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
@@ -1292,6 +1306,14 @@
     $('peek').addEventListener('change', () => { S.peek = $('peek').checked; renderStatus(); if (onClassic('train')) renderCharts(); });
     $('labelled').addEventListener('change', () => { S.labelled = +$('labelled').value; resetModel(S.labelled ? `${S.labelled} labelled training cases: the other ${S.ds.train.length - S.labelled} stay in the tray without a label, and the network never sees them — fresh random weights.` : 'Every training case labelled again — fresh random weights.'); renderDataTrays(); });
     $('backbone').addEventListener('change', () => { S.backbone = $('backbone').value; resetModel(`The code now comes from ${codeEncoder().describe} — fresh random weights.`); });
+    for (const id of ['share', 'share-2']) {
+      $(id).addEventListener('input', () => { const v = +$(id).value; for (const o of ['share-val', 'share-2-val']) $(o).textContent = `${v}%`; });
+      $(id).addEventListener('change', () => {
+        const v = +$(id).value, c = DS.shareCounts(S.ds, v / 100); S.share = c.p === c.P && c.n === c.N ? null : v / 100; syncControls();
+        resetModel(S.share == null ? 'The training set as collected again — fresh random weights.' : `Training set collected with ${pct(S.share)} ${posName()}: ${c.p} ${posName()} and ${c.n} ${negName()}, the other ${c.P + c.N - c.p - c.n} left out — fresh random weights. A network learns the mix it is shown; the test set keeps its own.`);
+        renderDataTrays(); renderScatter(); renderInspector();
+      });
+    }
     $('finetune').addEventListener('change', () => { S.ftRate = +$('finetune').value; resetModel(S.ftRate ? `The encoder is unfrozen: the gradient of the ${S.h1 ? 'network' : 'single layer'} on the code runs on into the encoder’s ${codeEncoder().cl.parameterCount().toLocaleString()} weights, at ${S.ftRate === 1 ? 'the same' : 'a tenth of the'} learning rate — a fresh copy of the pretrained encoder, fresh random weights on top. Watch the training accuracy reach 100% whatever the labelled count, and the test accuracy follow only when there are labels enough.` : 'The encoder is frozen again: only the layer on its code trains — fresh random weights.'); });
     for (const id of ['source-train', 'source-train-2']) $(id).addEventListener('change', ev => setTrainSource(ev.target.value));
     for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
@@ -4744,7 +4766,7 @@
     const L = S.km; kmStop();
     if (!kmModes().includes(L.mode)) L.mode = 'features';
     if (L.mode === 'code') revealFoundation();
-    const inp = inputsFor(L.mode, false, new Set()); L.inp = inp; L.for = kmKey();
+    const inp = inputsFor(L.mode, false, new Set(), { share: null }); L.inp = inp; L.for = kmKey(); // the clusters take the training set as collected, whatever mix the classifier was given
     L.X = S.ds.train.map(s => Array.from(inp.xOf(s))); L.Xt = S.ds.test.map(s => Array.from(inp.xOf(s)));
     if (L.pcaKey !== L.for) { L.pca = NucleusCluster.pca2(L.X); L.pcaKey = L.for; }
     L.st = L.start === 'random' ? NucleusCluster.startRandom(L.X, L.k, L.seed) : NucleusCluster.start(L.X, L.k, L.seed); L.At = null; L.names = null; L.built = true;

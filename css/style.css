@@ -222,6 +222,8 @@ ul.prose li + li { margin-top: 4px; }
 .thumb.unknown { border-style: dashed; border-color: var(--line-strong); }
 .thumb.unlabelled { border-style: dashed; border-color: var(--line-strong); opacity: 0.4; }
 .thumb.unlabelled.selected { opacity: 0.8; }
+.thumb.uncollected { opacity: 0.18; border-style: dotted; filter: grayscale(1); }
+.thumb.uncollected.selected { opacity: 0.6; }
 .thumb.in-batch { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
 .thumb.selected { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
 .thumb.selected.in-batch { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink), 0 0 0 6px var(--accent); }

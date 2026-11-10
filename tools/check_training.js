@@ -12,7 +12,7 @@ const NF = require('../js/features.js');
 const DS = require('../js/dataset.js');
 
 const nSeeds = process.argv.includes('--seeds') ? +process.argv[process.argv.indexOf('--seeds') + 1] : 3;
-const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null; // 'labelled': just the labelled-cases table
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null; // 'labelled': just the labelled-cases table; 'mix': just the class-mix table
 const window = {};
 for (const f of ['leukemia/patients_data.js', 'atypia/nuclei_data.js', 'enlargement/nuclei_data.js', 'irregularity/nuclei_data.js', 'foundation/backbones.js']) new Function('window', fs.readFileSync(path.join(__dirname, '..', 'data', f), 'utf8'))(window);
 const tasks = {};
@@ -139,4 +139,26 @@ console.log(`\nHow many labelled cases? Irregularity, test accuracy at our lab, 
   }
 }
 }
-if (only === 'labelled') labelledTable(); else { everything(); labelledTable(); }
+// the class mix: recipe ① trained on training sets collected with a chosen share of leukemia (the first positives and
+// negatives of the training order that give it, as many cases as the set allows; the test set keeps its own 22 of 40)
+function runMix(r, seed, share) {
+  const ds = tasks[r.task].ds; DS.assignLabs(ds, 'ours', 'ours');
+  const inp = DS.buildInputs(ds, r.mode, { share });
+  const net = new Net({ inputSize: inp.inputSize, hidden: r.hidden, activation: 'relu', seed }), rnd = mulberry32(seed), idx = inp.trainX.map((_, i) => i);
+  for (let e = 1; e <= r.epochs; e++) {
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    for (let b = 0; b < idx.length; b += 8) { const bb = idx.slice(b, b + 8); net.trainBatch(bb.map(i => inp.trainX[i]), bb.map(i => inp.trainY[i]), r.lr, r.l2); }
+  }
+  const ps = ds.test.map(s => net.forward(inp.xOf(s)).p), ys = ds.test.map(s => s.label);
+  let tp = 0, tn = 0, P = 0, N = 0, sum = 0; ps.forEach((p, i) => { sum += p; if (ys[i]) { P++; if (p >= 0.5) tp++; } else { N++; if (p < 0.5) tn++; } });
+  return { acc: (tp + tn) / ys.length, sens: tp / P, spec: tn / N, meanP: sum / ys.length, n: inp.trainX.length };
+}
+function mixTable() {
+  const r = RECIPES[0], ds = tasks[r.task].ds;
+  console.log(`\nClass mix (recipe ${r.n}, mean of ${nSeeds} seeds): share of leukemia among the training cases · cases collected (leukemia + not) · test accuracy · sensitivity · specificity · mean P(leukemia) over the test set`);
+  for (const share of [0, 0.1, 0.25, null, 0.75, 0.9, 1]) {
+    const rs = Array.from({ length: nSeeds }, (_, i) => runMix(r, i + 1, share)), c = DS.shareCounts(ds, share);
+    console.log(`  ${(share == null ? 'as collected' : pc(share)).padEnd(13)} ${String(c.p + c.n).padStart(3)} (${c.p} + ${c.n})   accuracy ${pc(mean(rs, x => x.acc))}   sensitivity ${pc(mean(rs, x => x.sens))}   specificity ${pc(mean(rs, x => x.spec))}   mean P ${mean(rs, x => x.meanP).toFixed(2)}`);
+  }
+}
+if (only === 'labelled') labelledTable(); else if (only === 'mix') mixTable(); else { everything(); labelledTable(); mixTable(); }

@@ -198,7 +198,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 
 | Recipe | Parameters | Test accuracy | What it shows |
 |---|---|---|---|
-| ① Leukemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and hemoglobin, positive on basophils, immature granulocytes, WBC and blasts. |
+| ① Leukemia · blood count · single layer | 11 | ~90% | The whole network on one screen. A perceptron is a weighted checklist: negative on neutrophil fraction, platelets and hemoglobin, positive on basophils, immature granulocytes, WBC and blasts. Then the *Mix of the training set* card on the Specimens step: collected from leukemias alone, it calls every patient leukemia; at 10% leukemia it misses a third of them (see *Class mix*). |
 | ② Leukemia · blood count · 3 ReLU units | 37 | ~95% | Hidden units organise themselves: one becomes an acute-leukemia detector, one a CML detector, one a "looks healthy" detector with a negative weight; CLL is folded into a neighbour. Nobody told the network these types exist. |
 | ③ Leukemia · cluster the blood counts · no labels | k centres | subtype purity 60% at k = 4 and 89% at k = 7 on the training counts; named by each cluster’s majority class, 93% of the held-out counts at k = 4 | Unsupervised learning, before the next labelled recipe: k-means is told only how many groups to find, and its rounds are watched like a training run, the centres gliding and the cases changing sides until none does. With four, the counts fall into CML (basophils and immature granulocytes far from everything), the blast-rich acute leukemias, a neutrophil-high group of normal counts, infections and iron deficiency, and a lymphocytosis group of CLL, viral lymphocytosis and the acute leukemias presenting with a low count: the label cuts across the clusters. With seven, every kind of count comes out on its own except CLL and viral lymphocytosis, which the counts cannot part. The Test step names the clusters by hand and scores the naming on the held-out counts. |
 | ④ Atypia · measurements · single layer | 7 | ~95% | One approach to images: measure what a pathologist would name (area, darkness, chromatin texture, solidity, contour roughness) and let a single layer weigh the numbers. The checklist reads like a grading scheme: every trait measurement earns a weight, because each trait appears on its own in some nuclei, and elongation, the decoy, stays near zero. |
@@ -379,6 +379,36 @@ stopping early all soften it; the labels stay wrong.
 Mean of three seeds (`node tools/check_training.js`): test accuracy peaks at 97% (epochs 2 to 14) and ends at
 83% after 300 epochs; the test loss goes from 0.31 at its minimum to 0.48; training accuracy ends at 88%,
 above the 75% ceiling.
+
+## Class mix: a network learns the mix it was shown
+
+A model trained only on cases with the finding finds the finding in everything: the training set had no other answer
+in it. The *Mix of the training set* card on the Specimens step (and a *Class mix* slider in the Train step's Advanced
+settings) collects a different training set from the same cases: slide the share of the positive class away from the
+set's own and the cases that would spoil it are left out, in the training order, keeping as many as the set allows
+(72 leukemias and 88 other counts give 72 + 8 at 90%, 10 + 88 at 10%, 72 alone at 100%). The cases left out are dimmed
+and dotted in the trays, absent from the scatter, and the network never sees them; the standardiser is fitted on the
+cases collected, as it would be; the test set keeps its own mix throughout. Recipe ①, mean of five seeds
+(`node tools/check_training.js --only mix`), scored on the 40 test patients, 22 of them leukemia:
+
+| Share of leukemia in the training set | Cases collected | Test accuracy | Sensitivity | Specificity | Mean P(leukemia) |
+|---|---|---|---|---|---|
+| 0% | 88 | 48% | 5% | 100% | 0.06 |
+| 10% | 98 | 82% | 66% | 100% | 0.41 |
+| 25% | 117 | 89% | 80% | 100% | 0.45 |
+| 45%, as collected | 160 | 90% | 91% | 89% | 0.50 |
+| 75% | 96 | 93% | 95% | 89% | 0.54 |
+| 90% | 80 | 95% | 100% | 89% | 0.61 |
+| 100% | 72 | 55% | 100% | 0% | 0.96 |
+
+Trained on leukemias alone the single layer calls every test patient leukemia, with a mean probability of 0.96: its
+bias has learned that the answer is always yes, and nothing in the training set ever said otherwise. At 10% it learns
+the opposite habit and misses a third of the leukemias while keeping a perfect specificity, the same trade-off as
+moving the decision threshold, built into the weights by the data instead of chosen afterwards. The mild cases are the
+realistic ones: a registry that is mostly one class, a training set collected from a specialist clinic. The remedies
+are a mixed set, a loss that weighs the rare class up, or a threshold moved back afterwards, and in every case a test
+set with the mix of the population the model will meet; the prevalence slider on the Test step is where that mix
+turns sensitivity and specificity into predictive values.
 
 ## A foundation model, in miniature
 
