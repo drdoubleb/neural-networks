@@ -122,7 +122,18 @@
   //   labelled:  how many training cases carry a label (0 = all): the first labelled/2 of each class in the training
   //              order; the rest stay in the tray, the network never trains on them and the training scores skip them
   //              (their images still serve to standardise the inputs)
-  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off', labelNoise = 0, encoder = null, labelled = 0 } = {}) {
+  // the training set's class mix: asked for a share of the positive class, the first positives and negatives of the
+  // training order that give it, keeping as many cases as the set allows (null = the set as collected)
+  function shareCounts(ds, share) {
+    const P = ds.train.filter(s => s.label).length, N = ds.train.length - P;
+    if (share == null) return { p: P, n: N, P, N };
+    let p, n;
+    if (share >= 1) { p = P; n = 0; } else if (share <= 0) { p = 0; n = N; }
+    else if (share >= P / (P + N)) { p = P; n = Math.min(N, Math.round(P * (1 - share) / share)); }
+    else { n = N; p = Math.min(P, Math.round(N * share / (1 - share))); }
+    return { p, n, P, N };
+  }
+  function buildInputs(ds, mode, { augment = false, exclude = null, normalize = 'off', labelNoise = 0, encoder = null, labelled = 0, share = null } = {}) {
     const flipped = new Set();
     if (labelNoise > 0) {
       const rng = NN.mulberry32(48151 + Math.round(labelNoise * 1000));
@@ -135,11 +146,14 @@
     const inkFor = (s, lab) => { const v = variant(s, lab); if (normalize === 'off' || !ds.labStats || !v.levels) return v.ink; return normalizeInk(v.ink, normalize === 'lab' ? ds.labStats[lab] || ds.labStats.A : v.levels, ds.labStats.A); };
     const rawFor = (s, lab) => (mode === 'pixels' ? inkFor(s, lab) : mode === 'code' ? encoder.encode(inkFor(s, lab)) : columns.map(i => { const f = variant(s, lab).features; return ds.featureDefs[i].log ? Math.log(Math.max(f[i], 1e-3)) : f[i]; }));
     const rawOf = s => rawFor(s, s.lab || 'A');
+    // the cases collected for training: the set as it is, or the first positives and negatives that give the share asked for
+    const { p: nPos, n: nNeg } = shareCounts(ds, share); let ip = 0, ineg = 0;
+    const collectedSet = share == null ? ds.train : ds.train.filter(s => (s.label ? ip++ < nPos : ineg++ < nNeg));
     // the labelled training cases: all of them, or the first labelled/2 of each class
-    let trainSet = ds.train;
-    if (labelled > 0 && labelled < ds.train.length) {
-      const per = Math.ceil(labelled / 2), pos = new Set(ds.train.filter(s => s.label).slice(0, per).map(s => s.id)), neg = new Set(ds.train.filter(s => !s.label).slice(0, labelled - per).map(s => s.id));
-      trainSet = ds.train.filter(s => pos.has(s.id) || neg.has(s.id));
+    let trainSet = collectedSet;
+    if (labelled > 0 && labelled < collectedSet.length) {
+      const per = Math.ceil(labelled / 2), pos = new Set(collectedSet.filter(s => s.label).slice(0, per).map(s => s.id)), neg = new Set(collectedSet.filter(s => !s.label).slice(0, labelled - per).map(s => s.id));
+      trainSet = collectedSet.filter(s => pos.has(s.id) || neg.has(s.id));
     }
     const labelledIds = new Set(trainSet.map(s => s.id));
     let trainRows = trainSet.map(rawOf), trainLabels = trainSet.map(labelOf), trainOwner = trainSet.map(s => s.id);
@@ -150,13 +164,14 @@
     }
     // the standardiser sees every training image, labels or not, as one would use an unlabelled archive; with every
     // case labelled that is the training rows themselves (augmented views included)
-    const std = NN.fitStandardizer(trainSet === ds.train ? trainRows : ds.train.map(rawOf), { perDimScale: mode !== 'pixels' });
+    const archive = share == null ? ds.train : collectedSet, std = NN.fitStandardizer(trainSet === archive ? trainRows : archive.map(rawOf), { perDimScale: mode !== 'pixels' });
     const byId = new Map();
     for (const s of ds.specimens) byId.set(s.id, std.apply(rawOf(s)));
     return {
       mode, std, columns, normalize, labelNoise, flipped,
       labelOf,                                          // the label the network is given for a training case
       labelled: labelledIds, trainSet,                  // the training cases the network sees
+      collected: new Set(collectedSet.map(s => s.id)), share, shareActual: collectedSet.length ? collectedSet.filter(s => s.label).length / collectedSet.length : 0, // the class mix collected
       inkOf: s => (mode === 'features' ? null : inkFor(s, s.lab || 'A')), // the scan as the network (or the encoder) sees it
       inkFor: (s, lab) => (mode === 'features' ? null : inkFor(s, lab)), // the same, as scanned at a given lab (for an encoder that trains on)
       inputSize: trainRows[0].length,
@@ -168,5 +183,5 @@
     };
   }
 
-  return { prepare, assignLabs, buildInputs, dihedral, deviation, SOURCE_MODES, labUnder, stainLevels, normalizeInk };
+  return { prepare, assignLabs, buildInputs, shareCounts, dihedral, deviation, SOURCE_MODES, labUnder, stainLevels, normalizeInk };
 });

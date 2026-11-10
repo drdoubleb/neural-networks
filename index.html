@@ -56,6 +56,17 @@
         </details>
       </div>
 
+      <div class="card" id="mix-card">
+        <div class="card-head">
+          <h2>The mix of the training set</h2>
+          <span class="small muted">a network learns the mix it was shown · the test set keeps its own</span>
+        </div>
+        <div class="controls">
+          <div class="ctl wide"><label for="share">Share of <span data-cls="1"></span> among the training cases <span class="val" id="share-val"></span></label><input type="range" id="share" min="0" max="100" step="5" value="50" title="collect a different training set: as the share moves away from the set’s own, the cases that would spoil it are left out, dimmed in the tray"></div>
+        </div>
+        <p class="prose small" id="share-text" style="margin-top:10px"></p>
+      </div>
+
       <div class="card" id="sources-card">
         <div class="card-head">
           <h2>Where the cases come from</h2>
@@ -132,7 +143,7 @@
         <div class="status" id="status"></div>
         <div class="note" id="note"></div>
         <details class="advanced" id="advanced">
-          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, label noise, source lab, stain normalisation, inputs</span></summary>
+          <summary>Advanced settings <span class="muted small">second layer, activation, learning rate, batch, epochs, speed, seed, weight decay, augmentation, label noise, class mix, source lab, stain normalisation, inputs</span></summary>
           <div class="controls">
             <div class="ctl"><label for="hidden2">Hidden layer 2 <span class="val" id="hidden2-val">–</span></label><input type="range" id="hidden2" min="0" max="8" step="1" value="0"></div>
             <div class="ctl"><label for="activation">Activation</label>
@@ -148,6 +159,7 @@
             <div class="ctl check" id="augment-wrap"><input type="checkbox" id="augment"><label for="augment" class="plainlabel">Augment pixels with flips &amp; rotations (×8)</label></div>
             <div class="ctl check"><input type="checkbox" id="peek"><label for="peek" class="plainlabel">Peek at the test set while training</label></div>
             <div class="ctl"><label for="noise">Label noise <span class="val" id="noise-val">off</span></label><input type="range" id="noise" min="0" max="30" step="5" value="0" title="this share of the training cases carries the wrong label, as a second pathologist might have called them; the test labels stay true"></div>
+            <div class="ctl"><label for="share-2">Class mix <span class="val" id="share-2-val"></span></label><input type="range" id="share-2" min="0" max="100" step="5" value="50" title="the share of the positive class among the training cases, as on 1 · Specimens"></div>
             <div class="ctl" id="source-train-wrap"><label for="source-train-2">Training cases from</label><select id="source-train-2"></select></div>
             <div class="ctl" id="normalize-wrap"><label for="normalize">Stain normalisation</label>
               <select id="normalize"><option value="off">off: the pixels as scanned</option><option value="lab">per lab: each lab’s levels matched to ours</option><option value="image">per image: each scan by its own levels</option></select></div>
