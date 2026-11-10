@@ -15,6 +15,7 @@
     trainLab: 'ours', testLab: 'ours', normalize: 'off', showLab: false, // where each set's cases come from (our lab, the other lab, both), and whether the pixels are stain-normalised first
     labelNoise: 0, showFlipped: false, // the share of training cases given the wrong label, and whether they are marked
     labelled: 0, backbone: 'page', shipped: {}, // how many training cases carry a label (0 = all), and which foundation encoder feeds the code input ('page', or a shipped backbone's id)
+    ftRate: 0, ft: null, // the code input with the encoder unfrozen: its learning rate as a fraction of the head's (0 = frozen), and the copy of the encoder that trains on (see ftSetup)
     foundationShown: false, // the code input and the labelled-cases control of the nucleus questions appear once the foundation question, a slides question or recipe 12/13 introduces them, and stay for the session
     // the Slides questions: attention over slides of nuclei with one label each
     sl: { built: false, model: null, question: 'atypia', context: false, hoverAtt: null, trial: { next: 0, results: new Map() }, dataSelected: null, testSelected: null, trayFor: {}, attention: true, units: 4, lr: 0.02, epochs: 60, speed: 2, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastSlide: null, selected: null, hoverNucleus: null, hoverScorer: null, hoverHead: null, hoverUnrolled: null, walk: null, walkNucleus: null, reveal: false, encKey: null, pinned: null, attView: 'both', linksAll: false, linksMin: 0.1, hoverDecide: null, dwalk: null },
@@ -42,7 +43,7 @@
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
   const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default']; // the number first, in plain digits, so that it reads in the dropdown
-  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
+  const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, ftRate: 0, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
     2: { task: 'leukemia',    mode: 'features', h1: 3, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 150, augment: false, l2: 0,    peek: false, speed: 10 },
@@ -186,6 +187,28 @@
   // the label a training case carries (wrong for the mislabelled ones when label noise is on), and whether it is wrong
   const trainLabel = s => (s.split === 'train' && S.inputs && S.inputs.labelOf ? S.inputs.labelOf(s) : s.label);
   const isFlipped = s => !!(S.inputs && S.inputs.flipped && S.inputs.flipped.has(s.id));
+  // ---- fine-tuning: the code input with the encoder unfrozen. S.ft holds a copy of the pretrained encoder that the head's
+  // gradient runs on into (the Foundation question's encoder and the shipped ones stay as they are); the code's
+  // standardiser stays as fitted on the frozen codes, so the fine-tuned code is read on the same scale. Null when the
+  // encoder is frozen, and for every other input.
+  function ftSetup() { if (S.mode !== 'code' || !(S.ftRate > 0)) { S.ft = null; return; } const enc = codeEncoder(); S.ft = { cl: enc.cl.clone(), encStd: enc.std, inputs: new Map(), codes: new Map() }; }
+  function ftEncInput(s, lab) { const F = S.ft, k = `${s.id}|${lab}`; if (!F.inputs.has(k)) F.inputs.set(k, F.encStd.apply(S.inputs.inkFor(s, lab))); return F.inputs.get(k); }
+  function ftCode(s, lab) { const F = S.ft, k = `${s.id}|${lab}`, c = F.codes.get(k); if (c && c.steps === F.cl.enc.steps) return c; const raw = F.cl.encode(ftEncInput(s, lab)), o = { steps: F.cl.enc.steps, raw, x: S.inputs.std.apply(raw) }; F.codes.set(k, o); return o; }
+  // the input the network is given for a case: the live code while the encoder fine-tunes, else as built
+  const liveX = s => (S.ft ? ftCode(s, s.lab || 'A').x : S.inputs.xOf(s));
+  const liveXFor = (s, lab) => (S.ft ? ftCode(s, lab).x : S.inputs.xFor(s, lab));
+  const liveRaw = s => (S.ft ? ftCode(s, s.lab || 'A').raw : S.inputs.rawOf(s));
+  // one gradient step with the encoder unfrozen: the head's gradient at its input, divided by the code standardiser's
+  // scale, is the loss's gradient at the code, and runs on through the encoder's layer and convolution
+  function ftTrainBatch(idx) {
+    const F = S.ft, enc = F.cl.enc, gC = S.net.newGradient(), gE = enc.newGradient(), scale = S.inputs.std.scale, set = S.inputs.trainSet, Y = S.inputs.trainY;
+    for (const i of idx) {
+      const sp = set[i], xi = ftEncInput(sp, sp.lab || 'A'), fwE = enc.forward(xi), x = S.inputs.std.apply(fwE.a[1]), fwC = S.net.forward(x);
+      const dIn = S.net.backDense(fwC, fwC.p - Y[i], gC), dCode = new Float64Array(dIn.length); for (let d = 0; d < dIn.length; d++) dCode[d] = dIn[d] / scale[d];
+      const d0 = enc.backHidden(fwE, dCode, gE); if (enc.conv) enc.convAccumulate(xi, fwE, d0, gE);
+    }
+    S.net.applyGradient(gC, idx.length, S.lr, S.l2); enc.applyGradient(gE, idx.length, S.lr * S.ftRate, S.l2);
+  }
   const labelWord = s => (S.labelNoise > 0 && s.split === 'train' ? 'label' : 'truth');
   // ---- the two labs: which scans each set uses, and the pixels' stain normalisation
   function applySources() { DS.assignLabs(S.ds, S.trainLab, S.testLab); repaintThumbs(); }
@@ -239,7 +262,7 @@
   }
   function resetModel(reason) {
     stopTraining();
-    S.inputs = inputsFor(S.mode, S.augment, S.excluded);
+    S.inputs = inputsFor(S.mode, S.augment, S.excluded); ftSetup();
     const conv = S.kind === 'image' && S.mode === 'pixels' && S.convK > 0 ? { K: S.convK, f: 5, pool: 4 } : null;
     const hidden = S.h1 > 0 ? (S.h2 > 0 ? [S.h1, S.h2] : [S.h1]) : [];
     S.net = new NN.Net({ inputSize: S.inputs.inputSize, imageSize: S.size, conv, hidden, activation: S.activation, seed: S.seed });
@@ -260,12 +283,12 @@
   }
   function evaluateAll() {
     const tr = S.ds.train, te = S.ds.test, lab = S.inputs.labelled;
-    S.trainEval = S.net.evaluate(tr.map(s => S.inputs.xOf(s)), tr.map(trainLabel), 0.5, true); // against the labels the network was given
+    S.trainEval = S.net.evaluate(tr.map(s => liveX(s)), tr.map(trainLabel), 0.5, true); // against the labels the network was given
     if (lab.size < tr.length) { // the training scores count only the cases the network sees; the rest still get a call, for the tray
-      const sub = tr.filter(s => lab.has(s.id)), ev = S.net.evaluate(sub.map(s => S.inputs.xOf(s)), sub.map(trainLabel));
+      const sub = tr.filter(s => lab.has(s.id)), ev = S.net.evaluate(sub.map(s => liveX(s)), sub.map(trainLabel));
       S.trainEval.accuracy = ev.accuracy; S.trainEval.loss = ev.loss;
     }
-    S.testEval = S.net.evaluate(te.map(s => S.inputs.xOf(s)), te.map(s => s.label));
+    S.testEval = S.net.evaluate(te.map(s => liveX(s)), te.map(s => s.label));
   }
   function recordEpoch() {
     evaluateAll();
@@ -278,7 +301,7 @@
     const end = Math.min(n, S.ptr + S.batch);
     const idx = S.order.slice(S.ptr, end);
     S.prevW = { W: S.net.W.map(w => Float64Array.from(w)), Wo: Float64Array.from(S.net.Wo) };
-    S.net.trainBatch(idx.map(i => X[i]), idx.map(i => Y[i]), S.lr, S.l2);
+    if (S.ft) ftTrainBatch(idx); else S.net.trainBatch(idx.map(i => X[i]), idx.map(i => Y[i]), S.lr, S.l2);
     S.lastBatch = new Set(idx.map(i => S.inputs.trainOwner[i]));
     S.ptr = end >= n ? 0 : end;
     let ended = false;
@@ -377,7 +400,7 @@
     ph.push(['gradient', LESSON_MS.gradient + (conv ? LESSON_MS.convGradient : 0)], ['update', LESSON_MS.update], ['check', S.mode === 'pixels' ? Math.round(replay.total / 3) : replay.total]); // the check replays a pixel sweep at triple speed, the subtraction already done
     return ph;
   }
-  function canTeach() { return !!(S.net && !S.running && !S.lesson); }
+  function canTeach() { return !!(S.net && !S.running && !S.lesson && !S.ft); } // no lessons while the encoder fine-tunes: a lesson shows the head's step alone
   // the case the next lesson will use: a training case the user picked, else the one after the last lesson
   function nextLessonCase() {
     const tr = S.ds.train, lab = S.inputs.labelled;
@@ -389,7 +412,7 @@
     const b = $('btn-teach'); if (!b || !S.net) return;
     b.disabled = !canTeach() && !S.lesson;
     b.textContent = S.lesson ? 'Skip ▸' : 'Teach next case';
-    b.title = `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
+    b.title = S.ft ? 'Lessons show the layer on the code alone; set the encoder to frozen to teach case by case' : `Teach ${nextLessonCase().name} one step: forward pass, loss, backward pass, gradients, update, check (T)`;
   }
   function teachNext() {
     if (S.lesson) { S.lesson.player.skip(); return; }
@@ -412,10 +435,10 @@
     return p;
   }
   function startLesson(s) {
-    if (!s || s.split !== 'train' || !S.net || !S.inputs.labelled.has(s.id)) return;
+    if (!s || s.split !== 'train' || !S.net || S.ft || !S.inputs.labelled.has(s.id)) return;
     stopTraining();
     if (S.selected !== s) selectSpecimen(s);
-    const x = S.inputs.xOf(s), y = trainLabel(s); // the network learns the label it is given, right or wrong
+    const x = liveX(s), y = trainLabel(s); // the network learns the label it is given, right or wrong
     const res = S.net.lesson(x, y);
     const hops = S.net.conv ? Viz.convPlan(S.net, true).hops : Viz.sweepPlan(S.net, S.mode).hops;
     S.lastLesson = null;
@@ -559,7 +582,7 @@
     if (S.test.animating) { if (S.test.player) S.test.player.skip(); return false; }
     if (S.test.next >= S.ds.test.length) return false;
     const s = S.ds.test[S.test.next++];
-    const fw = S.net.forward(S.inputs.xOf(s));
+    const fw = S.net.forward(liveX(s));
     S.test.results.set(s.id, { p: fw.p });
     $('test-note').textContent = '';
     selectSpecimen(s, { silent: true });
@@ -693,7 +716,7 @@
     const nTrain = S.inputs.trainSet.length, sub = nTrain < S.ds.train.length, flippedSeen = [...S.inputs.flipped].filter(id => S.inputs.labelled.has(id)).length;
     $('status').innerHTML =
       `<span>architecture <b>${inputDesc} → ${S.net.describe()} → output</b></span>` +
-      `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b></span>` +
+      `<span>parameters <b>${S.net.parameterCount().toLocaleString()}</b>${S.ft ? ` + <b>${S.ft.cl.parameterCount().toLocaleString()}</b> in the encoder, fine-tuning at ${S.ftRate === 1 ? 'the same' : `${S.ftRate} × the`} learning rate` : ''}</span>` +
       `<span>training cases <b>${nTrain}</b>${sub ? ` labelled of ${S.ds.train.length}` : ''}${S.augment && S.mode === 'pixels' ? ` (× 8 orientations = ${S.inputs.trainX.length})` : ''}${S.ds.sources.train !== 'ours' ? ` · from ${esc(SOURCE_LABELS()[S.ds.sources.train])}` : ''}${S.normalize !== 'off' && S.mode !== 'features' ? ' · stain normalised' : ''}${S.labelNoise > 0 ? ` · <b>${flippedSeen}</b> mislabelled` : ''}</span>` +
       `<span>epoch <b>${S.epoch}</b> / ${S.epochs}</span>` +
       `<span>batch <b>${S.ptr === 0 ? '–' : bi}</b> / ${bpe}</span>` +
@@ -705,12 +728,12 @@
     const s = spec || null;
     let x = null, fw = null;
     if (s) {
-      x = S.inputs.xOf(s);
+      x = liveX(s);
       const allowed = isClassified(s) || s.split === 'train';
       fw = S.net.forward(x);
       if (!allowed) { fw = null; stage = 0; }
     }
-    return { net: S.net, mode: S.mode === 'code' ? 'features' : S.mode, inputCaption: S.mode === 'code' ? `INPUT · THE CODE · ${S.inputs.inputSize} NUMBERS` : null, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
+    return { net: S.net, mode: S.mode === 'code' ? 'features' : S.mode, inputCaption: S.mode === 'code' ? `INPUT · THE CODE · ${S.inputs.inputSize} NUMBERS${S.ft ? ' · THE ENCODER FINE-TUNING' : ''}` : null, x, fw, prev: S.prevW, featureNames: S.inputs.featureNames || [], specimen: s, size: S.size, tint: S.tint, stage, hover,
       inputMean: S.mode === 'pixels' && S.inputs.std ? S.inputs.std.mean : null,
       inputPx: s && S.mode === 'pixels' && S.inputs.normalize !== 'off' ? inkToPx(S.inputs.rawOf(s)) : null, // the scan after the stain normalisation
       activation: S.activation, activationLabel: NN.ACTIVATIONS[S.activation].label, positiveName: posName(), negativeName: negName() };
@@ -743,7 +766,7 @@
   function animateDenseClassify(s) {
     const plan = Viz.sweepPlan(S.net, S.mode), hops = plan.hops;
     const T = [['forward', plan.total], ['call', 900], ['reveal', 900]];
-    const x = S.inputs.xOf(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
+    const x = liveX(s), p = S.net.forward(x).p, called = p >= S.test.threshold ? 1 : 0;
     let shown = false;
     const P = makePlayer(T, null); S.test.player = P;
     const finish = () => { S.test.player = null; S.test.revealed.add(s.id); S.test.animating = false; renderTestPanel(); renderInspector(); renderTestGraph(); renderTestLine(s, p, called, 'done'); };
@@ -969,7 +992,7 @@
     document.querySelector('.views').hidden = tabular;
     document.querySelectorAll('.views button').forEach(b => b.classList.toggle('is-active', b.dataset.view === S.view));
     const m = s.measurement;
-    const x = S.inputs.xOf(s);
+    const x = liveX(s);
     const classified = isClassified(s) && (s.split === 'train' || S.test.revealed.has(s.id));
     const untrainedHere = onClassic('data') && S.net.steps === 0;
     const fw = classified && !untrainedHere ? S.net.forward(x) : null;
@@ -985,13 +1008,13 @@
         for (let i = 0; i < g.length; i++) sal[i] = g[i] * x[i];
         Viz.renderEvidence(cv, s.px, s.size, sal, S.tint);
         caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()} (${!S.net.conv && S.net.hidden.length === 0 ? 'weight × input at each pixel' : 'gradient × input at each pixel: the network linearised at this nucleus'}).`;
-      } else if (S.mode === 'code') { // the classifier's evidence on the code, carried back through the frozen encoder to the pixels
-        const enc = codeEncoder(), gCode = S.net.inputGradient(x, fw), dRaw = new Float64Array(gCode.length);
+      } else if (S.mode === 'code') { // the classifier's evidence on the code, carried back through the encoder (frozen, or as fine-tuned so far) to the pixels
+        const enc = S.ft ? { cl: S.ft.cl, std: S.ft.encStd } : codeEncoder(), gCode = S.net.inputGradient(x, fw), dRaw = new Float64Array(gCode.length);
         for (let i = 0; i < gCode.length; i++) dRaw[i] = gCode[i] / S.inputs.std.scale[i];
         const xEnc = enc.std.apply(S.inputs.inkOf(s)), gPix = enc.cl.inputGradient(xEnc, dRaw), sal = new Float64Array(gPix.length);
         for (let i = 0; i < gPix.length; i++) sal[i] = gPix[i] * xEnc[i];
         Viz.renderEvidence(cv, s.px, s.size, sal, S.tint);
-        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()}: the evidence on the code, carried back through the frozen encoder to the pixels (a linear approximation).`;
+        caption = `Orange pixels push the score toward ${posName()}, blue toward ${negName()}: the evidence on the code, carried back through the ${S.ft ? 'fine-tuned' : 'frozen'} encoder to the pixels (a linear approximation).`;
       } else { Viz.renderMeasurement(cv, s.px, s.size, m, S.tint); caption = 'In measurement mode the evidence is per measurement — see the “push” column below.'; }
     }
     $('spec-caption').textContent = caption;
@@ -1059,7 +1082,7 @@
   // the code the encoder gives this case: its numbers, standardized, and each one's push on the score
   function renderCodeCard(s, x, fw) {
     const card = $('code-card'); card.hidden = S.mode !== 'code'; if (card.hidden) return;
-    const raw = S.inputs.rawOf(s), g = fw ? S.net.inputGradient(x, fw) : null;
+    const raw = liveRaw(s), g = fw ? S.net.inputGradient(x, fw) : null;
     let maxPush = 1e-9; if (g) for (let i = 0; i < g.length; i++) maxPush = Math.max(maxPush, Math.abs(g[i] * x[i]));
     $('code-table').innerHTML = Array.from(raw, (v, i) => {
       const push = g ? g[i] * x[i] : null, w = push == null ? 0 : Math.min(50, Math.abs(push) / maxPush * 50);
@@ -1078,7 +1101,7 @@
       el.classList.toggle('current', s.lab === lab);
       const p = el.querySelector('.p');
       if (!fw) { p.textContent = ''; p.className = 'p'; continue; }
-      const q = S.net.forward(S.inputs.xFor(s, lab)).p, call = q >= thr ? 1 : 0;
+      const q = S.net.forward(liveXFor(s, lab)).p, call = q >= thr ? 1 : 0;
       p.textContent = `P ${q.toFixed(2)} · ${className(call)}`; p.className = `p ${classOf(call)}`;
     }
     $('lab-note').textContent = fw
@@ -1116,7 +1139,7 @@
     $('conv-wrap').hidden = !pixels;
     $('augment-wrap').hidden = !pixels;
     $('picker-wrap').hidden = pixels || code;
-    $('code-wrap').hidden = !code;
+    $('code-wrap').hidden = !code; $('finetune-wrap').hidden = !code;
     $('mode-code').hidden = !S.foundationShown; $('labelled-wrap').hidden = !S.foundationShown;
     $('tint-wrap').hidden = tabular;
     $('prevalence-card').hidden = !tabular;
@@ -1141,7 +1164,7 @@
     $('peek').checked = S.peek;
     $('labelled').value = String(S.labelled); $('labelled').querySelector('option[value="0"]').textContent = `all ${S.ds.train.length}`;
     if (S.backbone !== 'page' && !backbones().some(b => b.id === S.backbone)) S.backbone = defaultBackbone();
-    $('backbone').value = S.backbone;
+    $('backbone').value = S.backbone; $('finetune').value = String(S.ftRate);
     renderNoiseControls();
     $('threshold').value = S.test.threshold;
     $('prev').value = sliderFromPrev(S.test.prevalence);
@@ -1243,7 +1266,7 @@
     showStage('train');
     if (k === '9') note(`Recipe ${RECIPE_LABELS[9]}: after training, go to 3 · Test, classify all, then switch “Test cases from” to the other lab and classify again: this network falls to chance on the paler scans. Stain normalisation per lab (Advanced settings) repairs it after retraining.`);
     if (k === '10') note(`Recipe ${RECIPE_LABELS[10]}: every irregular training nucleus was scanned at the other lab. Train, test on the matching test set, then switch the test cases to our lab. Watch the first-layer weight maps: they turn into plain interior templates instead of contour detectors, and the Evidence view weighs the inside of the nucleus.`);
-    if (k === '13') note(`Recipe ${RECIPE_LABELS[13]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 7 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
+    if (k === '13') note(`Recipe ${RECIPE_LABELS[13]}: the network sees 10 labelled nuclei only, each as ${S.inputs.inputSize} numbers from ${codeEncoder().describe}. Train, then compare: set “Labelled cases” to 10 on recipe 7 (pixels), or switch this input to measurements with the same 10 cases; with 40 labelled cases the code pulls further ahead. Then set “Encoder” to fine-tuned: the gradient runs on into the encoder, which memorises 10 labelled cases (training 100%, test down) and only pays with 40 or more. Before training, seed 8 starts near chance; roll the dice and the untrained network can start anywhere from 20% to 85%, because every code number already carries information and a random weighting of them is already a classifier, right or wrong.`);
     if (k === '5') note(`Recipe ${RECIPE_LABELS[5]}: ${S.inputs.flipped.size} of the ${S.ds.train.length} training labels are wrong. Train with the test set peeking: the test curve peaks early and then falls while training accuracy climbs past the honest ceiling, as the network memorises the mislabelled cases. Tick “Mark the mislabelled cases” to watch it happen.`);
   }
   function bindControls() {
@@ -1269,6 +1292,7 @@
     $('peek').addEventListener('change', () => { S.peek = $('peek').checked; renderStatus(); if (onClassic('train')) renderCharts(); });
     $('labelled').addEventListener('change', () => { S.labelled = +$('labelled').value; resetModel(S.labelled ? `${S.labelled} labelled training cases: the other ${S.ds.train.length - S.labelled} stay in the tray without a label, and the network never sees them — fresh random weights.` : 'Every training case labelled again — fresh random weights.'); renderDataTrays(); });
     $('backbone').addEventListener('change', () => { S.backbone = $('backbone').value; resetModel(`The code now comes from ${codeEncoder().describe} — fresh random weights.`); });
+    $('finetune').addEventListener('change', () => { S.ftRate = +$('finetune').value; resetModel(S.ftRate ? `The encoder is unfrozen: the gradient of the ${S.h1 ? 'network' : 'single layer'} on the code runs on into the encoder’s ${codeEncoder().cl.parameterCount().toLocaleString()} weights, at ${S.ftRate === 1 ? 'the same' : 'a tenth of the'} learning rate — a fresh copy of the pretrained encoder, fresh random weights on top. Watch the training accuracy reach 100% whatever the labelled count, and the test accuracy follow only when there are labels enough.` : 'The encoder is frozen again: only the layer on its code trains — fresh random weights.'); });
     for (const id of ['source-train', 'source-train-2']) $(id).addEventListener('change', ev => setTrainSource(ev.target.value));
     for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
     $('normalize').addEventListener('change', () => { S.normalize = $('normalize').value; syncControls(); resetModel(S.normalize === 'off' ? 'Stain normalisation off — fresh random weights.' : `Stain normalisation ${S.normalize === 'lab' ? 'per lab' : 'per image'} — fresh random weights.`); });
@@ -4382,6 +4406,7 @@
     const sh = classicShipped(); if (!sh) { note('Pick a recipe from the masthead first: the trained models ship one per recipe.'); return; }
     stopTraining(); const e = sh.entry, net = NN.Net.fromJSON(e.model);
     if (net.D !== S.inputs.inputSize) { note('The settings on screen no longer match the recipe; pick it again from the masthead, then load.'); return; }
+    if (S.ft) { S.ftRate = 0; S.ft = null; syncControls(); } // the shipped model trained on the frozen code
     S.net = net; S.epoch = e.epochs; S.epochs = Math.max(S.epochs, e.epochs); S.ptr = 0; S.debt = 0; S.history = e.hist.map(h => Object.assign({}, h)); S.lastBatch = new Set(); S.prevW = null;
     S.lesson = null; S.lastLesson = null; S.lessonCursor = 0; renderLessonLine();
     clearTestResults(false); evaluateAll(); renderTraining(true); showRecipe(sh.k); syncClassicLoad();

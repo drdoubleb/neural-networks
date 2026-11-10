@@ -158,6 +158,7 @@
       labelOf,                                          // the label the network is given for a training case
       labelled: labelledIds, trainSet,                  // the training cases the network sees
       inkOf: s => (mode === 'features' ? null : inkFor(s, s.lab || 'A')), // the scan as the network (or the encoder) sees it
+      inkFor: (s, lab) => (mode === 'features' ? null : inkFor(s, lab)), // the same, as scanned at a given lab (for an encoder that trains on)
       inputSize: trainRows[0].length,
       trainX: trainRows.map(r => std.apply(r)), trainY: trainLabels, trainOwner,
       xOf: s => byId.get(s.id),

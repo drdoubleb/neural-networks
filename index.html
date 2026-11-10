@@ -113,6 +113,8 @@
             </div>
           </div>
           <div class="ctl" id="code-wrap" hidden><label for="backbone">Code from</label><select id="backbone"></select></div>
+          <div class="ctl" id="finetune-wrap" hidden><label for="finetune">Encoder</label>
+            <select id="finetune" title="frozen: the pretrained encoder stays as it is and only the layer on its code trains; fine-tuned: the gradient runs on into the encoder, at a tenth of the learning rate or at the same rate, from a fresh copy of the pretrained encoder"><option value="0">frozen</option><option value="0.1">fine-tuned · lr ÷ 10</option><option value="1">fine-tuned · same lr</option></select></div>
           <div class="ctl slim" id="labelled-wrap" hidden><label for="labelled">Labelled cases</label>
             <select id="labelled" title="how many training cases carry a label; the rest stay in the tray but the network never sees them"><option value="4">4</option><option value="10">10</option><option value="20">20</option><option value="40">40</option><option value="0" selected>all 80</option></select></div>
           <div class="ctl" id="conv-wrap"><label for="conv">Convolution</label>
