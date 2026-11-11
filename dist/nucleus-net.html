@@ -371,13 +371,15 @@ ul.prose li + li { margin-top: 4px; }
 .pbar-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); font-family: var(--font-mono); }
 .evidence-sum { font-family: var(--font-mono); font-size: 12px; color: var(--ink-2); margin-top: 6px; line-height: 1.6; }
 
+#feat-card { overflow-x: auto; } /* the blood count's table is wide for the inspector; it fits, and a scrollbar is the fallback, never a spill over the card's edge */
 table.feat { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.feat th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 4px; border-bottom: 1px solid var(--line); }
-table.feat td { padding: 5px 4px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.feat th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 3px; border-bottom: 1px solid var(--line); }
+table.feat td { padding: 5px 3px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 table.feat tr:last-child td { border-bottom: 0; }
 table.feat td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+table.feat td.name .unit { font-size: 11px; white-space: nowrap; } /* the blood count's unit sits by the parameter's name, where the column has room, so the value column stays a number */
 table.feat td.name { cursor: help; }
-table.feat .bar { position: relative; height: 12px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+table.feat .bar { position: relative; height: 12px; min-width: 40px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
 table.feat .bar i { position: absolute; top: 0; bottom: 0; }
 table.feat .bar i.pos { background: var(--irregular); left: 50%; }
 table.feat .bar i.neg { background: var(--regular); right: 50%; }
@@ -2523,7 +2525,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
       </table>
       <p class="small muted" id="code-note" style="margin-top:8px"></p>
     </div>
-    <div class="card">
+    <div class="card" id="feat-card">
       <h3 id="feat-card-title">Measurements</h3>
       <table class="feat">
         <thead><tr id="feat-head"></tr></thead>
@@ -9150,7 +9152,7 @@ window.Glossary = (function () {
     zInputs.columns.forEach((fi, ci) => { zByFeature[fi] = zx[ci]; });
     $('feat-card-title').textContent = tabular ? 'Blood count' : 'Measurements';
     $('feat-head').innerHTML = tabular
-      ? `<th>parameter</th><th style="text-align:right">value</th><th class="ref">reference</th><th>flag</th><th style="text-align:right" title="standardized: training-set standard deviations from the training-set mean (log scale for counts)">z</th>${featMode ? '<th>push</th>' : ''}`
+      ? `<th>parameter</th><th style="text-align:right">value</th><th class="ref" title="reference range">ref.</th><th>flag</th><th style="text-align:right" title="standardized: training-set standard deviations from the training-set mean (log scale for counts)">z</th>${featMode ? '<th>push</th>' : ''}`
       : `<th>measurement</th><th style="text-align:right">value</th><th style="text-align:right" title="standardized: how many training-set standard deviations from the training-set mean">z</th>${featMode ? '<th>push</th>' : ''}`;
     $('feat-table').innerHTML = S.featureDefs.map((f, i) => {
       const val = s.features[i];
@@ -9162,7 +9164,7 @@ window.Glossary = (function () {
       const zTxt = z == null ? '' : Viz.fmtSigned(z, 1);
       if (tabular) {
         const flag = f.high === f.low ? (val > f.high ? 'H' : '') : (val > f.high ? 'H' : val < f.low ? 'L' : '');
-        return `<tr class="${off ? 'off' : ''}"><td class="name" title="${esc(f.desc)}">${esc(f.name)}</td><td class="n">${f.fmt(val)} <span class="muted">${esc(f.unit)}</span></td><td class="ref">${f.low === f.high ? f.low : `${f.low}–${f.high}`}</td><td class="flag ${flag}">${flag}</td><td class="n">${zTxt}</td>${bar}</tr>`;
+        return `<tr class="${off ? 'off' : ''}"><td class="name" title="${esc(f.desc)}">${esc(f.name)} <span class="muted unit">${esc(f.unit)}</span></td><td class="n">${f.fmt(val)}</td><td class="ref">${f.low === f.high ? f.low : `${f.low}–${f.high}`}</td><td class="flag ${flag}">${flag}</td><td class="n">${zTxt}</td>${bar}</tr>`;
       }
       return `<tr class="${off ? 'off' : ''}"><td class="name" title="${esc(f.desc)}">${esc(f.name)}</td><td class="n">${f.fmt(val)}${f.unit ? ' ' + f.unit : ''}</td><td class="n">${zTxt}</td>${bar}</tr>`;
     }).join('');
