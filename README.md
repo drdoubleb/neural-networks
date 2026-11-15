@@ -1547,7 +1547,11 @@ the recipe uses seed 2. Microsatellites
 fall to 1.50, the TATA box and the introns move little (the box is six bases five times in the held-out quarter, and
 the introns' AT-rich body has a floor of 1.88), and the repeat family stays at 1.96 after 30 epochs: 42 copies of an
 80-base element are not enough for a model this size to memorise it in that time, where the human genome's repeat
-families are a million copies deep and the large models know them by heart. {{LONG_LEARNS}}
+families are a million copies deep and the large models know them by heart. Training on to 120 epochs, which is what the shipped model is, changes little of this: the held-out loss ends at 1.83
+bits per base, the exons at 1.54 (they touch 1.50 at epoch 60 and settle there, a quarter of a bit above the floor),
+the islands at 1.80, the microsatellites at 1.48, the open sequence at 1.97, and the repeat family at 1.92. What the
+model has not learned by epoch 30 it does not learn by 120 at this size, and that plateau is itself the lesson about
+scale.
 
 The variants are scored as the real models score them, the log-probability of the sequence with the change minus
 the log-probability without it, over the variant and the 32 bases after it, with nothing ever said about genes. After
@@ -1571,7 +1575,16 @@ trained model, 68% on the untrained one. A CpG island: 100% and 98%, because the
 carry the base composition, which is all an island is. The repeat: 91% and 94%; an intron: 66% and 74%. What the
 pretraining added is what it learned: the frame of the code.
 
-{{LONG_SHIPPED}}
+The shipped model is that run carried to 120 epochs (`node tools/check_dna.js --epochs 120 --lr 0.01 --window 64
+--stride 32 --seed 2 --curve --save data/dna/dna_weights.js`; 175 kB, fetched on demand when the *Load the trained
+model* button is pressed), with the curves of its training and the sequence it wrote after every epoch. Its variant
+table reads synonymous +0.22, open sequence −0.42, missense −0.64, TATA box −0.94, splice site −1.57 and frameshift
+−15 bits, and a harmful kind scores below a neutral one 84% of the time: the measure climbs from 77% at epoch 30 to
+90% at epoch 60 and then settles between 84 and 88%. Its probe answers *an exon?* 98% right (the untrained model 68%),
+*a CpG island?* 100% (98%), *the repeat?* 81% (94%) and *an intron?* 74% (74%). The honest limits are the last note of
+the Test step. This model saw 33,000 bases with a context of 64; Evo 2 saw nine trillion with a context of a million,
+and the human genome's repeat families are a million copies deep, not 42. What carries over is the shape of the thing:
+a token, a teacher that is the next base, and measures that ask the trained model questions it was never trained for.
 
 ## The trained models that ship
 
@@ -1580,7 +1593,7 @@ training: the model that the recipe trains, with the curves of its training, com
 step works from it. The language models, the segmentation network and the two end-to-end field models ship from their Node trainers
 (above); the two text models' files (3.1 MB for *Mountain Interval*, most of it two tables of 2,541 rows, and about
 8 MB for the five books) are not loaded with the page but fetched when the button is pressed, each for its own text;
-a pasted text has none. The DNA model's file ({{WEIGHTS_KB}} kB, with its curves and a sequence written after every
+a pasted text has none. The DNA model's file (175 kB, with its curves and a sequence written after every
 epoch) is fetched the same way. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
 recipe (1, 2, 4 to 11 and 13), the Foundation stage, both slide questions with and without the context layer and with
 attention pooling or a plain average, and the field model with and without positions and the context layers, presses
