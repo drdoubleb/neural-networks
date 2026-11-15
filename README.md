@@ -222,6 +222,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ㉒ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ㉓ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
 | ㉔ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30; the five books' own model after 7 epochs: held-out loss lowest at epoch 3 (5.18), 5.45 at epoch 7, 18% of the held-out next words right against 30% of the training ones | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
+| ㉕ DNA · a genome of our own · the next-base model on a chromosome drawn by a script | 11,019 | held-out loss 1.85 bits per base after 30 epochs (2 is a coin toss over four): the exons at 1.53 once the frame of the code is found at epoch 12, the CpG islands 1.78, the microsatellites 1.50, the open sequence 1.99 at its floor; a frameshift scores −17 bits, a synonymous change 0; a harmful variant below a neutral one 77% of the time | The DNA foundation model in miniature: the same next-token model, the four bases as tokens, the next base the only teacher, on a genome whose every base carries a truth the model never sees. The loss by kind of base shows what is learnable (composition at once, the frame of the code in a sudden step, a repeat family not in this time), the variant table shows the zero-shot use and its limits (the frameshift is a catastrophe, the synonymous change nothing, the splice site beyond a model that has seen 55 introns), and the probe shows the few-labels use. See *DNA* below. |
 
 The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
@@ -1494,6 +1495,83 @@ trains on another text written the way `tools/generate_text.js` writes them; the
 `node tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --epochs 7 --curve --save
 data/text/text_weights_all.js --global-out TEXT_LM_ALL` (add `--keep-best --patience 4` for the early-stopped model).
 
+## DNA: the same model on a genome of our own
+
+The DNA foundation models (DNABERT, the Nucleotide Transformer, HyenaDNA, Evo 2) are the language-model idea on a
+genome: the token is a base or a k-mer, the teacher is the next base or a masked one, and no label is ever shown.
+Afterwards the model is asked things it was never trained for: how much less likely a sequence becomes with a variant
+in it, zero-shot, and what a small layer on its vectors can tell from a few labelled examples. Recipe ㉕ does this
+with the page's own next-token model on a chromosome a script drew, so that every base carries the truth of what it
+is and the page can hold what the model learned against what was planted.
+
+`tools/generate_genome.js` draws one chromosome of 44,419 bases and labels every base. Open intergenic sequence is
+random at 40% GC with CpG depleted four-fold, as a vertebrate genome has it; in front of every gene sits a CpG island
+of 250 to 350 bases at 80% GC with CG pairs enriched, and a TATA box 30 bases before the start of transcription; then
+a 5′ UTR, the exons, the introns and a 3′ UTR that ends in the polyadenylation signal AATAAA. The exons are written in
+the organism's own code, purine · any · pyrimidine (RNY): 16 codons for 8 amino acids, the third base synonymous and
+used evenly, ATG first and one of the real stops last. The code is not the real one on purpose. The real code's frame
+cannot be found from a few bases, which is why a reading frame has to be set by a start codon; an RNY code lets a
+reader find the frame from a handful of codons (the comma-free and primordial-code hypotheses), and finding a frame is
+the lesson. Codon usage is strongly uneven, as any genome's is and more so (the commonest amino acid is a codon in
+four), so that a model of 11,019 parameters finds the frame in minutes: in frame a codon costs 3.8 bits, 1.26 bits per
+base, against 2 for a coin toss over four. Every gene has 3 to 6 exons, cut from one coding sequence after the AG of
+a codon, so that an exon ends …AG and the intron opens GTAAGT, the consensus of the real splice donor, and runs
+AT-rich to a pyrimidine tract and CAG, the codon finishing after it. A repeat family is one 80-base element in 42
+copies, one to four back to back at a locus, each copy 3% mutated; microsatellites ((CA)n, (A)n, (GATA)n, (TG)n,
+(AAT)n) lie in the open sequence. By kind the chromosome is 27% open sequence, 22% exon, 19% intron, 15% CpG island,
+8% repeat and 8% UTR. The last quarter is held out, and in it the script plants fifteen variants of each of six kinds:
+a synonymous change (the third base of a codon), a missense change (one codon of the code for another), a frameshift
+(the middle base of a codon lost), a splice-site change (a base of the donor GT or the acceptor AG), a TATA box
+change, and a change in the open sequence.
+
+The question has the three steps of the others. *Specimens* shows the chromosome as a track, every base coloured by
+its kind with the held-out quarter marked, the rules the script followed behind a fold, and any window of 64 bases with
+its truth. *Train* is the shared language-model panel: the documents are windows of 64 bases every 32 over the first
+three quarters (1,040 of them) and in step over the held-out quarter (173); the loss is in bits per base by the kind of
+base predicted, so that each curve says what the model saved below the coin toss on that kind of sequence; after
+every epoch the page scores the ninety planted variants and writes 120 bases from the start token. *Test* asks what
+was learned without a label: the loss base by base along the held-out quarter over the bands of the truth, the variant
+table, and a probe with ten labelled windows a side. A run on the page is the run in Node, seed for seed
+(`node tools/check_dna.js --epochs 30 --lr 0.01 --window 64 --stride 32 --seed 2 --curve`; about 12 s an epoch in the
+browser), so the numbers here are what the recipe shows.
+
+What it learns, and when. The held-out loss starts at 2.79 bits per base and is at 1.95 after one epoch, the
+composition learned; the CpG islands are at 1.78 from the first epochs (their floor is about 1.70) and the open
+sequence stays at 1.99, whose floor is 1.97: there is nothing in random sequence to learn, and that is the right
+answer. The exons sit at 1.99 for eleven epochs and then fall to 1.57 inside two, a step the curve shows as the
+model finds the frame of the code; by epoch 30 they are at 1.53 against a floor of 1.26, and the loss by position in
+the codon on the held-out exons is 1.35, 1.93 and 1.30 bits, the first and third bases nearly known and the middle
+base, which is the amino acid, not. Which epoch the step comes in depends on the draw: over seven seeds and genomes
+it came between epoch 9 and epoch 28, and seed 2 was chosen for the recipe because it comes early. Microsatellites
+fall to 1.50, the TATA box and the introns move little (the box is six bases five times in the held-out quarter, and
+the introns' AT-rich body has a floor of 1.88), and the repeat family stays at 1.96 after 30 epochs: 42 copies of an
+80-base element are not enough for a model this size to memorise it in that time, where the human genome's repeat
+families are a million copies deep and the large models know them by heart. {{LONG_LEARNS}}
+
+The variants are scored as the real models score them, the log-probability of the sequence with the change minus
+the log-probability without it, over the variant and the 32 bases after it, with nothing ever said about genes. After
+30 epochs a synonymous change scores −0.05 bits and a change in the open sequence −0.23, both nothing, as planted;
+a missense change −0.54, one codon of the code for a rarer one; a TATA box change −0.89; and a frameshift −17 bits
+(median −18), the drama of the table: every codon after the lost base reads out of frame to a model that holds the
+frame by position, and this model does. Splice-site changes score −0.70 on average but +1.05 at the changed base
+alone, and the list behind the row shows why: at the donor the model expects the code to go on and finds the GT of
+the intron a surprise, so the change that breaks the GT reads to it as a correction, and what it scores against is
+only the intron's first bases. A next-base model that has seen 55 introns cannot anticipate where an exon ends;
+the real models, with hundreds of thousands, can. A harmful kind (frameshift, splice site, TATA box) scores below a
+neutral one (synonymous, open sequence) 77% of the time, 45% for the untrained model. The frameshift score is the
+one to watch over a run: a model that tracks the frame by content rather than by position re-finds the shifted frame
+within a codon or two, which no ribosome does, and in some runs the score sits near zero for a few epochs before
+the frame is held.
+
+The probe is the foundation-model use of such a model: it is frozen, every window of 66 bases becomes the mean of its
+final vectors, and a single layer on those 32 numbers is trained to answer one question with ten labelled windows a
+side and scored on held-out windows, as many of the kind as of the rest. Is this window an exon: 95% right on the
+trained model, 68% on the untrained one. A CpG island: 100% and 98%, because the untrained model's vectors already
+carry the base composition, which is all an island is. The repeat: 91% and 94%; an intron: 66% and 74%. What the
+pretraining added is what it learned: the frame of the code.
+
+{{LONG_SHIPPED}}
+
 ## The trained models that ship
 
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
@@ -1501,7 +1579,8 @@ training: the model that the recipe trains, with the curves of its training, com
 step works from it. The language models, the segmentation network and the two end-to-end field models ship from their Node trainers
 (above); the two text models' files (3.1 MB for *Mountain Interval*, most of it two tables of 2,541 rows, and about
 8 MB for the five books) are not loaded with the page but fetched when the button is pressed, each for its own text;
-a pasted text has none. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
+a pasted text has none. The DNA model's file ({{WEIGHTS_KB}} kB, with its curves and a sequence written after every
+epoch) is fetched the same way. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
 recipe (1, 2, 4 to 11 and 13), the Foundation stage, both slide questions with and without the context layer and with
 attention pooling or a plain average, and the field model with and without positions and the context layers, presses
 Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
