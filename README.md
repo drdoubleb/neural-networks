@@ -1541,8 +1541,9 @@ sequence stays at 1.99, whose floor is 1.97: there is nothing in random sequence
 answer. The exons sit at 1.99 for eleven epochs and then fall to 1.57 inside two, a step the curve shows as the
 model finds the frame of the code; by epoch 30 they are at 1.53 against a floor of 1.26, and the loss by position in
 the codon on the held-out exons is 1.35, 1.93 and 1.30 bits, the first and third bases nearly known and the middle
-base, which is the amino acid, not. Which epoch the step comes in depends on the draw: over seven seeds and genomes
-it came between epoch 9 and epoch 28, and seed 2 was chosen for the recipe because it comes early. Microsatellites
+base, which is the amino acid, not. Which epoch the step comes in depends on the seed: on this chromosome the five seeds 1 to 5 found the frame at
+epochs 27, 12, 9, 12 and 11, and all five end near the same place (held-out 1.84 to 1.88 bits, exons 1.49 to 1.66);
+the recipe uses seed 2. Microsatellites
 fall to 1.50, the TATA box and the introns move little (the box is six bases five times in the held-out quarter, and
 the introns' AT-rich body has a floor of 1.88), and the repeat family stays at 1.96 after 30 epochs: 42 copies of an
 80-base element are not enough for a model this size to memorise it in that time, where the human genome's repeat
@@ -1553,7 +1554,7 @@ the log-probability without it, over the variant and the 32 bases after it, with
 30 epochs a synonymous change scores −0.05 bits and a change in the open sequence −0.23, both nothing, as planted;
 a missense change −0.54, one codon of the code for a rarer one; a TATA box change −0.89; and a frameshift −17 bits
 (median −18), the drama of the table: every codon after the lost base reads out of frame to a model that holds the
-frame by position, and this model does. Splice-site changes score −0.70 on average but +1.05 at the changed base
+frame by position, and this model does. Splice-site changes score −0.70 on average (−1 to −2 with other seeds) but +1.05 at the changed base
 alone, and the list behind the row shows why: at the donor the model expects the code to go on and finds the GT of
 the intron a surprise, so the change that breaks the GT reads to it as a correction, and what it scores against is
 only the intron's first bases. A next-base model that has seen 55 introns cannot anticipate where an exon ends;
