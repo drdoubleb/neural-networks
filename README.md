@@ -19,8 +19,8 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
   the labelled-cases table), `node tools/check_foundation.js` (the foundation model's pretraining),
   `node tools/check_distill.js` (a teacher and a student against the game),
   `node tools/check_finetune.js` (the code input with the encoder unfrozen),
-  `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) and `node tools/check_slides.js`
-  (attention over slides) reproduce them.
+  `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation), `node tools/check_slides.js`
+  (attention over slides) and `node tools/check_dna.js` (the next-base model on the chromosome) reproduce them.
 
 Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
@@ -54,10 +54,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The recipes ask fourteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
+The recipes ask fifteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
 label, the foundation model, two questions asked of slides, the fields of bladder, the same fields painted a class per pixel, the reports a small language model
 writes from an analyser's findings, the chat the same model holds about a case, the description it writes of a nucleus
-from its image, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
+from its image, the next-word model trained on any text you paste, and the same model on a genome of our own, a base at a time. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings. The address follows: `#19/train` is recipe 19 on its Train step, `#reports/train` a
 question at its default settings, so a refresh or a copied link comes back to the same recipe and step.
 
@@ -190,7 +190,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the twenty-four recipe buttons
+## The lecture arc: the twenty-five recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑮:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑯: `node tools/check_slides.js --question focus --context none,distX
@@ -222,6 +222,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ㉒ Chat · the next-word model on transcripts · ask it about a case | 41,369 | 85% of the brief answers exact, 52% of the full-sentence ones, 72% in the agent loop; 41%, 3% and 26% with the held-out phrasing of the instruction | The same model, a corpus of transcripts: a system line, the user's turn, the assistant's. Instruction tuning in miniature, an agent as a loop with a program, and the honest limit: the instruction is a learned cue, not an instruction. |
 | ㉓ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
 | ㉔ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30; the five books' own model after 7 epochs: held-out loss lowest at epoch 3 (5.18), 5.45 at epoch 7, 18% of the held-out next words right against 30% of the training ones | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
+| ㉕ DNA · a genome of our own · the next-base model on a chromosome drawn by a script | 11,019 | held-out loss 1.85 bits per base after 30 epochs (2 is a coin toss over four): the exons at 1.53 once the frame of the code is found at epoch 12, the CpG islands 1.78, the microsatellites 1.50, the open sequence 1.99 at its floor; a frameshift scores −17 bits, a synonymous change 0; a harmful variant below a neutral one 77% of the time | The DNA foundation model in miniature: the same next-token model, the four bases as tokens, the next base the only teacher, on a genome whose every base carries a truth the model never sees. The loss by kind of base shows what is learnable (composition at once, the frame of the code in a sudden step, a repeat family not in this time), the variant table shows the zero-shot use and its limits (the frameshift is a catastrophe, the synonymous change nothing, the splice site beyond a model that has seen 55 introns), and the probe shows the few-labels use. See *DNA* below. |
 
 The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
@@ -1494,6 +1495,97 @@ trains on another text written the way `tools/generate_text.js` writes them; the
 `node tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --epochs 7 --curve --save
 data/text/text_weights_all.js --global-out TEXT_LM_ALL` (add `--keep-best --patience 4` for the early-stopped model).
 
+## DNA: the same model on a genome of our own
+
+The DNA foundation models (DNABERT, the Nucleotide Transformer, HyenaDNA, Evo 2) are the language-model idea on a
+genome: the token is a base or a k-mer, the teacher is the next base or a masked one, and no label is ever shown.
+Afterwards the model is asked things it was never trained for: how much less likely a sequence becomes with a variant
+in it, zero-shot, and what a small layer on its vectors can tell from a few labelled examples. Recipe ㉕ does this
+with the page's own next-token model on a chromosome a script drew, so that every base carries the truth of what it
+is and the page can hold what the model learned against what was planted.
+
+`tools/generate_genome.js` draws one chromosome of 44,419 bases and labels every base. Open intergenic sequence is
+random at 40% GC with CpG depleted four-fold, as a vertebrate genome has it; in front of every gene sits a CpG island
+of 250 to 350 bases at 80% GC with CG pairs enriched, and a TATA box 30 bases before the start of transcription; then
+a 5′ UTR, the exons, the introns and a 3′ UTR that ends in the polyadenylation signal AATAAA. The exons are written in
+the organism's own code, purine · any · pyrimidine (RNY): 16 codons for 8 amino acids, the third base synonymous and
+used evenly, ATG first and one of the real stops last. The code is not the real one on purpose. The real code's frame
+cannot be found from a few bases, which is why a reading frame has to be set by a start codon; an RNY code lets a
+reader find the frame from a handful of codons (the comma-free and primordial-code hypotheses), and finding a frame is
+the lesson. Codon usage is strongly uneven, as any genome's is and more so (the commonest amino acid is a codon in
+four), so that a model of 11,019 parameters finds the frame in minutes: in frame a codon costs 3.8 bits, 1.26 bits per
+base, against 2 for a coin toss over four. Every gene has 3 to 6 exons, cut from one coding sequence after the AG of
+a codon, so that an exon ends …AG and the intron opens GTAAGT, the consensus of the real splice donor, and runs
+AT-rich to a pyrimidine tract and CAG, the codon finishing after it. A repeat family is one 80-base element in 42
+copies, one to four back to back at a locus, each copy 3% mutated; microsatellites ((CA)n, (A)n, (GATA)n, (TG)n,
+(AAT)n) lie in the open sequence. By kind the chromosome is 27% open sequence, 22% exon, 19% intron, 15% CpG island,
+8% repeat and 8% UTR. The last quarter is held out, and in it the script plants fifteen variants of each of six kinds:
+a synonymous change (the third base of a codon), a missense change (one codon of the code for another), a frameshift
+(the middle base of a codon lost), a splice-site change (a base of the donor GT or the acceptor AG), a TATA box
+change, and a change in the open sequence.
+
+The question has the three steps of the others. *Specimens* shows the chromosome as a track, every base coloured by
+its kind with the held-out quarter marked, the rules the script followed behind a fold, and any window of 64 bases with
+its truth. *Train* is the shared language-model panel: the documents are windows of 64 bases every 32 over the first
+three quarters (1,040 of them) and in step over the held-out quarter (173); the loss is in bits per base by the kind of
+base predicted, so that each curve says what the model saved below the coin toss on that kind of sequence; after
+every epoch the page scores the ninety planted variants and writes 120 bases from the start token. *Test* asks what
+was learned without a label: the loss base by base along the held-out quarter over the bands of the truth, the variant
+table, and a probe with ten labelled windows a side. A run on the page is the run in Node, seed for seed
+(`node tools/check_dna.js --epochs 30 --lr 0.01 --window 64 --stride 32 --seed 2 --curve`; about 12 s an epoch in the
+browser), so the numbers here are what the recipe shows.
+
+What it learns, and when. The held-out loss starts at 2.79 bits per base and is at 1.95 after one epoch, the
+composition learned; the CpG islands are at 1.78 from the first epochs (their floor is about 1.70) and the open
+sequence stays at 1.99, whose floor is 1.97: there is nothing in random sequence to learn, and that is the right
+answer. The exons sit at 1.99 for eleven epochs and then fall to 1.57 inside two, a step the curve shows as the
+model finds the frame of the code; by epoch 30 they are at 1.53 against a floor of 1.26, and the loss by position in
+the codon on the held-out exons is 1.35, 1.93 and 1.30 bits, the first and third bases nearly known and the middle
+base, which is the amino acid, not. Which epoch the step comes in depends on the seed: on this chromosome the five seeds 1 to 5 found the frame at
+epochs 27, 12, 9, 12 and 11, and all five end near the same place (held-out 1.84 to 1.88 bits, exons 1.49 to 1.66);
+the recipe uses seed 2. Microsatellites
+fall to 1.50, the TATA box and the introns move little (the box is six bases five times in the held-out quarter, and
+the introns' AT-rich body has a floor of 1.88), and the repeat family stays at 1.96 after 30 epochs: 42 copies of an
+80-base element are not enough for a model this size to memorise it in that time, where the human genome's repeat
+families are a million copies deep and the large models know them by heart. Training on to 120 epochs, which is what the shipped model is, changes little of this: the held-out loss ends at 1.83
+bits per base, the exons at 1.54 (they touch 1.50 at epoch 60 and settle there, a quarter of a bit above the floor),
+the islands at 1.80, the microsatellites at 1.48, the open sequence at 1.97, and the repeat family at 1.92. What the
+model has not learned by epoch 30 it does not learn by 120 at this size, and that plateau is itself the lesson about
+scale.
+
+The variants are scored as the real models score them, the log-probability of the sequence with the change minus
+the log-probability without it, over the variant and the 32 bases after it, with nothing ever said about genes. After
+30 epochs a synonymous change scores −0.05 bits and a change in the open sequence −0.23, both nothing, as planted;
+a missense change −0.54, one codon of the code for a rarer one; a TATA box change −0.89; and a frameshift −17 bits
+(median −18), the drama of the table: every codon after the lost base reads out of frame to a model that holds the
+frame by position, and this model does. Splice-site changes score −0.70 on average (−1 to −2 with other seeds) but +1.05 at the changed base
+alone, and the list behind the row shows why: at the donor the model expects the code to go on and finds the GT of
+the intron a surprise, so the change that breaks the GT reads to it as a correction, and what it scores against is
+only the intron's first bases. A next-base model that has seen 55 introns cannot anticipate where an exon ends;
+the real models, with hundreds of thousands, can. A harmful kind (frameshift, splice site, TATA box) scores below a
+neutral one (synonymous, open sequence) 77% of the time, 45% for the untrained model. The frameshift score is the
+one to watch over a run: a model that tracks the frame by content rather than by position re-finds the shifted frame
+within a codon or two, which no ribosome does, and in some runs the score sits near zero for a few epochs before
+the frame is held.
+
+The probe is the foundation-model use of such a model: it is frozen, every window of 66 bases becomes the mean of its
+final vectors, and a single layer on those 32 numbers is trained to answer one question with ten labelled windows a
+side and scored on held-out windows, as many of the kind as of the rest. Is this window an exon: 95% right on the
+trained model, 68% on the untrained one. A CpG island: 100% and 98%, because the untrained model's vectors already
+carry the base composition, which is all an island is. The repeat: 91% and 94%; an intron: 66% and 74%. What the
+pretraining added is what it learned: the frame of the code.
+
+The shipped model is that run carried to 120 epochs (`node tools/check_dna.js --epochs 120 --lr 0.01 --window 64
+--stride 32 --seed 2 --curve --save data/dna/dna_weights.js`; 175 kB, fetched on demand when the *Load the trained
+model* button is pressed), with the curves of its training and the sequence it wrote after every epoch. Its variant
+table reads synonymous +0.22, open sequence −0.42, missense −0.64, TATA box −0.94, splice site −1.57 and frameshift
+−15 bits, and a harmful kind scores below a neutral one 84% of the time: the measure climbs from 77% at epoch 30 to
+90% at epoch 60 and then settles between 84 and 88%. Its probe answers *an exon?* 98% right (the untrained model 68%),
+*a CpG island?* 100% (98%), *the repeat?* 81% (94%) and *an intron?* 74% (74%). The honest limits are the last note of
+the Test step. This model saw 33,000 bases with a context of 64; Evo 2 saw nine trillion with a context of a million,
+and the human genome's repeat families are a million copies deep, not 42. What carries over is the shape of the thing:
+a token, a teacher that is the next base, and measures that ask the trained model questions it was never trained for.
+
 ## The trained models that ship
 
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
@@ -1501,7 +1593,8 @@ training: the model that the recipe trains, with the curves of its training, com
 step works from it. The language models, the segmentation network and the two end-to-end field models ship from their Node trainers
 (above); the two text models' files (3.1 MB for *Mountain Interval*, most of it two tables of 2,541 rows, and about
 8 MB for the five books) are not loaded with the page but fetched when the button is pressed, each for its own text;
-a pasted text has none. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
+a pasted text has none. The DNA model's file (175 kB, with its curves and a sequence written after every
+epoch) is fetched the same way. The others ship from the page itself: `tools/export_models.js` opens the page in a headless browser, selects every classic
 recipe (1, 2, 4 to 11 and 13), the Foundation stage, both slide questions with and without the context layer and with
 attention pooling or a plain average, and the field model with and without positions and the context layers, presses
 Train on each, waits for the last epoch and saves what the page holds: the weights, the settings, the seed and the
@@ -1703,6 +1796,7 @@ js/reports.js              the reports as tokens: the word-level tokenizer, the 
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
 js/text.js                 the Your-text question: a text normalised and cut into documents (a poem per marked title or a paragraph each, windows of 200 tokens at line ends), the tenth of every ten held out, the whole text's vocabulary, the title line as the prefix the model continues (browser + Node)
+js/dna.js                  the DNA question: the four bases (or k-mers in step) as tokens, the chromosome cut into windows, the kind of every base, the loss by kind, the surprise base by base, the zero-shot variant score and the probe on the frozen model’s vectors (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network, and the network unrolled at one pixel (circles for the channels, lines for the kernels' contributions)
@@ -1722,6 +1816,8 @@ data/text/mountain_interval.js  the default text of the Your-text question: Fros
 data/text/frost_collected.js  Frost's five books of 1913 to 1928 from the same eBook, fetched by the page on demand, written by tools/generate_text.js --all
 data/text/text_weights.js  the trained text model (30 epochs on Mountain Interval) with its vocabulary, the curves of its training, the two titles continued after every epoch and the words' paths, written by tools/check_text.js --save; fetched by the page on demand
 data/text/text_weights_all.js  the trained text model of the five books (7 epochs) with its vocabulary, curves, samples and word paths, written by tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --save; fetched on demand
+data/dna/genome_data.js    the synthetic chromosome of the DNA question: the sequence, the kind of every base, the genes, repeats, microsatellites and planted variants, written by tools/generate_genome.js
+data/dna/dna_weights.js    the trained DNA model with the curves of its training (the loss by kind of base, the variant measure and a written sample per epoch), written by tools/check_dna.js --save; fetched by the page on demand
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑱ and ⑲) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
@@ -1743,6 +1839,8 @@ tools/generate_describe.js make the Describe nuclei and their descriptions (a co
 tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
 tools/generate_text.js     write a text of the Your-text question from a Project Gutenberg plain text: the header and licence stripped, the lines between two headings taken
 tools/check_text.js        train the next-word model on a text as the page does and take its measures: loss and next word right on the held-out and the training documents per epoch, two titles continued after every epoch, recall of the training and held-out poems from their title lines, poems from titles of one's own at a temperature
+tools/generate_genome.js   draw the chromosome of the DNA question: genes with a CpG island, a TATA box, exons in the organism’s own code and introns with splice sites, a repeat family, microsatellites, every base labelled, and the planted variants
+tools/check_dna.js         train the next-base model on the chromosome as the page does and take its measures: the loss by kind of base per epoch, the codon rhythm, the planted variants scored, the probe on the frozen model; --save writes the shipped model
 tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
