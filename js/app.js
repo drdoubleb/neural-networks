@@ -26,6 +26,8 @@
     dsq: { world: 'describe', colour: 'prob', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, probe: 'own', encoder: null, map: { mode: 'tsne', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null } },
     tx: { world: 'text', colour: 'chance', built: false, model: null, dim: 48, layers: 2, positions: true, epochs: 10, lr: 0.005, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
       text: null, source: 'default', D: null, prompt: null, maxWords: 80, loading: null, loadingW: null, inputFor: null, trainTitleAt: 0, labelled: null, labelledFor: null }, // the Your-text question: the text pasted (null: the default), where it came from, its documents, and the Test step's prompt
+    dna: { world: 'dna', colour: 'chance', built: false, model: null, dim: 32, layers: 2, positions: true, epochs: 30, lr: 0.01, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0.8, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
+      window: 64, stride: 32, D: null, loadingW: null, test: { key: null, surprise: null, variants: null, probe: null, probe0: null, probe0For: null, cls: null } }, // the DNA question: the same model on a genome of our own, windows of 64 bases as documents
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, hoverLive: null, testHoverNet: null },
     km: { built: false, mode: 'features', k: 4, seed: 1, start: 'pp', colour: 'cluster', show: { spokes: false, territories: false }, axes: { x: 'pc1', y: 'pc2' }, st: null, hist: [], inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, running: false, anim: null, sweep: null, sweepKey: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
     fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, pinnedCell: null, hoverLayers: null, hoverCellNet: null, hoverLive: null, lwalk: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
@@ -43,7 +45,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default']; // the number first, in plain digits, so that it reads in the dropdown
+  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default','25 · DNA · a genome of our own · the next-base model: what it learns of exons, repeats and motifs without a label, where it is surprised, how it scores a variant']; // the number first, in plain digits, so that it reads in the dropdown
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, ftRate: 0, share: null, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -92,6 +94,7 @@
     { id: 'chat', title: 'Chat: ask the model about a case?', world: 'chat' },
     { id: 'describe', title: 'Describe: from pixels to words?', world: 'describe' },
     { id: 'text', title: 'Your text: train it on any text?', world: 'text' },
+    { id: 'dna', title: 'DNA: a genome of our own?', world: 'dna' },
   ];
   const onClassic = step => S.world === 'classic' && S.stage === step;
   function selectQuestion(id) {
@@ -1207,6 +1210,12 @@
       go();
       return;
     }
+    if (k === '25') { // the DNA question: the next-base model on a genome of our own
+      S.dna.dim = 32; S.dna.layers = 2; S.dna.positions = true; S.dna.epochs = 30; S.dna.lr = 0.01; S.dna.seed = 1;
+      selectQuestion('dna'); showStage('train'); const L = S.dna; if (!L.built) { showRecipe(k); return; }
+      rpReset(`Recipe ${RECIPE_LABELS[25]}: ${L.train.length} windows of ${L.window} bases from the first three quarters of a ${dnaGenome().meta.length.toLocaleString()}-base chromosome drawn by a script, the four bases as tokens, the next base the only teacher. Press Train and watch the loss by kind of base: the open sequence stays at the coin toss, the motifs and microsatellites fall first, the exons as the frame of the code is found; or load the trained model, then go to 3 · Test for where it is surprised, how it scores the planted variants and what a probe on its vectors can tell.`);
+      showRecipe(k); return;
+    }
     if (k === '24') { // the Your-text question: the same model on a text of one's own, Frost's Mountain Interval by default
       S.tx.dim = 48; S.tx.layers = 2; S.tx.positions = true; S.tx.epochs = 10; S.tx.lr = 0.005; S.tx.seed = 1;
       const go = () => { selectQuestion('text'); showStage('train'); const L = S.tx; rpReset(`Recipe ${RECIPE_LABELS[24]}: ${L.train.length} training documents, ${L.meta.poems} poems of Frost cut into windows of 200 tokens with one document in ten held out, and the next word alone. Press Train (an epoch is ${txEpochEstimate()} here) and watch the two accuracy lines part: the training line climbs on while the held-out one stalls, memorisation outrunning what it learns of the language, and the box below the curves shows two titles continued after every epoch, a training poem’s and a held-out one’s. Load the trained model, then go to 3 · Test and start it off with a title of your own; or paste a text of your own on 1 · Specimens.`); };
@@ -1314,6 +1323,7 @@
         renderDataTrays(); renderScatter(); renderInspector();
       });
     }
+    dnaBind();
     $('finetune').addEventListener('change', () => { S.ftRate = +$('finetune').value; resetModel(S.ftRate ? `The encoder is unfrozen: the gradient of the ${S.h1 ? 'network' : 'single layer'} on the code runs on into the encoder’s ${codeEncoder().cl.parameterCount().toLocaleString()} weights, at ${S.ftRate === 1 ? 'the same' : 'a tenth of the'} learning rate — a fresh copy of the pretrained encoder, fresh random weights on top. Watch the training accuracy reach 100% whatever the labelled count, and the test accuracy follow only when there are labels enough.` : 'The encoder is frozen again: only the layer on its code trains — fresh random weights.'); });
     for (const id of ['source-train', 'source-train-2']) $(id).addEventListener('change', ev => setTrainSource(ev.target.value));
     for (const id of ['source-test', 'source-test-2']) $(id).addEventListener('change', ev => setTestSource(ev.target.value));
@@ -1408,7 +1418,7 @@
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
     applyVisibility();
   }
-  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test', 'text:data': 'panel-tx-data', 'text:train': 'panel-reports', 'text:test': 'panel-tx-test', 'cluster:data': 'panel-data', 'cluster:train': 'panel-cluster', 'cluster:test': 'panel-km-test' };
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test', 'text:data': 'panel-tx-data', 'text:train': 'panel-reports', 'text:test': 'panel-tx-test', 'dna:data': 'panel-dna-data', 'dna:train': 'panel-reports', 'dna:test': 'panel-dna-test', 'cluster:data': 'panel-data', 'cluster:train': 'panel-cluster', 'cluster:test': 'panel-km-test' };
   function showStage(name) {
     if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
@@ -1447,6 +1457,7 @@
     else if (w === 'chat') { if (name === 'data') chEnterData(); else if (name === 'train') rpEnter(); else chEnterTest(); }
     else if (w === 'describe') { if (name === 'data') dsEnterData(); else if (name === 'train') rpEnter(); else dsEnterTest(); }
     else if (w === 'text') { if (name === 'data') txEnterData(); else if (name === 'train') rpEnter(); else txEnterTest(); }
+    else if (w === 'dna') { if (name === 'data') dnaEnterData(); else if (name === 'train') rpEnter(); else dnaEnterTest(); }
     else if (w === 'segment') { if (name === 'data') sgEnterData(); else if (name === 'train') sgEnter(); else sgEnterTest(); }
     else if (w === 'cluster') { if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); } else if (name === 'train') kmEnter(); else kmEnterTest(); }
     else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
@@ -3410,6 +3421,126 @@
         weights: { global: 'TEXT_LM', size: '3 MB', sources: ['data/text/text_weights.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/text_weights.js', 'https://drdoubleb.github.io/neural-networks/data/text/text_weights.js'] } },
       all: { global: 'LECTURE_TEXT_ALL', label: 'the five books', size: '340 kB', sources: ['data/text/frost_collected.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/frost_collected.js', 'https://drdoubleb.github.io/neural-networks/data/text/frost_collected.js'],
         weights: { global: 'TEXT_LM_ALL', size: '8 MB', sources: ['data/text/text_weights_all.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/text/text_weights_all.js', 'https://drdoubleb.github.io/neural-networks/data/text/text_weights_all.js'] } } } }; // each from the page's own folder, then a mirror of the repository, then the published page
+  // ------------------------------------------------------------------ the DNA question: the next-token model on a genome of our own
+  // The chromosome is drawn by tools/generate_genome.js, every base labelled with the truth of what it is; the model is
+  // the reports' language model with the four bases as tokens and windows of the chromosome as documents (js/dna.js).
+  const NDNA = window.NucleusDNA;
+  const DNA = { sampleLen: 120, tail: 32, probeN: 10, weights: { global: 'DNA_LM', size: '0.5 MB', sources: ['data/dna/dna_weights.js', 'https://cdn.jsdelivr.net/gh/drdoubleb/neural-networks@main/data/dna/dna_weights.js', 'https://drdoubleb.github.io/neural-networks/data/dna/dna_weights.js'] } };
+  function dnaGenome() { const G = window.LECTURE_GENOME; return G && G.meta ? G : null; }
+  function dnaData() { // the chromosome as the language-model lab wants it: windows of the training stretch, the held-out stretch in step
+    const L = S.dna, G = dnaGenome(); if (!G) return null; const key = `${L.window}|${L.stride}`; if (L.D && L.D.key === key) return L.D;
+    const w = NDNA.windows(G, { window: L.window, stride: L.stride, k: 1 }); L.D = { key, meta: G.meta, train: w.train, test: w.test, held: [] }; return L.D;
+  }
+  const dnaStub = {};
+  function dnaShipped() { const w = DNA.weights; if (window[w.global]) return window[w.global]; return dnaStub.s || (dnaStub.s = { size: w.size, load: () => S.dna.loadingW || (S.dna.loadingW = txLoadScript(w.sources, () => window[w.global]).finally(() => { S.dna.loadingW = null; })) }); }
+  const dnaKindName = k => NDNA.KIND_NAMES[k] || k, dnaKindColor = k => NDNA.KIND_COLORS[k] || '#999';
+  const dnaLegend = kinds => kinds.map(k => `<span><span class="swatch" style="background:${dnaKindColor(k)}"></span>${esc(dnaKindName(k))}</span>`).join('');
+  const dnaBits = v => (v == null ? '–' : v.toFixed(2));
+  // the variant scores summarised: how often a harmful kind (frameshift, splice site, TATA box) scores below a neutral one (synonymous, intergenic)
+  function dnaAuc(rows) { const h = rows.filter(r => NDNA.HARMFUL.includes(r.cls)), u = rows.filter(r => NDNA.NEUTRAL.includes(r.cls)); if (!h.length || !u.length) return null; let below = 0; for (const a of h) for (const b of u) below += a.score < b.score ? 1 : a.score === b.score ? 0.5 : 0; return below / (h.length * u.length); }
+  function dnaMeans(rows) { const by = {}; for (const r of rows) (by[r.cls] = by[r.cls] || []).push(r.score); const out = {}; for (const [k, xs] of Object.entries(by)) out[k] = +(xs.reduce((a, x) => a + x, 0) / xs.length).toFixed(3); return out; }
+  // the measure after every epoch: the planted variants scored (a few per frame), then a sequence written from the start token; true when done
+  function dnaMeasureChunk(L, M, deadline) {
+    const G = dnaGenome(), vs = G.variants;
+    while (performance.now() < deadline) {
+      if (M.i < vs.length) { const v = vs[M.i++], r = NDNA.variantScore(L.model, G, L.vocab, v, { window: L.window, tail: DNA.tail }); (M.scores = M.scores || []).push({ cls: v.cls, score: r.score }); continue; }
+      if (M.rec.ground == null) { M.rec.ground = dnaAuc(M.scores || []); M.rec.means = dnaMeans(M.scores || []); }
+      if (!M.st) { M.st = L.model.genState([L.vocab.start]); M.rng = NN.mulberry32(L.epoch * 13 + 1); }
+      if (M.st.tokens.length - 1 >= DNA.sampleLen) { M.rec.sample = NDNA.decode(L.vocab, M.st.tokens.slice(1)).map(w => (w.length === 1 ? w : 'N')).join(''); return true; }
+      L.model.genNext(M.st, { temperature: 0.8, rng: M.rng });
+    }
+    return false;
+  }
+  function dnaMarkMotifs(seq) { // the planted motifs in a written sequence, marked where they appear
+    const marks = new Array(seq.length).fill(null);
+    for (const m of NDNA.MOTIFS) { m.re.lastIndex = 0; let r; while ((r = m.re.exec(seq))) { for (let i = r.index; i < r.index + r[0].length; i++) if (!marks[i]) marks[i] = m; if (!r[0].length) m.re.lastIndex++; } }
+    let html = '', cur = null, buf = ''; const flush = () => { if (!buf) return; html += cur ? `<span class="motif" style="background:${dnaKindColor(cur.kind)}" title="${esc(cur.name)}">${buf}</span>` : esc(buf); buf = ''; };
+    seq.split('').forEach((ch, i) => { if (marks[i] !== cur) { flush(); cur = marks[i]; } buf += ch; }); flush();
+    return html;
+  }
+  function dnaRenderSamples(L) { // what the model writes after every epoch, the newest first, the planted motifs marked
+    const recs = L.hist.filter(h => h.sample), el = $('rp-samples');
+    $('rp-samples-sub').textContent = `after every epoch the model writes ${DNA.sampleLen} bases from the start token, drawn at temperature 0.8 · the motifs the script planted are marked where they appear: TATA box, splice donor, polyadenylation signal, microsatellite runs, ATG`;
+    el.style.setProperty('--tx-cols', 1);
+    el.innerHTML = recs.length ? recs.slice().reverse().slice(0, 12).map(h => `<div class="tx-sample"><span class="ep">epoch ${h.epoch}</span><div class="txt dna-seq">${dnaMarkMotifs(h.sample)}</div></div>`).join('') : '<p class="small muted">Nothing written yet: the first sample comes after the first epoch.</p>';
+  }
+  function dnaFinishNote(L, last) { return `Finished ${L.epochs} epochs on ${L.train.length} windows without a label. Held-out loss ${dnaBits(last.testLoss)} bits per base${last.e != null ? `, ${dnaBits(last.e)} in the exons and ${dnaBits(last.i)} in the open sequence` : ''}${last.ground != null ? `; a harmful variant scores below a neutral one ${pct(last.ground)} of the time` : ''}. Go to 3 · Test.`; }
+  // ---- Specimens: the chromosome and its windows
+  function dnaEnterData() { const L = S.dna; if (!LMW().data() || !rpBuild()) return; if (L.dataSelected == null || !L.byId.get(L.dataSelected)) L.dataSelected = L.train[0].id; dnaRenderData(); }
+  function dnaDataSelect(id) { S.dna.dataSelected = id; dnaRenderData(); }
+  function dnaDataNeighbour(step) { const L = S.dna, i = L.all.findIndex(r => r.id === L.dataSelected); dnaDataSelect(L.all[(i + step + L.all.length) % L.all.length].id); }
+  function dnaDataAt(pos) { const L = S.dna; let best = L.all[0]; for (const r of L.all) if (pos >= r.start && pos < r.end) { best = r; if (r.split === 'train' && pos - r.start < L.stride) break; } dnaDataSelect(best.id); }
+  // the chromosome as a strip: one rect per run of a kind, the held-out stretch hatched off, the window on screen framed
+  function dnaDrawTrack(svg, G, { from = 0, to = G.seq.length, height = 46, sel = null, onHover = null } = {}) {
+    const W = Math.max(320, svg.clientWidth || 800), H = height, n = to - from, x = p => (p - from) / n * W, lab = G.lab; let html = '';
+    for (let p = from; p < to;) { let q = p + 1; while (q < to && lab[q] === lab[p]) q++; html += `<rect x="${x(p).toFixed(2)}" y="8" width="${Math.max(0.6, x(q) - x(p)).toFixed(2)}" height="${H - 16}" fill="${dnaKindColor(lab[p])}" opacity="${lab[p] === 'i' ? 0.45 : 0.95}"></rect>`; p = q; }
+    if (G.meta.trainEnd > from && G.meta.trainEnd < to) html += `<line x1="${x(G.meta.trainEnd).toFixed(1)}" y1="2" x2="${x(G.meta.trainEnd).toFixed(1)}" y2="${H - 2}" stroke="var(--ink)" stroke-dasharray="3 3" stroke-width="1.5"></line><text x="${(x(G.meta.trainEnd) + 4).toFixed(1)}" y="${H - 3}" font-size="9" fill="var(--ink-3)">held out →</text>`;
+    for (const g of G.genes) if (g.tss >= from && g.tss < to) html += `<text x="${x(g.tss).toFixed(1)}" y="7" font-size="8" fill="var(--ink-3)" text-anchor="middle">${esc(g.id)}</text>`;
+    if (sel) html += `<rect x="${x(sel.start).toFixed(2)}" y="5" width="${Math.max(2, x(sel.end) - x(sel.start)).toFixed(2)}" height="${H - 10}" fill="none" stroke="var(--ink)" stroke-width="1.5"></rect>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.innerHTML = html;
+    svg.onmousemove = onHover ? ev => { const r = svg.getBoundingClientRect(), p = Math.min(to - 1, Math.max(from, Math.floor(from + (ev.clientX - r.left) / r.width * n))); onHover(p, ev); } : null;
+    return { x, W, H };
+  }
+  function dnaRenderData() {
+    const L = S.dna, G = dnaGenome(); if (!L.built || !G) return; const r = L.byId.get(L.dataSelected) || L.train[0], M = G.meta;
+    $('dna-data-sub').textContent = `${M.length.toLocaleString()} bases · ${M.genes} genes · ${M.repeats} copies of the repeat · ${M.microsats} microsatellites · GC ${pct(M.gc)} · ${L.train.length} training windows of ${L.window} bases every ${L.stride}, ${L.test.length} held-out windows in step`;
+    $('dna-rules').innerHTML = M.rules.map(x => `<li>${esc(x)}</li>`).join('');
+    $('dna-track-legend').innerHTML = dnaLegend(NDNA.KINDS);
+    const tip = $('dna-track-tip'), wrap = tip.parentElement;
+    dnaDrawTrack($('dna-track'), G, { sel: r, onHover: (p, ev) => { const g = G.genes.find(x => p >= x.start && p < x.end); tip.hidden = false; tip.textContent = `base ${p.toLocaleString()} · ${dnaKindName(G.lab[p])}${g ? ` · ${g.id}` : ''} · ${p < M.trainEnd ? 'training stretch' : 'held out'} · click to open its window`; const wr = wrap.getBoundingClientRect(); tip.style.left = `${Math.min(wr.width - 260, ev.clientX - wr.left + 10)}px`; tip.style.top = '-30px'; } });
+    $('dna-track').onmouseleave = () => { tip.hidden = true; }; $('dna-track').onclick = ev => { const svg = $('dna-track'), rc = svg.getBoundingClientRect(); dnaDataAt(Math.floor((ev.clientX - rc.left) / rc.width * M.length)); };
+    $('dna-track-note').textContent = `Every base coloured by what the script made it; the open sequence faint. The last quarter, right of the dashed line, is held out: the model trains on windows of the first three quarters and is measured on this stretch, which it never sees. Hover for a base, click to open the window there.`;
+    $('dna-data-doc-title').textContent = `Window ${r.name} · ${r.split === 'train' ? 'training' : 'held out, never trained on'} · mostly ${dnaKindName(r.kind)}`;
+    $('dna-data-text').innerHTML = rpTextHtml(r.words, null, { secs: r.sections, tight: true });
+    const counts = {}; for (const ch of r.lab) counts[ch] = (counts[ch] || 0) + 1; let gc = 0; for (const b of r.text) if (b === 'C' || b === 'G') gc++;
+    $('dna-data-case').innerHTML = `<div class="row"><span class="k">window</span><span class="v">${esc(r.id)} · bases ${esc(r.name)}</span></div><div class="row"><span class="k">split</span><span class="v">${r.split === 'train' ? 'training' : 'held out'}</span></div><div class="row"><span class="k">GC</span><span class="v">${pct(gc / r.text.length)}</span></div><div class="row"><span class="k">kinds</span><span class="v">${Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map(k => `<span class="swatch" style="background:${dnaKindColor(k)}"></span>${esc(dnaKindName(k))} ${counts[k]}`).join(' · ')}</span></div>`;
+    $('dna-data-doc-note').textContent = 'Every base is a token, coloured here by the truth the model never sees. The model trains on the training windows, the next base alone, and is measured on the held-out quarter. Click the chromosome above for another window, or step through them.';
+  }
+  // ---- Test: where the model is surprised, how it scores the planted variants, what a probe on its vectors can tell
+  function dnaMeasures(L) { // the Test step's measures for the model as it stands, cached per model state
+    const G = dnaGenome(), key = `${L.model.steps}|${L.shipped ? 'shipped' : 'page'}|${L.dim}|${L.layers}|${L.window}`; if (L.test.key === key) return L.test;
+    const T = L.test; T.key = key; T.surprise = NDNA.surprise(L.model, G, L.vocab, G.meta.trainEnd, G.seq.length, L.window); T.variants = NDNA.variantTable(L.model, G, L.vocab, { window: L.window, tail: DNA.tail }); T.probe = NDNA.probes(L.model, G, L.vocab, { nPer: DNA.probeN });
+    if (!T.probe0 || T.probe0For !== `${L.dim}|${L.layers}|${L.positions}`) { const fresh = new NN.LanguageModel(rpConfig()); T.probe0 = NDNA.probes(fresh, G, L.vocab, { nPer: DNA.probeN }); T.probe0For = `${L.dim}|${L.layers}|${L.positions}`; }
+    return T;
+  }
+  function dnaEnterTest() { const L = S.dna; if (!LMW().data() || !rpBuild()) return; if (!L.model) rpReset(); L.test.cls = L.test.cls || 'frameshift'; dnaRenderTest(); }
+  function dnaRenderTest() {
+    const L = S.dna, G = dnaGenome(); if (!L.built || !L.model || !G) return;
+    $('dna-test-warning').hidden = !(L.model.steps === 0 && !L.shipped);
+    $('dna-test-sub').textContent = L.shipped ? 'the trained model that ships with the page' : L.model.steps ? `the model as trained here, ${L.epoch} epoch${L.epoch === 1 ? '' : 's'}` : 'an untrained model: every next base a guess over four';
+    const T = dnaMeasures(L), from = G.meta.trainEnd, to = G.seq.length;
+    // the surprise along the held-out stretch: the loss per base in bins, over the kinds
+    const svg = $('dna-surprise'), W = Math.max(320, svg.clientWidth || 800), H = 190, top = 10, trackY = H - 34, plotH = trackY - top - 6, n = to - from, bin = Math.max(1, Math.ceil(n / W * 2)), x = p => (p - from) / n * W, y = v => top + plotH * (1 - Math.min(1, v / 3));
+    let html = '';
+    for (let p = from; p < to;) { let q = p + 1; while (q < to && G.lab[q] === G.lab[p]) q++; html += `<rect x="${x(p).toFixed(2)}" y="${trackY}" width="${Math.max(0.6, x(q) - x(p)).toFixed(2)}" height="18" fill="${dnaKindColor(G.lab[p])}" opacity="${G.lab[p] === 'i' ? 0.45 : 0.95}"></rect><rect x="${x(p).toFixed(2)}" y="${top}" width="${Math.max(0.6, x(q) - x(p)).toFixed(2)}" height="${plotH}" fill="${dnaKindColor(G.lab[p])}" opacity="${G.lab[p] === 'i' ? 0.04 : 0.12}"></rect>`; p = q; }
+    html += `<line x1="0" y1="${y(2).toFixed(1)}" x2="${W}" y2="${y(2).toFixed(1)}" stroke="var(--ink-3)" stroke-dasharray="4 3"></line><text x="4" y="${(y(2) - 3).toFixed(1)}" font-size="9" fill="var(--ink-3)">2 bits: a coin toss over four bases</text>`;
+    for (const v of [1, 3]) html += `<text x="4" y="${(y(v) + 3).toFixed(1)}" font-size="9" fill="var(--ink-3)">${v}</text>`;
+    const bins = []; for (let p = from; p < to; p += bin) { let s = 0, c = 0; for (let q = p; q < Math.min(to, p + bin); q++) { const v = T.surprise[q - from]; if (!isNaN(v)) { s += v; c++; } } bins.push({ p, v: c ? s / c : null }); }
+    let d = ''; for (const b of bins) if (b.v != null) d += `${d ? 'L' : 'M'}${x(b.p + bin / 2).toFixed(1)},${y(b.v).toFixed(1)}`;
+    html += `<path d="${d}" fill="none" stroke="var(--ink)" stroke-width="1.2"></path>`;
+    for (const v of G.variants) html += `<line x1="${x(v.pos).toFixed(1)}" y1="${trackY + 20}" x2="${x(v.pos).toFixed(1)}" y2="${trackY + 26}" stroke="${NDNA.HARMFUL.includes(v.cls) ? 'var(--bad)' : 'var(--ink-3)'}" stroke-width="1"></line>`;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('width', W); svg.setAttribute('height', H); svg.innerHTML = html;
+    const tip = $('dna-surprise-tip'), wrap = tip.parentElement;
+    svg.onmousemove = ev => { const rc = svg.getBoundingClientRect(), p = Math.min(to - 1, Math.max(from, Math.floor(from + (ev.clientX - rc.left) / rc.width * n))), g = G.genes.find(z => p >= z.start && p < z.end), b = bins[Math.floor((p - from) / bin)]; tip.hidden = false; tip.textContent = `base ${p.toLocaleString()} ${G.seq[p]} · ${dnaKindName(G.lab[p])}${g ? ` · ${g.id}` : ''} · ${dnaBits(T.surprise[p - from])} bits here, ${b && b.v != null ? dnaBits(b.v) : '–'} over the ${bin} around it`; const wr = wrap.getBoundingClientRect(); tip.style.left = `${Math.min(wr.width - 300, ev.clientX - wr.left + 10)}px`; tip.style.top = `${Math.max(0, ev.clientY - wr.top - 34)}px`; };
+    svg.onmouseleave = () => { tip.hidden = true; };
+    const byKind = {}, nk = {}; for (let p = from; p < to; p++) { const v = T.surprise[p - from]; if (isNaN(v)) continue; const k = G.lab[p]; byKind[k] = (byKind[k] || 0) + v; nk[k] = (nk[k] || 0) + 1; }
+    $('dna-surprise-legend').innerHTML = NDNA.KINDS.filter(k => nk[k]).map(k => `<span><span class="swatch" style="background:${dnaKindColor(k)}"></span>${esc(dnaKindName(k))} ${dnaBits(byKind[k] / nk[k])}</span>`).join('');
+    $('dna-surprise-note').textContent = `The line is the model’s loss base by base along the held-out quarter it never trained on, averaged over ${bin} bases, in bits: 2 bits is a coin toss over four, 0 is certainty. The bands beneath are the truth. The legend gives the mean per kind. Where the line sits at the coin toss the model learned nothing of that sequence, which is the right answer for random sequence; where it dips, something was learned without a label: the frame of the code in the exons, the repeat element from its other copies, the motifs. The ticks are the planted variants, red the harmful kinds. Hover for a base.`;
+    // the variants: a row per kind with its scores as dots on one scale
+    const VT = T.variants, lo = Math.min(-4, ...VT.rows.map(r => r.score)), hi = Math.max(1, ...VT.rows.map(r => r.score)), sx = v => 6 + (v - lo) / (hi - lo) * 228;
+    $('dna-variants').innerHTML = `<thead><tr><th>kind of change</th><th class="n">n</th><th class="n">mean score</th><th>the fifteen, each a dot · 0 is no change in likelihood</th></tr></thead><tbody>` + NDNA.CLASSES.filter(c => VT.summary[c]).map(c => { const s = VT.summary[c], rows = VT.rows.filter(r => r.cls === c); return `<tr class="${L.test.cls === c ? 'now' : ''} ${NDNA.HARMFUL.includes(c) ? 'harm' : NDNA.NEUTRAL.includes(c) ? 'neutral' : ''}" data-cls="${c}"><td class="name">${esc(NDNA.CLASS_NAMES[c])}${NDNA.HARMFUL.includes(c) ? ' <span class="muted">harmful</span>' : NDNA.NEUTRAL.includes(c) ? ' <span class="muted">neutral</span>' : ''}</td><td class="n">${s.n}</td><td class="n">${s.mean >= 0 ? '+' : ''}${s.mean.toFixed(2)}</td><td><svg class="dna-dots" viewBox="0 0 240 18" width="240" height="18"><line x1="${sx(0).toFixed(1)}" y1="0" x2="${sx(0).toFixed(1)}" y2="18" stroke="var(--line-strong)"></line>${rows.map(r => `<circle cx="${sx(r.score).toFixed(1)}" cy="9" r="3.2" fill="${NDNA.HARMFUL.includes(c) ? 'var(--bad)' : NDNA.NEUTRAL.includes(c) ? 'var(--ink-3)' : 'var(--accent)'}" opacity="0.7"><title>base ${r.pos.toLocaleString()} ${r.ref || '–'} → ${r.alt || 'lost'} · ${esc(r.note)} · ${r.score.toFixed(2)} bits</title></circle>`).join('')}</svg></td></tr>`; }).join('') + '</tbody>';
+    $('dna-variants').querySelectorAll('tbody tr').forEach(tr => tr.addEventListener('click', () => { L.test.cls = tr.dataset.cls; dnaRenderTest(); }));
+    $('dna-variants-note').textContent = `Each planted change is scored as the real DNA models score a variant: the log-probability of the sequence with the change minus the log-probability without it, summed over the variant and the ${DNA.tail} bases after it. Nothing told the model what a gene, a splice site or a TATA box is. ${VT.auc != null ? `A harmful kind (frameshift, splice site, TATA box) scores below a neutral one (synonymous, intergenic) ${pct(VT.auc)} of the time; chance is 50%.` : ''} A frameshift is scored by what follows it: every base after the lost one reads out of frame. Missense changes are a fair test of what a DNA model cannot know: one codon of the code for another, equally likely, is not a surprise, and the harm of a missense change lives in the protein. Click a kind for its list.`;
+    const rows = VT.rows.filter(r => r.cls === L.test.cls);
+    $('dna-variant-list').innerHTML = rows.length ? `<p class="small muted" style="margin:10px 0 4px">${esc(NDNA.CLASS_NAMES[L.test.cls])} changes, the planted fifteen:</p><table class="feat dna-vlist"><thead><tr><th>base</th><th>change</th><th>what it does</th><th class="n">score</th><th class="n">at the base alone</th></tr></thead><tbody>${rows.map(r => `<tr><td class="n">${r.pos.toLocaleString()}</td><td class="n">${r.ref || '–'} → ${r.alt || 'lost'}</td><td>${esc(r.note)}</td><td class="n" style="color:${r.score < -1 ? 'var(--bad)' : 'inherit'}">${r.score >= 0 ? '+' : ''}${r.score.toFixed(2)}</td><td class="n">${r.local >= 0 ? '+' : ''}${r.local.toFixed(2)}</td></tr>`).join('')}</tbody></table>` : '';
+    // the probe
+    const P = T.probe, P0 = T.probe0, qs = [['exon', 'an exon'], ['island', 'a CpG island'], ['repeat', 'the repeat'], ['intron', 'an intron']];
+    $('dna-probe').innerHTML = `<thead><tr><th>is this window…</th><th class="n">on this model</th><th class="n">on an untrained model</th><th class="n">labelled windows</th></tr></thead><tbody>${qs.map(([k, name]) => (P[k] ? `<tr><td class="name">${name}?</td><td class="n"><b>${pct(P[k].acc)}</b></td><td class="n">${P0[k] ? pct(P0[k].acc) : '–'}</td><td class="n">${P[k].nTrain} · scored on ${P[k].nTest}</td></tr>` : '')).join('')}</tbody>`;
+    $('dna-probe-note').textContent = `The foundation-model use: the model is frozen, every window of 66 bases becomes the mean of its final vectors, and a single layer on those numbers is trained to answer one question with ${DNA.probeN} labelled windows a side, then scored on held-out windows, as many of the kind as of the rest. The untrained model’s vectors carry the base composition and little else, which already tells a CpG island; what the trained model’s vectors add is what the pretraining learned: the frame of the code in the exons, the repeat.`;
+  }
+  function dnaBind() {
+    $('dna-data-prev').addEventListener('click', () => dnaDataNeighbour(-1)); $('dna-data-next').addEventListener('click', () => dnaDataNeighbour(1));
+  }
   const txShippedStubs = {}; // a stand-in per preset for its trained model until the file is loaded: the Load button fetches it
   function txShipped() { const p = TX.presets[S.tx.source], w = p && p.weights; if (!w) return null; if (window[w.global]) return window[w.global]; return txShippedStubs[S.tx.source] || (txShippedStubs[S.tx.source] = { size: w.size, load: () => S.tx.loadingW || (S.tx.loadingW = txLoadScript(w.sources, () => window[w.global]).finally(() => { S.tx.loadingW = null; })) }); }
   const txVocabFrom = words => ({ words, index: new Map(words.map((w, i) => [w, i])), start: 0, end: 1, unk: 2, size: words.length });
@@ -3504,6 +3635,33 @@
       testView: L => (L.written && !L.writing && L.written.view ? L.written.view : null),
       renderData: () => txRenderData(), renderTest: () => txRenderTest(),
     },
+    dna: {
+      key: 'dna', title: 'DNA: the same model on a genome of our own', subtitle: 'the next-token model with the four bases as tokens · the only teacher is the next base · what it learns of exons, repeats and motifs without a label', testNote: 'dna-test-note',
+      state: () => S.dna, data: () => dnaData(), shipped: () => dnaShipped(),
+      sections: NDNA ? NDNA.KINDS : [], colors: NDNA ? NDNA.KIND_COLORS : {}, headers: {}, sectionsOf: words => words.map(() => 'i'),
+      vocabOf: () => NDNA.vocabOf(1), splits: D => ({ train: D.train, test: D.test, held: [] }), evalN: 1000, lossScale: 1 / Math.LN2, nextLabel: 'next base right', tight: true, noMap: true,
+      groundN: 90, groundDocs: () => [], measureChunk: (L, M, deadline) => dnaMeasureChunk(L, M, deadline), measureNote: () => 'Scoring the 90 planted variants and writing a sample…', finishNote: (L, last) => dnaFinishNote(L, last),
+      unit: 'windows', doc: 'window', wideThumbs: true, heldLabel: 'never trained on', groundLabel: 'harmful variants scored below neutral ones', groundSub: 'frameshift, splice-site and TATA changes against synonymous and intergenic ones, every pair', groundChart: 'Harmful variants scored below neutral ones (chance 50%)', groundVerb: 'Scoring the planted variants', groundColor: '#eb6834',
+      groundKeys: () => [{ key: 'ground', color: '#eb6834' }],
+      curveKeys: () => ['i', 'c', 't', 'e', 'n', 'r', 'm'].map(k => ({ key: k, color: NDNA.KIND_COLORS[k] })), lossChart: 'Loss per epoch by kind of base, the held-out quarter (bits per base · 2 is a coin toss over four)',
+      curveLegend: () => ['i', 'c', 't', 'e', 'n', 'r', 'm'].map(k => `<span><span class="line" style="border-top-color:${NDNA.KIND_COLORS[k]}"></span>${esc(NDNA.KIND_NAMES[k])}</span>`).join(''),
+      noEvidence: true, samples: L => dnaRenderSamples(L), mapModes: ['pca'], epochTime: () => 'about 15 s',
+      prep: (L, w, split) => NDNA.prep(L.vocab, w, split),
+      groundPrefix: d => d.tokens.slice(0, 1), groundStop: () => false, groundRight: () => false,
+      evidenceSpan: () => null, evidenceChart: '', evidenceNow: '', evidenceColor: '#eb6834',
+      defaultWord: words => Math.min(32, words.length - 1), defaultWordName: 'the base in the middle of the window',
+      docTitle: r => `Window ${r.name} · ${r.split === 'train' ? 'training' : 'held out, never trained on'} · mostly ${NDNA.KIND_NAMES[r.kind]}`,
+      thumbClass: r => `dna-${r.kind}`, thumbTitle: r => `bases ${r.name} · mostly ${NDNA.KIND_NAMES[r.kind]} (${pct(r.share)}) · ${r.split === 'train' ? 'training' : 'held out'}`, thumbLabel: r => NDNA.KIND_NAMES[r.kind], traysTitle: 'The windows',
+      get traysLegend() { return dnaLegend(NDNA.KINDS) + '<span><span class="swatch batch"></span>the last batch trained on</span>'; },
+      labelled: () => new Set(['A', 'C', 'G', 'T']), mapExample: '', mapColour: '', mapLegend: () => '',
+      untrainedNote: 'Untrained: every next base is a guess over four, so the window is red all over. Step a batch to watch one gradient step, press Train (an epoch is about 15 s) and watch which kinds of base become predictable first, or load the trained model.',
+      loadedNote: 'Go to 3 · Test to see where along the held-out quarter it is surprised, how it scores the planted variants, and what a single layer on its vectors can tell; or keep training it here.',
+      blurb: 'The tokens are the four bases and the documents are windows of 64 bases of the chromosome, the first three quarters of it; the only teacher is the next base, and nothing says where the genes are. A coin toss over four bases costs 2 bits, so what the model learns of a kind of sequence is what it saves below that. The large DNA models (Evo 2, HyenaDNA) are this with billions of bases, a context of a million and months of training; the rest of the slide, the k-mer tokens and the masked models, are other choices of the same two things, the token and the teacher.',
+      curvesNote: 'The loss is the surprise per base, in bits, on the held-out quarter of the chromosome the model never trains on, by the kind of base predicted; 2 bits is a coin toss over four. The open sequence stays near its floor, there is nothing in it to learn, and that is the right answer. The microsatellites and the TATA box fall first, patterns a few bases long; the exons fall as the model finds the frame of the organism’s code; the repeat copies last, as it memorises an element it has met a dozen times. The second chart is how often its most probable base is the right one, the third how it ranks the planted variants.',
+      attentionNote: n => `Rows ask, columns answer: every row is one base’s shares over the bases before it, scaled to its largest share. The near head reads the base or two just before, where the code’s frame and the motifs live; the far head reaches back along the window. The bars give each head’s attention by distance back, averaged over the ${n} bases of the window.`,
+      testView: () => null,
+      renderData: () => dnaRenderData(), renderTest: () => dnaRenderTest(),
+    },
   };
   const LMW = () => LM_WORLDS[LM_WORLDS[S.world] ? S.world : 'reports']; // the language-model world on screen (the reports' when none is)
   const LM = () => LMW().state();                                          // its state
@@ -3527,7 +3685,7 @@
     L.built = true;
     return true;
   }
-  function rpConfig() { const L = LM(); return { vocabSize: L.vocab.size, dim: L.dim, layers: L.layers, heads: RP.heads, dk: L.dim >= 48 ? 12 : 8, ffn: L.dim, costInit: RP.costs, positions: L.positions ? RP.positions : 0, clip: RP.clip, optimizer: 'adam', seed: L.seed, codeDim: LMW().codeDim ? LMW().codeDim(L) : 0 }; }
+  function rpConfig() { const L = LM(); return { vocabSize: L.vocab.size, dim: L.dim, layers: L.layers, heads: RP.heads, dk: L.dim >= 48 ? 12 : 8, ffn: L.dim, costInit: LMW().costs || RP.costs, positions: L.positions ? RP.positions : 0, clip: RP.clip, optimizer: 'adam', seed: L.seed, codeDim: LMW().codeDim ? LMW().codeDim(L) : 0 }; }
   function rpReset(reason) {
     const L = LM(); rpStop(); if (!rpBuild()) return;
     L.model = new NN.LanguageModel(rpConfig()); L.shipped = false;
@@ -3572,7 +3730,7 @@
     L.model = NN.LanguageModel.fromJSON(W); L.shipped = true; L.dim = W.dim; L.layers = W.layers; L.positions = W.positions > 0;
     L.rng = NN.mulberry32(L.seed * 977 + 1); L.order = L.train.map((_, i) => i);
     const hist = Array.isArray(W.hist) && W.hist.length ? W.hist.map(h => Object.assign({}, h)) : null; // the history of its training in Node, epoch by epoch, when the file carries it
-    L.epoch = hist ? hist.length : 30; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist || []; L.lastBatch = []; L.trainLoss = hist ? hist[hist.length - 1].loss : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
+    L.epoch = hist ? hist.length - (hist[0] && hist[0].epoch === 0 ? 1 : 0) : 30; L.epochs = Math.max(L.epochs, L.epoch); L.ptr = 0; L.hist = hist || []; L.lastBatch = []; L.trainLoss = hist && hist[hist.length - 1].loss != null ? hist[hist.length - 1].loss / (WD.lossScale || 1) : null; L.measuring = null; L.fw = null; L.fwFor = null; L.finishedAt = null;
     L.trial = { next: 0, results: new Map() }; L.written = null; L.writing = null; L.formCase = null; L.truthShown = false;
     L.trail = rpTrailLoad(W.trails); L.pcaAxes = null; // the words' paths through its training in Node, when the file carries them
     if (!hist) rpRecordEpoch(true); else if (!L.trail.steps.length) rpTrailPush(L);
@@ -3582,9 +3740,9 @@
   // the test loss by section on the first reports of the test set, and, from epoch 1, the diagnosis written from the
   // findings alone on a few of them (measured in the animation loop, a few words per frame, so the page stays alive)
   function rpRecordEpoch(withGround) {
-    const L = LM(), docs = L.test.slice(0, RP.evalN), ev = L.model.evaluate(docs), rec = { epoch: L.epoch, loss: L.trainLoss, testLoss: ev.loss, acc: ev.accuracy, ground: null };
+    const L = LM(), WDe = WDof(L), sc = WDe.lossScale || 1, docs = L.test.slice(0, WDe.evalN || RP.evalN), ev = L.model.evaluate(docs), rec = { epoch: L.epoch, loss: L.trainLoss == null ? null : L.trainLoss * sc, testLoss: ev.loss * sc, acc: ev.accuracy, ground: null };
     const sum = {}, n = {}; docs.forEach((d, k) => { for (let i = 0; i + 1 < d.tokens.length; i++) { const s = d.sections[i + 1]; sum[s] = (sum[s] || 0) + ev.per[k][i]; n[s] = (n[s] || 0) + 1; } });
-    for (const s of WDof(L).sections) rec[s] = n[s] ? sum[s] / n[s] : null;
+    for (const s of WDof(L).sections) rec[s] = n[s] ? sum[s] / n[s] * sc : null;
     rec.evidence = rpEvidenceShare(L); // where the diagnosis (the answer) looks: the share of its attention on the findings, on a few test documents
     L.hist.push(rec); rpTrailPush(L); // the tables now: one step of every word's path on the map
     if (withGround) { const WDg = WDof(L), docsG = WDg.groundDocs ? WDg.groundDocs(L) : L.test.slice(0, WDg.groundN || RP.groundN); rec.groundN = docsG.length; L.measuring = { docs: docsG, i: 0, st: null, ok: 0, n: 0, rec }; if (!L.running) requestAnimationFrame(now => rpTick(now, L)); }
@@ -3686,14 +3844,14 @@
       `<span>architecture <b>${esc(m.describe())}</b></span><span>parameters <b>${m.parameterCount()}</b></span>` +
       `<span>${WD.unit} <b>${L.train.length}</b> training · <b>${L.test.length}</b> test · <b>${L.held.length}</b> ${WD.heldLabel}</span>` +
       `<span>epoch <b>${L.epoch}</b> / ${L.epochs}${L.shipped ? ' (the trained model that ships with the page)' : ''}</span><span>batch <b>${L.ptr === 0 ? '–' : Math.ceil(L.ptr / RP.batch)}</b> / ${Math.ceil(L.train.length / RP.batch)}</span>` +
-      `<span>loss <b>${L.trainLoss == null ? '–' : L.trainLoss.toFixed(3)}</b> training · <b>${last ? last.testLoss.toFixed(3) : '–'}</b> test</span><span>next word right <b>${last ? pct(last.acc) : '–'}</b> test</span>` +
+      `<span>loss <b>${L.trainLoss == null ? '–' : (L.trainLoss * (WD.lossScale || 1)).toFixed(3)}</b> training · <b>${last ? last.testLoss.toFixed(3) : '–'}</b> test${WD.lossScale ? ' (bits per base)' : ''}</span><span>${WD.nextLabel || 'next word right'} <b>${last ? pct(last.acc) : '–'}</b> test</span>` +
       `<span>${WD.groundLabel} <b>${L.measuring ? 'measuring…' : last && last.ground != null ? pct(last.ground) : '–'}</b> (${last && last.groundN ? last.groundN : L.shipped && W && W.groundN ? W.groundN : WD.groundN || RP.groundN} ${WD.groundSub})</span>`;
   }
   function rpForward(r) { const L = LM(); if (L.fw && L.fwFor === r.id) return L.fw; L.fw = L.model.forward(r.tokens, r.code || null); L.fwFor = r.id; return L.fw; }
   // the words of a report as spans: each coloured by the probability the model gave it, given the words before
   const fmtTimes = x => (x >= 100 ? String(Math.round(x)) : x >= 10 ? x.toFixed(0) : x.toFixed(1));
   function rpTextHtml(words, probsOf, opts) {
-    const WD = LMW(), L = LM(), secs = WD.sectionsOf(words), chance = L.colour === 'chance', V = L.vocab ? L.vocab.size : 1; let html = '', lineStart = true;
+    const WD = LMW(), L = LM(), secs = opts && opts.secs ? opts.secs : WD.sectionsOf(words), tight = !!(opts && opts.tight), chance = L.colour === 'chance', V = L.vocab ? L.vocab.size : 1; let html = '', lineStart = true;
     words.forEach((w, i) => {
       if (w === RPR.START) return;
       if (w === RPR.END) { html += `<span class="tok muted" data-i="${i}">⟨end⟩</span>`; return; }
@@ -3708,7 +3866,7 @@
           tip = ` · P = ${p.toFixed(3)} · ${x >= 1 ? `${fmtTimes(x)}× chance` : `${fmtTimes(1 / x)}× below chance`}`;
         } else { style = p >= 0.35 ? ` style="background:rgba(12,163,12,${(0.1 + 0.4 * p).toFixed(2)})"` : ` style="background:rgba(208,59,59,${(0.12 + 0.5 * (0.35 - p) / 0.35).toFixed(2)})"`; tip = ` · P = ${p.toFixed(3)}`; }
       }
-      const space = lineStart || /^[,.:;)]$/.test(w) ? '' : ' ';
+      const space = tight || lineStart || /^[,.:;)]$/.test(w) ? '' : ' ';
       html += `${space}<span class="${cls}" data-i="${i}"${style}${p != null ? ` title="${w === '\n' ? '' : esc(w)}${tip}"` : ''}>${esc(w)}</span>`; lineStart = false;
     });
     return html;
@@ -3739,7 +3897,7 @@
   function rpRenderText() {
     const L = LM(), r = rpFocus(), fw = rpForward(r), probsOf = i => (i > 0 ? fw.probs[i - 1][r.tokens[i]] : null);
     $('rp-report-title').textContent = `${LMW().docTitle(r)}${L.selected == null && L.lastBatch.length ? ' · in the last batch trained on' : ''}`;
-    const el = $('rp-text'), WDx = LMW(); el.innerHTML = rpTextHtml(r.words, probsOf, WDx.imageOf ? { img: WDx.imageOf(r) } : null);
+    const el = $('rp-text'), WDx = LMW(); el.classList.toggle('tight', !!WDx.tight); el.innerHTML = rpTextHtml(r.words, probsOf, Object.assign(WDx.tight ? { secs: r.sections, tight: true } : {}, WDx.imageOf ? { img: WDx.imageOf(r) } : {}));
     let s = 0, n = 0, right = 0, worse = 0; for (let i = 1; i < r.tokens.length; i++) { const p = probsOf(i); s += -Math.log(p + 1e-7); n++; if (p * L.vocab.size < 1) worse++; const pr = fw.probs[i - 1]; let best = 0; for (let v = 1; v < pr.length; v++) if (pr[v] > pr[best]) best = v; if (best === r.tokens[i]) right++; }
     $('rp-text-note').textContent = (L.colour === 'chance'
       ? `Each word is coloured by how far the probability the model gave it stands from chance, 1 in ${L.vocab.size.toLocaleString()}, on a log scale: green towards certainty, faint at chance, red when the model gave the actual word less than chance and deep red when it was sure of something else (loss ${(s / n).toFixed(2)} per word on this ${LMW().doc}, ${pct(right / n)} of its words the most probable, ${worse} of ${n} below chance).`
@@ -3794,6 +3952,7 @@
     if (!rpBuild()) return;
     const WD = LMW(); $('rp-panel-title').textContent = WD.title; $('rp-panel-sub').textContent = WD.subtitle; $('rp-step-epoch').title = `one pass through the ${L.train.length} training ${WD.unit} (${WD.epochTime ? WD.epochTime() : 'about half a minute'})`; $('rp-blurb').innerHTML = WD.blurb || ''; $('rp-blurb').hidden = !WD.blurb; L.trayFor.train = false; // the trays are this world's
     { const modes = WD.mapModes || ['pca', 'tsne']; document.querySelectorAll('#rp-map-seg button').forEach(b => { b.hidden = !modes.includes(b.dataset.map); }); if (!modes.includes(L.map.mode)) { L.map.mode = modes[0]; L.map.running = false; } } // a vocabulary of thousands has no t-SNE: the text world keeps to the two directions
+    $('rp-map-card').hidden = !!WD.noMap; // four bases make no map
     L.hover = null; L.pinned = null; L.hoverNet = null; L.hoverAtt = null; rpSyncControls();
     if (!L.model) rpReset(WD.untrainedNote);
     else rpRender(true);
@@ -4400,7 +4559,7 @@
   // the masthead's one menu, the lecture recipe, names where the page is: on the classic questions the recipe whose
   // settings are on screen, or the question and "your own settings" once a setting has moved off it; on the other
   // questions the recipe last chosen, the fields by their kind (recipes 17, 18 and 19 are the three kinds), the clusters by their cases (3 the blood counts, 14 the nuclei)
-  const RECIPE_QUESTION = { 3: 'cluster', 12: 'foundation', 14: 'cluster', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'fields', 20: 'segment', 21: 'reports', 22: 'chat', 23: 'describe', 24: 'text' };
+  const RECIPE_QUESTION = { 3: 'cluster', 12: 'foundation', 14: 'cluster', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'fields', 20: 'segment', 21: 'reports', 22: 'chat', 23: 'describe', 24: 'text', 25: 'dna' };
   const recipeQuestion = k => (RECIPES[k] ? RECIPES[k].task : RECIPE_QUESTION[k]);
   const fdRecipe = () => ({ deep: '19', shallow: '18' }[S.fd.kind] || '17');
   function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); recipeAnchor = +k; syncRecipeNav(); writeHash(); }

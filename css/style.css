@@ -720,3 +720,24 @@ table.km-sweep td.bar i.sil { background: var(--irregular); }
 table.km-sweep tr.now td { background: var(--surface-2); font-weight: 600; }
 .verdict.km .pbar, .verdict.km .pbar-labels { display: none; } /* the Cluster question: no probability to mark */
 .chart.scatter svg polygon.terr { fill-opacity: 0.09; stroke-opacity: 0.4; stroke-width: 1; pointer-events: none; } /* a cluster's territory on the map */
+
+/* ---------- the DNA question ---------- */
+.rp-text.tight { word-break: break-all; letter-spacing: 0.7px; line-height: 1.75; }
+.rp-text .tok.sec-i { color: #6f6f7a; }
+.rp-text .tok.sec-c { color: #0e9f6e; font-weight: 600; }
+.rp-text .tok.sec-t { color: #b8860b; font-weight: 700; }
+.rp-text .tok.sec-5, .rp-text .tok.sec-3 { color: #5b86b8; }
+.rp-text .tok.sec-e { color: #4a3aa7; font-weight: 600; }
+.rp-text .tok.sec-n { color: #8f86c9; }
+.rp-text .tok.sec-r { color: #eb6834; font-weight: 600; }
+.rp-text .tok.sec-m { color: #c2185b; font-weight: 600; }
+.thumb.report.dna-i { border-color: #c4c4cc; } .thumb.report.dna-c { border-color: #0e9f6e; } .thumb.report.dna-t { border-color: #d4a017; }
+.thumb.report.dna-5, .thumb.report.dna-3 { border-color: #7aa6d6; } .thumb.report.dna-e { border-color: #4a3aa7; } .thumb.report.dna-n { border-color: #b7b0e6; }
+.thumb.report.dna-r { border-color: #eb6834; } .thumb.report.dna-m { border-color: #c2185b; }
+.dna-track-wrap { position: relative; }
+#dna-track, #dna-surprise { display: block; width: 100%; height: auto; }
+.dna-seq { font-family: var(--font-mono); font-size: 12px; word-break: break-all; letter-spacing: 0.6px; line-height: 1.7; }
+.dna-seq .motif { color: #fff; border-radius: 3px; padding: 0 2px; }
+table.dna-variants tr.now td { background: var(--surface-2); }
+table.dna-variants tr { cursor: pointer; }
+table.dna-variants td .dna-dots { display: block; }

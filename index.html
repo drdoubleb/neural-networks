@@ -1619,6 +1619,73 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
       </div>
     </section>
 
+    <!-- ============================ DNA · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-dna-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>DNA: a genome of our own</h2>
+          <span class="small muted" id="dna-data-sub"></span>
+        </div>
+        <p class="prose small">The same next-token model as the reports, the chat and the text, on a chromosome drawn by a script, so that every base carries the truth of what it is. The tokens are the four bases; the documents are windows of 64 bases; the first three quarters of the chromosome train the model and the last quarter is held out; the only teacher is the next base, and nothing says where the genes are. This is what a <strong>DNA foundation model</strong> is, in miniature: the same choice of a token and a teacher as a language model, on a genome. Afterwards the Test step asks what it learned: where along the held-out stretch it is surprised, how it scores a planted variant, and what a single layer on its vectors can tell with a few labels.</p>
+        <details class="fold"><summary>What the script planted, and the model is never told</summary><ul class="prose small" id="dna-rules"></ul></details>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The chromosome</h2>
+          <div class="legend" id="dna-track-legend"></div>
+        </div>
+        <div class="dna-track-wrap"><svg id="dna-track" role="img" aria-label="The chromosome, every base coloured by its kind"></svg><div class="tip" id="dna-track-tip" hidden></div></div>
+        <p class="small muted" id="dna-track-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="dna-data-doc-title">The window</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="dna-data-prev" title="the previous window">◀ previous</button><button type="button" class="btn" id="dna-data-next" title="the next window">next ▶</button></div>
+        </div>
+        <div class="rp-two">
+          <div><div class="rp-text tight" id="dna-data-text"></div></div>
+          <div><div class="rp-case" id="dna-data-case"></div><p class="small muted" id="dna-data-doc-note" style="margin-top:8px"></p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ DNA · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-dna-test" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>What the model learned without a label</h2>
+          <span class="small muted" id="dna-test-sub"></span>
+        </div>
+        <p class="note" id="dna-test-warning" hidden>The model has not trained: every next base is a guess over four, and the measures below are what that looks like. Load the trained model on the Train step, or train it there.</p>
+        <div class="note" id="dna-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Where it is surprised: the held-out quarter, base by base</h2>
+          <div class="legend" id="dna-surprise-legend"></div>
+        </div>
+        <div class="dna-track-wrap"><svg id="dna-surprise" role="img" aria-label="The model’s loss base by base along the held-out stretch, over the kinds of sequence"></svg><div class="tip" id="dna-surprise-tip" hidden></div></div>
+        <p class="small muted" id="dna-surprise-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The planted variants, scored without a label</h2>
+          <span class="small muted">log₂ P(the sequence with the change) − log₂ P(without it), over the variant and the 32 bases after it</span>
+        </div>
+        <table class="feat dna-variants" id="dna-variants"></table>
+        <p class="small muted" id="dna-variants-note" style="margin-top:8px"></p>
+        <div id="dna-variant-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>What the frozen model knows: a probe with ten labelled windows a side</h2>
+          <span class="small muted">a single layer on the mean of the model’s vectors over a window · scored on held-out windows</span>
+        </div>
+        <table class="feat" id="dna-probe"></table>
+        <p class="small muted" id="dna-probe-note" style="margin-top:8px"></p>
+      </div>
+    </section>
+
     <section class="stage-panel" id="panel-sg-data" hidden>
       <div class="card">
         <div class="card-head">
@@ -1829,6 +1896,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="data/describe/describe_data.js"></script>
 <script src="data/describe/describe_weights.js"></script>
 <script src="data/text/mountain_interval.js"></script>
+<script src="data/dna/genome_data.js"></script>
 <script src="data/fields/seg_weights.js"></script>
 <script src="data/fields/fields_cnn_weights.js"></script>
 <script src="data/trained/trained_models.js"></script>
@@ -1840,6 +1908,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="js/text.js"></script>
 <script src="js/cluster.js"></script>
 <script src="js/nn.js"></script>
+<script src="js/dna.js"></script>
 <script src="js/dataset.js"></script>
 <script src="js/viz.js"></script>
 <script src="js/glossary.js"></script>

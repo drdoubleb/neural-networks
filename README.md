@@ -19,8 +19,8 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
   the labelled-cases table), `node tools/check_foundation.js` (the foundation model's pretraining),
   `node tools/check_distill.js` (a teacher and a student against the game),
   `node tools/check_finetune.js` (the code input with the encoder unfrozen),
-  `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation) and `node tools/check_slides.js`
-  (attention over slides) reproduce them.
+  `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation), `node tools/check_slides.js`
+  (attention over slides) and `node tools/check_dna.js` (the next-base model on the chromosome) reproduce them.
 
 Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
@@ -54,10 +54,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The recipes ask fourteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
+The recipes ask fifteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
 label, the foundation model, two questions asked of slides, the fields of bladder, the same fields painted a class per pixel, the reports a small language model
 writes from an analyser's findings, the chat the same model holds about a case, the description it writes of a nucleus
-from its image, and the next-word model trained on any text you paste. Whatever the question, the nav has the same three steps, and a lecture recipe
+from its image, the next-word model trained on any text you paste, and the same model on a genome of our own, a base at a time. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings. The address follows: `#19/train` is recipe 19 on its Train step, `#reports/train` a
 question at its default settings, so a refresh or a copied link comes back to the same recipe and step.
 
@@ -190,7 +190,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the twenty-four recipe buttons
+## The lecture arc: the twenty-five recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑮:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑯: `node tools/check_slides.js --question focus --context none,distX
@@ -1703,6 +1703,7 @@ js/reports.js              the reports as tokens: the word-level tokenizer, the 
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
 js/text.js                 the Your-text question: a text normalised and cut into documents (a poem per marked title or a paragraph each, windows of 200 tokens at line ends), the tenth of every ten held out, the whole text's vocabulary, the title line as the prefix the model continues (browser + Node)
+js/dna.js                  the DNA question: the four bases (or k-mers in step) as tokens, the chromosome cut into windows, the kind of every base, the loss by kind, the surprise base by base, the zero-shot variant score and the probe on the frozen model’s vectors (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network, and the network unrolled at one pixel (circles for the channels, lines for the kernels' contributions)
@@ -1722,6 +1723,8 @@ data/text/mountain_interval.js  the default text of the Your-text question: Fros
 data/text/frost_collected.js  Frost's five books of 1913 to 1928 from the same eBook, fetched by the page on demand, written by tools/generate_text.js --all
 data/text/text_weights.js  the trained text model (30 epochs on Mountain Interval) with its vocabulary, the curves of its training, the two titles continued after every epoch and the words' paths, written by tools/check_text.js --save; fetched by the page on demand
 data/text/text_weights_all.js  the trained text model of the five books (7 epochs) with its vocabulary, curves, samples and word paths, written by tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --save; fetched on demand
+data/dna/genome_data.js    the synthetic chromosome of the DNA question: the sequence, the kind of every base, the genes, repeats, microsatellites and planted variants, written by tools/generate_genome.js
+data/dna/dna_weights.js    the trained DNA model with the curves of its training (the loss by kind of base, the variant measure and a written sample per epoch), written by tools/check_dna.js --save; fetched by the page on demand
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑱ and ⑲) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
@@ -1743,6 +1746,8 @@ tools/generate_describe.js make the Describe nuclei and their descriptions (a co
 tools/check_describe.js    train the describe model on the frozen backbone's codes and take its measures: loss by section, the traits written from the image alone, the no-image and shuffled-code controls, the other lab's scans, the seven other views
 tools/generate_text.js     write a text of the Your-text question from a Project Gutenberg plain text: the header and licence stripped, the lines between two headings taken
 tools/check_text.js        train the next-word model on a text as the page does and take its measures: loss and next word right on the held-out and the training documents per epoch, two titles continued after every epoch, recall of the training and held-out poems from their title lines, poems from titles of one's own at a temperature
+tools/generate_genome.js   draw the chromosome of the DNA question: genes with a CpG island, a TATA box, exons in the organism’s own code and introns with splice sites, a repeat family, microsatellites, every base labelled, and the planted variants
+tools/check_dna.js         train the next-base model on the chromosome as the page does and take its measures: the loss by kind of base per epoch, the codon rhythm, the planted variants scored, the probe on the frozen model; --save writes the shipped model
 tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma
