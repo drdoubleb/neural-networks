@@ -20,7 +20,8 @@ miniature foundation model on 100 unlabelled nuclei, live. No installation, no s
   `node tools/check_distill.js` (a teacher and a student against the game),
   `node tools/check_finetune.js` (the code input with the encoder unfrozen),
   `node tools/pretrain_backbone.js --measure` (the shipped encoder's ablation), `node tools/check_slides.js`
-  (attention over slides) and `node tools/check_dna.js` (the next-base model on the chromosome) reproduce them.
+  (attention over slides) `node tools/check_dna.js` (the next-base model on the chromosome) and `node tools/check_dna_annotate.js` (that model
+  put to work, with its controls) reproduce them.
 
 Keys during a lecture: `1` `2` `3` switch steps, `space` trains/pauses, `T` or `N` teaches the next case one step
 (Train) and `N` classifies the next test case (Test).
@@ -54,10 +55,10 @@ style). The network never sees it; the page uses it to show which hidden units r
 
 ## Three steps for every question
 
-The recipes ask fifteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
+The recipes ask sixteen questions: a blood count, three nucleus questions, the clusters those cases fall into with no
 label, the foundation model, two questions asked of slides, the fields of bladder, the same fields painted a class per pixel, the reports a small language model
 writes from an analyser's findings, the chat the same model holds about a case, the description it writes of a nucleus
-from its image, the next-word model trained on any text you paste, and the same model on a genome of our own, a base at a time. Whatever the question, the nav has the same three steps, and a lecture recipe
+from its image, the next-word model trained on any text you paste, the same model on a genome of our own, a base at a time, and that model put to work finding the genes from one labelled gene. Whatever the question, the nav has the same three steps, and a lecture recipe
 simply selects a question and its settings. The address follows: `#19/train` is recipe 19 on its Train step, `#reports/train` a
 question at its default settings, so a refresh or a copied link comes back to the same recipe and step.
 
@@ -190,7 +191,7 @@ by back-propagating the score to the input, so it works through hidden layers an
 *push* bar per measurement. For a nucleus it also shows the same nucleus as scanned at both labs, with the network's
 call for each scan.
 
-## The lecture arc: the twenty-five recipe buttons
+## The lecture arc: the twenty-six recipe buttons
 
 Numbers are test-set accuracy, mean of three seeds, reproducible with `node tools/check_training.js` (recipe ⑮:
 `node tools/check_slides.js --epochs 60 --lr 0.02`; recipe ⑯: `node tools/check_slides.js --question focus --context none,distX
@@ -223,6 +224,7 @@ Numbers are test-set accuracy, mean of three seeds, reproducible with `node tool
 | ㉓ Describe · from pixels to words · the image as the first token | 26,361 | all four traits right for 63% of the test nuclei described from the image alone (size 96%, stain 86%, outline 80%, chromatin 98%), against 6% with no image | The frozen encoder of the Foundation question makes a code of 16 numbers of each nucleus; one learned matrix projects it into the embedding space as the first token, and the report model writes the description. Press Train and watch the third chart: size is read in the first epoch, the chromatin by the third, the stain by the fifth, the outline last. On the Test step describe a nucleus, then the same nucleus as scanned at the other lab, flipped and turned, and with no image at all. |
 | ㉔ Your text · paste any text and train the next-word model on it · Frost's Mountain Interval by default | 274,945 | the next word right for 10% of the held-out words and 89% of the training words after 30 epochs; the held-out loss lowest after epoch 4 (5.68), 10.35 at epoch 30; the five books' own model after 7 epochs: held-out loss lowest at epoch 3 (5.18), 5.45 at epoch 7, 18% of the held-out next words right against 30% of the training ones | The model handed over: any text, cut into documents with one in ten held out, the next word alone. The two curves part within a few epochs, memorisation outrunning what the model learns of the language, and a box shows a held-out title and a training title continued after every epoch, the second turning into the poem itself. Then start it off with a training title, a held-out one or words of your own, at a temperature. |
 | ㉕ DNA · a genome of our own · the next-base model on a chromosome drawn by a script | 11,019 | held-out loss 1.85 bits per base after 30 epochs (2 is a coin toss over four): the exons at 1.53 once the frame of the code is found at epoch 12, the CpG islands 1.78, the microsatellites 1.50, the open sequence 1.99 at its floor; a frameshift scores −17 bits, a synonymous change 0; a harmful variant below a neutral one 77% of the time | The DNA foundation model in miniature: the same next-token model, the four bases as tokens, the next base the only teacher, on a genome whose every base carries a truth the model never sees. The loss by kind of base shows what is learnable (composition at once, the frame of the code in a sudden step, a repeat family not in this time), the variant table shows the zero-shot use and its limits (the frameshift is a catastrophe, the synonymous change nothing, the splice site beyond a model that has seen 55 introns), and the probe shows the few-labels use. See *DNA* below. |
+| ㉖ DNA · find the genes · a single layer on the frozen model's vectors and one labelled gene | 165 on a frozen 11,019 | 78% of the held-out bases named right from one labelled gene (3,220 bases), mean IoU 68%: exons 86%, CpG islands 96%, introns 40%; all 21 held-out exons found, none false; the same layer on an untrained model: exons 35%, 10 found, 6 false; the same network from scratch on the labels: exons 21% with one gene, 76% with sixteen | What a foundation model is for, on DNA. The model of ㉕ is frozen, every base becomes the vector the model holds there, and a single layer trained on one labelled gene paints the held-out quarter a kind per base: the labels only name what the training on the next base had found. Sixteen genes change little; an untrained model's vectors find the islands and not the exons; and the layer finds the exons at the very epoch the model finds the frame. The last card asks the same of a network trained on the labels alone, which is the road of Enformer, Borzoi and AlphaGenome, and shows when each road is the one to take. See *Put to work* under *DNA* below. |
 
 The Reports question's experiment without a context layer (the lookup table and the output table alone, so that every next word comes from the current word and its position) is no longer a recipe: a link on the Reports Train step sets it up, and its numbers are under *Reports* below. In the page, the recipes carry plain numbers (*18 · Describe · …*); the circled numbers here are the same recipes.
 
@@ -1586,6 +1588,86 @@ the Test step. This model saw 33,000 bases with a context of 64; Evo 2 saw nine 
 and the human genome's repeat families are a million copies deep, not 42. What carries over is the shape of the thing:
 a token, a teacher that is the next base, and measures that ask the trained model questions it was never trained for.
 
+### Put to work: the genes from one labelled gene
+
+Recipe ㉖ is what a DNA language model is for. The model of ㉕ is frozen. It reads the chromosome in windows of 64
+bases every 32, and every base is described by the 32 numbers the model holds after reading it (taken from the window
+in which the base has at least 32 bases before it), averaged over the 33 bases centred on it. A single layer on those
+numbers, a softmax over five kinds, 165 weights, is trained on a labelled stretch, and then names the kind of every
+base of the held-out quarter, 11,105 bases the model never trained on and the layer never saw. The five kinds are exon,
+intron, CpG island, repeat and everything else (the open sequence, the UTRs, the TATA box and the microsatellites). The
+labels come as an annotator would give them, a stretch of the chromosome with the kind of every base: from the first
+base to the start of the gene after the k-th, so k genes with the open sequence and the repeat copies on the way; one
+gene is 3,220 bases, 588 of them exon. The painting is scored like the Segment question's: the bases right, the
+intersection over union of every kind, and the exons, found when more than half of an exon's bases are painted exon,
+false when a painted run of 20 bases or more lies less than half inside a true one.
+
+This is how the models trained on sequence alone are used. Evo 2 ships an exon classifier that is a small model on its
+frozen vectors; SegmentNT puts a segmentation network on the Nucleotide Transformer and trains both to paint fourteen
+kinds of element per base. The other family of large DNA models has no label-free stage at all: Enformer, Borzoi and
+AlphaGenome are trained directly on measured tracks (RNA-seq, chromatin accessibility, histone marks, splicing, contact
+maps; 5,930 human tracks for AlphaGenome, which reads a million bases at a time and predicts many of them per base),
+so their labels are experiments that cover every base of the genome. The recipe asks the question both ways.
+
+| Labelled genes | Labelled bases | The frozen model, a single layer | The same network from scratch, the labels alone | An untrained model, a single layer |
+|---|---|---|---|---|
+| 1 | 3,220 | **86% · 21/21 · 0 false** | 21% · 3/21 · 21 false | 35% · 10/21 · 6 false |
+| 2 | 4,928 | **88% · 21/21 · 0 false** | 32% · 11/21 · 28 false | 45% · 17/21 · 18 false |
+| 3 | 7,900 | **88% · 21/21 · 0 false** | 46% · 18/21 · 22 false | 45% · 13/21 · 14 false |
+| 5 | 10,679 | **89% · 21/21 · 0 false** | 52% · 16/21 · 11 false | 40% · 12/21 · 12 false |
+| 10 | 20,841 | **90% · 21/21 · 0 false** | 69% · 18/21 · 4 false | 43% · 13/21 · 8 false |
+| 16 | 32,311 | **90% · 21/21 · 0 false** | 76% · 20/21 · 4 false | 38% · 13/21 · 9 false |
+
+Every cell is the exons' intersection over union on the held-out quarter, the exons found of 21, and the false ones
+(`node tools/check_dna_annotate.js`; the page's Train step gives the first and third columns, seed for seed).
+
+**The frozen model.** With one labelled gene the layer names 78% of the held-out bases right, mean IoU 68%: exons
+86%, CpG islands 96%, the repeat 58%, everything else 60%, introns 40%. All 21 held-out exons are found and
+none is painted where there is none. Sixteen labelled genes, ten times the labels, change little (81%, 70%, exons
+90%): the layer is 165 numbers on vectors that already tell the kinds apart, and the labels only name them. The
+introns are the hard kind. Only their first six and last three bases are a signal; the body is random sequence a
+little richer in A and T than the open sequence, and the layer confuses the two. The exon edges come a few bases
+early or late, because the model reads left to right and needs a few codons to find the frame, and the mean over 33
+bases blurs a boundary.
+
+**What the pretraining bought.** The control is the same network with fresh random weights, read the same way, the same
+layer trained on the same labels: 61% of the bases, exons 35%, 10 of 21 found and 6 false. It finds the CpG islands
+(91%), because an untrained model's vectors still carry the base composition of the bases around, which is all an
+island is; an exon's composition is close to the open sequence's, and what tells an exon is the frame of its code. The
+bases themselves, one-hot with eight either side and no model at all, do worse: exons 17%, none found. The layer finds
+the exons exactly when the model finds the frame (`--by-epoch 30`, the recipe's pretraining run again with the layer
+trained afresh after every epoch): for the first 11 epochs the exons stay at 42% with about 11 of 21 found,
+no better than untrained; at epoch 12, where the model's loss on the exons has fallen from the coin toss's 2 bits to
+1.57, the layer has 79% and 21 of 21, and from there it stays between 80% and 89%. Nothing about the layer or its labels
+changed. The Test step shows the two curves side by side, and the page lets a learner repeat it: train the DNA model
+for a few epochs in ㉕, come back, and choose *the model trained here*.
+
+**The other road.** The same network with fresh weights, trained end to end on the labels and nothing else (`--e2e
+scratch`: every position predicts the kind of the base it read eight bases before, so that it has read past it;
+every run 60,000 windows, the gradient steps of sixty pretraining epochs; the last four scores of a run averaged,
+then seeds 2 and 3), finds the exons poorly from one gene, 21% with 21 false ones, and climbs
+with the labels: 32%, 46%, 52%, 69% and, with all sixteen genes, 76% with 20 of 21 found. With one gene it memorises
+it: its training loss goes to nothing while the held-out score does not move. So the frozen model with one labelled
+gene is ahead of the from-scratch network with sixteen, and the gap closes as the labels grow. With few labels, pretrain; with a label for every base, the labels
+alone get there too. AlphaGenome's family has experiments along the whole human and mouse genomes and needs no
+label-free stage; a genome with no experiments behind it is the case for the other.
+
+Fine-tuning is the third way (`--e2e finetune`: the pretrained weights unfrozen at a tenth of the layer's rate,
+20,000 windows, seed 2), and it buys nothing here over the frozen layer: mean IoU 55%, 55% and 64% with
+one, three and sixteen labelled genes, where the frozen layer has 68%, 70% and 70%; on the exons
+83%, 84% and 91% against 86%, 88% and 90%. With few genes it memorises them, as the fine-tuned encoder
+of recipe ⑬ memorised its few nuclei, and with all sixteen it draws level on the exons. The frozen layer is the safer
+use of few labels.
+
+The two families meet at a variant: both score it by running the model on the sequence with the change and without
+it, the likelihood for Evo 2 (the Test step of ㉕), the predicted tracks for AlphaGenome. AlphaGenome's second stage
+of training is the teacher and the student of the Foundation section, an ensemble of its models distilled into one.
+
+Reproduce: `node tools/check_dna_annotate.js` (the single-layer columns, 15 s), `--e2e scratch --genes 16 --seed 2
+--append runs.jsonl` (one end-to-end run, about ten minutes), `--by-epoch 30 --save epochs.json`, and `--table
+runs.jsonl --epochs-file epochs.json --save data/dna/annotate_table.js` for the table the page ships (7 kB, loaded
+with the page).
+
 ## The trained models that ship
 
 Every lesson has a *Load the trained model* button on its Train step, so that a lecture never has to wait for
@@ -1796,7 +1878,7 @@ js/reports.js              the reports as tokens: the word-level tokenizer, the 
 js/chat.js                 the transcripts of the chat question: the role of every token, the assistant's lines and the tool call, the persona, the styles with their phrasings, the eight questions with their answers from the findings, the probes (browser + Node)
 js/describe.js             the Describe question: the phrasings and sentence shapes of a description, a description from a nucleus's traits, the vocabulary with the image token, the traits and the impression read back from a written description, the share of a description's attention on the image token
 js/text.js                 the Your-text question: a text normalised and cut into documents (a poem per marked title or a paragraph each, windows of 200 tokens at line ends), the tenth of every ten held out, the whole text's vocabulary, the title line as the prefix the model continues (browser + Node)
-js/dna.js                  the DNA question: the four bases (or k-mers in step) as tokens, the chromosome cut into windows, the kind of every base, the loss by kind, the surprise base by base, the zero-shot variant score and the probe on the frozen model’s vectors (browser + Node)
+js/dna.js                  the DNA question: the four bases (or k-mers in step) as tokens, the chromosome cut into windows, the kind of every base, the loss by kind, the surprise base by base, the zero-shot variant score and the probe on the frozen model’s vectors; and the model put to work: the vector at every base, the single layer on it, the painting of the held-out quarter and its score (browser + Node)
 js/fields.js               the tissue fields shared by the page and the tools: PNG decoding, the grain from the field's seed, every nucleus's crop, the membrane's height, the per-pixel mask from the field's geometry and the intersection over union (browser + Node)
 js/dataset.js              decoding, blood-count fingerprints, the two labs' scans and source modes, stain normalisation, label noise, flip/rotation augmentation, standardized inputs, withheld inputs, the code input, labelled-case subsets (browser + Node)
 js/viz.js                  canvas + SVG drawing: images, fingerprints, weight maps, filters, feature maps, evidence overlays, network diagram, charts, the encoder's pair panel and similarity matrix, the slide viewer (with every link between the nuclei) and the attention ranking, the unrolled slide model, the who-looks-at-whom map and the how-a-nucleus-decides diagram; the field painted with its mask, the first layer's filters and maps of the segmentation network, and the network unrolled at one pixel (circles for the channels, lines for the kernels' contributions)
@@ -1818,6 +1900,7 @@ data/text/text_weights.js  the trained text model (30 epochs on Mountain Interva
 data/text/text_weights_all.js  the trained text model of the five books (7 epochs) with its vocabulary, curves, samples and word paths, written by tools/check_text.js --text data/text/frost_collected.js --global LECTURE_TEXT_ALL --save; fetched on demand
 data/dna/genome_data.js    the synthetic chromosome of the DNA question: the sequence, the kind of every base, the genes, repeats, microsatellites and planted variants, written by tools/generate_genome.js
 data/dna/dna_weights.js    the trained DNA model with the curves of its training (the loss by kind of base, the variant measure and a written sample per epoch), written by tools/check_dna.js --save; fetched by the page on demand
+data/dna/annotate_table.js the Annotate question’s comparison, measured in Node: the single layer on the frozen and on an untrained model and the same network from scratch, by labelled genes, and the layer after every epoch of the pretraining; written by tools/check_dna_annotate.js --table
 data/trained/trained_models.js  the trained models of the classic recipes, the foundation stage, the slide and the field questions, trained on the page by tools/export_models.js, with their curves
 data/fields/fields_cnn_weights.js the two end-to-end field models (recipes ⑱ and ⑲) with the curves of their training and their mimic tables, written by tools/check_fields_cnn.js --ship
 data/fields/seg_weights.js the trained segmentation network with the curves of its training and its measures, written by tools/check_segment.js --save; contact_sheet_segmentation.png beside it shows ten test fields as the image, the truth and the prediction
@@ -1841,6 +1924,7 @@ tools/generate_text.js     write a text of the Your-text question from a Project
 tools/check_text.js        train the next-word model on a text as the page does and take its measures: loss and next word right on the held-out and the training documents per epoch, two titles continued after every epoch, recall of the training and held-out poems from their title lines, poems from titles of one's own at a temperature
 tools/generate_genome.js   draw the chromosome of the DNA question: genes with a CpG island, a TATA box, exons in the organism’s own code and introns with splice sites, a repeat family, microsatellites, every base labelled, and the planted variants
 tools/check_dna.js         train the next-base model on the chromosome as the page does and take its measures: the loss by kind of base per epoch, the codon rhythm, the planted variants scored, the probe on the frozen model; --save writes the shipped model
+tools/check_dna_annotate.js the DNA model put to work (recipe ㉖): the single layer on the frozen model’s vectors by labelled genes, the untrained and raw-base controls, the same network trained end to end from scratch or fine-tuned, the layer after every pretraining epoch; --table writes the comparison the page ships
 tools/export_models.js     train every lesson's model on the page itself (headless browser) and write data/trained/trained_models.js for the Load the trained model buttons
 tools/check_segment.js     train the segmentation network on crops of the fields and take its measures: loss, pixels right, the intersection over union per class on the test fields, by pattern, and where the pixels went; a sheet of predictions
 tools/probe_segment.js     what the shipped segmentation network reads: the nests' sizes and their distance from the membrane, the nest recall by depth, the band painted over with stroma, a nest's centre pasted into the band and a band patch pasted into the stroma

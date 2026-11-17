@@ -1644,7 +1644,7 @@ window.Viz = (function () {
     const xstep = niceStep(maxX, 5);
     for (let e = 0; e <= maxX + 1e-9; e += xstep) g += `<text x="${sx(e).toFixed(1)}" y="${H - 6}" text-anchor="middle">${e}</text>`;
     g += `<line class="axis" x1="${ml}" x2="${W - mr}" y1="${mt + ph}" y2="${mt + ph}"/>`;
-    const base = opt.baseline != null ? opt.baseline : (opt.pct ? 0.5 : null);
+    const base = opt.noBaseline ? null : opt.baseline != null ? opt.baseline : (opt.pct ? 0.5 : null); // noBaseline: a percentage with no chance level to mark (an intersection over union)
     if (base != null) g += `<line class="chance" x1="${ml}" x2="${W - mr}" y1="${sy(base).toFixed(1)}" y2="${sy(base).toFixed(1)}"/>` + (opt.baselineLabel ? `<text x="${W - mr}" y="${(sy(base) - 4).toFixed(1)}" text-anchor="end">${esc(opt.baselineLabel)}</text>` : '');
     for (const k of opt.keys) {
       const pts = hist.filter(h => h[k.key] != null);

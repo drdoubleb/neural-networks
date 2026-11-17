@@ -1686,6 +1686,152 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
       </div>
     </section>
 
+    <!-- ============================ ANNOTATE · the DNA model put to work · 1 · SPECIMENS ============================ -->
+    <section class="stage-panel" id="panel-an-data" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2>Annotate: the labels</h2>
+          <span class="small muted" id="an-data-sub"></span>
+        </div>
+        <p class="prose small">The DNA model of the last recipe was trained on the next base alone. Here it is put to work. An annotator has labelled one stretch of the chromosome, a kind for every base of it: <strong>exon</strong>, <strong>intron</strong>, <strong>CpG island</strong>, <strong>repeat</strong>, or everything else. The model is frozen and reads the chromosome; a single layer on what it holds at every base learns the labelled stretch, and is then asked to name the kind of every base of the held-out quarter, which the model never trained on and the layer never saw. The middle of the chromosome carries no labels at all: the model read it during its training, as sequence and nothing more.</p>
+        <div class="bar-row" style="margin-top:10px">
+          <div class="ctl"><span class="lbl">Labelled genes</span><div class="seg" id="an-data-genes-seg"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The chromosome, and what is labelled</h2>
+          <div class="legend" id="an-data-legend"></div>
+        </div>
+        <div class="dna-track-wrap"><svg id="an-data-track" class="an-svg" role="img" aria-label="The chromosome: the labelled stretch with the kind of every base, the unlabelled middle, the held-out quarter"></svg><div class="tip" id="an-data-tip" hidden></div></div>
+        <p class="small muted" id="an-data-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The labelled stretch, kind by kind</h2>
+          <span class="small muted">what the layer trains on · the chromosome as a whole beside it</span>
+        </div>
+        <table class="feat" id="an-data-table"></table>
+        <p class="small muted" id="an-data-table-note" style="margin-top:8px"></p>
+      </div>
+    </section>
+
+    <!-- ============================ ANNOTATE · 2 · TRAIN ============================ -->
+    <section class="stage-panel" id="panel-an-train" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>Annotate: a single layer on the frozen DNA model</h2>
+          <span class="small muted">the model is not trained here · 165 weights are · a kind for every base</span>
+        </div>
+        <p class="prose small" id="an-blurb"></p>
+        <div class="bar-row">
+          <div class="ctl"><span class="lbl">The vectors come from</span><div class="seg" id="an-source-seg"><button type="button" data-source="shipped" class="is-active" title="the DNA model that ships with the page: the recipe's run, 120 epochs on the next base">the trained DNA model</button><button type="button" data-source="page" title="the DNA model as you trained it on this page in the DNA question" hidden>the model trained here</button><button type="button" data-source="untrained" title="the same network with fresh random weights: what the layer finds with no pretraining behind it">an untrained model</button></div></div>
+          <div class="ctl"><span class="lbl">Labelled genes</span><div class="seg" id="an-genes-seg"></div></div>
+          <div class="ctl slim"><label for="an-epochs">Epochs <span class="val" id="an-epochs-val">30</span></label><input type="range" id="an-epochs" min="5" max="60" step="5" value="30"></div>
+          <div class="actions-inline">
+            <button type="button" class="btn" id="an-step" title="one pass of the layer over the labelled bases">Step epoch</button>
+            <button type="button" class="btn primary big" id="an-train" title="run the remaining epochs (space)">▶ Train</button>
+            <button type="button" class="btn" id="an-reset" title="the layer's weights back to zero">↺ Reset</button>
+          </div>
+        </div>
+        <div class="status" id="an-status"></div>
+        <div class="note" id="an-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>From a base to a kind</h2>
+          <span class="small muted">what is frozen, what is trained</span>
+        </div>
+        <div class="an-flow" id="an-flow"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>The held-out quarter, as the layer paints it</h2>
+          <div class="legend" id="an-legend"></div>
+        </div>
+        <div class="bar-row" style="margin-bottom:8px">
+          <div class="metrics">
+            <div class="metric"><span class="lbl">bases right</span><b id="an-stat-acc">–</b><small id="an-stat-acc-sub">of the held-out bases</small></div>
+            <div class="metric"><span class="lbl">mean IoU</span><b id="an-stat-iou">–</b><small>over the five kinds</small></div>
+            <div class="metric"><span class="lbl">exons found</span><b id="an-stat-exons">–</b><small id="an-stat-exons-sub">more than half painted exon</small></div>
+            <div class="metric"><span class="lbl">false exons</span><b id="an-stat-false">–</b><small>painted where there is none</small></div>
+          </div>
+        </div>
+        <div class="dna-track-wrap"><svg id="an-paint" class="an-svg" role="img" aria-label="The held-out quarter: the truth, the layer's painting, and the bases it gets wrong"></svg><div class="tip" id="an-paint-tip" hidden></div></div>
+        <p class="small muted" id="an-paint-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Curves</h2><span class="small muted">the layer's loss on the labelled bases · its painting of the held-out quarter after every epoch</span></div>
+        <div class="curves three">
+          <div class="chart"><div class="title"><span>Loss on the labelled bases</span><span class="now" id="an-loss-now"></span></div><svg id="an-loss" role="img" aria-label="The layer's loss per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Held-out bases right</span><span class="now" id="an-acc-now"></span></div><svg id="an-acc" role="img" aria-label="Held-out bases right per epoch"></svg></div>
+          <div class="chart"><div class="title"><span>Intersection over union, per kind</span><span class="now" id="an-iou-now"></span></div><svg id="an-iou" role="img" aria-label="Intersection over union per kind per epoch"></svg></div>
+        </div>
+        <div class="legend" id="an-curves-legend" style="margin-top:6px"></div>
+        <p class="small muted" id="an-curves-note" style="margin-top:8px"></p>
+      </div>
+    </section>
+
+    <!-- ============================ ANNOTATE · 3 · TEST ============================ -->
+    <section class="stage-panel" id="panel-an-test" hidden>
+      <div class="card bar">
+        <div class="card-head">
+          <h2>What one labelled gene bought</h2>
+          <span class="small muted" id="an-test-sub"></span>
+        </div>
+        <div class="bar-row">
+          <div class="metrics">
+            <div class="metric"><span class="lbl">bases right</span><b id="an-test-acc">–</b><small>of the held-out bases</small></div>
+            <div class="metric"><span class="lbl">mean IoU</span><b id="an-test-iou">–</b><small>over the five kinds</small></div>
+            <div class="metric"><span class="lbl">exons found</span><b id="an-test-exons">–</b><small>more than half painted exon</small></div>
+            <div class="metric"><span class="lbl">false exons</span><b id="an-test-false">–</b><small>painted where there is none</small></div>
+          </div>
+        </div>
+        <p class="note" id="an-test-warning" hidden>The layer has not trained yet: go to 2 · Train and press Train, it takes a few seconds.</p>
+        <div class="note" id="an-test-note"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="an-gene-title">A held-out gene, base by base</h2>
+          <div class="actions-inline"><button type="button" class="btn" id="an-gene-prev" title="the previous held-out gene">◀ previous</button><button type="button" class="btn" id="an-gene-next" title="the next held-out gene">next ▶</button></div>
+        </div>
+        <div class="dna-track-wrap"><svg id="an-gene" class="an-svg" role="img" aria-label="One held-out gene: the truth, the painting, and the layer's probability of exon at every base"></svg><div class="tip" id="an-gene-tip" hidden></div></div>
+        <div class="legend" id="an-gene-legend" style="margin-top:8px"></div>
+        <p class="small muted" id="an-gene-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Kind by kind, and what the pretraining bought</h2>
+          <span class="small muted">the held-out quarter · the same layer on an untrained model's vectors beside it</span>
+        </div>
+        <table class="feat" id="an-kinds"></table>
+        <p class="small muted" id="an-kinds-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card" id="an-epoch-card">
+        <div class="card-head">
+          <h2>The layer finds the exons when the model finds the frame</h2>
+          <span class="small muted">measured beforehand in Node · the recipe's pretraining run again, the layer trained afresh on one labelled gene after every epoch</span>
+        </div>
+        <div class="curves">
+          <div class="chart"><div class="title"><span>The DNA model: its loss on the held-out exons, bits per base</span><span class="now" id="an-epoch-loss-now"></span></div><svg id="an-epoch-loss" role="img" aria-label="The DNA model's loss on the held-out exons per epoch of its pretraining"></svg></div>
+          <div class="chart"><div class="title"><span>The single layer on its vectors: exons, intersection over union</span><span class="now" id="an-epoch-iou-now"></span></div><svg id="an-epoch-iou" role="img" aria-label="The single layer's exon intersection over union per epoch of the model's pretraining"></svg></div>
+        </div>
+        <p class="small muted" id="an-epoch-note" style="margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>How many labelled genes does it take, three ways</h2>
+          <span class="small muted">measured beforehand in Node · the dot is the layer on screen</span>
+        </div>
+        <div class="an-two">
+          <div class="chart"><div class="title"><span>Exons: intersection over union on the held-out quarter, by labelled genes</span></div><svg id="an-counts" role="img" aria-label="Exon intersection over union by the number of labelled genes: the frozen model with a single layer, the same network trained from scratch on the labels, the layer on an untrained model"></svg><div class="legend" id="an-counts-legend" style="margin-top:6px"></div></div>
+          <div><table class="feat" id="an-counts-table"></table></div>
+        </div>
+        <p class="small muted" id="an-counts-note" style="margin-top:10px"></p>
+        <p class="prose small" id="an-families" style="margin-top:10px"></p>
+      </div>
+    </section>
+
     <section class="stage-panel" id="panel-sg-data" hidden>
       <div class="card">
         <div class="card-head">
@@ -1897,6 +2043,7 @@ Tools: findings() returns the image analyser's findings for the open case. To ca
 <script src="data/describe/describe_weights.js"></script>
 <script src="data/text/mountain_interval.js"></script>
 <script src="data/dna/genome_data.js"></script>
+<script src="data/dna/annotate_table.js"></script>
 <script src="data/fields/seg_weights.js"></script>
 <script src="data/fields/fields_cnn_weights.js"></script>
 <script src="data/trained/trained_models.js"></script>
