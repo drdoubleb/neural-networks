@@ -741,3 +741,19 @@ table.km-sweep tr.now td { background: var(--surface-2); font-weight: 600; }
 table.dna-variants tr.now td { background: var(--surface-2); }
 table.dna-variants tr { cursor: pointer; }
 table.dna-variants td .dna-dots { display: block; }
+
+/* ---------- the Annotate question: the DNA model put to work ---------- */
+.an-svg { display: block; width: 100%; height: auto; }
+.an-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; }
+.an-box { flex: 1 1 130px; min-width: 120px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px; background: var(--surface); display: grid; gap: 3px; align-content: start; }
+.an-box b { font-size: 13px; }
+.an-box span { font-size: 12px; color: var(--ink-2); line-height: 1.4; }
+.an-box em { font-style: normal; font-weight: 600; color: var(--ink); }
+.an-box.frozen { background: var(--surface-2); border-style: dashed; }
+.an-box.trained { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.an-box i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 3px; }
+.an-arrow { align-self: center; color: var(--ink-3); font-size: 18px; flex: 0 0 auto; }
+.an-two { display: grid; gap: 18px; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; }
+@media (max-width: 1099px) { .an-two { grid-template-columns: minmax(0, 1fr); } }
+#an-counts-table tr.now td { background: var(--surface-2); }
+@media (min-width: 1100px) { .curves.three { grid-template-columns: 1fr 1fr 1fr; } }

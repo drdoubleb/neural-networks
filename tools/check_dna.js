@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * check_dna.js — the page's next-token model on the synthetic genome: single bases as tokens, windows of the chromosome
- * as documents, the first four fifths to train on and the last fifth held out. Per epoch it reports the loss (bits per
+ * as documents, the first three quarters to train on and the last quarter held out. Per epoch it reports the loss (bits per
  * base) on the held-out windows and by the kind of base predicted (exon, intron, intergenic, CpG island, repeat…).
  * After training it takes three measures of what the model learned without a label:
  *   the codon rhythm    the held-out exons' loss by position in the codon (a model that found the reading frame is

@@ -28,6 +28,7 @@
       text: null, source: 'default', D: null, prompt: null, maxWords: 80, loading: null, loadingW: null, inputFor: null, trainTitleAt: 0, labelled: null, labelledFor: null }, // the Your-text question: the text pasted (null: the default), where it came from, its documents, and the Test step's prompt
     dna: { world: 'dna', colour: 'chance', built: false, model: null, dim: 32, layers: 2, positions: true, epochs: 30, lr: 0.01, seed: 2, epoch: 0, ptr: 0, order: [], hist: [], running: false, stopAt: null, lastRender: 0, lastBatch: [], trainLoss: null, selected: null, hover: null, pinned: null, layer: 1, head: -1, reveal: false, dataSelected: null, trayFor: {}, cases: 'test', trial: { next: 0, results: new Map() }, testSelected: null, temperature: 0.8, pace: 8, form: null, formCase: null, noblock: false, writing: null, written: null, truthShown: false, batchWriting: false, measuring: null, shipped: false, fw: null, fwFor: null, arcs: true, hoverNet: null, hoverAtt: null, pcaAxes: null, trail: null, wordSec: null, netView: 'graph', netWalk: null, hops: true, hoverHeads: null, map: { mode: 'pca', source: 'out', Y: null, iter: 0, todo: 0, running: false, forModel: null, trail: false, hoverWord: null },
       window: 64, stride: 32, D: null, loadingW: null, test: { key: null, surprise: null, variants: null, probe: null, probe0: null, probe0For: null, cls: null } }, // the DNA question: the same model on a genome of our own, windows of 64 bases as documents
+    an: { source: 'shipped', genes: 1, epochs: 30, epoch: 0, running: false, timer: null, key: null, want: null, M: null, head: null, hist: [], Xl: null, Xh: null, end: 0, pred: null, probs: null, score: null, ctrl: null, gene: 0, reading: null, loading: null, loadError: null, pending: null }, // the Annotate question: a single layer on the frozen DNA model's vectors, trained on the labels of a few genes
     sg: { world: 'segment', built: false, model: null, levels: 2, channels: 8, crops: 100, epochs: 15, seed: 1, epoch: 0, ptr: 0, hist: [], running: false, lastRender: 0, trainLoss: null, lastField: null, selected: null, dataSelected: null, testSelected: null, trial: { next: 0, results: new Map() }, view: 'pred', testView: 'pred', dataView: 'truth', hover: null, testHover: null, trayFor: {}, thumbs: new Map(), shipped: false, readying: null, progress: '', fw: null, fwFor: null, share: null, meanInk: 0.29, pixel: null, pixelPinned: false, testPixel: null, testPixelPinned: false, hoverNet: null, hoverLive: null, testHoverNet: null },
     km: { built: false, mode: 'features', k: 4, seed: 1, start: 'pp', colour: 'cluster', show: { spokes: false, territories: false }, axes: { x: 'pc1', y: 'pc2' }, st: null, hist: [], inp: null, X: null, Xt: null, At: null, pca: null, pcaKey: null, names: null, running: false, anim: null, sweep: null, sweepKey: null, for: null }, // the Cluster question: k-means over the classic questions' cases, scored by their hidden subtypes
     fd: { built: false, model: null, kind: 'nuclei', cellView: 'attention', hoverCell: null, pinnedCell: null, hoverLayers: null, hoverCellNet: null, hoverLive: null, lwalk: null, cnnProbs: null, epochSums: null, stopAtEpoch: null, lastBatch: null, scoring: null, pos: true, ctx: true, crop: 'nucleus', units: 4, lr: 0.02, decay: 0.001, clip: 20, epochs: 60, speed: 8, seed: 1, epoch: 0, ptr: 0, order: [], hist: [], running: false, debt: 0, lastTime: 0, lastRender: 0, lastField: null, selected: null, hoverNucleus: null, pinned: null, reveal: false, linksAll: false, linksMin: 0.1, layer: 0, trial: { next: 0, results: new Map() }, dataSelected: null, dataHover: null, testSelected: null, trayFor: {}, encKey: null, progress: '', head: 1, attView: 'both', frozen: null, hoverAtt: null, hoverDecide: null, hoverUnrolled: null, hoverScorer: null, hoverHead: null, walk: null, dwalk: null, walkNucleus: null },
@@ -45,7 +46,7 @@
   };
   const thumbs = { data: new Map(), train: new Map(), test: new Map() }; // id -> element
 
-  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default','25 · DNA · a genome of our own · the next-base model: what it learns of exons, repeats and motifs without a label, where it is surprised, how it scores a variant']; // the number first, in plain digits, so that it reads in the dropdown
+  const RECIPE_LABELS = ['','1 · Leukemia · blood count · single layer','2 · Leukemia · blood count · 3 ReLU units','3 · Leukemia · cluster the blood counts · no labels: k-means finds the kinds of count, not the diagnosis','4 · Atypia · measurements · single layer','5 · Atypia · measurements · 8 + 8 ReLU · a quarter of the training labels wrong: overfitting','6 · Enlargement · pixels · single layer','7 · Irregularity · pixels · single layer','8 · Irregularity · pixels · 4 ReLU + augmentation','9 · Irregularity · pixels · 4 + 4 ReLU + augmentation · then try the other lab','10 · Irregularity · pixels · 4 + 4 ReLU · the shortcut: irregular nuclei scanned at another lab','11 · Irregularity · pixels · convolution + 4 ReLU + augmentation','12 · Foundation · pretrain a code on 100 unlabelled nuclei, then see what it is worth','13 · Irregularity · the foundation code · single layer · 10 labelled cases','14 · Irregularity · clusters revisited · pixels, the measurements or the foundation code · optional','15 · Slides · one label for 20 nuclei · attention finds the atypical ones','16 · Focus · four atypical cells together or scattered · the nuclei look at each other','17 · Fields · is it invasive? · the nuclei as tokens: cytology, location and arrangement · two heads, one per question','18 · Fields · is it invasive? · a shallow convolutional network on the pixels alone · attention over its patches','19 · Fields · is it invasive? · a deep convolutional network on the pixels alone · a plain average of its patches · optional','20 · Segment · a class for every pixel · the window it is decided from','21 · Reports · a small language model writes the report from the findings · fluency first, grounding last','22 · Chat · the next-word model on transcripts · ask it about a case','23 · Describe · from pixels to words · the image as the first token','24 · Your text · paste any text and train the next-word model on it, then start it off and read what it writes · Frost’s Mountain Interval by default','25 · DNA · a genome of our own · the next-base model: what it learns of exons, repeats and motifs without a label, where it is surprised, how it scores a variant','26 · DNA · find the genes · a single layer on the frozen model’s vectors and one labelled gene: every base of the held-out quarter named exon, intron, island or repeat']; // the number first, in plain digits, so that it reads in the dropdown
   const LAB_SETTINGS = { trainLab: 'ours', testLab: 'ours', normalize: 'off', labelNoise: 0, labelled: 0, ftRate: 0, share: null, seed: 1 }; // every recipe starts from our lab's scans, unnormalised, with every label as it is, from seed 1 unless it says otherwise
   const RECIPES = {
     1: { task: 'leukemia',    mode: 'features', h1: 0, h2: 0, convK: 0, activation: 'relu', lr: 0.05, batch: 8, epochs: 60,  augment: false, l2: 0,    peek: false, speed: 6 },
@@ -95,6 +96,7 @@
     { id: 'describe', title: 'Describe: from pixels to words?', world: 'describe' },
     { id: 'text', title: 'Your text: train it on any text?', world: 'text' },
     { id: 'dna', title: 'DNA: a genome of our own?', world: 'dna' },
+    { id: 'annotate', title: 'DNA: where are the genes?', world: 'annot' }, // the DNA model put to work: a single layer on its vectors, a few labelled genes
   ];
   const onClassic = step => S.world === 'classic' && S.stage === step;
   function selectQuestion(id) {
@@ -1210,6 +1212,12 @@
       go();
       return;
     }
+    if (k === '26') { // the Annotate question: the DNA model put to work, a single layer on its vectors and one labelled gene
+      Object.assign(S.an, { source: 'shipped', genes: 1, epochs: 30 }); $('an-note').textContent = ''; $('an-test-note').textContent = '';
+      selectQuestion('annotate'); showStage('train');
+      anReset(`Recipe ${RECIPE_LABELS[26]}. The DNA model of recipe 25 is frozen: every base becomes the 32 numbers the model holds after reading it, averaged over the 33 bases around, and a single layer on those numbers is trained on one labelled gene, ${NDNA.labelledEnd(dnaGenome(), 1).toLocaleString()} bases with their kinds. Press Train, it takes a few seconds: the layer paints the held-out quarter, which the model never trained on and the layer never saw, a kind per base. Then raise the labelled genes and see how little changes, set the vectors to an untrained model’s for what the pretraining bought, and go to 3 · Test for a gene base by base and for the same question asked of a network trained on the labels alone.`);
+      showRecipe(k); return;
+    }
     if (k === '25') { // the DNA question: the next-base model on a genome of our own
       S.dna.dim = 32; S.dna.layers = 2; S.dna.positions = true; S.dna.epochs = 30; S.dna.lr = 0.01; S.dna.seed = 2;
       selectQuestion('dna'); showStage('train'); const L = S.dna; if (!L.built) { showRecipe(k); return; }
@@ -1387,7 +1395,7 @@
       if (P && ev.key === 'ArrowRight') { ev.preventDefault(); P.next(); return; }
       if (P && ev.key === 'ArrowLeft') { ev.preventDefault(); P.prev(); return; }
       if (ev.target.matches('button') && ev.key === ' ') return;
-      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else if (S.world === 'reports' || S.world === 'chat' || S.world === 'describe') { const Lx = LM(); if (Lx.running && Lx.stopAt == null) rpStop('Paused.'); else rpStart(); } else if (S.world === 'segment') { if (S.sg.running) sgStop('Paused.'); else sgStart(); } else S.sl.running ? slStop('Paused.') : slStart(); }
+      if (ev.key === ' ' && S.stage === 'train') { ev.preventDefault(); if (S.world === 'classic') S.running ? stopTraining('Paused.') : startTraining(); else if (S.world === 'foundation') S.fm.running ? fmStop('Paused.') : fmStart(); else if (S.world === 'fields') S.fd.running ? fdStop('Paused.') : fdStart(); else if (LM_WORLDS[S.world]) { const Lx = LM(); if (Lx.running && Lx.stopAt == null) rpStop('Paused.'); else rpStart(); } else if (S.world === 'segment') { if (S.sg.running) sgStop('Paused.'); else sgStart(); } else if (S.world === 'annot') { if (S.an.running) anStop('Paused.'); else anStart(); } else if (S.world === 'cluster') kmRun(); else if (S.world === 'slides') S.sl.running ? slStop('Paused.') : slStart(); }
       else if ((ev.key === 'n' || ev.key === 'N') && S.stage === 'test') { if (S.world === 'classic') classifyNext(false); else if (S.world === 'slides') slClassifyNext(); else if (S.world === 'fields') fdClassifyNext(); else if (S.world === 'reports') rpWriteNext(); else if (S.world === 'chat') chAskNext(); else if (S.world === 'describe') dsDescribeNext(); else if (S.world === 'text') txWrite(); else if (S.world === 'segment') sgSegmentNext(false); }
       else if ((ev.key === 'n' || ev.key === 'N' || ev.key === 't' || ev.key === 'T') && onClassic('train')) teachNext();
       else if (ev.key === '1') showStage('data'); else if (ev.key === '2') showStage('train'); else if (ev.key === '3') showStage('test');
@@ -1418,7 +1426,7 @@
     if (!S.foundationShown) { S.foundationShown = true; try { sessionStorage.setItem('nucleus-net-foundation', '1'); } catch (e) { /* ignore */ } }
     applyVisibility();
   }
-  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test', 'text:data': 'panel-tx-data', 'text:train': 'panel-reports', 'text:test': 'panel-tx-test', 'dna:data': 'panel-dna-data', 'dna:train': 'panel-reports', 'dna:test': 'panel-dna-test', 'cluster:data': 'panel-data', 'cluster:train': 'panel-cluster', 'cluster:test': 'panel-km-test' };
+  const PANELS = { 'classic:data': 'panel-data', 'classic:train': 'panel-train', 'classic:test': 'panel-test', 'foundation:data': 'panel-fm-data', 'foundation:train': 'panel-foundation', 'foundation:test': 'panel-fm-test', 'slides:data': 'panel-sl-data', 'slides:train': 'panel-slides', 'slides:test': 'panel-sl-test', 'fields:data': 'panel-fd-data', 'fields:train': 'panel-fields', 'fields:test': 'panel-fd-test', 'reports:data': 'panel-rp-data', 'reports:train': 'panel-reports', 'reports:test': 'panel-rp-test', 'chat:data': 'panel-ch-data', 'chat:train': 'panel-reports', 'chat:test': 'panel-ch-test', 'describe:data': 'panel-ds-data', 'describe:train': 'panel-reports', 'describe:test': 'panel-ds-test', 'segment:data': 'panel-sg-data', 'segment:train': 'panel-segment', 'segment:test': 'panel-sg-test', 'text:data': 'panel-tx-data', 'text:train': 'panel-reports', 'text:test': 'panel-tx-test', 'dna:data': 'panel-dna-data', 'dna:train': 'panel-reports', 'dna:test': 'panel-dna-test', 'annot:data': 'panel-an-data', 'annot:train': 'panel-an-train', 'annot:test': 'panel-an-test', 'cluster:data': 'panel-data', 'cluster:train': 'panel-cluster', 'cluster:test': 'panel-km-test' };
   function showStage(name) {
     if (!['data', 'train', 'test'].includes(name)) name = 'data';
     S.stage = name;
@@ -1433,6 +1441,7 @@
     if (!(w === 'segment' && name === 'train')) sgStop();
     if (!(w === 'cluster' && name === 'train')) kmStop();
     if (!(LM_WORLDS[w] && name === 'train')) lmStopAll();
+    if (!(w === 'annot' && name === 'train')) anStop();
     if (!(w === 'reports' && name === 'test')) { rpWriteStop(); S.rp.batchWriting = false; }
     if (!(w === 'chat' && name === 'test')) { chWriteStop(); S.ch.batchWriting = false; }
     if (!(w === 'describe' && name === 'test')) { dsWriteStop(); S.dsq.batchWriting = false; }
@@ -1458,6 +1467,7 @@
     else if (w === 'describe') { if (name === 'data') dsEnterData(); else if (name === 'train') rpEnter(); else dsEnterTest(); }
     else if (w === 'text') { if (name === 'data') txEnterData(); else if (name === 'train') rpEnter(); else txEnterTest(); }
     else if (w === 'dna') { if (name === 'data') dnaEnterData(); else if (name === 'train') rpEnter(); else dnaEnterTest(); }
+    else if (w === 'annot') { if (name === 'data') anEnterData(); else if (name === 'train') anEnter(); else anEnterTest(); }
     else if (w === 'segment') { if (name === 'data') sgEnterData(); else if (name === 'train') sgEnter(); else sgEnterTest(); }
     else if (w === 'cluster') { if (name === 'data') { renderDataTrays(); renderScatter(); renderInspector(); } else if (name === 'train') kmEnter(); else kmEnterTest(); }
     else { if (name === 'data') fdEnterData(); else if (name === 'train') fdEnter(); else fdEnterTest(); }
@@ -3541,6 +3551,217 @@
   function dnaBind() {
     $('dna-data-prev').addEventListener('click', () => dnaDataNeighbour(-1)); $('dna-data-next').addEventListener('click', () => dnaDataNeighbour(1));
   }
+  // ------------------------------------------------------------------ the Annotate question: the DNA model put to work
+  // The DNA model is frozen. It reads the chromosome and holds a vector at every base; a single layer on the mean of the
+  // vectors around a base is trained on an annotated stretch (a few genes with the open sequence between them) and
+  // then paints the held-out quarter a kind per base: exon, intron, CpG island, repeat, everything else. What the DNA
+  // language models are used for (a small model on frozen embeddings, as Evo 2's exon classifier; a segmentation head,
+  // as SegmentNT); the supervised family, AlphaGenome's, is the contrast of the Test step's last card.
+  const AN = { counts: [1, 2, 3, 5, 10, 16], radius: 16, window: 64, stride: 32, tick: 110, vec: new Map(), fresh: new Map(), vocab: null, truth: null };
+  const anVocab = () => AN.vocab || (AN.vocab = NDNA.vocabOf(1)), anTruth = () => AN.truth || (AN.truth = NDNA.tagTruth(dnaGenome()));
+  const anTagName = k => NDNA.TAG_NAMES[NDNA.TAGS[k]], anTagColor = k => NDNA.TAG_COLORS[NDNA.TAGS[k]], anOpacity = k => (NDNA.TAGS[k] === 'o' ? 0.4 : 0.95);
+  const anLegend = () => NDNA.TAGS.map((t, k) => `<span><span class="swatch" style="background:${anTagColor(k)};opacity:${anOpacity(k)}"></span>${esc(anTagName(k))}</span>`).join('');
+  const anGenesWord = k => (k >= NDNA.labelGenes(dnaGenome()) ? `all ${NDNA.labelGenes(dnaGenome())} genes of the training stretch` : `${k} gene${k === 1 ? '' : 's'}`);
+  const anPct = v => (v == null ? '–' : pct(v));
+  const anSetText = (id, text) => { const el = $(id); if (el.dataset.anText !== text) { el.dataset.anText = text; el.textContent = text; } }, anSetHtml = (id, html) => { const el = $(id); if (el.dataset.anHtml !== html) { el.dataset.anHtml = html; el.innerHTML = html; } }; // a standing note is written only when it changes: every write is re-marked by the glossary
+  function anPageModel() { const L = S.dna; return L.model && L.model.steps > 0 && !L.shipped ? L.model : null; } // the DNA model as trained on this page, if it was
+  // a network of a given shape with fresh weights: the control, and the untrained source
+  function anFresh(shape) { const key = JSON.stringify(shape); let m = AN.fresh.get(key); if (!m) { m = new NN.LanguageModel({ vocabSize: anVocab().size, dim: shape.D, layers: shape.L, heads: shape.H, dk: shape.dk, ffn: shape.F, costInit: RP.costs, positions: shape.P, clip: RP.clip, optimizer: 'adam', seed: 2 }); AN.fresh.set(key, m); } return { lm: m, key: `untrained|${key}`, name: 'an untrained model: the same network, fresh random weights' }; }
+  const anShapeOf = lm => ({ D: lm.D, L: lm.layers.length, H: lm.H, dk: lm.dk, F: lm.F, P: lm.P }), anRecipeShape = () => ({ D: 32, L: 2, H: RP.heads, dk: 8, F: 32, P: AN.window + 1 });
+  // the model whose vectors the layer reads; null while the shipped one is on its way (its arrival comes back through anEnter)
+  function anModel() {
+    const A = S.an;
+    if (A.source === 'page') { const m = anPageModel(); if (m) return { lm: m, key: `page|${m.steps}|${JSON.stringify(anShapeOf(m))}`, name: `the DNA model as trained on this page, ${S.dna.epoch} epoch${S.dna.epoch === 1 ? '' : 's'}` }; A.source = 'shipped'; }
+    if (A.source === 'untrained') return anFresh(anRecipeShape());
+    const W = dnaShipped();
+    if (W.load) { if (!A.loading) { A.loadError = null; A.loading = W.load().then(() => { A.loading = null; A.loadError = null; if (S.world === 'annot') showStage(S.stage); }).catch(e => { A.loading = null; A.loadError = e.message; if (S.world === 'annot') anRenderStatus(); }); } return null; }
+    if (!AN.shipped) AN.shipped = NN.LanguageModel.fromJSON(W);
+    return { lm: AN.shipped, key: 'shipped', name: `the trained DNA model that ships with the page (${W.trained})` };
+  }
+  // the vectors of the labelled stretch and of the held-out quarter read with a model, a few windows per frame; then the callback
+  function anRead(M, genes, label, then) {
+    const A = S.an, G = dnaGenome(), N = G.seq.length, held = G.meta.trainEnd, end = NDNA.labelledEnd(G, genes);
+    let V = AN.vec.get(M.key); if (!V) { V = NDNA.newVectors(N, M.lm.D); AN.vec.set(M.key, V); if (AN.vec.size > 4) AN.vec.delete(AN.vec.keys().next().value); }
+    const starts = [...new Set([...NDNA.vectorStarts(V, 0, end + AN.radius, AN.window, AN.stride), ...NDNA.vectorStarts(V, held - AN.radius, N, AN.window, AN.stride)])];
+    if (!starts.length) { then(V); return; }
+    const job = { label, starts, i: 0 }; A.reading = job; anRenderStatus();
+    const pump = () => { if (A.reading !== job) return; const t0 = performance.now(); while (job.i < starts.length && performance.now() - t0 < 16) NDNA.readVectors(M.lm, G, anVocab(), starts[job.i++], V, AN.window, AN.stride); if (job.i < starts.length) { anRenderStatus(); requestAnimationFrame(pump); } else { A.reading = null; then(V); } };
+    requestAnimationFrame(pump);
+  }
+  // the layer ready to train: the vectors of the labelled bases and of the held-out quarter, each the mean over the bases around, the layer at zero
+  function anPrepare(then) {
+    const A = S.an, M = anModel(); if (!M) { anRenderStatus(); return; }
+    const key = `${M.key}|${A.genes}`; if (A.key === key && A.head) { if (then) then(); return; }
+    anStop(); A.key = null; A.head = null; A.want = key;
+    anRead(M, A.genes, 'the frozen model', V => {
+      if (A.want !== key) return; const G = dnaGenome(), N = G.seq.length, held = G.meta.trainEnd;
+      A.end = NDNA.labelledEnd(G, A.genes); A.M = M; A.Xl = NDNA.meanVectors(V, 0, A.end, AN.radius); A.Xh = NDNA.meanVectors(V, held, N, AN.radius); A.key = key; anResetHead(); if (then) then();
+    });
+  }
+  function anResetHead() { const A = S.an; anStop(); A.head = NDNA.newHead(A.M.lm.D, NDNA.TAGS.length, 1); NDNA.headStandardise(A.head, A.Xl, A.end); A.hist = []; A.pred = null; A.probs = null; A.score = null; A.ctrl = null; A.epoch = 0; }
+  function anEpoch() { // one pass of the layer over the labelled bases, then the held-out quarter painted and scored
+    const A = S.an, G = dnaGenome(), held = G.meta.trainEnd, n = G.seq.length - held, K = NDNA.TAGS.length;
+    const loss = NDNA.headEpoch(A.head, A.Xl, anTruth(), A.end); A.epoch = A.head.epoch;
+    A.probs = NDNA.headProbs(A.head, A.Xh, n); A.pred = NDNA.paintKinds(A.probs, n, K); A.score = NDNA.tagScore(A.pred, anTruth(), G, held);
+    const rec = { epoch: A.epoch, loss, acc: A.score.acc, miou: A.score.miou }; NDNA.TAGS.forEach((t, k) => { rec[t] = A.score.iou[k]; }); A.hist.push(rec);
+  }
+  function anNote(msg) { $(S.stage === 'test' ? 'an-test-note' : 'an-note').textContent = msg || ''; }
+  function anStop(msg) { const A = S.an; A.running = false; if (A.timer) { clearTimeout(A.timer); A.timer = null; } anSyncButtons(); if (msg) anNote(msg); }
+  function anStart() {
+    const A = S.an; if (A.running) return;
+    anPrepare(() => {
+      if (S.world !== 'annot' || S.stage !== 'train') return; // the step was left while the chromosome was being read
+      if (A.epoch >= A.epochs) { anNote(`The layer has had its ${A.epochs} epochs; raise the epochs or press Reset to train it again.`); anRenderAll(); return; }
+      A.running = true; anSyncButtons(); anNote('');
+      const tick = () => { if (!A.running) return; A.timer = null; anEpoch(); anRenderAll(); if (A.epoch >= A.epochs) { anStop(); anFinish(); } else A.timer = setTimeout(tick, AN.tick); };
+      tick();
+    });
+  }
+  function anStepEpoch() { const A = S.an; anStop(); anPrepare(() => { if (S.world !== 'annot' || S.stage !== 'train') return; if (A.epoch >= 60) { anNote('Sixty epochs is the most; press Reset to train the layer again.'); return; } if (A.epoch >= A.epochs) A.epochs = Math.min(60, A.epoch + 5); anEpoch(); anSyncControls(); anRenderAll(); anNote(`Epoch ${A.epoch}: one pass over the ${A.end.toLocaleString()} labelled bases, 64 at a time. The held-out quarter is painted again after every epoch.`); if (A.epoch >= A.epochs) anFinish(); }); }
+  function anReset(msg) { const A = S.an; anStop(); A.key = null; A.head = null; A.pending = msg || null; anPrepare(() => { anRenderAll(); anNote(A.pending || `The layer is at zero again: ${NDNA.TAGS.length} × ${A.M.lm.D} weights and ${NDNA.TAGS.length} biases. Press Train.`); A.pending = null; }); anRenderAll(); }
+  function anFinish() { // the note of a finished run, and the control measured behind it
+    const A = S.an, sc = A.score, untrained = A.source === 'untrained';
+    anNote(`${A.epochs} epochs, ${anGenesWord(A.genes)} labelled (${A.end.toLocaleString()} bases): ${pct(sc.acc)} of the held-out bases right, ${sc.found} of the ${sc.total} held-out exons found and ${sc.falseExons} painted where there is none. ${untrained ? 'These are an untrained model’s vectors: what a single layer finds with no pretraining behind it, the composition of an island and little else. Set the vectors back to the trained model.' : `The model was never told what an exon is; ${A.genes === 1 ? 'one labelled gene' : 'the labels'} only named what its training on the next base had found. Raise the labelled genes: little changes. Then try an untrained model’s vectors, or go to 3 · Test.`}`);
+    if (!untrained) anControl();
+  }
+  // the control: the same layer, the same labels, on the vectors of the same network with fresh weights; measured in the background
+  function anControl() {
+    const A = S.an, want = A.key, M0 = anFresh(anShapeOf(A.M.lm)), genes = A.genes, epochs = A.epochs;
+    anRead(M0, genes, 'an untrained model, for the control', V0 => { if (A.key !== want) return; A.ctrl = NDNA.annotate(M0.lm, dnaGenome(), anVocab(), { genes, epochs, vectors: V0, radius: AN.radius, window: AN.window, stride: AN.stride }); anRenderAll(); });
+  }
+  // ---- drawing: strips of kinds over a stretch of the chromosome, a row per array
+  function anStrips(svg, { from, to, rows, genes = true, onHover = null, ticks = false }) {
+    const G = dnaGenome(), W = Math.max(360, svg.clientWidth || 900), left = 104, pw = W - left - 8, n = to - from, x = p => left + (p - from) / n * pw; let y = genes ? 14 : 4, html = '';
+    if (genes) for (const g of G.genes) if (g.end > from && g.start < to) html += `<text x="${x((Math.max(from, g.start) + Math.min(to, g.end)) / 2).toFixed(1)}" y="9" font-size="9" fill="var(--ink-3)" text-anchor="middle">${esc(g.id)}</text>`;
+    for (const row of rows) {
+      const h = row.h || 14;
+      html += `<text x="${left - 8}" y="${(y + h / 2 + 3.5).toFixed(1)}" font-size="10.5" fill="var(--ink-2)" text-anchor="end">${esc(row.label)}</text>`;
+      if (row.kinds) { const a = row.kinds, at = row.at || 0, lo = Math.max(from, row.from == null ? from : row.from), hi = Math.min(to, row.to == null ? to : row.to); for (let p = lo; p < hi;) { const k = a[p - at]; let q = p + 1; while (q < hi && a[q - at] === k) q++; html += `<rect x="${x(p).toFixed(2)}" y="${y}" width="${Math.max(0.5, x(q) - x(p)).toFixed(2)}" height="${h}" fill="${anTagColor(k)}" opacity="${anOpacity(k)}"></rect>`; p = q; } }
+      if (row.marks) { const a = row.marks, at = row.at || 0; for (let p = from; p < to;) { if (!a[p - at]) { p++; continue; } let q = p + 1; while (q < to && a[q - at]) q++; html += `<rect x="${x(p).toFixed(2)}" y="${y}" width="${Math.max(0.5, x(q) - x(p)).toFixed(2)}" height="${h}" fill="var(--bad)"></rect>`; p = q; } html += `<rect x="${left}" y="${y}" width="${pw}" height="${h}" fill="none" stroke="var(--line)"></rect>`; }
+      if (row.curve) { const a = row.curve, at = row.at || 0, step = Math.max(1, Math.floor(n / pw / 2)); let d = `M${x(from).toFixed(1)} ${(y + h).toFixed(1)}`; for (let p = from; p < to; p += step) { let v = 0, c = 0; for (let q = p; q < Math.min(to, p + step); q++) { v += a(q - at); c++; } d += ` L${x(p + step / 2).toFixed(1)} ${(y + h - v / c * h).toFixed(1)}`; } d += ` L${x(to).toFixed(1)} ${(y + h).toFixed(1)} Z`; html += `<rect x="${left}" y="${y}" width="${pw}" height="${h}" fill="none" stroke="var(--line)"></rect><path d="${d}" fill="${row.color}" opacity="0.55"></path><line x1="${left}" x2="${left + pw}" y1="${(y + h / 2).toFixed(1)}" y2="${(y + h / 2).toFixed(1)}" stroke="var(--ink-3)" stroke-dasharray="3 4" stroke-width="1"></line>`; }
+      for (const b of row.blanks || []) { const a0 = Math.max(from, b.from), b0 = Math.min(to, b.to); if (b0 <= a0) continue; html += `<rect x="${x(a0).toFixed(2)}" y="${y}" width="${(x(b0) - x(a0)).toFixed(2)}" height="${h}" fill="var(--surface-2)" stroke="var(--line)"${b.dash ? ' stroke-dasharray="3 3"' : ''}></rect><text x="${((x(a0) + x(b0)) / 2).toFixed(1)}" y="${(y + h / 2 + 3.5).toFixed(1)}" font-size="10" fill="var(--ink-3)" text-anchor="middle">${esc(b.text)}</text>`; }
+      y += h + (row.gap == null ? 6 : row.gap);
+    }
+    if (ticks) { const step = n > 6000 ? 2000 : n > 2500 ? 500 : 200; for (let p = Math.ceil(from / step) * step; p < to; p += step) html += `<line x1="${x(p).toFixed(1)}" x2="${x(p).toFixed(1)}" y1="${y - 4}" y2="${y}" stroke="var(--ink-3)"></line><text x="${x(p).toFixed(1)}" y="${y + 10}" font-size="9" fill="var(--ink-3)" text-anchor="middle">${p.toLocaleString()}</text>`; y += 14; }
+    svg.setAttribute('viewBox', `0 0 ${W} ${y}`); svg.setAttribute('width', W); svg.setAttribute('height', y); svg.innerHTML = html;
+    svg.onmousemove = onHover ? ev => { const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W; if (px < left || px > left + pw) { onHover(null, ev); return; } onHover(Math.min(to - 1, Math.max(from, Math.floor(from + (px - left) / pw * n))), ev); } : null;
+    svg.onmouseleave = onHover ? ev => onHover(null, ev) : null;
+  }
+  function anTip(tip, p, ev, text) { if (p == null) { tip.hidden = true; return; } tip.hidden = false; tip.textContent = text; const wr = tip.parentElement.getBoundingClientRect(); tip.style.left = `${Math.max(0, Math.min(wr.width - 300, ev.clientX - wr.left + 12))}px`; tip.style.top = `${ev.clientY - wr.top + 14}px`; }
+  function anBaseTip(p) { // a base of the held-out quarter in words: its truth, the layer's painting and probabilities
+    const A = S.an, G = dnaGenome(), held = G.meta.trainEnd, K = NDNA.TAGS.length, g = G.genes.find(x => p >= x.start && p < x.end), t = anTruth()[p];
+    let s = `base ${p.toLocaleString()}${g ? ` · ${g.id}` : ''} · truth: ${anTagName(t)}`;
+    if (A.pred && p >= held) { const q = A.pred[p - held], o = (p - held) * K; s += ` · painted: ${anTagName(q)}${q === t ? '' : ' ✗'} · ${NDNA.TAGS.map((_, k) => `${anTagName(k)} ${pct(A.probs[o + k])}`).filter((_, k) => A.probs[o + k] >= 0.05).join(', ')}`; }
+    return s;
+  }
+  // ---- 1 · Specimens: the labelled stretch
+  function anEnterData() { anSyncControls(); anRenderData(); }
+  function anRenderData() {
+    const A = S.an, G = dnaGenome(), N = G.seq.length, held = G.meta.trainEnd, end = NDNA.labelledEnd(G, A.genes), truth = anTruth(), K = NDNA.TAGS.length;
+    $('an-data-sub').textContent = `${N.toLocaleString()} bases · ${end.toLocaleString()} labelled (${anGenesWord(A.genes)}) · ${(held - end).toLocaleString()} read by the model, never labelled · ${(N - held).toLocaleString()} held out`;
+    $('an-data-legend').innerHTML = anLegend();
+    const tip = $('an-data-tip');
+    anStrips($('an-data-track'), { from: 0, to: N, ticks: true, rows: [{ label: 'the chromosome', kinds: truth, h: 16 }, { label: 'the labels', kinds: truth, to: end, h: 16, blanks: [{ from: end, to: held, text: end < held - 4000 ? 'no labels: the model read this as sequence, the layer never sees its kinds' : 'no labels' }, { from: held, to: N, text: 'held out: painted and scored', dash: true }] }],
+      onHover: (p, ev) => anTip(tip, p, ev, p == null ? '' : `base ${p.toLocaleString()} · ${anTagName(truth[p])} · ${p < end ? 'labelled: the layer trains on this base' : p < held ? 'not labelled' : 'held out: scored, never shown to the model or the layer'}`) });
+    $('an-data-note').textContent = `The upper strip is what the script made; the lower strip is what the layer is given: the kinds of the first ${end.toLocaleString()} bases, from the first base to the start of ${G.genes[Math.min(A.genes, NDNA.labelGenes(G))].id}, so ${anGenesWord(A.genes)} with the open sequence and the repeat copies on the way. The DNA model itself trained on the first three quarters as sequence, with no kinds at all, and on none of the last quarter.`;
+    const cl = new Float64Array(K), ca = new Float64Array(K); for (let p = 0; p < N; p++) { ca[truth[p]]++; if (p < end) cl[truth[p]]++; }
+    $('an-data-table').innerHTML = `<thead><tr><th>kind</th><th class="n">labelled bases</th><th class="n">share of the labels</th><th class="n">in the whole chromosome</th><th>what it is</th></tr></thead><tbody>${NDNA.TAGS.map((t, k) => `<tr><td class="name"><span class="swatch" style="display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px;background:${anTagColor(k)};opacity:${anOpacity(k)}"></span>${esc(anTagName(k))}</td><td class="n">${cl[k].toLocaleString()}</td><td class="n">${pct(cl[k] / end)}</td><td class="n">${ca[k].toLocaleString()}</td><td>${esc({ e: 'codons of the organism’s code, cut by the introns', n: 'GTAAGT … an AT-rich body … a pyrimidine tract … CAG', c: 'a GC-rich stretch in front of every gene', r: 'a copy of the 80-base element', o: 'the open sequence, the UTRs, the TATA box, the microsatellites' }[t])}</td></tr>`).join('')}</tbody>`;
+    $('an-data-table-note').textContent = `Five kinds, a little coarser than the nine the script planted: the untranslated ends of a gene, the TATA box and the microsatellites are folded into everything else. With one labelled gene the layer sees ${cl[0].toLocaleString()} exon bases in ${G.genes[0].exons.length} exons, and that is all it is ever told about exons.`;
+  }
+  // ---- 2 · Train
+  function anEnter() { const A = S.an; anSyncControls(); anRenderAll(); anPrepare(() => { anRenderAll(); if (A.pending) { anNote(A.pending); A.pending = null; } else if (!A.epoch && !$('an-note').textContent) anNote('The chromosome is read and the layer is at zero. Press Train: thirty passes over the labelled bases take a few seconds.'); }); }
+  function anSyncButtons() { const A = S.an, b = $('an-train'); if (!b) return; b.textContent = A.running ? '❚❚ Pause' : '▶ Train'; b.title = A.running ? 'pause (space)' : 'run the remaining epochs (space)'; }
+  function anSyncControls() {
+    const A = S.an, page = anPageModel();
+    for (const id of ['an-genes-seg', 'an-data-genes-seg']) { const seg = $(id); if (!seg.children.length) seg.innerHTML = AN.counts.map(k => `<button type="button" data-genes="${k}" title="${k >= 16 ? 'the whole training stretch up to the first gene that is not whole in it' : `the chromosome from its first base to the start of the gene after gene ${k}`}">${k}</button>`).join(''); seg.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', +b.dataset.genes === A.genes)); }
+    $('an-source-seg').querySelectorAll('button').forEach(b => { if (b.dataset.source === 'page') { b.hidden = !page; if (page) b.textContent = `the model trained here (${S.dna.epoch} epoch${S.dna.epoch === 1 ? '' : 's'})`; } b.classList.toggle('is-active', b.dataset.source === A.source); });
+    $('an-epochs').value = A.epochs; $('an-epochs-val').textContent = A.epochs; anSyncButtons();
+  }
+  function anRenderStatus() {
+    const A = S.an, el = $('an-status'); if (!el) return; const M = A.M && A.key ? A.M : null, last = A.hist[A.hist.length - 1];
+    if (A.loadError) { el.innerHTML = `<span>the trained DNA model did not load: <b>${esc(A.loadError)}</b></span>`; return; }
+    if (A.loading) { el.innerHTML = `<span>fetching <b>the trained DNA model</b> (${esc(dnaShipped().size || '175 kB')})…</span>`; return; }
+    if (A.reading) { el.innerHTML = `<span>reading the chromosome with <b>${esc(A.reading.label)}</b>: <b>${pct(A.reading.i / A.reading.starts.length)}</b> of ${A.reading.starts.length} windows</span>${M ? `<span>epoch <b>${A.epoch}</b> / ${A.epochs}</span>` : ''}`; return; }
+    if (!M) { el.innerHTML = '<span>preparing…</span>'; return; }
+    el.innerHTML = `<span>vectors <b>${esc(M.name)}</b></span><span>labelled <b>${esc(anGenesWord(A.genes))} · ${A.end.toLocaleString()} bases</b></span><span>epoch <b>${A.epoch}</b> / ${A.epochs}</span><span>loss <b>${last ? last.loss.toFixed(3) : '–'}</b></span><span>layer <b>${NDNA.TAGS.length} × ${M.lm.D} weights + ${NDNA.TAGS.length} biases</b>, the model’s ${M.lm.parameterCount().toLocaleString()} weights frozen</span>`;
+  }
+  function anRenderFlow() {
+    const A = S.an, M = A.M && A.key ? A.M : null, D = M ? M.lm.D : 32, K = NDNA.TAGS.length, untrained = A.source === 'untrained';
+    const box = (cls, title, sub) => `<div class="an-box ${cls}"><b>${title}</b><span>${sub}</span></div>`, arrow = '<div class="an-arrow">→</div>';
+    $('an-flow').innerHTML = box('', 'the bases', 'A C G T, read in windows of 64') + arrow + box('frozen', untrained ? 'an untrained DNA model' : 'the DNA model', `${M ? M.lm.parameterCount().toLocaleString() : '11,019'} weights · ${untrained ? 'never trained' : 'trained on the next base'} · <em>frozen here</em>`) + arrow + box('', `${D} numbers per base`, 'what the model holds after reading the base') + arrow + box('', 'the mean over 33 bases', 'the base and 16 either side') + arrow + box('trained', 'a single layer', `${K} × ${D} weights + ${K} biases · <em>trained here</em> on ${M ? A.end.toLocaleString() : '…'} labelled bases`) + arrow + box('', 'a kind per base', NDNA.TAGS.map((_, k) => `<i style="background:${anTagColor(k)};opacity:${anOpacity(k)}"></i>${esc(anTagName(k))}`).join(' '));
+  }
+  function anRenderPaint() {
+    const A = S.an, G = dnaGenome(), N = G.seq.length, held = G.meta.trainEnd, truth = anTruth(), tip = $('an-paint-tip'), sc = A.score;
+    anSetHtml('an-legend', anLegend() + '<span><span class="swatch" style="background:var(--bad)"></span>a base painted wrong</span>');
+    const wrong = A.pred ? Uint8Array.from(A.pred, (q, i) => (q === truth[held + i] ? 0 : 1)) : null;
+    anStrips($('an-paint'), { from: held, to: N, ticks: true, rows: [{ label: 'the truth', kinds: truth, h: 18 }, A.pred ? { label: 'painted', kinds: A.pred, at: held, h: 18 } : { label: 'painted', h: 18, blanks: [{ from: held, to: N, text: A.reading ? 'reading the chromosome…' : 'the layer has not trained yet: press Train' }] }, wrong ? { label: 'wrong', marks: wrong, at: held, h: 8 } : { label: 'wrong', h: 8, blanks: [{ from: held, to: N, text: '' }] }],
+      onHover: (p, ev) => anTip(tip, p, ev, p == null ? '' : anBaseTip(p)) });
+    $('an-stat-acc').textContent = sc ? pct(sc.acc) : '–'; $('an-stat-iou').textContent = sc ? anPct(sc.miou) : '–'; $('an-stat-exons').textContent = sc ? `${sc.found} / ${sc.total}` : '–'; $('an-stat-false').textContent = sc ? String(sc.falseExons) : '–';
+    anSetText('an-paint-note', `The last quarter of the chromosome, ${(N - held).toLocaleString()} bases: the DNA model never trained on it and the layer has never seen its kinds. The upper strip is the truth, the lower strip the kind the layer gives every base, and the thin strip marks the bases it gets wrong: the edges, where a mean over 33 bases blurs a boundary, and the introns, whose body is random sequence a little richer in A and T than the open sequence around the genes. Hover for a base.`);
+  }
+  function anRenderCurves() {
+    const A = S.an, c = Viz.colors(), last = A.hist[A.hist.length - 1];
+    Viz.drawSeries($('an-loss'), { hist: A.hist, keys: [{ key: 'loss', color: c.accent }], maxEpoch: A.epochs });
+    Viz.drawSeries($('an-acc'), { hist: A.hist, keys: [{ key: 'acc', color: c.accent }], maxEpoch: A.epochs, pct: true, noBaseline: true });
+    Viz.drawSeries($('an-iou'), { hist: A.hist, keys: [{ key: 'miou', color: c.ink, dash: true }].concat(NDNA.TAGS.map((t, k) => ({ key: t, color: anTagColor(k) }))), maxEpoch: A.epochs, pct: true, noBaseline: true });
+    $('an-loss-now').textContent = last ? last.loss.toFixed(3) : ''; $('an-acc-now').textContent = last ? pct(last.acc) : ''; $('an-iou-now').textContent = last ? `mean ${anPct(last.miou)} · exon ${anPct(last.e)}` : '';
+    anSetHtml('an-curves-legend', NDNA.TAGS.map((t, k) => `<span><span class="line" style="border-top-color:${anTagColor(k)}"></span>${esc(anTagName(k))}</span>`).join('') + `<span><span class="line" style="border-top:2px dashed ${c.ink}"></span>the mean of the five</span>`);
+    anSetText('an-curves-note', 'The loss is the layer’s surprise at the labels of the labelled bases. The other two charts are measured on the held-out quarter after every epoch. Intersection over union: of the bases that are a kind or are painted that kind, the share that are both, the measure of the Segment question. The layer is 165 numbers on vectors that already tell the kinds apart, so it is as good as it gets within a few passes.');
+  }
+  function anRenderAll() { if (S.world !== 'annot') return; const A = S.an; if (S.stage === 'data') { anRenderData(); return; } if (S.stage === 'test') { anRenderTest(); return; } if (!$('an-blurb').innerHTML) $('an-blurb').innerHTML = 'This is what the DNA language models are used for. The model is not trained here: it reads the chromosome once and holds 32 numbers at every base. A <strong>single layer</strong>, 165 weights, is trained on those numbers for the bases an annotator has labelled, and then names the kind of every other base. Evo 2’s exon classifier is this, a small model on frozen vectors; SegmentNT puts a segmentation network on top of the Nucleotide Transformer and trains both. The other family of DNA models, Enformer, Borzoi and AlphaGenome, has no label-free stage: it is trained directly on measured tracks, a label for every base of the genome, and the last card of the Test step asks what that road takes here.'; anSyncControls(); anRenderStatus(); anRenderFlow(); anRenderPaint(); anRenderCurves(); }
+  // ---- 3 · Test
+  const anHeldGenes = () => { const G = dnaGenome(); return G.genes.filter(g => g.start >= G.meta.trainEnd); };
+  function anEnterTest() { const A = S.an; anSyncControls(); anRenderTest(); anPrepare(() => anRenderTest()); }
+  function anRenderTest() {
+    const A = S.an, G = dnaGenome(), N = G.seq.length, held = G.meta.trainEnd, truth = anTruth(), K = NDNA.TAGS.length, sc = A.score, M = A.M && A.key ? A.M : null, T = window.DNA_ANNOTATE || null;
+    $('an-test-sub').textContent = M ? `${M.name} · ${anGenesWord(A.genes)} labelled · the layer after ${A.epoch} epoch${A.epoch === 1 ? '' : 's'}` : '';
+    $('an-test-warning').hidden = !!sc;
+    $('an-test-acc').textContent = sc ? pct(sc.acc) : '–'; $('an-test-iou').textContent = sc ? anPct(sc.miou) : '–'; $('an-test-exons').textContent = sc ? `${sc.found} / ${sc.total}` : '–'; $('an-test-false').textContent = sc ? String(sc.falseExons) : '–';
+    document.querySelector('#panel-an-test h2').textContent = A.source === 'untrained' ? 'What the labels buy with no pretraining behind them' : `What ${A.genes === 1 ? 'one labelled gene' : anGenesWord(A.genes) + ' labelled'} bought`;
+    $('an-test-note').textContent = !sc ? '' : (`The held-out quarter, ${(N - held).toLocaleString()} bases the model never trained on and the layer never saw: ${pct(sc.acc)} of its bases named right, ${sc.found} of its ${sc.total} exons found, ${sc.falseExons} painted where there is none.${A.ctrl ? ` The same layer on an untrained model’s vectors: ${pct(A.ctrl.acc)} of the bases, ${A.ctrl.found} exons found and ${A.ctrl.falseExons} false ones.` : ''}`);
+    // a held-out gene, base by base
+    const genes = anHeldGenes(), gi = Math.max(0, Math.min(genes.length - 1, A.gene || 0)), g = genes[gi], from = Math.max(held, g.start - 120), to = Math.min(N, g.end + 120), tip = $('an-gene-tip');
+    $('an-gene-title').textContent = `A held-out gene, base by base: ${g.id} · bases ${g.start.toLocaleString()}–${g.end.toLocaleString()} · ${g.exons.length} exons`;
+    anStrips($('an-gene'), { from, to, genes: false, ticks: true, rows: [{ label: 'the truth', kinds: truth, h: 20 }, A.pred ? { label: 'painted', kinds: A.pred, at: held, h: 20 } : { label: 'painted', h: 20, blanks: [{ from, to, text: 'the layer has not trained yet' }] }, A.probs ? { label: 'P(exon)', curve: i => A.probs[i * K], at: held, h: 44, color: anTagColor(0), gap: 4 } : { label: 'P(exon)', h: 44, blanks: [{ from, to, text: '' }], gap: 4 }, A.probs ? { label: 'P(intron)', curve: i => A.probs[i * K + 1], at: held, h: 30, color: anTagColor(1), gap: 4 } : { label: 'P(intron)', h: 30, blanks: [{ from, to, text: '' }], gap: 4 }],
+      onHover: (p, ev) => anTip(tip, p, ev, p == null ? '' : anBaseTip(p)) });
+    $('an-gene-legend').innerHTML = anLegend();
+    const ex = sc ? sc.exons.filter(x => x.gene === g.id) : [];
+    $('an-gene-note').textContent = `${g.id} with 120 bases either side, a pixel a base or nearly. Under the two strips, the layer’s probability that a base is exon and that it is intron, 0 at the bottom, 1 at the top, the dashed line a half.${ex.length ? ` Its exons: ${ex.map(x => `${x.n} (${x.end - x.start} bases) ${pct(x.covered)} painted exon`).join(' · ')}.` : ''} The exon edges come a few bases late or early: the model reads left to right and needs a few codons to find the frame, and the mean over 33 bases blurs a boundary. The introns are the hard kind: only their first six and last three bases are a signal, the rest is random sequence a little richer in A and T.`;
+    // kind by kind, with the control
+    const count = new Float64Array(K); for (let p = held; p < N; p++) count[truth[p]]++; const c0 = A.ctrl;
+    $('an-kinds').innerHTML = `<thead><tr><th>kind</th><th class="n">held-out bases</th><th class="n">painted right</th><th class="n">intersection over union</th><th class="n">the same layer on an untrained model: IoU</th></tr></thead><tbody>${NDNA.TAGS.map((t, k) => `<tr><td class="name"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:6px;background:${anTagColor(k)};opacity:${anOpacity(k)}"></span>${esc(anTagName(k))}</td><td class="n">${count[k].toLocaleString()}</td><td class="n">${sc ? anPct(sc.recall[k]) : '–'}</td><td class="n"><b>${sc ? anPct(sc.iou[k]) : '–'}</b></td><td class="n">${A.source === 'untrained' ? '(these are)' : c0 ? anPct(c0.iou[k]) : sc ? '…' : '–'}</td></tr>`).join('')}<tr><td class="name">all five</td><td class="n">${(N - held).toLocaleString()}</td><td class="n">${sc ? pct(sc.acc) : '–'}</td><td class="n"><b>${sc ? `${anPct(sc.miou)} mean` : '–'}</b></td><td class="n">${A.source === 'untrained' ? '' : c0 ? `${anPct(c0.miou)} mean` : ''}</td></tr><tr><td class="name">exons found · false</td><td class="n">${sc ? sc.total : '–'}</td><td class="n">${sc ? `${sc.found} · ${sc.falseExons}` : '–'}</td><td class="n"></td><td class="n">${A.source === 'untrained' ? '' : c0 ? `${c0.found} · ${c0.falseExons}` : ''}</td></tr></tbody>`;
+    $('an-kinds-note').textContent = A.source === 'untrained' ? 'These are an untrained model’s vectors. They carry the base composition of the bases around, which is all a CpG island is, so the islands are found; an exon’s composition is close to the open sequence’s, and what tells an exon is the frame of its code, which only training on the next base found.' : 'The control is the same network with fresh random weights, read the same way, the same layer trained on the same labels. Its vectors carry the base composition of the bases around, which is all a CpG island is, so both find the islands. What tells an exon is the frame of its code, and that is what the training on the next base found: the difference between the two exon rows is what the pretraining bought.';
+    // the layer's exons after every epoch of the model's pretraining: it finds them when the model finds the frame
+    const BE = T && T.byEpoch, cv = Viz.colors(); $('an-epoch-card').hidden = !BE;
+    if (BE) {
+      const step = BE.find(r => r.epoch > 0 && r.iou[0] >= 0.7), before = BE.filter(r => r.epoch > 0 && (!step || r.epoch < step.epoch)), mean = xs => xs.reduce((a, x) => a + x, 0) / Math.max(1, xs.length), lastE = BE[BE.length - 1], mine = A.source === 'page' && A.genes === 1 && sc ? { epoch: S.dna.epoch, live: sc.iou[0] } : null;
+      Viz.drawSeries($('an-epoch-loss'), { hist: BE.filter(r => r.epoch > 0).map(r => ({ epoch: r.epoch, loss: r.exonLoss })), keys: [{ key: 'loss', color: anTagColor(0) }], maxEpoch: lastE.epoch, baseline: 2, baselineLabel: 'a coin toss over four' });
+      Viz.drawSeries($('an-epoch-iou'), { hist: BE.map(r => ({ epoch: r.epoch, exon: r.iou[0] })).concat(mine && mine.epoch <= lastE.epoch ? [mine] : []).sort((p, q) => p.epoch - q.epoch), keys: [{ key: 'exon', color: cv.accent }, { key: 'live', color: cv.ink }], maxEpoch: lastE.epoch, pct: true, noBaseline: true });
+      $('an-epoch-loss-now').textContent = `${lastE.exonLoss.toFixed(2)} at epoch ${lastE.epoch}`; $('an-epoch-iou-now').textContent = `${anPct(lastE.iou[0])} at epoch ${lastE.epoch}`;
+      $('an-epoch-note').textContent = `Left, the exon curve of recipe 25: the model’s loss on the held-out exons, at the coin toss until it finds the frame of the code${step ? ` at epoch ${step.epoch}` : ''}. Right, the same single layer with the same labelled gene, trained afresh on the model’s vectors after every epoch. ${step ? `For ${before.length} epochs it finds the exons no better than on an untrained model (${anPct(mean(before.map(r => r.iou[0])))}, about ${Math.round(mean(before.map(r => r.found)))} of ${step.total} exons and ${Math.round(mean(before.map(r => r.falseExons)))} false ones); at epoch ${step.epoch} it has ${anPct(step.iou[0])} and ${step.found} of ${step.total}.` : ''} Nothing about the layer or its labels changed: what changed is what the vectors hold. To see it yourself, train the DNA model for a few epochs in recipe 25, come back, and choose the model trained here${mine ? ': the black dot is that layer' : ''}.`;
+    }
+    // how many labelled genes, three ways
+    const hist = AN.counts.map((k, i) => ({ epoch: k, frozen: T ? T.frozen[i].iou[0] : null, scratch: T && T.scratch[i] ? T.scratch[i].iou[0] : null, untrained: T ? T.untrained[i].iou[0] : null, live: sc && k === A.genes ? sc.iou[0] : null })), c = Viz.colors(), col = { frozen: c.accent, scratch: '#eb6834', untrained: '#9a9aa6' };
+    Viz.drawSeries($('an-counts'), { hist, keys: [{ key: 'untrained', color: col.untrained }, { key: 'scratch', color: col.scratch, dash: true }, { key: 'frozen', color: col.frozen }, { key: 'live', color: c.ink }], maxEpoch: 16, pct: true, noBaseline: true });
+    $('an-counts-legend').innerHTML = `<span><span class="line" style="border-top-color:${col.frozen}"></span>the frozen DNA model, a single layer</span><span><span class="line" style="border-top:2px dashed ${col.scratch}"></span>the same network from scratch, the labels alone</span><span><span class="line" style="border-top-color:${col.untrained}"></span>an untrained model, a single layer</span><span><span class="swatch" style="background:${c.ink};border-radius:50%;width:9px;height:9px"></span>the layer on screen</span>`;
+    const cell = r => (r ? `${anPct(r.iou[0])} · ${typeof r.found === 'number' ? (Number.isInteger(r.found) ? r.found : r.found.toFixed(0)) : '–'}/${r.total} · ${Number.isInteger(r.falseExons) ? r.falseExons : r.falseExons.toFixed(0)} false` : '–');
+    $('an-counts-table').innerHTML = T ? `<thead><tr><th class="n">labelled genes</th><th class="n">bases</th><th class="n">frozen model, single layer</th><th class="n">from scratch, labels alone</th><th class="n">untrained model, single layer</th></tr></thead><tbody>${AN.counts.map((k, i) => `<tr class="${k === A.genes ? 'now' : ''}"><td class="n">${k}</td><td class="n">${T.bases[i].toLocaleString()}</td><td class="n"><b>${cell(T.frozen[i])}</b></td><td class="n">${cell(T.scratch[i])}</td><td class="n">${cell(T.untrained[i])}</td></tr>`).join('')}</tbody>` : '<tbody><tr><td>The table did not load with the page.</td></tr></tbody>';
+    const s1 = T && T.scratch[0], sN = T && T.scratch[T.scratch.length - 1], f1 = T && T.frozen[0];
+    $('an-counts-note').textContent = `Every cell: the exons’ intersection over union on the held-out quarter, the exons found of ${sc ? sc.total : 21}, and the false ones. The single-layer columns are measured as on this page; the from-scratch column is the same network with fresh weights trained on the labels and nothing else, every run given as many gradient steps as sixty epochs of the pretraining, its last four scores averaged${T && T.scratch.some(r => r && r.seeds > 1) ? ', and two seeds' : ''}.`;
+    $('an-families').innerHTML = `<strong>With few labels, pretrain.</strong> The frozen model with a single layer has the exons from one labelled gene${f1 ? ` (${anPct(f1.iou[0])})` : ''} and gains little from sixteen: its training on the next base had already found what an exon is, and the labels only name it. The same layer on an untrained model does not improve whatever the labels. <strong>With a label for every base, the labels alone get there too.</strong> ${s1 && sN ? `From scratch the network finds the exons poorly with one gene (${anPct(s1.iou[0])}, and ${s1.falseExons.toFixed(0)} false ones) and climbs with the labels, to ${anPct(sN.iou[0])} with sixteen.` : ''} The large DNA models come in these two families. Evo 2 and the Nucleotide Transformer are trained on sequence alone and put to work as on this page: a small model on their vectors, or a network on top that is trained with them, as SegmentNT is. Enformer, Borzoi and AlphaGenome have no label-free stage: their labels are experiments, RNA-seq, chromatin accessibility, splicing, measured along the whole genome, some 5,900 tracks of them for AlphaGenome, which reads a million bases at a time, so they were never short of labels. The two roads meet at a variant: both score it by running the model on the sequence with and without the change.`;
+  }
+  function bindAnnotate() {
+    const A = S.an;
+    const pickGenes = ev => { const b = ev.target.closest('button'); if (!b) return; const k = +b.dataset.genes; if (k === A.genes) return; A.genes = k; anStop(); anSyncControls(); if (S.stage === 'data') { anRenderData(); return; } $('an-note').textContent = ''; $('an-test-note').textContent = ''; anReset(`${anGenesWord(k)[0].toUpperCase()}${anGenesWord(k).slice(1)} labelled, ${NDNA.labelledEnd(dnaGenome(), k).toLocaleString()} bases. The layer starts again from zero: press Train.`); };
+    $('an-genes-seg').addEventListener('click', pickGenes); $('an-data-genes-seg').addEventListener('click', pickGenes);
+    $('an-source-seg').addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b || b.dataset.source === A.source) return; A.source = b.dataset.source; anStop(); $('an-note').textContent = ''; $('an-test-note').textContent = ''; anSyncControls(); anReset(A.source === 'untrained' ? 'The vectors now come from an untrained model: the same network with fresh random weights, read the same way. Press Train and see what a single layer finds with no pretraining behind it.' : A.source === 'page' ? 'The vectors now come from the DNA model as you trained it on this page. Press Train: before the model has found the frame of the code, the layer cannot find the exons either.' : 'The vectors come from the trained DNA model again. Press Train.'); });
+    $('an-epochs').addEventListener('input', ev => { A.epochs = +ev.target.value; $('an-epochs-val').textContent = A.epochs; anRenderStatus(); if (A.hist.length) anRenderCurves(); });
+    $('an-train').addEventListener('click', () => { if (A.running) anStop('Paused.'); else anStart(); });
+    $('an-step').addEventListener('click', anStepEpoch);
+    $('an-reset').addEventListener('click', () => { $('an-note').textContent = ''; anReset(); });
+    $('an-gene-prev').addEventListener('click', () => { const n = anHeldGenes().length; A.gene = ((A.gene || 0) + n - 1) % n; anRenderTest(); });
+    $('an-gene-next').addEventListener('click', () => { const n = anHeldGenes().length; A.gene = ((A.gene || 0) + 1) % n; anRenderTest(); });
+  }
   const txShippedStubs = {}; // a stand-in per preset for its trained model until the file is loaded: the Load button fetches it
   function txShipped() { const p = TX.presets[S.tx.source], w = p && p.weights; if (!w) return null; if (window[w.global]) return window[w.global]; return txShippedStubs[S.tx.source] || (txShippedStubs[S.tx.source] = { size: w.size, load: () => S.tx.loadingW || (S.tx.loadingW = txLoadScript(w.sources, () => window[w.global]).finally(() => { S.tx.loadingW = null; })) }); }
   const txVocabFrom = words => ({ words, index: new Map(words.map((w, i) => [w, i])), start: 0, end: 1, unk: 2, size: words.length });
@@ -4559,7 +4780,7 @@
   // the masthead's one menu, the lecture recipe, names where the page is: on the classic questions the recipe whose
   // settings are on screen, or the question and "your own settings" once a setting has moved off it; on the other
   // questions the recipe last chosen, the fields by their kind (recipes 17, 18 and 19 are the three kinds), the clusters by their cases (3 the blood counts, 14 the nuclei)
-  const RECIPE_QUESTION = { 3: 'cluster', 12: 'foundation', 14: 'cluster', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'fields', 20: 'segment', 21: 'reports', 22: 'chat', 23: 'describe', 24: 'text', 25: 'dna' };
+  const RECIPE_QUESTION = { 3: 'cluster', 12: 'foundation', 14: 'cluster', 15: 'slides-atypia', 16: 'slides-focus', 17: 'fields', 18: 'fields', 19: 'fields', 20: 'segment', 21: 'reports', 22: 'chat', 23: 'describe', 24: 'text', 25: 'dna', 26: 'annotate' };
   const recipeQuestion = k => (RECIPES[k] ? RECIPES[k].task : RECIPE_QUESTION[k]);
   const fdRecipe = () => ({ deep: '19', shallow: '18' }[S.fd.kind] || '17');
   function showRecipe(k) { const sel = $('recipe-select'); sel.value = String(k); sel.classList.remove('is-off'); recipeAnchor = +k; syncRecipeNav(); writeHash(); }
@@ -5128,7 +5349,7 @@
     const hash = (location.hash || '').replace('#', ''), steps = ['data', 'train', 'test']; // read before the page writes its own
     S.tasks = window.LECTURE_TASKS;
     $('recipe-select').innerHTML = '<option value="" id="recipe-none" hidden>choose a step…</option>' + RECIPE_LABELS.map((l, i) => (i ? `<option value="${i}">${esc((i < 10 ? '\u2007' : '') + l)}</option>` : '')).join('');
-    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindText(); bindSegment(); bindCluster(); bindTrainedModels();
+    bindControls(); bindFoundation(); bindSlides(); bindFields(); bindReports(); bindChat(); bindDescribe(); bindText(); bindAnnotate(); bindSegment(); bindCluster(); bindTrainedModels();
     renderBackboneOptions();
     window.NUCLEUS_NET = { state: S, nn: NN, keys: { slides: slShippedKey, fields: fdShippedKey }, question: selectQuestion }; // the page's state, for the console and for tools/export_models.js, which opens a question by its id
     loadTask(S.taskId);
